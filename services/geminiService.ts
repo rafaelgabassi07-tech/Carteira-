@@ -20,12 +20,12 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000
   }
 }
 
-export async function fetchMarketNews(tickers: string[] = [], apiKey?: string): Promise<NewsArticle[]> {
+export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
   const executeFetch = async () => {
-      const key = apiKey || process.env.API_KEY;
+      const key = process.env.API_KEY;
 
       if (!key) {
-        throw new Error("Chave de API não configurada. Adicione sua chave nas Configurações > Avançado.");
+        throw new Error("Chave de API do Gemini não configurada no ambiente.");
       }
       const ai = new GoogleGenAI({ apiKey: key });
 
@@ -98,12 +98,12 @@ export interface RealTimeData {
     administrator: string;
 }
 
-export async function fetchRealTimeData(tickers: string[], apiKey?: string): Promise<Record<string, RealTimeData>> {
+export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
     if (tickers.length === 0) return {};
     
     const executeFetch = async () => {
-        const key = apiKey || process.env.API_KEY;
-        if (!key) throw new Error("Chave API ausente");
+        const key = process.env.API_KEY;
+        if (!key) throw new Error("Chave de API do Gemini não configurada no ambiente.");
         
         const ai = new GoogleGenAI({ apiKey: key });
         
@@ -185,9 +185,9 @@ export async function fetchRealTimeData(tickers: string[], apiKey?: string): Pro
 }
 
 // NEW: Function to validate API connectivity
-export async function validateApiKey(apiKey?: string): Promise<boolean> {
+export async function validateApiKey(): Promise<boolean> {
     try {
-        const key = apiKey || process.env.API_KEY;
+        const key = process.env.API_KEY;
         if (!key) return false;
         
         const ai = new GoogleGenAI({ apiKey: key });

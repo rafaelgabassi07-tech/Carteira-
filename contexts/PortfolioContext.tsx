@@ -132,7 +132,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (tickers.length === 0) return;
 
       try {
-          const newData = await fetchRealTimeData(tickers, preferences.customApiKey);
+          const newData = await fetchRealTimeData(tickers);
           
           // Smart Merge: Only update tickers that returned valid data
           // This prevents wiping out cache for tickers that failed in a partial update
@@ -159,7 +159,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } catch (error) {
           console.error("Failed to refresh market data", error);
       }
-  }, [transactions, isDemoMode, preferences.customApiKey, setMarketData, setLastSync]);
+  }, [transactions, isDemoMode, setMarketData, setLastSync]);
 
   // Initial Load of Market Data if needed (and not demo)
   useEffect(() => {

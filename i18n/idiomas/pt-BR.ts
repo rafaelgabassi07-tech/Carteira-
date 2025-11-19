@@ -296,8 +296,7 @@ export const ptBR = {
     
     advanced: 'Avançado',
     api_key: 'Conexão com Gemini (IA)',
-    api_key_placeholder: 'Sua Chave API (Opcional)',
-    api_key_help: 'A chave permite que o app busque notícias e preços sem limites.',
+    api_key_help: 'A chave de API é fornecida pelo ambiente. Este status indica se a conexão está ativa.',
     reset_app: 'Restaurar Padrões',
     reset_app_confirm: 'PERIGO: Apagará TODAS as transações. Continuar?',
     support: 'Suporte',

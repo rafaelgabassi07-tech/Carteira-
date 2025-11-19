@@ -562,27 +562,18 @@ const TransactionSettings: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: string, type?: ToastMessage['type']) => void }> = ({ onBack, addToast }) => {
     const { t } = useI18n();
     const { preferences, updatePreferences, resetApp, clearCache, lastSync, getRawData } = usePortfolio();
-    const [apiKey, setApiKey] = useState(preferences.customApiKey || '');
     const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline' | 'idle'>('idle');
     const [showRawData, setShowRawData] = useState(false);
 
     useEffect(() => {
-        // Check status on mount if key exists
-        if (preferences.customApiKey) {
-            checkStatus();
-        }
+        // Check status on mount
+        checkStatus();
     }, []);
 
     const checkStatus = async () => {
         setApiStatus('checking');
-        const isWorking = await validateApiKey(preferences.customApiKey);
+        const isWorking = await validateApiKey();
         setApiStatus(isWorking ? 'online' : 'offline');
-    };
-
-    const handleSaveKey = async () => {
-        updatePreferences({ customApiKey: apiKey });
-        addToast(t('toast_settings_saved'), 'success');
-        await checkStatus();
     };
 
     const handleReset = () => {
@@ -614,7 +605,7 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
             <div className="space-y-6 pb-10">
                  {/* API Key */}
                 <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                              <CodeIcon className="w-5 h-5 text-[var(--accent-color)]"/>
                              <h3 className="font-bold">{t('api_key')}</h3>
@@ -632,19 +623,7 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
                              <button onClick={checkStatus} className="text-xs font-bold bg-[var(--bg-primary)] px-2 py-1 rounded hover:bg-[var(--bg-tertiary-hover)]">{t('adv_test_conn')}</button>
                         </div>
                     </div>
-                    <p className="text-xs text-[var(--text-secondary)] mb-3">
-                        {t('api_key_help')} <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">Obter chave</a>
-                    </p>
-                    <div className="flex space-x-2">
-                        <input 
-                            type="text" 
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder={t('api_key_placeholder')}
-                            className="flex-1 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)]"
-                        />
-                        <button onClick={handleSaveKey} className="bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold px-4 rounded-lg text-sm">{t('save')}</button>
-                    </div>
+                    <p className="text-xs text-[var(--text-secondary)] mt-2">{t('api_key_help')}</p>
                 </div>
                 
                 {/* Performance & Animation */}

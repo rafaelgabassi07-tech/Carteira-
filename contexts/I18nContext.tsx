@@ -1,11 +1,9 @@
-
 import React, { createContext, useContext, ReactNode, useCallback } from 'react';
 import type { Locale } from '../types';
 import { translations } from '../i18n/idiomas';
 
 export interface I18nContextType {
   locale: Locale;
-  setLocale: (locale: Locale) => void;
   t: (key: string, options?: { [key: string]: string | number }) => string;
   formatCurrency: (value: number) => string;
 }
@@ -13,13 +11,7 @@ export interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Hardcoded locale
   const locale: Locale = 'pt-BR';
-
-  // No-op function as language switching is disabled
-  const setLocale = (newLocale: Locale) => {
-      console.warn("Language switching is disabled in this version.");
-  };
 
   const t = useCallback((key: string, options?: { [key: string]: string | number }) => {
     const lang = translations['pt-BR'];
@@ -41,7 +33,7 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   return (
-    <I18nContext.Provider value={{ locale, setLocale, t, formatCurrency }}>
+    <I18nContext.Provider value={{ locale, t, formatCurrency }}>
       {children}
     </I18nContext.Provider>
   );

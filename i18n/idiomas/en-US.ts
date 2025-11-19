@@ -274,9 +274,8 @@ export const enUS = {
     cache_cleared: 'Cache cleared!',
     
     advanced: 'Advanced',
-    api_key: 'Gemini API Key',
-    api_key_placeholder: 'Optional',
-    api_key_help: 'Your personal key.',
+    api_key: 'Gemini API Connection',
+    api_key_help: 'The API key is provided by the environment. This status indicates if the connection is active.',
     reset_app: 'Factory Reset',
     reset_app_confirm: 'DANGER: Wipes EVERYTHING. Continue?',
     support: 'Support',

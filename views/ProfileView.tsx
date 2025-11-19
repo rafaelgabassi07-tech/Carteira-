@@ -378,7 +378,7 @@ const MainMenu: React.FC<{
     theme: Theme;
     setTheme: (theme: Theme) => void;
 }> = ({ setScreen, onShowUpdateModal, addToast, theme, setTheme }) => {
-    const { t, locale, setLocale } = useI18n();
+    const { t } = useI18n();
 
     const handleLogout = () => {
         if (window.confirm(t('logout_confirm'))) {
@@ -397,7 +397,6 @@ const MainMenu: React.FC<{
             { label: t('notifications'), icon: <BellIcon className="w-5 h-5" />, action: () => setScreen('notifications') },
         ],
         settings: [
-            { label: t('language'), isLanguage: true },
             { label: t('theme'), icon: <ThemeIcon className="w-5 h-5" />, isToggle: true, toggleState: theme === 'dark', onToggle: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
             { label: t('check_for_update'), icon: <UpdateIcon className="w-5 h-5" />, action: onShowUpdateModal },
         ],
@@ -428,16 +427,6 @@ const MainMenu: React.FC<{
                 </div>
                 <div className="bg-[var(--bg-secondary)] rounded-lg divide-y divide-[var(--border-color)]">
                     {menuItems.settings.map((item) => {
-                         if (item.isLanguage) {
-                            return (
-                                <div key={item.label} className="p-3">
-                                    <div className="flex space-x-1 bg-[var(--bg-primary)] p-1 rounded-lg text-sm">
-                                        <button onClick={() => setLocale('pt-BR')} className={`w-full py-1.5 px-3 font-semibold rounded-md transition-colors duration-200 ${locale === 'pt-BR' ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}>🇧🇷 PT-BR</button>
-                                        <button onClick={() => setLocale('en-US')} className={`w-full py-1.5 px-3 font-semibold rounded-md transition-colors duration-200 ${locale === 'en-US' ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}>🇺🇸 EN-US</button>
-                                    </div>
-                                </div>
-                            )
-                         }
                          return (
                             <div key={item.label} className="w-full flex justify-between items-center py-3 px-4 text-left">
                                 <button onClick={() => { item.action?.(); vibrate(); }} className="flex-grow flex items-center space-x-4">

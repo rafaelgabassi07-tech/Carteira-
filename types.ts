@@ -1,4 +1,3 @@
-
 export interface Asset {
   ticker: string;
   quantity: number;
@@ -73,7 +72,7 @@ export interface ToastMessage {
 
 export type NotificationType = 'dividend' | 'price' | 'news';
 
-export type Locale = 'pt-BR' | 'en-US';
+export type Locale = 'pt-BR';
 
 export type SortOption = 'valueDesc' | 'valueAsc' | 'tickerAsc' | 'performanceDesc';
 
@@ -120,7 +119,6 @@ export interface AppPreferences {
   };
 
   // Advanced
-  customApiKey?: string;
   autoBackup: boolean;
   betaFeatures: boolean;
   devMode: boolean;
