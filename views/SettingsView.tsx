@@ -1,5 +1,4 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { ToastMessage, AppColor, AppPreferences, SortOption, TransactionType } from '../types';
 import UserIcon from '../components/icons/UserIcon';
 import ShieldIcon from '../components/icons/ShieldIcon';
@@ -565,16 +564,16 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
     const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline' | 'idle'>('idle');
     const [showRawData, setShowRawData] = useState(false);
 
-    useEffect(() => {
-        // Check status on mount
-        checkStatus();
+    const checkStatus = useCallback(async (key?: string) => {
+        setApiStatus('checking');
+        const isWorking = await validateApiKey(key);
+        setApiStatus(isWorking ? 'online' : 'offline');
     }, []);
 
-    const checkStatus = async () => {
-        setApiStatus('checking');
-        const isWorking = await validateApiKey();
-        setApiStatus(isWorking ? 'online' : 'offline');
-    };
+    useEffect(() => {
+        checkStatus(preferences.customApiKey);
+    }, [checkStatus, preferences.customApiKey]);
+
 
     const handleReset = () => {
         if(window.confirm(t('reset_app_confirm'))) {
@@ -620,10 +619,31 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
                                     {apiStatus === 'checking' ? t('adv_api_status_checking') : t(`adv_api_status_${apiStatus}`)}
                                 </span>
                             )}
-                             <button onClick={checkStatus} className="text-xs font-bold bg-[var(--bg-primary)] px-2 py-1 rounded hover:bg-[var(--bg-tertiary-hover)]">{t('adv_test_conn')}</button>
                         </div>
                     </div>
                     <p className="text-xs text-[var(--text-secondary)] mt-2">{t('api_key_help')}</p>
+                    <div className="mt-3 relative">
+                        <input
+                            type="password"
+                            value={preferences.customApiKey}
+                            onChange={(e) => updatePreferences({ customApiKey: e.target.value })}
+                            placeholder={t('api_key_placeholder')}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors pr-10"
+                        />
+                        {preferences.customApiKey && (
+                             <button 
+                                onClick={() => {
+                                    updatePreferences({ customApiKey: '' });
+                                }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-white"
+                             >
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
+                    <button onClick={() => checkStatus(preferences.customApiKey)} className="mt-3 w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
+                        {t('adv_test_conn')}
+                     </button>
                 </div>
                 
                 {/* Performance & Animation */}

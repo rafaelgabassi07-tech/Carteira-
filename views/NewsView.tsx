@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews } from '../services/geminiService';
@@ -122,7 +121,7 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  const { assets } = usePortfolio();
+  const { assets, preferences } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -185,7 +184,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       }
 
       // If no cache or forced refresh, fetch API
-      const articles = await fetchMarketNews(assetTickers);
+      const articles = await fetchMarketNews(assetTickers, preferences.customApiKey);
       setNews(articles);
       CacheManager.set(cacheKey, articles); // Save to cache
 
@@ -208,7 +207,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setIsRefreshing(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, addToast]);
+  }, [t, assetTickers, addToast, preferences.customApiKey]);
   
   const handleTouchStart = (e: React.TouchEvent) => {
       if(containerRef.current && containerRef.current.scrollTop === 0) {

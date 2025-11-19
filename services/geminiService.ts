@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle } from '../types';
 
@@ -20,13 +19,20 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000
   }
 }
 
-export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
-  const executeFetch = async () => {
-      const key = process.env.API_KEY;
+function getApiKey(customApiKey?: string): string {
+    if (customApiKey && customApiKey.trim() !== '') {
+        return customApiKey;
+    }
+    const envKey = process.env.API_KEY;
+    if (!envKey) {
+        throw new Error("Chave de API do Gemini não configurada.");
+    }
+    return envKey;
+}
 
-      if (!key) {
-        throw new Error("Chave de API do Gemini não configurada no ambiente.");
-      }
+export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string): Promise<NewsArticle[]> {
+  const executeFetch = async () => {
+      const key = getApiKey(customApiKey);
       const ai = new GoogleGenAI({ apiKey: key });
 
       const tickerPromptPart = tickers.length > 0
@@ -98,12 +104,11 @@ export interface RealTimeData {
     administrator: string;
 }
 
-export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
+export async function fetchRealTimeData(tickers: string[], customApiKey?: string): Promise<Record<string, RealTimeData>> {
     if (tickers.length === 0) return {};
     
     const executeFetch = async () => {
-        const key = process.env.API_KEY;
-        if (!key) throw new Error("Chave de API do Gemini não configurada no ambiente.");
+        const key = getApiKey(customApiKey);
         
         const ai = new GoogleGenAI({ apiKey: key });
         
@@ -185,11 +190,9 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
 }
 
 // NEW: Function to validate API connectivity
-export async function validateApiKey(): Promise<boolean> {
+export async function validateApiKey(customApiKey?: string): Promise<boolean> {
     try {
-        const key = process.env.API_KEY;
-        if (!key) return false;
-        
+        const key = getApiKey(customApiKey);
         const ai = new GoogleGenAI({ apiKey: key });
         // Simple lightweight prompt
         await ai.models.generateContent({

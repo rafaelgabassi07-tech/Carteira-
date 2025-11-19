@@ -119,6 +119,7 @@ export interface AppPreferences {
   };
 
   // Advanced
+  customApiKey: string;
   autoBackup: boolean;
   betaFeatures: boolean;
   devMode: boolean;

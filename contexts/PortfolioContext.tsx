@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
 import { fetchRealTimeData } from '../services/geminiService';
@@ -60,6 +59,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     dndStart: '22:00',
     dndEnd: '07:00',
     notificationChannels: { push: true, email: false },
+    customApiKey: '',
     autoBackup: false,
     betaFeatures: false,
     devMode: false
@@ -132,7 +132,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (tickers.length === 0) return;
 
       try {
-          const newData = await fetchRealTimeData(tickers);
+          const newData = await fetchRealTimeData(tickers, preferences.customApiKey);
           
           // Smart Merge: Only update tickers that returned valid data
           // This prevents wiping out cache for tickers that failed in a partial update
@@ -159,7 +159,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } catch (error) {
           console.error("Failed to refresh market data", error);
       }
-  }, [transactions, isDemoMode, setMarketData, setLastSync]);
+  }, [transactions, isDemoMode, setMarketData, setLastSync, preferences.customApiKey]);
 
   // Initial Load of Market Data if needed (and not demo)
   useEffect(() => {
