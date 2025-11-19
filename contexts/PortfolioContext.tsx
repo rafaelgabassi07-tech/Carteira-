@@ -172,8 +172,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
     } catch (error: any) {
         console.error("Market refresh failed:", error);
-        // Do NOT clear marketData. Keep old data visible.
-        setMarketDataError('Falha na atualização. Verifique sua conexão ou chave API.');
+        setMarketDataError(error.message || 'Falha na atualização. Verifique sua conexão ou chave API.');
+        throw error; // Re-throw so UI can catch it for toasts
     } finally {
         setIsRefreshing(false);
     }

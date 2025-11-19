@@ -58,6 +58,37 @@ function cleanJsonString(text: string): string {
     return clean;
 }
 
+// --- API Call Resiliency ---
+async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await apiCall();
+    } catch (error: any) {
+      attempt++;
+      // Check if it's a retryable server error (5xx)
+      const isServerError = error?.error?.code >= 500 && error?.error?.code < 600;
+
+      if (isServerError && attempt < maxRetries) {
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        console.warn(`Gemini API server error. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error("Gemini API Error (non-retryable or max retries exceeded):", error);
+        if (error?.error?.message?.includes("overloaded")) {
+             throw new Error("O modelo de IA está sobrecarregado. Por favor, tente novamente mais tarde.");
+        }
+        if (error?.error?.code === 400) {
+            throw new Error("Chave de API inválida ou mal formatada.");
+        }
+        throw new Error("Falha na conexão com a API do Gemini.");
+      }
+    }
+  }
+  throw new Error("Falha na chamada da API após múltiplas tentativas.");
+}
+
+
 export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string | null): Promise<NewsArticle[]> {
   const apiKey = getApiKey(customApiKey);
   const ai = new GoogleGenAI({ apiKey });
@@ -68,23 +99,25 @@ export async function fetchMarketNews(tickers: string[] = [], customApiKey?: str
   Formato JSON estrito: [{"source": "Fonte", "title": "Titulo", "summary": "Resumo curto", "date": "YYYY-MM-DD", "url": "link", "sentiment": "Neutral"}]`;
 
   try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-        }
-      });
+      return await withRetry(async () => {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+            }
+          });
 
-      const jsonString = cleanJsonString(response.text || '');
-      const data = JSON.parse(jsonString);
-      
-      if (Array.isArray(data)) return data;
-      if (data.news && Array.isArray(data.news)) return data.news;
-      
-      return [];
+          const jsonString = cleanJsonString(response.text || '');
+          const data = JSON.parse(jsonString);
+          
+          if (Array.isArray(data)) return data;
+          if (data.news && Array.isArray(data.news)) return data.news;
+          
+          return [];
+      });
   } catch (error) {
-      console.warn("News fetch failed", error);
+      console.warn("News fetch failed after retries", error);
       return []; // Fail silently for news
   }
 }
@@ -103,19 +136,18 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
     const apiKey = getApiKey(customApiKey);
     const ai = new GoogleGenAI({ apiKey });
     
-    // Prompt extremamente direto e econômico para evitar timeouts e erros de parse
     const prompt = `JSON com dados atuais B3 para: ${tickers.join(',')}.
     Chaves: currentPrice (number), dy (number), pvp (number), sector (string), administrator (string).
     Use chave do objeto = TICKER.
     Exemplo: {"MXRF11": {"currentPrice": 10.55, "dy": 12.0, "pvp": 1.0, "sector": "Papel", "administrator": "X"}}`;
 
-    try {
+    return withRetry(async () => {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
-                temperature: 0.1, // Baixa temperatura para respostas mais determinísticas
+                temperature: 0.1,
             }
         });
 
@@ -125,11 +157,9 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
         const data = JSON.parse(jsonString);
         const result: Record<string, RealTimeData> = {};
         
-        // Normalização flexível
         const entries = Array.isArray(data) ? data : Object.entries(data);
 
         entries.forEach((entry: any) => {
-            // Se for array, entry é o objeto. Se for objeto, entry é [key, value]
             const val = Array.isArray(data) ? entry : entry[1];
             let key = Array.isArray(data) ? (val.ticker || val.symbol) : entry[0];
 
@@ -145,15 +175,11 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
         });
         
         return result;
-
-    } catch (error) {
-        console.error("Gemini API Error:", error);
-        throw new Error("Falha na conexão com API.");
-    }
+    });
 }
 
 export async function validateApiKey(customApiKey?: string | null): Promise<boolean> {
-    try {
+     return withRetry(async () => {
         const apiKey = getApiKey(customApiKey);
         const ai = new GoogleGenAI({ apiKey });
         await ai.models.generateContent({
@@ -161,8 +187,5 @@ export async function validateApiKey(customApiKey?: string | null): Promise<bool
             contents: "JSON vazio {}",
         });
         return true;
-    } catch (e) {
-        console.error(e);
-        throw e;
-    }
+    }, 2, 500); // Less aggressive retry for validation
 }

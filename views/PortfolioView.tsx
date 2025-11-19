@@ -245,12 +245,11 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
         setIsPullRefreshing(true);
         vibrate(20);
         try {
-            await refreshMarketData();
+            await refreshMarketData(true);
             addToast(t('toast_updating_prices'));
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error refreshing data:", error);
-            // Global error is handled by App.tsx, but we can show a specific one for manual refresh
-            addToast(t('toast_update_failed'), 'error');
+            addToast(error.message || t('toast_update_failed'), 'error');
         } finally {
             setIsPullRefreshing(false);
         }
