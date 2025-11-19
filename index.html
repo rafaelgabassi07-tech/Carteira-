@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#020617" />
+    <title>Invest Portfolio</title>
+    <link rel="manifest" href="/manifest.json" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        /* Deep Fintech Dark Theme */
+        --bg-primary: #020617;   /* Slate 950 */
+        --bg-secondary: #1e293b; /* Slate 800 */
+        --bg-tertiary-hover: #334155; /* Slate 700 */
+        --text-primary: #f8fafc; /* Slate 50 */
+        --text-secondary: #94a3b8; /* Slate 400 */
+        --border-color: #334155; /* Slate 700 */
+        
+        /* Vibrancy & Finance Colors */
+        --accent-color: #38bdf8; /* Sky 400 */
+        --accent-color-text: #020617; 
+        --green-text: #4ade80; /* Green 400 */
+        --red-text: #f87171; /* Red 400 */
+        
+        /* Safe Area Insets */
+        --safe-top: env(safe-area-inset-top);
+        --safe-bottom: env(safe-area-inset-bottom);
+      }
+
+      [data-theme="light"] {
+        /* Clean Fintech Light Theme */
+        --bg-primary: #f8fafc;   /* Slate 50 */
+        --bg-secondary: #ffffff; /* White */
+        --bg-tertiary-hover: #e2e8f0; /* Slate 200 */
+        --text-primary: #0f172a; /* Slate 900 */
+        --text-secondary: #64748b; /* Slate 500 */
+        --border-color: #cbd5e1; /* Slate 300 */
+        
+        --accent-color: #0284c7; /* Sky 600 */
+        --accent-color-text: #ffffff;
+        --green-text: #16a34a; /* Green 600 */
+        --red-text: #dc2626; /* Red 600 */
+      }
+
+      body {
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        overflow-x: hidden;
+        transition: background-color 0.3s ease, color 0.3s ease;
+        padding-top: var(--safe-top);
+        padding-bottom: var(--safe-bottom);
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* Refined Global Scrollbar */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-color); 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-secondary); 
+      }
+
+      /* Utility Classes for Animations */
+      .glass {
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      [data-theme="light"] .glass {
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes fade-in-up { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes scale-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+      @keyframes grow-up { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+      @keyframes wipe-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+      
+      .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+      .animate-fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-scale-in { animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-grow-up { animation: grow-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; transform-origin: bottom; }
+      .animate-wipe-in { animation: wipe-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+        });
+      }
+    </script>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
