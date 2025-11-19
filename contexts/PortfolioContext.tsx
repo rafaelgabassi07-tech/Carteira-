@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
 import { fetchRealTimeData } from '../services/geminiService';
@@ -207,19 +206,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               totalCost += cost;
               quantity += tx.quantity;
           } else if (tx.type === 'Venda') {
-              // Sell: Decrease Quantity. 
-              // Reduce Cost proportionally to the Average Price.
-              // Avg Price DOES NOT CHANGE on sell.
+              // Clamp sell quantity to prevent negative holdings from bad data
+              const sellQuantity = Math.min(tx.quantity, quantity);
+
               if (quantity > EPSILON) {
                   const avgPrice = totalCost / quantity;
-                  const costReduction = tx.quantity * avgPrice;
+                  const costReduction = sellQuantity * avgPrice;
                   totalCost -= costReduction;
-                  quantity -= tx.quantity;
+                  quantity -= sellQuantity;
               }
           }
 
           // Floating Point Cleanup
-          if (quantity <= EPSILON) {
+          if (quantity < EPSILON) {
               quantity = 0;
               totalCost = 0;
           }
