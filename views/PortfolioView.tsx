@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
@@ -203,12 +204,14 @@ interface PortfolioViewProps {
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
     const { t, formatCurrency } = useI18n();
-    const { assets, refreshMarketData, privacyMode, preferences } = usePortfolio();
+    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
     const [searchQuery, setSearchQuery] = useState('');
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isPullRefreshing, setIsPullRefreshing] = useState(false);
     const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
     const [isSortOpen, setIsSortOpen] = useState(false);
     
+    const isRefreshing = isContextRefreshing || isPullRefreshing;
+
     // Pull to Refresh Logic
     const touchStartY = useRef(0);
     const [pullDistance, setPullDistance] = useState(0);
@@ -239,16 +242,17 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
     };
 
     const handleRefreshPrices = async () => {
-        setIsRefreshing(true);
+        setIsPullRefreshing(true);
         vibrate(20);
         try {
             await refreshMarketData();
             addToast(t('toast_updating_prices'));
         } catch (error) {
             console.error("Error refreshing data:", error);
+            // Global error is handled by App.tsx, but we can show a specific one for manual refresh
             addToast(t('toast_update_failed'), 'error');
         } finally {
-            setIsRefreshing(false);
+            setIsPullRefreshing(false);
         }
     };
 

@@ -1,8 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
 import { fetchRealTimeData } from '../services/geminiService';
 import { usePersistentState, CacheManager } from '../utils';
-import { DEMO_TRANSACTIONS, DEMO_MARKET_DATA } from '../constants';
+import { DEMO_TRANSACTIONS, DEMO_MARKET_DATA, CACHE_TTL } from '../constants';
 
 interface PortfolioContextType {
   assets: Asset[];
@@ -14,6 +15,8 @@ interface PortfolioContextType {
   projectedAnnualIncome: number;
   monthlyIncome: MonthlyIncome[];
   lastSync: number | null;
+  isRefreshing: boolean;
+  marketDataError: string | null;
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (transaction: Transaction) => void;
   deleteTransaction: (id: string) => void;
@@ -72,6 +75,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [privacyMode, setPrivacyMode] = useState(false);
   const [marketData, setMarketData] = usePersistentState<Record<string, any>>('market_data', {});
   const [lastSync, setLastSync] = usePersistentState<number | null>('last_sync_timestamp', null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [marketDataError, setMarketDataError] = useState<string | null>(null);
 
   // Derived Assets State
   const assets = useMemo<Asset[]>(() => {
@@ -126,50 +131,59 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [transactions, marketData, isDemoMode]);
 
   const refreshMarketData = useCallback(async () => {
-      if (isDemoMode) return; // Don't refresh in demo mode
+    if (isDemoMode) return;
+    const tickers = Array.from(new Set(transactions.map(t => t.ticker)));
+    if (tickers.length === 0) return;
 
-      const tickers = Array.from(new Set(transactions.map(t => t.ticker)));
-      if (tickers.length === 0) return;
+    setIsRefreshing(true);
+    setMarketDataError(null);
 
-      try {
-          const newData = await fetchRealTimeData(tickers, preferences.customApiKey);
-          
-          // Smart Merge: Only update tickers that returned valid data
-          // This prevents wiping out cache for tickers that failed in a partial update
-          setMarketData(prev => {
-              const merged = { ...prev };
-              Object.keys(newData).forEach(ticker => {
-                  if (newData[ticker] && newData[ticker].currentPrice > 0) {
-                      // Maintain price history
-                      const oldHistory = merged[ticker]?.priceHistory || [];
-                      const newPrice = newData[ticker].currentPrice;
-                      // Only add to history if price changed significantly or it's a new day (simplified here)
-                      const updatedHistory = [...oldHistory.slice(-29), newPrice]; 
-                      
-                      merged[ticker] = {
-                          ...newData[ticker],
-                          priceHistory: updatedHistory
-                      };
-                  }
-              });
-              return merged;
-          });
-          
-          setLastSync(Date.now()); // Update timestamp
-      } catch (error) {
-          console.error("Failed to refresh market data", error);
-          throw error;
-      }
+    try {
+        const newData = await fetchRealTimeData(tickers, preferences.customApiKey);
+        
+        // Smart Merge: Only update tickers that returned valid data
+        if (Object.keys(newData).length > 0) {
+            setMarketData(prev => {
+                const merged = { ...prev };
+                Object.keys(newData).forEach(ticker => {
+                    if (newData[ticker] && newData[ticker].currentPrice > 0) {
+                        const oldHistory = merged[ticker]?.priceHistory || [];
+                        const newPrice = newData[ticker].currentPrice;
+                        const updatedHistory = [...oldHistory.slice(-29), newPrice]; 
+                        
+                        merged[ticker] = {
+                            ...newData[ticker],
+                            priceHistory: updatedHistory
+                        };
+                    }
+                });
+                return merged;
+            });
+            setLastSync(Date.now()); // Update timestamp
+        } else {
+            // If API returns empty object but was expected to return data
+            if (tickers.length > 0) {
+                 throw new Error("A API não retornou dados válidos.");
+            }
+        }
+    } catch (error: any) {
+        setMarketDataError(error.message || 'Falha ao buscar dados do mercado.');
+        throw error;
+    } finally {
+        setIsRefreshing(false);
+    }
   }, [transactions, isDemoMode, setMarketData, setLastSync, preferences.customApiKey]);
 
-  // Initial Load of Market Data
+  // Initial and background data loading
   useEffect(() => {
-      if (!isDemoMode && transactions.length > 0) {
-         // If no last sync or synced more than 15 mins ago, refresh
-         if (!lastSync || (Date.now() - lastSync > 15 * 60 * 1000)) {
-             refreshMarketData();
-         }
-      }
+    const needsRefresh = !lastSync || (Date.now() - lastSync > CACHE_TTL.PRICES);
+    
+    if (!isDemoMode && transactions.length > 0 && needsRefresh) {
+        refreshMarketData().catch(() => {
+            // Error is set in the context state by refreshMarketData itself.
+            // We just catch the promise rejection here so it doesn't become an unhandled rejection.
+        });
+    }
   }, [isDemoMode, transactions.length, lastSync, refreshMarketData]);
 
   const monthlyIncome = useMemo<MonthlyIncome[]>(() => {
@@ -183,12 +197,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return rotatedMonths.map((month) => {
           const total = assets.reduce((acc, asset) => {
-              // Accurate projection: (Price * DY% / 12) * Quantity
               const monthlyYield = (asset.currentPrice * ((asset.dy || 0) / 100)) / 12;
               return acc + (monthlyYield * asset.quantity);
           }, 0);
           
-          // Safety check
           return { month, total: isFinite(total) ? total : 0 };
       });
   }, [assets]);
@@ -262,10 +274,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const clearCache = (key?: string) => {
       if (key && key !== 'all') {
           CacheManager.clear(key);
-          // If clearing price cache, reset market data in state to trigger UI update
           if (key === 'asset_prices') setMarketData({});
       } else {
-          // Clear all keys starting with 'cache_'
           Object.keys(localStorage).forEach(k => {
               if (k.startsWith('cache_')) localStorage.removeItem(k);
           });
@@ -302,6 +312,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       projectedAnnualIncome,
       monthlyIncome,
       lastSync,
+      isRefreshing,
+      marketDataError,
       addTransaction,
       updateTransaction,
       deleteTransaction,

@@ -14,12 +14,14 @@ import Toast from './components/Toast';
 import Tour from './components/tour/Tour';
 import type { ToastMessage } from './types';
 import { usePortfolio } from './contexts/PortfolioContext';
+import { useI18n } from './contexts/I18nContext';
 
 export type View = 'carteira' | 'transacoes' | 'analise' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail';
 export type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
-  const { assets, preferences, setDemoMode, isDemoMode } = usePortfolio();
+  const { assets, preferences, setDemoMode, isDemoMode, marketDataError } = usePortfolio();
+  const { t } = useI18n();
   const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'carteira');
   const [previousView, setPreviousView] = useState<View>('carteira');
   const [showTour, setShowTour] = useState(false);
@@ -28,6 +30,24 @@ const App: React.FC = () => {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
+
+  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
+    const newToast: ToastMessage = { id: Date.now(), message, type };
+    setToast(newToast);
+    setTimeout(() => {
+      setToast(t => (t?.id === newToast.id ? null : t));
+    }, 3000);
+  }, []);
+
+  // Global handler for background data sync errors
+  useEffect(() => {
+    if (marketDataError) {
+        // Avoid showing redundant "API key not configured" toast, as Settings view handles it.
+        if (!marketDataError.includes("Chave de API")) {
+            addToast(`${t('toast_update_failed')}`, 'error');
+        }
+    }
+  }, [marketDataError, addToast, t]);
 
   // Theme Management
   useEffect(() => {
@@ -113,14 +133,6 @@ const App: React.FC = () => {
     // but we don't have a direct setter for that specific pref here easily without updatePreferences. 
     // Relying on 'hasVisited' check mostly.
   };
-  
-  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
-    const newToast: ToastMessage = { id: Date.now(), message, type };
-    setToast(newToast);
-    setTimeout(() => {
-      setToast(t => (t?.id === newToast.id ? null : t));
-    }, 3000);
-  }, []);
 
   const navigateTo = (view: View) => {
     setPreviousView(activeView);

@@ -32,14 +32,24 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000
 
 // Função auxiliar para limpar JSON retornado em markdown
 function cleanJsonString(text: string): string {
-    let clean = text.trim();
-    // Remove markdown formatting ```json ... ```
-    if (clean.startsWith('```json')) {
-        clean = clean.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (clean.startsWith('```')) {
-        clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    // Attempt to extract JSON from a markdown block first
+    const match = text.match(/```(json)?\s*([\s\S]*?)\s*```/);
+    if (match && match[2]) {
+        return match[2].trim();
     }
-    return clean;
+
+    // If no markdown block, find the first occurrence of '{' or '['
+    const jsonStartIndex = text.search(/[{\[]/);
+    if (jsonStartIndex !== -1) {
+        // Find the last occurrence of '}' or ']'
+        const jsonEndIndex = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
+        if (jsonEndIndex > jsonStartIndex) {
+             return text.substring(jsonStartIndex, jsonEndIndex + 1).trim();
+        }
+    }
+    
+    // Fallback to original text if no JSON structure is found
+    return text.trim();
 }
 
 export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string | null): Promise<NewsArticle[]> {
@@ -53,6 +63,7 @@ export async function fetchMarketNews(tickers: string[] = [], customApiKey?: str
 
       const prompt = `Você é um jornalista financeiro. Use o Google Search para encontrar notícias atuais.
       ${tickerPromptPart}
+      Responda o mais rápido possível.
       
       Retorne um ARRAY JSON com 5 notícias. 
       Formato esperado:
@@ -73,7 +84,7 @@ export async function fetchMarketNews(tickers: string[] = [], customApiKey?: str
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
-          systemInstruction: "Você é uma API de dados financeiros. Sua resposta deve ser apenas um JSON válido, sem nenhum texto, formatação markdown ou explicação adicional.",
+          systemInstruction: "Sua única função é retornar dados em formato JSON. Não inclua markdown, explicações ou qualquer texto fora do JSON solicitado.",
           tools: [{ googleSearch: {} }], // Ativa busca na web
         }
       });
@@ -108,13 +119,14 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
         const ai = new GoogleGenAI({ apiKey });
         
         const prompt = `Pesquise os dados ATUAIS de mercado (B3/Bovespa) para estes FIIs: ${tickers.join(', ')}.
+        Responda o mais rápido possível.
         
         Para CADA ativo, preciso de:
-        1. Preço atual da cota (R$)
-        2. Dividend Yield (DY) anual (em %)
-        3. P/VP
-        4. Setor
-        5. Administradora
+        1. Preço atual da cota (currentPrice)
+        2. Dividend Yield anual (dy)
+        3. P/VP (pvp)
+        4. Setor (sector)
+        5. Administradora (administrator)
 
         Retorne um Objeto JSON onde a chave é o Ticker. Exemplo:
         {
@@ -129,7 +141,7 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
-                systemInstruction: "Você é uma API de dados financeiros. Sua resposta deve ser apenas um JSON válido, sem nenhum texto, formatação markdown ou explicação adicional.",
+                systemInstruction: "Sua única função é retornar dados em formato JSON. Não inclua markdown, explicações ou qualquer texto fora do JSON solicitado.",
                 tools: [{ googleSearch: {} }], // Essencial para dados reais
             }
         });
