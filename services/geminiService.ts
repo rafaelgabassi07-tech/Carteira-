@@ -19,9 +19,6 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000
   }
 }
 
-// FIX: Per coding guidelines, API key must come only from process.env.API_KEY.
-// Removed customApiKey parameter and getApiKey function. process.env.API_KEY is now used directly.
-
 // Função auxiliar para limpar JSON retornado em markdown
 function cleanJsonString(text: string): string {
     let clean = text.trim();
@@ -34,11 +31,9 @@ function cleanJsonString(text: string): string {
     return clean;
 }
 
-// FIX: Per coding guidelines, API key comes from process.env, not parameters.
-// Removed customApiKey parameter.
 export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
   const executeFetch = async () => {
-      // FIX: Per coding guidelines, instantiate GoogleGenAI with process.env.API_KEY directly.
+      // FIX: Use `process.env.API_KEY` as per coding guidelines.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
       const tickerPromptPart = tickers.length > 0
@@ -64,13 +59,11 @@ export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArtic
       IMPORTANTE: Retorne APENAS o JSON válido, sem texto adicional.`;
 
       const response = await ai.models.generateContent({
-        // FIX: Using recommended model 'gemini-2.5-flash' instead of deprecated 'gemini-1.5-flash'.
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           systemInstruction: "Você é uma API de dados financeiros. Sua resposta deve ser apenas um JSON válido, sem nenhum texto, formatação markdown ou explicação adicional.",
           tools: [{ googleSearch: {} }], // Ativa busca na web
-          // responseMimeType não pode ser usado com tools
         }
       });
 
@@ -96,13 +89,11 @@ export interface RealTimeData {
     administrator: string;
 }
 
-// FIX: Per coding guidelines, API key comes from process.env, not parameters.
-// Removed customApiKey parameter.
 export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
     if (tickers.length === 0) return {};
     
     const executeFetch = async () => {
-        // FIX: Per coding guidelines, instantiate GoogleGenAI with process.env.API_KEY directly.
+        // FIX: Use `process.env.API_KEY` as per coding guidelines.
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         const prompt = `Pesquise os dados ATUAIS de mercado (B3/Bovespa) para estes FIIs: ${tickers.join(', ')}.
@@ -124,7 +115,6 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
         - Retorne APENAS o JSON válido.`;
 
         const response = await ai.models.generateContent({
-            // FIX: Using recommended model 'gemini-2.5-flash' instead of deprecated 'gemini-1.5-flash'.
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
@@ -190,7 +180,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
 
 export async function validateApiKey(): Promise<void> {
     try {
-        // FIX: Per coding guidelines, instantiate GoogleGenAI with process.env.API_KEY directly.
+        // FIX: Use `process.env.API_KEY` as per coding guidelines.
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         await ai.models.generateContent({
             model: "gemini-2.5-flash",
