@@ -295,8 +295,8 @@ export const ptBR = {
     
     advanced: 'Avançado',
     api_key: 'Conexão com Gemini (IA)',
-    api_key_placeholder: 'Cole sua chave API aqui (opcional)',
-    api_key_help: 'Forneça uma chave para usar seu próprio plano. Se em branco, o app usará a chave do ambiente.',
+    api_key_placeholder: 'Cole sua chave API aqui',
+    api_key_help: 'Gerencie sua chave API do Gemini. Deixe em branco para usar a chave configurada no ambiente.',
     reset_app: 'Restaurar Padrões',
     reset_app_confirm: 'PERIGO: Apagará TODAS as transações. Continuar?',
     support: 'Suporte',
@@ -451,7 +451,9 @@ export const ptBR = {
     toast_notify_registered: 'Você será avisado!',
     toast_welcome_back: 'Bem-vindo de volta!',
     toast_api_success: 'Conexão com a API Gemini bem-sucedida!',
-    toast_api_failed: 'Falha na conexão. Verifique se a chave de API está configurada corretamente no ambiente.',
+    toast_api_failed: 'Falha na conexão. Verifique a chave ou o ambiente.',
+    toast_api_key_saved: 'Chave API salva com sucesso!',
+    save_key: 'Salvar Chave',
 
     // Error Boundary
     error_boundary_title: 'Ops!',

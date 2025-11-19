@@ -1,5 +1,16 @@
+
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle } from '../types';
+
+// Helper to determine the API key to use. Prefers custom key, falls back to environment variable.
+function getApiKey(customApiKey?: string | null): string {
+    // FIX: Property 'env' does not exist on type 'ImportMeta'. The API key must be obtained from `process.env.API_KEY` as per the coding guidelines.
+    const key = customApiKey || process.env.API_KEY;
+    if (!key) {
+        throw new Error("Chave de API do Gemini não configurada.");
+    }
+    return key;
+}
 
 // Helper for exponential backoff retry
 async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
@@ -8,8 +19,8 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000
   } catch (error: any) {
     if (retries <= 0) throw error;
     
-    // Don't retry on 401 (Auth) or 400 (Bad Request)
-    if (error.toString().includes('401') || error.toString().includes('400') || error.toString().includes('API_KEY')) {
+    // Don't retry on critical client-side errors (Auth, Bad Request, missing key)
+    if (error.toString().includes('401') || error.toString().includes('400') || /API.*key/i.test(error.toString())) {
          throw error;
     }
 
@@ -31,10 +42,10 @@ function cleanJsonString(text: string): string {
     return clean;
 }
 
-export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
+export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string | null): Promise<NewsArticle[]> {
   const executeFetch = async () => {
-      // FIX: Use process.env.API_KEY per coding guidelines instead of Vite's import.meta.env.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = getApiKey(customApiKey);
+      const ai = new GoogleGenAI({ apiKey });
 
       const tickerPromptPart = tickers.length > 0
           ? `Foque estritamente em notícias recentes (últimas 48h) sobre: ${tickers.join(', ')}.`
@@ -89,12 +100,12 @@ export interface RealTimeData {
     administrator: string;
 }
 
-export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
+export async function fetchRealTimeData(tickers: string[], customApiKey?: string | null): Promise<Record<string, RealTimeData>> {
     if (tickers.length === 0) return {};
     
     const executeFetch = async () => {
-        // FIX: Use process.env.API_KEY per coding guidelines instead of Vite's import.meta.env.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = getApiKey(customApiKey);
+        const ai = new GoogleGenAI({ apiKey });
         
         const prompt = `Pesquise os dados ATUAIS de mercado (B3/Bovespa) para estes FIIs: ${tickers.join(', ')}.
         
@@ -178,10 +189,10 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
     }
 }
 
-export async function validateApiKey(): Promise<void> {
+export async function validateApiKey(customApiKey?: string | null): Promise<void> {
     try {
-        // FIX: Use process.env.API_KEY per coding guidelines instead of Vite's import.meta.env.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = getApiKey(customApiKey);
+        const ai = new GoogleGenAI({ apiKey });
         await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: "Ping",

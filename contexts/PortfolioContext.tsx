@@ -59,7 +59,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     dndStart: '22:00',
     dndEnd: '07:00',
     notificationChannels: { push: true, email: false },
-    // FIX: Removed customApiKey per coding guidelines.
+    customApiKey: null,
     autoBackup: false,
     betaFeatures: false,
     devMode: false
@@ -132,8 +132,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (tickers.length === 0) return;
 
       try {
-          // FIX: Removed customApiKey from fetchRealTimeData call per guidelines.
-          const newData = await fetchRealTimeData(tickers);
+          const newData = await fetchRealTimeData(tickers, preferences.customApiKey);
           
           // Smart Merge: Only update tickers that returned valid data
           // This prevents wiping out cache for tickers that failed in a partial update
@@ -161,8 +160,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           console.error("Failed to refresh market data", error);
           throw error;
       }
-      // FIX: Removed preferences.customApiKey from dependency array as it's no longer used.
-  }, [transactions, isDemoMode, setMarketData, setLastSync]);
+  }, [transactions, isDemoMode, setMarketData, setLastSync, preferences.customApiKey]);
 
   // Initial Load of Market Data
   useEffect(() => {

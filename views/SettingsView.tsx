@@ -559,13 +559,14 @@ const TransactionSettings: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: string, type?: ToastMessage['type']) => void }> = ({ onBack, addToast }) => {
     const { t } = useI18n();
     const { preferences, updatePreferences, resetApp, clearCache, lastSync, getRawData, getStorageUsage } = usePortfolio();
+    const [apiKeyInput, setApiKeyInput] = useState(preferences.customApiKey || '');
     const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline' | 'idle'>('idle');
     const [showRawData, setShowRawData] = useState(false);
 
-    const checkStatus = useCallback(async () => {
+    const checkStatus = useCallback(async (keyToCheck?: string | null) => {
         setApiStatus('checking');
         try {
-            await validateApiKey();
+            await validateApiKey(keyToCheck ?? preferences.customApiKey);
             setApiStatus('online');
             addToast(t('toast_api_success'), 'success');
         } catch (e: any) {
@@ -573,12 +574,18 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
             addToast(t('toast_api_failed'), 'error');
             console.error("API Connection test failed:", e);
         }
-    }, [addToast, t]);
+    }, [addToast, t, preferences.customApiKey]);
 
     useEffect(() => {
+        // Automatically check status on component mount
         checkStatus();
-    }, [checkStatus]);
+    }, []); // Removed checkStatus from deps to avoid loop, it's stable
 
+    const handleSaveKey = () => {
+        updatePreferences({ customApiKey: apiKeyInput });
+        addToast(t('toast_api_key_saved'), 'success');
+        checkStatus(apiKeyInput); // Re-validate with the new key
+    };
 
     const handleReset = () => {
         if(window.confirm(t('reset_app_confirm'))) {
@@ -596,7 +603,7 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
             version: '1.5.0',
             platform: navigator.userAgent,
             storage: getStorageUsage(),
-            prefs: { ...preferences, appPin: '***HIDDEN***' },
+            prefs: { ...preferences, appPin: '***', customApiKey: '***' },
             lastSync
         };
         const success = await copyToClipboard(JSON.stringify(debugInfo, null, 2));
@@ -625,10 +632,24 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
                             )}
                         </div>
                     </div>
-                    <p className="text-xs text-[var(--text-secondary)] mt-2">{t('adv_api_key_desc')}</p>
-                     <button onClick={() => checkStatus()} className="mt-3 w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
-                        {t('adv_test_conn')}
-                     </button>
+                    <p className="text-xs text-[var(--text-secondary)] mt-2">{t('api_key_help')}</p>
+                    <div className="mt-3 space-y-2">
+                        <input 
+                            type="password"
+                            value={apiKeyInput}
+                            onChange={e => setApiKeyInput(e.target.value)}
+                            placeholder={t('api_key_placeholder')}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
+                        />
+                        <div className="flex gap-2">
+                            <button onClick={handleSaveKey} className="w-full text-center text-xs font-bold bg-[var(--accent-color)] text-[var(--accent-color-text)] py-2 rounded-lg hover:opacity-90">
+                                {t('save_key')}
+                            </button>
+                             <button onClick={() => checkStatus()} className="w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded-lg hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
+                                {t('adv_test_conn')}
+                             </button>
+                        </div>
+                    </div>
                 </div>
                 
                 {/* Performance & Animation */}
