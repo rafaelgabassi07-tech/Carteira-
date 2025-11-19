@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type, Schema } from '@google/genai';
 import type { NewsArticle } from '../types';
 
 // Helper to determine the API key to use safely in Browser environment
@@ -28,75 +28,77 @@ function getApiKey(customApiKey?: string | null): string {
     throw new Error("Chave de API não encontrada. Insira manualmente em Configurações > Avançado.");
 }
 
-// Robust JSON cleaner that finds the outermost JSON object or array
-function cleanJsonString(text: string): string {
-    if (!text) return "{}";
-    
-    // Remove markdown code blocks first
-    let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    // Find the first '{' or '['
-    const firstOpenBrace = clean.indexOf('{');
-    const firstOpenBracket = clean.indexOf('[');
-
-    // Determine if it starts as an object or array
-    let startIndex = -1;
-    let endIndex = -1;
-
-    if (firstOpenBrace !== -1 && (firstOpenBracket === -1 || firstOpenBrace < firstOpenBracket)) {
-        startIndex = firstOpenBrace;
-        endIndex = clean.lastIndexOf('}');
-    } else if (firstOpenBracket !== -1) {
-        startIndex = firstOpenBracket;
-        endIndex = clean.lastIndexOf(']');
-    }
-
-    if (startIndex !== -1 && endIndex !== -1) {
-        return clean.substring(startIndex, endIndex + 1);
-    }
-
-    return clean;
-}
-
 // --- API Call Resiliency ---
-async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 4, initialDelay = 1500): Promise<T> {
+async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
   let attempt = 0;
   while (attempt < maxRetries) {
     try {
       return await apiCall();
     } catch (error: any) {
       attempt++;
-      // Check if it's a retryable server error (5xx)
-      const isServerError = error?.error?.code >= 500 && error?.error?.code < 600;
+      const isServerError = error?.status >= 500 && error?.status < 600;
+      const isOverloaded = error?.status === 503 || error?.message?.includes("overloaded");
 
-      if (isServerError && attempt < maxRetries) {
+      if ((isServerError || isOverloaded) && attempt < maxRetries) {
         const delay = initialDelay * Math.pow(2, attempt - 1);
-        console.warn(`Gemini API server error. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
+        console.warn(`Gemini API busy. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
-        console.error("Gemini API Error (non-retryable or max retries exceeded):", error);
-        if (error?.error?.message?.includes("overloaded")) {
-             throw new Error("O modelo de IA está sobrecarregado. Por favor, tente novamente mais tarde.");
+        console.error("Gemini API Critical Failure:", error);
+        if (error?.status === 400 || error?.message?.includes("API key")) {
+            throw new Error("Chave de API inválida.");
         }
-        if (error?.error?.code === 400) {
-            throw new Error("Chave de API inválida ou mal formatada.");
-        }
-        throw new Error("Falha na conexão com a API do Gemini.");
+        throw error; // Re-throw to be handled by the caller
       }
     }
   }
-  throw new Error("Falha na chamada da API após múltiplas tentativas.");
+  throw new Error("Serviço indisponível no momento.");
 }
 
+// --- SCHEMAS (Structured Outputs for Speed) ---
+
+const newsSchema: Schema = {
+    type: Type.ARRAY,
+    description: "List of financial news articles",
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            source: { type: Type.STRING, description: "Name of the news source/website" },
+            title: { type: Type.STRING, description: "Headline of the news" },
+            summary: { type: Type.STRING, description: "Concise summary in Portuguese (max 20 words)" },
+            date: { type: Type.STRING, description: "Date in YYYY-MM-DD format" },
+            sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] }
+        },
+        required: ["source", "title", "summary", "date", "sentiment"]
+    }
+};
+
+const marketDataSchema: Schema = {
+    type: Type.ARRAY,
+    description: "List of market data for assets",
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            ticker: { type: Type.STRING, description: "Asset ticker symbol (uppercase)" },
+            currentPrice: { type: Type.NUMBER, description: "Current market price (BRL)" },
+            dy: { type: Type.NUMBER, description: "Dividend Yield 12 months % (e.g. 10.5)" },
+            pvp: { type: Type.NUMBER, description: "P/VP Ratio" },
+            sector: { type: Type.STRING, description: "Asset sector (e.g. Logística, Papel)" },
+            administrator: { type: Type.STRING, description: "Fund administrator name" }
+        },
+        required: ["ticker", "currentPrice", "dy", "pvp", "sector"]
+    }
+};
+
+// --- SERVICES ---
 
 export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string | null): Promise<NewsArticle[]> {
   const apiKey = getApiKey(customApiKey);
   const ai = new GoogleGenAI({ apiKey });
 
-  const limitedTickers = tickers.slice(0, 3); // Reduce to 3 to save tokens and speed up
-  
-  const prompt = `Liste 3 notícias recentes (24h) sobre: ${limitedTickers.length > 0 ? limitedTickers.join(', ') : 'Fundos Imobiliários'}.
-  Formato JSON estrito: [{"source": "Fonte", "title": "Titulo", "summary": "Resumo curto", "date": "YYYY-MM-DD", "url": "link", "sentiment": "Neutral"}]`;
+  // Optimization: Limit tickers context to reduce input tokens
+  const contextTickers = tickers.slice(0, 5).join(', ');
+  const prompt = `Notícias recentes do mercado financeiro brasileiro (FIIs). Foco: ${contextTickers || 'Geral'}.`;
 
   try {
       return await withRetry(async () => {
@@ -105,20 +107,17 @@ export async function fetchMarketNews(tickers: string[] = [], customApiKey?: str
             contents: prompt,
             config: {
               responseMimeType: "application/json",
+              responseSchema: newsSchema,
+              temperature: 0.1, // Low temperature for factual data
             }
           });
 
-          const jsonString = cleanJsonString(response.text || '');
-          const data = JSON.parse(jsonString);
-          
-          if (Array.isArray(data)) return data;
-          if (data.news && Array.isArray(data.news)) return data.news;
-          
-          return [];
+          const data = JSON.parse(response.text || '[]');
+          return Array.isArray(data) ? data : [];
       });
   } catch (error) {
-      console.warn("News fetch failed after retries", error);
-      return []; // Fail silently for news
+      console.warn("News fetch failed:", error);
+      return []; // Fail silently for news to not block UI
   }
 }
 
@@ -136,10 +135,8 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
     const apiKey = getApiKey(customApiKey);
     const ai = new GoogleGenAI({ apiKey });
     
-    // Simplified, robust prompt to prevent hallucinations or markdown
-    const prompt = `Retorne um JSON (sem markdown) com o preço atual (currentPrice), Dividend Yield anual (dy), P/VP (pvp) para estes ativos da B3: ${tickers.join(', ')}.
-    Use o ticker como chave. Se não achar, use 0.
-    Exemplo: {"MXRF11": {"currentPrice": 10.50, "dy": 12.5, "pvp": 1.01, "sector": "Papel", "administrator": "BTG"}}`;
+    // Optimization: Extremely concise prompt. The Schema does the heavy lifting.
+    const prompt = `Dados atualizados B3: ${tickers.join(', ')}`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
@@ -147,32 +144,27 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
-                temperature: 0.1,
+                responseSchema: marketDataSchema,
+                temperature: 0, // Zero temperature for maximum speed and consistency
             }
         });
 
-        const rawText = response.text || '';
-        const jsonString = cleanJsonString(rawText);
-        
-        const data = JSON.parse(jsonString);
+        const data = JSON.parse(response.text || '[]');
         const result: Record<string, RealTimeData> = {};
-        
-        const entries = Array.isArray(data) ? data : Object.entries(data);
 
-        entries.forEach((entry: any) => {
-            const val = Array.isArray(data) ? entry : entry[1];
-            let key = Array.isArray(data) ? (val.ticker || val.symbol) : entry[0];
-
-            if (key && val && typeof val === 'object') {
-                 result[key.toUpperCase()] = {
-                    currentPrice: Number(val.currentPrice || val.price || 0),
-                    dy: Number(val.dy || val.dividendYield || 0),
-                    pvp: Number(val.pvp || 1),
-                    sector: val.sector || 'Outros',
-                    administrator: val.administrator || 'N/A'
-                 };
-            }
-        });
+        if (Array.isArray(data)) {
+            data.forEach((item: any) => {
+                if (item.ticker) {
+                    result[item.ticker.toUpperCase()] = {
+                        currentPrice: Number(item.currentPrice || 0),
+                        dy: Number(item.dy || 0),
+                        pvp: Number(item.pvp || 1),
+                        sector: item.sector || 'Outros',
+                        administrator: item.administrator || 'N/A'
+                    };
+                }
+            });
+        }
         
         return result;
     });
@@ -182,10 +174,12 @@ export async function validateApiKey(customApiKey?: string | null): Promise<bool
      return withRetry(async () => {
         const apiKey = getApiKey(customApiKey);
         const ai = new GoogleGenAI({ apiKey });
+        // Minimal token usage for validation
         await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: "JSON vazio {}",
+            contents: "Hi",
+            config: { maxOutputTokens: 1 } 
         });
         return true;
-    }, 2, 500); // Less aggressive retry for validation
+    }, 1, 500);
 }
