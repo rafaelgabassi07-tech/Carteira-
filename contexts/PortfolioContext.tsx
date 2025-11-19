@@ -151,12 +151,20 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setMarketDataError(null);
     try {
       const data = await fetchRealTimeData(uniqueTickers, preferences.customApiKey);
-      setMarketData(prev => ({ ...prev, ...data }));
-      setLastSync(Date.now());
+      // Only update if we got valid data to prevent overwriting with empty objects
+      if (data && Object.keys(data).length > 0) {
+          setMarketData(prev => ({ ...prev, ...data }));
+          setLastSync(Date.now());
+      } else {
+          // If API returns empty but no error, it might be a soft fail. 
+          // We keep old data but don't update timestamp to allow retry soon.
+          console.warn("Market data refresh returned empty result.");
+      }
     } catch (error: any) {
       console.error("Market refresh failed:", error);
       setMarketDataError(error.message || "Falha na conexão com API.");
-      throw error;
+      // Important: Re-throw if forced so the UI can show a toast
+      if (force) throw error; 
     } finally {
       if (!silent) setIsRefreshing(false);
     }

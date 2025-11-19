@@ -136,10 +136,10 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
     const apiKey = getApiKey(customApiKey);
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `JSON com dados atuais B3 para: ${tickers.join(',')}.
-    Chaves: currentPrice (number), dy (number), pvp (number), sector (string), administrator (string).
-    Use chave do objeto = TICKER.
-    Exemplo: {"MXRF11": {"currentPrice": 10.55, "dy": 12.0, "pvp": 1.0, "sector": "Papel", "administrator": "X"}}`;
+    // Simplified, robust prompt to prevent hallucinations or markdown
+    const prompt = `Retorne um JSON (sem markdown) com o preço atual (currentPrice), Dividend Yield anual (dy), P/VP (pvp) para estes ativos da B3: ${tickers.join(', ')}.
+    Use o ticker como chave. Se não achar, use 0.
+    Exemplo: {"MXRF11": {"currentPrice": 10.50, "dy": 12.5, "pvp": 1.01, "sector": "Papel", "administrator": "BTG"}}`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({

@@ -11,7 +11,7 @@ export const ptBR = {
     // Portfolio View
     main_portfolio: 'Carteira Principal',
     share: 'Compartilhar',
-    refresh_prices: 'Atualizar preços',
+    refresh_prices: 'Atualizar Dados do Mercado',
     notifications: 'Notificações',
     my_portfolio: 'Minha Carteira',
     equity_on_date: 'Patrimônio em {{date}}',

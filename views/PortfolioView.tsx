@@ -36,7 +36,9 @@ const PortfolioSkeleton: React.FC = () => (
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
     onShare: () => void;
-}> = ({ setActiveView, onShare }) => {
+    onRefresh: () => void;
+    isRefreshing: boolean;
+}> = ({ setActiveView, onShare, onRefresh, isRefreshing }) => {
     const { t } = useI18n();
     const { privacyMode, togglePrivacyMode } = usePortfolio();
 
@@ -47,6 +49,14 @@ const Header: React.FC<{
                 <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
             </div>
             <div className="flex items-center space-x-2">
+                <button 
+                    id="refresh-btn" 
+                    onClick={() => { onRefresh(); vibrate(); }} 
+                    className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
+                    aria-label={t('refresh_prices')}
+                >
+                     <RefreshIcon className="w-5 h-5"/>
+                </button>
                 <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
                      {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                 </button>
@@ -311,7 +321,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 </div>
             </div>
 
-            <Header setActiveView={setActiveView} onShare={handleShare} />
+            <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
             
             {assets.length > 0 ? (
                 <>
