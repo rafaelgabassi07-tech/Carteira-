@@ -17,8 +17,7 @@ const CountUp: React.FC<CountUpProps> = ({
   prefix = '', 
   suffix = '' 
 }) => {
-  // FIX: The error "Expected 1 arguments, but got 0" suggests `useState` was called without an argument.
-  // Providing a default value of 0. The original lazy initializer might have caused issues with the build toolchain.
+  // FIX: The `useState` hook requires an initial value. Initializing with 0 resolves the error.
   const [count, setCount] = useState(0);
   const startRef = useRef(0);
   const animationRef = useRef<number>();

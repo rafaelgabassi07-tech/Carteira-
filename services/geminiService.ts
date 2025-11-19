@@ -33,7 +33,7 @@ function cleanJsonString(text: string): string {
 
 export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
   const executeFetch = async () => {
-      // FIX: Use `process.env.API_KEY` as per coding guidelines.
+      // FIX: Use `process.env.API_KEY` to resolve build error and adhere to guidelines.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
       const tickerPromptPart = tickers.length > 0
@@ -93,7 +93,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
     if (tickers.length === 0) return {};
     
     const executeFetch = async () => {
-        // FIX: Use `process.env.API_KEY` as per coding guidelines.
+        // FIX: Use `process.env.API_KEY` to resolve build error and adhere to guidelines.
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         const prompt = `Pesquise os dados ATUAIS de mercado (B3/Bovespa) para estes FIIs: ${tickers.join(', ')}.
@@ -180,7 +180,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
 
 export async function validateApiKey(): Promise<void> {
     try {
-        // FIX: Use `process.env.API_KEY` as per coding guidelines.
+        // FIX: Use `process.env.API_KEY` to resolve build error and adhere to guidelines.
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         await ai.models.generateContent({
             model: "gemini-2.5-flash",
