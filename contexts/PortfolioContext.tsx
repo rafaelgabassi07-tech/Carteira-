@@ -161,12 +161,15 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
   }, [transactions, isDemoMode, setMarketData, setLastSync, preferences.customApiKey]);
 
-  // Initial Load of Market Data if needed (and not demo)
+  // Initial Load of Market Data
   useEffect(() => {
       if (!isDemoMode && transactions.length > 0) {
-         // Logic to check if auto-refresh is needed could go here
+         // If no last sync or synced more than 15 mins ago, refresh
+         if (!lastSync || (Date.now() - lastSync > 15 * 60 * 1000)) {
+             refreshMarketData();
+         }
       }
-  }, [isDemoMode, transactions.length]);
+  }, [isDemoMode, transactions.length, lastSync, refreshMarketData]);
 
   const monthlyIncome = useMemo<MonthlyIncome[]>(() => {
       const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];

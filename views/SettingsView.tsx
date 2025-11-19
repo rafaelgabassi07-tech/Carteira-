@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { ToastMessage, AppColor, AppPreferences, SortOption, TransactionType } from '../types';
+import type { ToastMessage, AppColor, AppPreferences, TransactionType } from '../types';
 import UserIcon from '../components/icons/UserIcon';
 import ShieldIcon from '../components/icons/ShieldIcon';
 import UpdateIcon from '../components/icons/UpdateIcon';
@@ -7,7 +8,6 @@ import BellIcon from '../components/icons/BellIcon';
 import DatabaseIcon from '../components/icons/DatabaseIcon';
 import InfoIcon from '../components/icons/InfoIcon';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
-import ThemeIcon from '../components/icons/ThemeIcon';
 import DownloadIcon from '../components/icons/DownloadIcon';
 import UploadIcon from '../components/icons/UploadIcon';
 import ToggleSwitch from '../components/ToggleSwitch';
@@ -37,7 +37,6 @@ const BugIcon: React.FC<{ className?: string }> = ({ className }) => <svg xmlns=
 type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'advanced';
 
 // --- Components ---
-// ... [Previous components UserProfileDetail, ChangePasswordModal, TwoFactorAuthModal, SecuritySettings, NotificationSettings, BackupWrapper, AboutApp, AppearanceSettings, GeneralSettings, TransactionSettings remain unchanged]
 
 const UserProfileDetail: React.FC<{ onBack: () => void, addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ onBack, addToast }) => {
     const { t } = useI18n();
@@ -560,7 +559,7 @@ const TransactionSettings: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
 const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: string, type?: ToastMessage['type']) => void }> = ({ onBack, addToast }) => {
     const { t } = useI18n();
-    const { preferences, updatePreferences, resetApp, clearCache, lastSync, getRawData } = usePortfolio();
+    const { preferences, updatePreferences, resetApp, clearCache, lastSync, getRawData, getStorageUsage } = usePortfolio();
     const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline' | 'idle'>('idle');
     const [showRawData, setShowRawData] = useState(false);
 
@@ -590,7 +589,7 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
         const debugInfo = {
             version: '1.5.0',
             platform: navigator.userAgent,
-            storage: usePortfolio().getStorageUsage(),
+            storage: getStorageUsage(),
             prefs: { ...preferences, customApiKey: '***HIDDEN***', appPin: '***HIDDEN***' },
             lastSync
         };
@@ -688,7 +687,7 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
                     <div className="grid grid-cols-2 gap-3 text-sm">
                         <div className="bg-[var(--bg-primary)] p-2 rounded">
                             <p className="text-[var(--text-secondary)] text-xs">{t('diag_memory')}</p>
-                            <p className="font-mono font-bold">{(usePortfolio().getStorageUsage() / 1024).toFixed(1)} KB</p>
+                            <p className="font-mono font-bold">{(getStorageUsage() / 1024).toFixed(1)} KB</p>
                         </div>
                          <div className="bg-[var(--bg-primary)] p-2 rounded">
                             <p className="text-[var(--text-secondary)] text-xs">{t('adv_requests')}</p>
