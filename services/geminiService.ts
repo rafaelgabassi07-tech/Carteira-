@@ -20,14 +20,7 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000
 }
 
 // FIX: Per coding guidelines, API key must come only from process.env.API_KEY.
-// Removed customApiKey parameter and logic.
-function getApiKey(): string {
-    const envKey = process.env.API_KEY;
-    if (!envKey) {
-        throw new Error("Chave de API do Gemini não configurada.");
-    }
-    return envKey;
-}
+// Removed customApiKey parameter and getApiKey function. process.env.API_KEY is now used directly.
 
 // Função auxiliar para limpar JSON retornado em markdown
 function cleanJsonString(text: string): string {
@@ -41,13 +34,12 @@ function cleanJsonString(text: string): string {
     return clean;
 }
 
-// FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
+// FIX: Per coding guidelines, API key comes from process.env, not parameters.
 // Removed customApiKey parameter.
 export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
   const executeFetch = async () => {
-      // FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
-      const key = getApiKey();
-      const ai = new GoogleGenAI({ apiKey: key });
+      // FIX: Per coding guidelines, instantiate GoogleGenAI with process.env.API_KEY directly.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
       const tickerPromptPart = tickers.length > 0
           ? `Foque estritamente em notícias recentes (últimas 48h) sobre: ${tickers.join(', ')}.`
@@ -104,15 +96,14 @@ export interface RealTimeData {
     administrator: string;
 }
 
-// FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
+// FIX: Per coding guidelines, API key comes from process.env, not parameters.
 // Removed customApiKey parameter.
 export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
     if (tickers.length === 0) return {};
     
     const executeFetch = async () => {
-        // FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
-        const key = getApiKey();
-        const ai = new GoogleGenAI({ apiKey: key });
+        // FIX: Per coding guidelines, instantiate GoogleGenAI with process.env.API_KEY directly.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         const prompt = `Pesquise os dados ATUAIS de mercado (B3/Bovespa) para estes FIIs: ${tickers.join(', ')}.
         
@@ -199,8 +190,8 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
 
 export async function validateApiKey(): Promise<void> {
     try {
-        const key = getApiKey();
-        const ai = new GoogleGenAI({ apiKey: key });
+        // FIX: Per coding guidelines, instantiate GoogleGenAI with process.env.API_KEY directly.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: "Ping",
