@@ -157,7 +157,8 @@ const QuickAccess: React.FC<{ setActiveView: (view: View) => void; }> = ({ setAc
 const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: () => void, style?: React.CSSProperties, privacyMode: boolean, hideCents: boolean }>(({ asset, totalValue, onClick, style, privacyMode, hideCents }) => {
     const { t, formatCurrency } = useI18n();
     const currentValue = asset.quantity * asset.currentPrice;
-    const variation = currentValue - (asset.quantity * asset.avgPrice);
+    const totalInvested = asset.quantity * asset.avgPrice;
+    const variation = currentValue - totalInvested;
     const allocation = totalValue > 0 ? (currentValue / totalValue) * 100 : 0;
     
     const format = (val: number) => {

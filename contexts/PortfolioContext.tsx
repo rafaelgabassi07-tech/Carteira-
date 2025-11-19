@@ -68,6 +68,9 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     devMode: false
 };
 
+// Helper for precise float math
+const EPSILON = 0.000001;
+
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [transactions, setTransactions] = usePersistentState<Transaction[]>('transactions', []);
   const [preferences, setPreferences] = usePersistentState<AppPreferences>('app_preferences', DEFAULT_PREFERENCES);
@@ -137,7 +140,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
 
-    // FIX: Explicitly type uniqueTickers as string[] to avoid type inference issues.
     const uniqueTickers: string[] = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
     if (uniqueTickers.length === 0) {
       setMarketData({});
@@ -161,92 +163,107 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [sourceTransactions, preferences.customApiKey, isRefreshing, lastSync]);
 
   useEffect(() => {
-    // Silent background refresh on initial load
     refreshMarketData(false, true).catch(() => {});
   }, [sourceTransactions.length]);
+
+  // --- UNIFIED CALCULATION ENGINE ---
+  // This function calculates the state of a single asset by replaying its history.
+  // Used for both 'assets' view and 'getAveragePriceForTransaction'.
+  const calculateAssetMetrics = useCallback((ticker: string, upToTransactionId?: string) => {
+      // 1. Filter Transactions for this ticker
+      let tickerTxs = sourceTransactions.filter(t => t.ticker === ticker);
+
+      // 2. Sort Chronologically
+      // Critical: Date ASC. If Date same -> Buy before Sell.
+      tickerTxs.sort((a, b) => {
+          if (a.date !== b.date) {
+              return a.date.localeCompare(b.date);
+          }
+          if (a.type === 'Compra' && b.type === 'Venda') return -1;
+          if (a.type === 'Venda' && b.type === 'Compra') return 1;
+          return 0;
+      });
+
+      let quantity = 0;
+      let totalCost = 0; // This is "Total Invested" book value
+
+      for (const tx of tickerTxs) {
+          // If we are looking for a specific point in time (for transaction history), stop here
+          if (upToTransactionId && tx.id === upToTransactionId) {
+              break;
+          }
+
+          if (tx.type === 'Compra') {
+              // Buy: Increase Quantity and Increase Cost
+              const cost = (tx.quantity * tx.price) + (tx.costs || 0);
+              totalCost += cost;
+              quantity += tx.quantity;
+          } else if (tx.type === 'Venda') {
+              // Sell: Decrease Quantity. 
+              // Reduce Cost proportionally to the Average Price.
+              // Avg Price DOES NOT CHANGE on sell.
+              if (quantity > EPSILON) {
+                  const avgPrice = totalCost / quantity;
+                  const costReduction = tx.quantity * avgPrice;
+                  totalCost -= costReduction;
+                  quantity -= tx.quantity;
+              }
+          }
+
+          // Floating Point Cleanup
+          if (quantity <= EPSILON) {
+              quantity = 0;
+              totalCost = 0;
+          }
+      }
+      
+      const avgPrice = quantity > EPSILON ? totalCost / quantity : 0;
+
+      return { quantity, totalCost, avgPrice };
+  }, [sourceTransactions]);
 
 
   useEffect(() => {
     const sourceMarketData = isDemoMode ? DEMO_MARKET_DATA : marketData;
 
-    const calculateAssets = () => {
-        const assetMap: { [ticker: string]: { quantity: number; totalCost: number } } = {};
+    // Calculate all assets based on the unified engine
+    const uniqueTickers = Array.from(new Set(sourceTransactions.map(t => t.ticker))) as string[];
+    
+    const finalAssets: Asset[] = uniqueTickers.map((ticker): Asset | null => {
+        const metrics = calculateAssetMetrics(ticker);
+        
+        if (metrics.quantity <= EPSILON) return null;
 
-        // Sort transactions chronologically. Using string compare on 'YYYY-MM-DD' is timezone-safe.
-        const sortedTransactions = [...sourceTransactions].sort((a, b) => {
-            if (a.date !== b.date) {
-                return a.date.localeCompare(b.date);
-            }
-            // If dates are the same, process 'Compra' before 'Venda' to ensure correct avg. price calculation
-            if (a.type === 'Compra' && b.type === 'Venda') {
-                return -1; // a (Compra) comes first
-            }
-            if (a.type === 'Venda' && b.type === 'Compra') {
-                return 1; // b (Compra) comes first
-            }
-            return 0; // Same date, same type, order doesn't matter
-        });
-
-        for (const tx of sortedTransactions) {
-            if (!assetMap[tx.ticker]) {
-                assetMap[tx.ticker] = { quantity: 0, totalCost: 0 };
-            }
-
-            const asset = assetMap[tx.ticker];
-            const avgPrice = asset.quantity > 0 ? asset.totalCost / asset.quantity : 0;
-
-            if (tx.type === 'Compra') {
-                asset.totalCost += tx.quantity * tx.price + (tx.costs || 0);
-                asset.quantity += tx.quantity;
-            } else { // Venda
-                if (asset.quantity > 0) {
-                    asset.totalCost -= tx.quantity * avgPrice;
-                    asset.quantity -= tx.quantity;
-                }
-            }
-            if (asset.quantity <= 0.00001) { // Use a small threshold for float precision
-                 asset.quantity = 0;
-                 asset.totalCost = 0;
-            }
+        const liveData = sourceMarketData[ticker] || {};
+        
+        // Fallback: Use AvgPrice if Market Price is missing/zero to prevent -100% gain display
+        let currentPrice = liveData.currentPrice || 0;
+        if (currentPrice <= 0 && metrics.avgPrice > 0) {
+            currentPrice = metrics.avgPrice;
         }
 
-        const finalAssets: Asset[] = Object.entries(assetMap)
-            .filter(([, data]) => data.quantity > 0.0001)
-            .map(([ticker, data]) => {
-                const liveData = sourceMarketData[ticker] || {};
-                const avgPrice = data.quantity > 0 ? data.totalCost / data.quantity : 0;
-                
-                // Fallback Logic: If API returns 0 or fails, use AvgPrice to avoid showing -100% loss
-                // This prevents "scares" when offline or API is down.
-                let currentPrice = liveData.currentPrice || 0;
-                if (currentPrice <= 0 && avgPrice > 0) {
-                    currentPrice = avgPrice;
-                }
-                
-                const dy = liveData.dy || 0;
+        const dy = liveData.dy || 0;
+        
+        return {
+            ticker,
+            quantity: metrics.quantity,
+            avgPrice: metrics.avgPrice,
+            currentPrice: currentPrice,
+            priceHistory: liveData.priceHistory || [metrics.avgPrice, currentPrice],
+            dy: dy,
+            pvp: liveData.pvp || 0,
+            segment: liveData.sector || liveData.segment || 'Outros',
+            administrator: liveData.administrator || 'N/A',
+            vacancyRate: liveData.vacancyRate || 0,
+            liquidity: liveData.liquidity || 0,
+            shareholders: liveData.shareholders || 0,
+            yieldOnCost: metrics.avgPrice > 0 && dy > 0 ? ( (currentPrice * (dy / 100)) / metrics.avgPrice ) * 100 : 0,
+        };
+    }).filter((a): a is Asset => a !== null);
 
-                return {
-                    ticker,
-                    quantity: data.quantity,
-                    avgPrice: avgPrice,
-                    currentPrice: currentPrice,
-                    priceHistory: liveData.priceHistory || [avgPrice, currentPrice],
-                    dy: dy,
-                    pvp: liveData.pvp || 0,
-                    segment: liveData.sector || liveData.segment || 'Outros',
-                    administrator: liveData.administrator || 'N/A',
-                    vacancyRate: liveData.vacancyRate || 0,
-                    liquidity: liveData.liquidity || 0,
-                    shareholders: liveData.shareholders || 0,
-                    yieldOnCost: avgPrice > 0 && dy > 0 ? ( (currentPrice * (dy / 100)) / avgPrice ) * 100 : 0,
-                };
-            });
+    setAssets(finalAssets);
 
-        setAssets(finalAssets);
-    };
-    
-    calculateAssets();
-  }, [sourceTransactions, marketData, isDemoMode]);
+  }, [sourceTransactions, marketData, isDemoMode, calculateAssetMetrics]);
   
   const { projectedAnnualIncome, yieldOnCost } = useMemo(() => {
     let income = 0;
@@ -287,47 +304,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return assets.find(a => a.ticker.toUpperCase() === ticker.toUpperCase());
   }, [assets]);
   
+  // Uses the exact same engine as the main portfolio to ensure data consistency
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
-      const relevantTransactions = sourceTransactions
-          .filter(tx => tx.ticker === targetTx.ticker)
-          // Use timezone-safe string comparison for sorting
-          .sort((a, b) => {
-              if (a.date !== b.date) {
-                  return a.date.localeCompare(b.date);
-              }
-              if (a.type === 'Compra' && b.type === 'Venda') return -1;
-              if (a.type === 'Venda' && b.type === 'Compra') return 1;
-              return 0;
-          });
-
-      let quantity = 0;
-      let totalCost = 0;
-      
-      for (const tx of relevantTransactions) {
-          const avgPrice = quantity > 0 ? totalCost / quantity : 0;
-          
-          if (tx.id === targetTx.id) {
-              // Found the transaction, return the average price just before it
-              return avgPrice;
-          }
-
-          if (tx.type === 'Compra') {
-              totalCost += tx.quantity * tx.price + (tx.costs || 0);
-              quantity += tx.quantity;
-          } else { // Venda
-              if (quantity > 0) {
-                  totalCost -= tx.quantity * avgPrice;
-                  quantity -= tx.quantity;
-              }
-          }
-
-          if (quantity <= 0.00001) {
-              quantity = 0;
-              totalCost = 0;
-          }
-      }
-      return 0; // Should not be reached if targetTx is in transactions
-  }, [sourceTransactions]);
+      const metrics = calculateAssetMetrics(targetTx.ticker, targetTx.id);
+      return metrics.avgPrice;
+  }, [calculateAssetMetrics]);
   
   const setDemoMode = (enabled: boolean) => {
     setIsDemoMode(enabled);
