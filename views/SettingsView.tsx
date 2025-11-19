@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { ToastMessage, AppColor, AppPreferences, TransactionType } from '../types';
+import type { ToastMessage, AppColor, AppPreferences, TransactionType, Transaction } from '../types';
 import UserIcon from '../components/icons/UserIcon';
 import ShieldIcon from '../components/icons/ShieldIcon';
 import UpdateIcon from '../components/icons/UpdateIcon';
@@ -316,7 +316,7 @@ const BackupWrapper: React.FC<{ onBack: () => void; addToast: (message: string, 
                         } else { throw new Error(t('invalid_file_format')); }
                     } else if (file.name.endsWith('.csv')) {
                         const lines = text.split('\n').slice(1); // Skip header
-                        const importedTxs: any[] = lines.filter(line => line.trim() !== '').map((line, index) => {
+                        const importedTxs: Transaction[] = lines.filter(line => line.trim() !== '').map((line, index) => {
                             const [id, ticker, type, quantity, price, date, costs, notes] = line.split(',');
                             return { id: id || `csv_${Date.now()}_${index}`, ticker, type: type as TransactionType, quantity: parseFloat(quantity), price: parseFloat(price), date, costs: parseFloat(costs), notes: notes?.replace(/"/g, '') };
                         });

@@ -80,6 +80,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
 
+  const sourceTransactions = useMemo(() => isDemoMode ? DEMO_TRANSACTIONS : transactions, [isDemoMode, transactions]);
+
   const addTransaction = (transaction: Transaction) => setTransactions(prev => [...prev, transaction]);
   const updateTransaction = (transaction: Transaction) => setTransactions(prev => prev.map(t => t.id === transaction.id ? transaction : t));
   const deleteTransaction = (id: string) => setTransactions(prev => prev.filter(t => t.id !== id));
@@ -135,7 +137,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
 
-    const uniqueTickers = Array.from(new Set(transactions.map(t => t.ticker)));
+    // FIX: Explicitly type uniqueTickers as string[] to avoid type inference issues.
+    const uniqueTickers: string[] = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
     if (uniqueTickers.length === 0) {
       setMarketData({});
       setLastSync(Date.now());
@@ -155,26 +158,24 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
       if (!silent) setIsRefreshing(false);
     }
-  }, [transactions, preferences.customApiKey, isRefreshing, lastSync]);
+  }, [sourceTransactions, preferences.customApiKey, isRefreshing, lastSync]);
 
   useEffect(() => {
     // Silent background refresh on initial load
     refreshMarketData(false, true).catch(() => {});
-  }, [transactions.length]);
+  }, [sourceTransactions.length]);
 
 
   useEffect(() => {
-    const sourceTransactions = isDemoMode ? DEMO_TRANSACTIONS : transactions;
     const sourceMarketData = isDemoMode ? DEMO_MARKET_DATA : marketData;
 
     const calculateAssets = () => {
         const assetMap: { [ticker: string]: { quantity: number; totalCost: number } } = {};
 
+        // Sort transactions chronologically. Using string compare on 'YYYY-MM-DD' is timezone-safe.
         const sortedTransactions = [...sourceTransactions].sort((a, b) => {
-            const dateA = new Date(a.date).getTime();
-            const dateB = new Date(b.date).getTime();
-            if (dateA !== dateB) {
-                return dateA - dateB;
+            if (a.date !== b.date) {
+                return a.date.localeCompare(b.date);
             }
             // If dates are the same, process 'Compra' before 'Venda' to ensure correct avg. price calculation
             if (a.type === 'Compra' && b.type === 'Venda') {
@@ -238,7 +239,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     calculateAssets();
-  }, [transactions, marketData, isDemoMode]);
+  }, [sourceTransactions, marketData, isDemoMode]);
   
   const { projectedAnnualIncome, yieldOnCost } = useMemo(() => {
     let income = 0;
@@ -280,13 +281,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [assets]);
   
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
-      const relevantTransactions = transactions
+      const relevantTransactions = sourceTransactions
           .filter(tx => tx.ticker === targetTx.ticker)
+          // Use timezone-safe string comparison for sorting
           .sort((a, b) => {
-              const dateA = new Date(a.date).getTime();
-              const dateB = new Date(b.date).getTime();
-              if (dateA !== dateB) {
-                  return dateA - dateB;
+              if (a.date !== b.date) {
+                  return a.date.localeCompare(b.date);
               }
               if (a.type === 'Compra' && b.type === 'Venda') return -1;
               if (a.type === 'Venda' && b.type === 'Compra') return 1;
@@ -320,7 +320,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }
       }
       return 0; // Should not be reached if targetTx is in transactions
-  }, [transactions]);
+  }, [sourceTransactions]);
   
   const setDemoMode = (enabled: boolean) => {
     setIsDemoMode(enabled);
@@ -334,7 +334,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const value = {
     assets,
-    transactions,
+    transactions: sourceTransactions,
     preferences,
     isDemoMode,
     privacyMode,
