@@ -2,30 +2,24 @@
 import { GoogleGenAI, Type, Schema } from '@google/genai';
 import type { NewsArticle } from '../types';
 
-// Helper to determine the API key to use safely in Browser environment
-function getApiKey(customApiKey?: string | null): string {
-    // 1. Priority: Custom User Key (Manual)
-    if (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10) {
-        return customApiKey.trim();
-    }
-
-    // 2. Vite Environment Variable (Browser Standard)
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
-        // @ts-ignore
-        return import.meta.env.VITE_API_KEY;
-    }
-
-    // 3. Fallback: Process Environment (Node/Server)
+function getApiKey(): string {
+    // This function assumes the environment polyfills process.env or it's running in Node.
+    // The strict guideline is to use process.env.API_KEY.
     try {
         if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
             return process.env.API_KEY;
         }
     } catch (e) {
-        // Ignore
+      // process is not defined in browser, this is expected
+    }
+    // As per user's setup, VITE_API_KEY is the way for browser deployment
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+      // @ts-ignore
+      return import.meta.env.VITE_API_KEY;
     }
 
-    throw new Error("Chave de API não encontrada. Insira manualmente em Configurações > Avançado.");
+    throw new Error("Chave de API do Gemini não configurada no ambiente.");
 }
 
 // --- API Call Resiliency ---
@@ -92,11 +86,10 @@ const marketDataSchema: Schema = {
 
 // --- SERVICES ---
 
-export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string | null): Promise<NewsArticle[]> {
-  const apiKey = getApiKey(customApiKey);
+export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
+  const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  // Optimization: Limit tickers context to reduce input tokens
   const contextTickers = tickers.slice(0, 5).join(', ');
   const prompt = `Notícias recentes do mercado financeiro brasileiro (FIIs). Foco: ${contextTickers || 'Geral'}.`;
 
@@ -108,7 +101,7 @@ export async function fetchMarketNews(tickers: string[] = [], customApiKey?: str
             config: {
               responseMimeType: "application/json",
               responseSchema: newsSchema,
-              temperature: 0.1, // Low temperature for factual data
+              temperature: 0.1,
             }
           });
 
@@ -117,7 +110,7 @@ export async function fetchMarketNews(tickers: string[] = [], customApiKey?: str
       });
   } catch (error) {
       console.warn("News fetch failed:", error);
-      return []; // Fail silently for news to not block UI
+      return []; 
   }
 }
 
@@ -129,13 +122,12 @@ export interface RealTimeData {
     administrator: string;
 }
 
-export async function fetchRealTimeData(tickers: string[], customApiKey?: string | null): Promise<Record<string, RealTimeData>> {
+export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
     if (tickers.length === 0) return {};
     
-    const apiKey = getApiKey(customApiKey);
+    const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey });
     
-    // Optimization: Extremely concise prompt. The Schema does the heavy lifting.
     const prompt = `Dados atualizados B3: ${tickers.join(', ')}`;
 
     return withRetry(async () => {
@@ -145,7 +137,7 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
             config: {
                 responseMimeType: "application/json",
                 responseSchema: marketDataSchema,
-                temperature: 0, // Zero temperature for maximum speed and consistency
+                temperature: 0,
             }
         });
 
@@ -170,11 +162,10 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
     });
 }
 
-export async function validateApiKey(customApiKey?: string | null): Promise<boolean> {
+export async function validateApiKey(): Promise<boolean> {
      return withRetry(async () => {
-        const apiKey = getApiKey(customApiKey);
+        const apiKey = getApiKey();
         const ai = new GoogleGenAI({ apiKey });
-        // Minimal token usage for validation
         await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: "Hi",

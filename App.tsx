@@ -105,10 +105,6 @@ const App: React.FC = () => {
   }, [preferences.accentColor, preferences.systemTheme]); 
 
   useEffect(() => {
-    // Check if PIN exists, if so, enforce lock on re-entry (if reload)
-  }, [preferences.appPin]);
-
-  useEffect(() => {
     // Show tour only if unlocked and first visit
     if (!isLocked) {
         const hasVisited = localStorage.getItem('hasVisited');
@@ -129,9 +125,6 @@ const App: React.FC = () => {
     setDemoMode(false); // Clear Demo Data (Back to zero/user data)
     setShowTour(false);
     localStorage.setItem('hasVisited', 'true');
-    // If restarting tutorial was true, likely need to reset it to false so it doesn't loop,
-    // but we don't have a direct setter for that specific pref here easily without updatePreferences. 
-    // Relying on 'hasVisited' check mostly.
   };
 
   const navigateTo = (view: View) => {
@@ -169,7 +162,7 @@ const App: React.FC = () => {
       case 'noticias':
         return <NewsView addToast={addToast} />;
       case 'settings':
-        return <SettingsView addToast={addToast} theme={preferences.systemTheme === 'light' ? 'light' : 'dark'} setTheme={(t) => {}} />;
+        return <SettingsView addToast={addToast} />;
       case 'notificacoes':
         return <NotificationsView setActiveView={navigateTo} />;
       case 'assetDetail':

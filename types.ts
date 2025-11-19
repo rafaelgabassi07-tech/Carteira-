@@ -90,7 +90,6 @@ export interface AppPreferences {
 
   // General
   startScreen: 'carteira' | 'analise' | 'noticias';
-  // FIX: Changed type from literal 'true' to 'boolean' to allow toggling the haptic feedback setting.
   hapticFeedback: boolean;
   vibrationIntensity: 'light' | 'medium' | 'heavy';
   hideCents: boolean;
@@ -120,7 +119,6 @@ export interface AppPreferences {
   };
 
   // Advanced
-  customApiKey: string | null;
   autoBackup: boolean;
   betaFeatures: boolean;
   devMode: boolean;

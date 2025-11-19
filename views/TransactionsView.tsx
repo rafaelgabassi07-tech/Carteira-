@@ -21,11 +21,9 @@ const TransactionModal: React.FC<{
     const isEditMode = !!transaction;
     const [errors, setErrors] = useState<Record<string, string>>({});
     
-    // State for form inputs
     const [ticker, setTicker] = useState(transaction?.ticker || '');
     const [price, setPrice] = useState(transaction?.price?.toString() || '');
 
-    // Use utility to get consistent "YYYY-MM-DD" string
     const todayISODate = getTodayISODate();
 
     const validate = (tx: Partial<Transaction>): boolean => {
@@ -39,13 +37,12 @@ const TransactionModal: React.FC<{
         return Object.keys(newErrors).length === 0;
     };
     
-    // Auto-fill price logic
     const handleTickerBlur = () => {
         if (!isEditMode && ticker.length >= 4 && !price) {
             const asset = getAssetByTicker(ticker.toUpperCase());
             if (asset && asset.currentPrice > 0) {
                 setPrice(asset.currentPrice.toFixed(2));
-                vibrate(); // Feedback
+                vibrate();
                 addToast(`Preço atual (${asset.currentPrice.toFixed(2)}) preenchido!`, 'info');
             }
         }
@@ -60,7 +57,7 @@ const TransactionModal: React.FC<{
             type: formData.get('type') as TransactionType,
             quantity: parseFloat(formData.get('quantity') as string),
             price: parseFloat(formData.get('price') as string),
-            date: formData.get('date') as string, // Will be YYYY-MM-DD from input type="date"
+            date: formData.get('date') as string,
             costs: parseFloat(formData.get('costs') as string) || 0,
             notes: formData.get('notes') as string,
         };
@@ -157,7 +154,6 @@ const TransactionModal: React.FC<{
     );
 };
 
-// Memoized item to prevent lag on long lists
 const TransactionItem = React.memo<{ 
     transaction: Transaction, 
     onEdit: (tx: Transaction) => void, 
@@ -289,7 +285,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
     }, [filteredTransactions]);
 
     const groupedTransactions = useMemo(() => {
-        const sorted = [...filteredTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const sorted = [...filteredTransactions].sort((a, b) => b.date.localeCompare(a.date));
         return sorted.reduce<Record<string, Transaction[]>>((acc, tx) => {
             const date = new Date(tx.date);
             const monthYear = date.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });

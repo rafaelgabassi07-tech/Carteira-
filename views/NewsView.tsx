@@ -121,7 +121,7 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  const { assets, preferences } = usePortfolio();
+  const { assets } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -184,7 +184,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       }
 
       // If no cache or forced refresh, fetch API
-      const articles = await fetchMarketNews(assetTickers, preferences.customApiKey);
+      // FIX: Removed invalid second argument and non-existent preference property.
+      const articles = await fetchMarketNews(assetTickers);
       setNews(articles);
       CacheManager.set(cacheKey, articles); // Save to cache
 
@@ -207,7 +208,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setIsRefreshing(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, addToast, preferences.customApiKey]);
+  // FIX: Removed non-existent preference property from the dependency array.
+  }, [t, assetTickers, addToast]);
   
   const handleTouchStart = (e: React.TouchEvent) => {
       if(containerRef.current && containerRef.current.scrollTop === 0) {
