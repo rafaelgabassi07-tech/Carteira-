@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { ToastMessage, AppColor, AppPreferences, TransactionType } from '../types';
 import UserIcon from '../components/icons/UserIcon';
@@ -563,15 +562,17 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
     const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline' | 'idle'>('idle');
     const [showRawData, setShowRawData] = useState(false);
 
-    const checkStatus = useCallback(async (key?: string) => {
+    // FIX: Removed key parameter and updated to call parameter-less validateApiKey.
+    const checkStatus = useCallback(async () => {
         setApiStatus('checking');
-        const isWorking = await validateApiKey(key);
+        const isWorking = await validateApiKey();
         setApiStatus(isWorking ? 'online' : 'offline');
     }, []);
 
+    // FIX: Removed dependency on preferences.customApiKey.
     useEffect(() => {
-        checkStatus(preferences.customApiKey);
-    }, [checkStatus, preferences.customApiKey]);
+        checkStatus();
+    }, [checkStatus]);
 
 
     const handleReset = () => {
@@ -590,7 +591,8 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
             version: '1.5.0',
             platform: navigator.userAgent,
             storage: getStorageUsage(),
-            prefs: { ...preferences, customApiKey: '***HIDDEN***', appPin: '***HIDDEN***' },
+            // FIX: Removed customApiKey from debug info.
+            prefs: { ...preferences, appPin: '***HIDDEN***' },
             lastSync
         };
         const success = await copyToClipboard(JSON.stringify(debugInfo, null, 2));
@@ -601,12 +603,12 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
         <div>
             <PageHeader title={t('advanced')} onBack={onBack}/>
             <div className="space-y-6 pb-10">
-                 {/* API Key */}
+                 {/* FIX: Removed API Key input section and replaced with a status check only, per guidelines. */}
                 <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                              <CodeIcon className="w-5 h-5 text-[var(--accent-color)]"/>
-                             <h3 className="font-bold">{t('api_key')}</h3>
+                             <h3 className="font-bold">Gemini API Status</h3>
                         </div>
                         <div className="flex gap-2 items-center">
                             {apiStatus !== 'idle' && (
@@ -620,27 +622,8 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
                             )}
                         </div>
                     </div>
-                    <p className="text-xs text-[var(--text-secondary)] mt-2">{t('api_key_help')}</p>
-                    <div className="mt-3 relative">
-                        <input
-                            type="password"
-                            value={preferences.customApiKey}
-                            onChange={(e) => updatePreferences({ customApiKey: e.target.value })}
-                            placeholder={t('api_key_placeholder')}
-                            className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors pr-10"
-                        />
-                        {preferences.customApiKey && (
-                             <button 
-                                onClick={() => {
-                                    updatePreferences({ customApiKey: '' });
-                                }}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-white"
-                             >
-                                <CloseIcon className="w-5 h-5" />
-                            </button>
-                        )}
-                    </div>
-                    <button onClick={() => checkStatus(preferences.customApiKey)} className="mt-3 w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
+                    <p className="text-xs text-[var(--text-secondary)] mt-2">API key is managed via environment variables and is ready.</p>
+                     <button onClick={() => checkStatus()} className="mt-3 w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
                         {t('adv_test_conn')}
                      </button>
                 </div>

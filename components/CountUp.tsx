@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 
 interface CountUpProps {
@@ -18,7 +17,8 @@ const CountUp: React.FC<CountUpProps> = ({
   prefix = '', 
   suffix = '' 
 }) => {
-  const [count, setCount] = useState(0);
+  // FIX: Using lazy initializer for useState as a precaution against potential environment-specific issues causing the "Expected 1 arguments, but got 0" error.
+  const [count, setCount] = useState(() => 0);
   const startRef = useRef(0);
   const animationRef = useRef<number>();
 

@@ -19,10 +19,9 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000
   }
 }
 
-function getApiKey(customApiKey?: string): string {
-    if (customApiKey && customApiKey.trim() !== '') {
-        return customApiKey;
-    }
+// FIX: Per coding guidelines, API key must come only from process.env.API_KEY.
+// Removed customApiKey parameter and logic.
+function getApiKey(): string {
     const envKey = process.env.API_KEY;
     if (!envKey) {
         throw new Error("Chave de API do Gemini não configurada.");
@@ -42,9 +41,12 @@ function cleanJsonString(text: string): string {
     return clean;
 }
 
-export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string): Promise<NewsArticle[]> {
+// FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
+// Removed customApiKey parameter.
+export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
   const executeFetch = async () => {
-      const key = getApiKey(customApiKey);
+      // FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
+      const key = getApiKey();
       const ai = new GoogleGenAI({ apiKey: key });
 
       const tickerPromptPart = tickers.length > 0
@@ -70,6 +72,7 @@ export async function fetchMarketNews(tickers: string[] = [], customApiKey?: str
       IMPORTANTE: Retorne APENAS o JSON válido, sem texto adicional.`;
 
       const response = await ai.models.generateContent({
+        // FIX: Using recommended model 'gemini-2.5-flash' instead of deprecated 'gemini-1.5-flash'.
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -100,11 +103,14 @@ export interface RealTimeData {
     administrator: string;
 }
 
-export async function fetchRealTimeData(tickers: string[], customApiKey?: string): Promise<Record<string, RealTimeData>> {
+// FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
+// Removed customApiKey parameter.
+export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
     if (tickers.length === 0) return {};
     
     const executeFetch = async () => {
-        const key = getApiKey(customApiKey);
+        // FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
+        const key = getApiKey();
         const ai = new GoogleGenAI({ apiKey: key });
         
         const prompt = `Pesquise os dados ATUAIS de mercado (B3/Bovespa) para estes FIIs: ${tickers.join(', ')}.
@@ -126,6 +132,7 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
         - Retorne APENAS o JSON válido.`;
 
         const response = await ai.models.generateContent({
+            // FIX: Using recommended model 'gemini-2.5-flash' instead of deprecated 'gemini-1.5-flash'.
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
@@ -188,11 +195,15 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
     }
 }
 
-export async function validateApiKey(customApiKey?: string): Promise<boolean> {
+// FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
+// Removed customApiKey parameter.
+export async function validateApiKey(): Promise<boolean> {
     try {
-        const key = getApiKey(customApiKey);
+        // FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
+        const key = getApiKey();
         const ai = new GoogleGenAI({ apiKey: key });
         await ai.models.generateContent({
+            // FIX: Using recommended model 'gemini-2.5-flash' instead of deprecated 'gemini-1.5-flash'.
             model: "gemini-2.5-flash",
             contents: "Ping",
         });

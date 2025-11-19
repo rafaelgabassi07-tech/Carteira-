@@ -184,7 +184,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       }
 
       // If no cache or forced refresh, fetch API
-      const articles = await fetchMarketNews(assetTickers, preferences.customApiKey);
+      // FIX: Removed customApiKey from fetchMarketNews call per guidelines.
+      const articles = await fetchMarketNews(assetTickers);
       setNews(articles);
       CacheManager.set(cacheKey, articles); // Save to cache
 
@@ -207,7 +208,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setIsRefreshing(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, addToast, preferences.customApiKey]);
+    // FIX: Removed preferences.customApiKey from dependency array as it's no longer used.
+  }, [t, assetTickers, addToast]);
   
   const handleTouchStart = (e: React.TouchEvent) => {
       if(containerRef.current && containerRef.current.scrollTop === 0) {

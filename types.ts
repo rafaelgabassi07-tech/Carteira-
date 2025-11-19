@@ -119,7 +119,7 @@ export interface AppPreferences {
   };
 
   // Advanced
-  customApiKey: string;
+  // FIX: Removed customApiKey per coding guidelines. API key should only come from process.env.
   autoBackup: boolean;
   betaFeatures: boolean;
   devMode: boolean;
