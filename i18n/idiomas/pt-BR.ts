@@ -1,3 +1,4 @@
+
 export const ptBR = {
     // Navigation
     nav_portfolio: 'Carteira',
@@ -425,6 +426,7 @@ export const ptBR = {
     // Toasts (Existing + New)
     toast_updating_prices: 'Atualizando preços...',
     toast_update_failed: 'Falha ao atualizar dados. Tente novamente.',
+    toast_update_success: 'Dados atualizados com sucesso!',
     toast_share_not_supported: 'Navegador não suporta compartilhar.',
     toast_share_cancelled: 'Cancelado.',
     toast_profile_updated: 'Perfil salvo!',

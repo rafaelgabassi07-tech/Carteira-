@@ -59,7 +59,7 @@ function cleanJsonString(text: string): string {
 }
 
 // --- API Call Resiliency ---
-async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
+async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 4, initialDelay = 1500): Promise<T> {
   let attempt = 0;
   while (attempt < maxRetries) {
     try {

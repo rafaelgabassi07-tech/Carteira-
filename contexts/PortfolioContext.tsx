@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
 import { fetchRealTimeData } from '../services/geminiService';
@@ -21,7 +22,7 @@ interface PortfolioContextType {
   deleteTransaction: (id: string) => void;
   importTransactions: (transactions: Transaction[]) => void;
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
-  refreshMarketData: (force?: boolean) => Promise<void>;
+  refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
   getAssetByTicker: (ticker: string) => Asset | undefined;
   getAssetAveragePriceBeforeDate: (ticker: string, date: string) => number;
   setDemoMode: (enabled: boolean) => void;
@@ -127,7 +128,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     lastSync
   });
 
-  const refreshMarketData = useCallback(async (force = false) => {
+  const refreshMarketData = useCallback(async (force = false, silent = false) => {
     if (isRefreshing) return;
     
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) {
@@ -141,7 +142,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     };
 
-    setIsRefreshing(true);
+    if (!silent) setIsRefreshing(true);
     setMarketDataError(null);
     try {
       const data = await fetchRealTimeData(uniqueTickers, preferences.customApiKey);
@@ -152,12 +153,13 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(error.message || "Falha na conexão com API.");
       throw error;
     } finally {
-      setIsRefreshing(false);
+      if (!silent) setIsRefreshing(false);
     }
   }, [transactions, preferences.customApiKey, isRefreshing, lastSync]);
 
   useEffect(() => {
-    refreshMarketData(false).catch(() => {});
+    // Silent background refresh on initial load
+    refreshMarketData(false, true).catch(() => {});
   }, [transactions.length]);
 
 
