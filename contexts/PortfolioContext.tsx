@@ -132,7 +132,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const tickers = Array.from(new Set(transactions.map(t => t.ticker)));
     if (tickers.length === 0) return;
 
-    // Robust Cache Check: Don't refresh if data is fresh (< 5 min) unless forced
+    // Only skip if we have recent data AND we are not forcing (manual pull-to-refresh)
     if (!force && lastSync && (Date.now() - lastSync < 5 * 60 * 1000)) {
         return;
     }
@@ -141,19 +141,27 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setMarketDataError(null);
 
     try {
+        // Attempt to fetch new data
         const newData = await fetchRealTimeData(tickers, preferences.customApiKey);
         
         if (Object.keys(newData).length > 0) {
             setMarketData(prev => {
                 const merged = { ...prev };
                 Object.keys(newData).forEach(ticker => {
-                    if (newData[ticker] && newData[ticker].currentPrice > 0) {
+                    if (newData[ticker]) {
+                        // Preserve history if it exists
                         const oldHistory = merged[ticker]?.priceHistory || [];
                         const newPrice = newData[ticker].currentPrice;
-                        const updatedHistory = [...oldHistory.slice(-29), newPrice]; 
+                        
+                        // Avoid duplicate price entries if price hasn't changed significantly to keep chart clean
+                        let updatedHistory = oldHistory;
+                        if (newPrice > 0) {
+                             updatedHistory = [...oldHistory.slice(-29), newPrice];
+                        }
                         
                         merged[ticker] = {
-                            ...newData[ticker],
+                            ...merged[ticker], // Keep old fields if any
+                            ...newData[ticker], // Overwrite with new
                             priceHistory: updatedHistory
                         };
                     }
@@ -161,30 +169,24 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 return merged;
             });
             setLastSync(Date.now());
-        } else {
-            // If API returns empty but succeeds (no throw), we might have an issue, but keep old data
-            if (tickers.length > 0) {
-                setMarketDataError('Dados indisponíveis no momento.');
-            }
         }
     } catch (error: any) {
-        console.error("Market data refresh failed:", error);
-        // IMPORTANT: We do NOT clear marketData on error. We keep showing the old data.
-        // Just set the error flag for UI notification.
-        setMarketDataError('Erro de conexão. Verifique sua chave API em Configurações.');
+        console.error("Market refresh failed:", error);
+        // Do NOT clear marketData. Keep old data visible.
+        setMarketDataError('Falha na atualização. Verifique sua conexão ou chave API.');
     } finally {
         setIsRefreshing(false);
     }
   }, [transactions, isDemoMode, setMarketData, setLastSync, preferences.customApiKey, lastSync]);
 
-  // Auto-refresh on mount only if cache expired
+  // Auto-refresh on mount
   useEffect(() => {
     if (!isDemoMode && transactions.length > 0) {
         refreshMarketData(false);
     }
   }, [isDemoMode, transactions.length, refreshMarketData]);
 
-  // ... (Rest of the context remains the same: monthlyIncome, yieldOnCost, etc.)
+  // ... (Rest of context)
   const monthlyIncome = useMemo<MonthlyIncome[]>(() => {
       const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       const currentMonthIndex = new Date().getMonth();
