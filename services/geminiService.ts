@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle } from '../types';
 
 // Helper for exponential backoff retry
@@ -30,66 +30,62 @@ function getApiKey(customApiKey?: string): string {
     return envKey;
 }
 
+// Função auxiliar para limpar JSON retornado em markdown
+function cleanJsonString(text: string): string {
+    let clean = text.trim();
+    // Remove markdown formatting ```json ... ```
+    if (clean.startsWith('```json')) {
+        clean = clean.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (clean.startsWith('```')) {
+        clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+    return clean;
+}
+
 export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string): Promise<NewsArticle[]> {
   const executeFetch = async () => {
       const key = getApiKey(customApiKey);
       const ai = new GoogleGenAI({ apiKey: key });
 
       const tickerPromptPart = tickers.length > 0
-          ? `Foque estritamente em notícias, fatos relevantes e relatórios gerenciais sobre os seguintes FIIs: ${tickers.join(', ')}.`
-          : 'Foque em notícias gerais sobre o mercado de FIIs (Fundos Imobiliários), Selic e Ibovespa.';
+          ? `Foque estritamente em notícias recentes (últimas 48h) sobre: ${tickers.join(', ')}.`
+          : 'Foque em notícias gerais quentes sobre o mercado de FIIs (Fundos Imobiliários) e economia brasileira.';
 
-      const prompt = `Você é um assistente financeiro especializado em FIIs. Gere 5 notícias recentes e relevantes sobre o mercado. ${tickerPromptPart} 
+      const prompt = `Você é um jornalista financeiro. Use o Google Search para encontrar notícias atuais.
+      ${tickerPromptPart}
       
-      IMPORTANTE:
-      - Retorne APENAS o JSON puro. Não use blocos de código markdown (\`\`\`json).
-      - A análise de sentimento deve ser estritamente: 'Positive', 'Neutral' ou 'Negative'.
-      - Para cada notícia, forneça fonte, título, um breve resumo, a data, uma URL de exemplo (se não tiver real, use uma genérica de site financeiro) e o sentimento.`;
+      Retorne um ARRAY JSON com 5 notícias. 
+      Formato esperado:
+      [
+        {
+          "source": "Fonte",
+          "title": "Título",
+          "summary": "Resumo breve",
+          "date": "Data (DD/MM/AAAA)",
+          "url": "Link original",
+          "sentiment": "Positive" | "Neutral" | "Negative"
+        }
+      ]
+      
+      IMPORTANTE: Retorne APENAS o JSON válido, sem texto adicional.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              articles: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    source: { type: Type.STRING, description: "A fonte da notícia, ex: 'Valor Econômico', 'Suno', 'Funds Explorer'" },
-                    title: { type: Type.STRING, description: "O título da notícia" },
-                    summary: { type: Type.STRING, description: "Um resumo da notícia com 2-3 frases." },
-                    date: { type: Type.STRING, description: "A data da publicação, ex: '21/06/2024, 14:30'" },
-                    url: { type: Type.STRING, description: "A URL completa para a notícia original." },
-                    sentiment: { type: Type.STRING, description: "O sentimento da notícia: 'Positive', 'Neutral', or 'Negative'" }
-                  },
-                  required: ["source", "title", "summary", "date", "url", "sentiment"]
-                }
-              }
-            },
-            required: ["articles"]
-          }
+          tools: [{ googleSearch: {} }], // Ativa busca na web
+          // responseMimeType não pode ser usado com tools
         }
       });
 
-      let jsonString = response.text ? response.text.trim() : '';
-
-      // Sanitize: Remove markdown code blocks if present
-      if (jsonString.startsWith('```json')) {
-          jsonString = jsonString.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (jsonString.startsWith('```')) {
-          jsonString = jsonString.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
+      const jsonString = cleanJsonString(response.text || '');
 
       try {
           const data = JSON.parse(jsonString);
-          return data.articles;
+          return Array.isArray(data) ? data : (data.articles || []);
       } catch (parseError) {
-          console.error("Failed to parse Gemini response:", jsonString);
-          throw new Error("Falha ao processar resposta da IA. Tente novamente.");
+          console.error("Failed to parse Gemini news response:", jsonString);
+          return [];
       }
   };
 
@@ -109,96 +105,96 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
     
     const executeFetch = async () => {
         const key = getApiKey(customApiKey);
-        
         const ai = new GoogleGenAI({ apiKey: key });
         
-        const prompt = `Retorne os dados de mercado MAIS RECENTES possíveis para os seguintes FIIs brasileiros: ${tickers.join(', ')}.
+        const prompt = `Pesquise os dados ATUAIS de mercado (B3/Bovespa) para estes FIIs: ${tickers.join(', ')}.
         
-        Preciso de:
+        Para CADA ativo, preciso de:
         1. Preço atual da cota (R$)
-        2. Dividend Yield (DY) anualizado estimado (%)
-        3. P/VP (Preço sobre Valor Patrimonial)
-        4. Setor de atuação (ex: Logística, Papel, Shoppings)
-        5. Administradora (Nome curto)
+        2. Dividend Yield (DY) anual (em %)
+        3. P/VP
+        4. Setor
+        5. Administradora
 
-        Retorne APENAS JSON.`;
+        Retorne um Objeto JSON onde a chave é o Ticker. Exemplo:
+        {
+            "KNRI11": { "currentPrice": 150.50, "dy": 8.5, "pvp": 1.01, "sector": "Híbrido", "administrator": "Kinea" }
+        }
+
+        IMPORTANTE: 
+        - Use dados reais encontrados na busca.
+        - Retorne APENAS o JSON válido.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        assets: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    ticker: { type: Type.STRING },
-                                    currentPrice: { type: Type.NUMBER },
-                                    dy: { type: Type.NUMBER },
-                                    pvp: { type: Type.NUMBER },
-                                    sector: { type: Type.STRING },
-                                    administrator: { type: Type.STRING }
-                                },
-                                required: ["ticker", "currentPrice", "dy", "pvp", "sector"]
-                            }
-                        }
-                    }
-                }
+                tools: [{ googleSearch: {} }], // Essencial para dados reais
             }
         });
 
-        let jsonString = response.text ? response.text.trim() : '';
-         // Sanitize
-        if (jsonString.startsWith('```json')) {
-            jsonString = jsonString.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (jsonString.startsWith('```')) {
-            jsonString = jsonString.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        const jsonString = cleanJsonString(response.text || '');
+        
+        try {
+            const data = JSON.parse(jsonString);
+            const result: Record<string, RealTimeData> = {};
+            
+            // Normalizar dados caso a IA retorne estrutura diferente
+            const items = Array.isArray(data) ? data : Object.values(data); // Tenta tratar se vier array
+            
+            // Se for objeto com chaves de ticker (formato solicitado)
+            if (!Array.isArray(data) && Object.keys(data).length > 0) {
+                Object.keys(data).forEach(tickerKey => {
+                    const item = data[tickerKey];
+                    // Normaliza ticker para maiúsculo
+                    const cleanTicker = tickerKey.toUpperCase();
+                    if (item && typeof item.currentPrice === 'number') {
+                        result[cleanTicker] = {
+                            currentPrice: Number(item.currentPrice),
+                            dy: Number(item.dy || 0),
+                            pvp: Number(item.pvp || 1),
+                            sector: item.sector || 'Outros',
+                            administrator: item.administrator || 'N/A'
+                        };
+                    }
+                });
+            } else if (Array.isArray(items)) {
+                // Fallback se a IA retornar lista
+                items.forEach((item: any) => {
+                    if (item.ticker && typeof item.currentPrice === 'number') {
+                         result[item.ticker.toUpperCase()] = {
+                            currentPrice: Number(item.currentPrice),
+                            dy: Number(item.dy || 0),
+                            pvp: Number(item.pvp || 1),
+                            sector: item.sector || 'Outros',
+                            administrator: item.administrator || 'N/A'
+                        };
+                    }
+                });
+            }
+            
+            return result;
+        } catch (error) {
+            console.error("Error parsing real-time data:", error);
+            return {}; 
         }
-        
-        const data = JSON.parse(jsonString);
-        const result: Record<string, RealTimeData> = {};
-        
-        if (data.assets) {
-            data.assets.forEach((item: any) => {
-                // Basic validation to ensure we don't save garbage
-                if (item.ticker && typeof item.currentPrice === 'number') {
-                    result[item.ticker] = {
-                        currentPrice: item.currentPrice,
-                        dy: item.dy || 0,
-                        pvp: item.pvp || 1,
-                        sector: item.sector || 'Outros',
-                        administrator: item.administrator || 'N/A'
-                    };
-                }
-            });
-        }
-        
-        return result;
     };
 
-    // Use retry for robustness
     try {
         return await fetchWithRetry(executeFetch);
     } catch (error) {
         console.error("Error fetching real-time data:", error);
-        return {}; // Return empty on error to preserve old data
+        return {};
     }
 }
 
-// NEW: Function to validate API connectivity
 export async function validateApiKey(customApiKey?: string): Promise<boolean> {
     try {
         const key = getApiKey(customApiKey);
         const ai = new GoogleGenAI({ apiKey: key });
-        // Simple lightweight prompt
         await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: "Ping",
-            config: { maxOutputTokens: 1 }
         });
         return true;
     } catch (e) {
