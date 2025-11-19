@@ -69,16 +69,16 @@ const newsSchema: Schema = {
 
 const marketDataSchema: Schema = {
     type: Type.ARRAY,
-    description: "List of market data for assets",
+    description: "Lista de dados de mercado para ativos financeiros listados na B3.",
     items: {
         type: Type.OBJECT,
         properties: {
-            ticker: { type: Type.STRING, description: "Asset ticker symbol (uppercase)" },
-            currentPrice: { type: Type.NUMBER, description: "Current market price (BRL)" },
-            dy: { type: Type.NUMBER, description: "Dividend Yield 12 months % (e.g. 10.5)" },
-            pvp: { type: Type.NUMBER, description: "P/VP Ratio" },
-            sector: { type: Type.STRING, description: "Asset sector (e.g. Logística, Papel)" },
-            administrator: { type: Type.STRING, description: "Fund administrator name" }
+            ticker: { type: Type.STRING, description: "Símbolo do ativo (ticker), em maiúsculas. Exemplo: MXRF11" },
+            currentPrice: { type: Type.NUMBER, description: "Preço atual de mercado em BRL, como um número float. Exemplo: 10.55 para dez reais e cinquenta e cinco centavos." },
+            dy: { type: Type.NUMBER, description: "Dividend Yield percentual dos últimos 12 meses. Exemplo: 12.5 para 12.5%" },
+            pvp: { type: Type.NUMBER, description: "Relação Preço/Valor Patrimonial (P/VP). Exemplo: 1.05" },
+            sector: { type: Type.STRING, description: "Setor do ativo. Exemplo: Logística, Papel, Shoppings" },
+            administrator: { type: Type.STRING, description: "Nome da administradora do fundo." }
         },
         required: ["ticker", "currentPrice", "dy", "pvp", "sector"]
     }
@@ -128,7 +128,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
     const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `Dados atualizados B3: ${tickers.join(', ')}`;
+    const prompt = `Cotação e indicadores para os ativos da B3: ${tickers.join(', ')}.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({

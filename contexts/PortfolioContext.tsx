@@ -133,8 +133,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    // FIX: Use spread syntax for robust type inference of uniqueTickers as string[].
-    const uniqueTickers = [...new Set(sourceTransactions.map(t => t.ticker))];
+    // FIX: Explicitly type the map's return value to guide type inference for the Set.
+    const uniqueTickers = [...new Set(sourceTransactions.map((t): string => t.ticker))];
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);
