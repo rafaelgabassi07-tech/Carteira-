@@ -165,15 +165,15 @@ const TransactionItem = React.memo<{
     style?: React.CSSProperties 
 }>(({ transaction, onEdit, onDelete, style }) => {
     const { t, locale, formatCurrency } = useI18n();
-    const { getAssetAveragePriceBeforeDate } = usePortfolio();
+    const { getAveragePriceForTransaction } = usePortfolio();
     const isBuy = transaction.type === 'Compra';
 
     const realizedGain = useMemo(() => {
         if (isBuy) return null;
-        const avgPriceBeforeSale = getAssetAveragePriceBeforeDate(transaction.ticker, transaction.date);
+        const avgPriceBeforeSale = getAveragePriceForTransaction(transaction);
         if (avgPriceBeforeSale === 0) return 0;
         return (transaction.price - avgPriceBeforeSale) * transaction.quantity - (transaction.costs || 0);
-    }, [transaction, isBuy, getAssetAveragePriceBeforeDate]);
+    }, [transaction, isBuy, getAveragePriceForTransaction]);
     
     const totalValue = transaction.quantity * transaction.price + (isBuy ? (transaction.costs || 0) : -(transaction.costs || 0));
 

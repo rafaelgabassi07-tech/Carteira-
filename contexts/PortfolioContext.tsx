@@ -24,7 +24,7 @@ interface PortfolioContextType {
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
   refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
   getAssetByTicker: (ticker: string) => Asset | undefined;
-  getAssetAveragePriceBeforeDate: (ticker: string, date: string) => number;
+  getAveragePriceForTransaction: (transaction: Transaction) => number;
   setDemoMode: (enabled: boolean) => void;
   togglePrivacyMode: () => void;
   resetApp: () => void;
@@ -170,7 +170,21 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const calculateAssets = () => {
         const assetMap: { [ticker: string]: { quantity: number; totalCost: number } } = {};
 
-        const sortedTransactions = [...sourceTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const sortedTransactions = [...sourceTransactions].sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            if (dateA !== dateB) {
+                return dateA - dateB;
+            }
+            // If dates are the same, process 'Compra' before 'Venda' to ensure correct avg. price calculation
+            if (a.type === 'Compra' && b.type === 'Venda') {
+                return -1; // a (Compra) comes first
+            }
+            if (a.type === 'Venda' && b.type === 'Compra') {
+                return 1; // b (Compra) comes first
+            }
+            return 0; // Same date, same type, order doesn't matter
+        });
 
         for (const tx of sortedTransactions) {
             if (!assetMap[tx.ticker]) {
@@ -189,7 +203,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     asset.quantity -= tx.quantity;
                 }
             }
-            if (asset.quantity <= 0) {
+            if (asset.quantity <= 0.00001) { // Use a small threshold for float precision
                  asset.quantity = 0;
                  asset.totalCost = 0;
             }
@@ -265,26 +279,47 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return assets.find(a => a.ticker.toUpperCase() === ticker.toUpperCase());
   }, [assets]);
   
-  const getAssetAveragePriceBeforeDate = useCallback((ticker: string, date: string) => {
-      const targetDate = new Date(date).getTime();
+  const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
       const relevantTransactions = transactions
-          .filter(tx => tx.ticker === ticker && new Date(tx.date).getTime() < targetDate)
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          .filter(tx => tx.ticker === targetTx.ticker)
+          .sort((a, b) => {
+              const dateA = new Date(a.date).getTime();
+              const dateB = new Date(b.date).getTime();
+              if (dateA !== dateB) {
+                  return dateA - dateB;
+              }
+              if (a.type === 'Compra' && b.type === 'Venda') return -1;
+              if (a.type === 'Venda' && b.type === 'Compra') return 1;
+              return 0;
+          });
 
       let quantity = 0;
       let totalCost = 0;
       
       for (const tx of relevantTransactions) {
           const avgPrice = quantity > 0 ? totalCost / quantity : 0;
+          
+          if (tx.id === targetTx.id) {
+              // Found the transaction, return the average price just before it
+              return avgPrice;
+          }
+
           if (tx.type === 'Compra') {
               totalCost += tx.quantity * tx.price + (tx.costs || 0);
               quantity += tx.quantity;
-          } else {
-              totalCost -= tx.quantity * avgPrice;
-              quantity -= tx.quantity;
+          } else { // Venda
+              if (quantity > 0) {
+                  totalCost -= tx.quantity * avgPrice;
+                  quantity -= tx.quantity;
+              }
+          }
+
+          if (quantity <= 0.00001) {
+              quantity = 0;
+              totalCost = 0;
           }
       }
-      return quantity > 0 ? totalCost / quantity : 0;
+      return 0; // Should not be reached if targetTx is in transactions
   }, [transactions]);
   
   const setDemoMode = (enabled: boolean) => {
@@ -316,7 +351,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     updatePreferences,
     refreshMarketData,
     getAssetByTicker,
-    getAssetAveragePriceBeforeDate,
+    getAveragePriceForTransaction,
     setDemoMode,
     togglePrivacyMode,
     resetApp,
