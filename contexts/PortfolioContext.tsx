@@ -159,6 +159,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setLastSync(Date.now()); // Update timestamp
       } catch (error) {
           console.error("Failed to refresh market data", error);
+          throw error;
       }
       // FIX: Removed preferences.customApiKey from dependency array as it's no longer used.
   }, [transactions, isDemoMode, setMarketData, setLastSync]);

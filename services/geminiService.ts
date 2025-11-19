@@ -76,6 +76,7 @@ export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArtic
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
+          systemInstruction: "Você é uma API de dados financeiros. Sua resposta deve ser apenas um JSON válido, sem nenhum texto, formatação markdown ou explicação adicional.",
           tools: [{ googleSearch: {} }], // Ativa busca na web
           // responseMimeType não pode ser usado com tools
         }
@@ -136,6 +137,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
+                systemInstruction: "Você é uma API de dados financeiros. Sua resposta deve ser apenas um JSON válido, sem nenhum texto, formatação markdown ou explicação adicional.",
                 tools: [{ googleSearch: {} }], // Essencial para dados reais
             }
         });
@@ -195,20 +197,16 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
     }
 }
 
-// FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
-// Removed customApiKey parameter.
-export async function validateApiKey(): Promise<boolean> {
+export async function validateApiKey(): Promise<void> {
     try {
-        // FIX: Per coding guidelines, API key comes from getApiKey(), not parameters.
         const key = getApiKey();
         const ai = new GoogleGenAI({ apiKey: key });
         await ai.models.generateContent({
-            // FIX: Using recommended model 'gemini-2.5-flash' instead of deprecated 'gemini-1.5-flash'.
             model: "gemini-2.5-flash",
             contents: "Ping",
         });
-        return true;
     } catch (e) {
-        return false;
+        console.error("API Key validation failed:", e);
+        throw e;
     }
 }

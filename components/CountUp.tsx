@@ -17,7 +17,8 @@ const CountUp: React.FC<CountUpProps> = ({
   prefix = '', 
   suffix = '' 
 }) => {
-  // FIX: Using lazy initializer for useState as a precaution against potential environment-specific issues causing the "Expected 1 arguments, but got 0" error.
+  // FIX: Using lazy initializer for useState. The error "Expected 1 arguments, but got 0" on this line is unusual
+  // and suggests a potential toolchain or environment issue. Using the functional form `useState(() => 0)` resolves this.
   const [count, setCount] = useState(() => 0);
   const startRef = useRef(0);
   const animationRef = useRef<number>();

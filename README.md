@@ -1,20 +1,21 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Carteira de Investimentos (FIIs)
 
-# Run and deploy your AI Studio app
+## Deploy na Vercel
 
-This contains everything you need to run your app locally.
+Este projeto está configurado para ser implantado na Vercel utilizando o preset de framework "Vite", como mostrado na sua imagem.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1MxPRuJWcLfqHW-Ozc9cy0X-uiYyo_Ogg
+### Configuração Essencial: Variável de Ambiente
 
-## Run Locally
+Para que o aplicativo se conecte à API do Gemini e funcione corretamente online, é **essencial** configurar uma variável de ambiente no seu projeto na Vercel. Siga os passos abaixo:
 
-**Prerequisites:**  Node.js
+1.  Acesse o painel do seu projeto na Vercel.
+2.  Vá para a aba **Settings**.
+3.  No menu lateral, clique em **Environment Variables**.
+4.  Crie uma nova variável com os seguintes detalhes:
+    -   **Name (Nome)**: `API_KEY`
+    -   **Value (Valor)**: `SUA_CHAVE_DE_API_DO_GEMINI` (Cole sua chave de API real aqui)
 
+5.  Certifique-se de que a variável esteja disponível para todos os ambientes (Production, Preview, e Development).
+6.  Salve a variável. A Vercel iniciará um novo deploy automaticamente para aplicar a alteração.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+O código da aplicação já está preparado para utilizar esta variável `API_KEY`. Nenhuma outra alteração no código é necessária. Após configurar a variável na Vercel, sua aplicação funcionará perfeitamente.

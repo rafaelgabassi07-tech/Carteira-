@@ -317,9 +317,10 @@ export const ptBR = {
     
     // Advanced Advanced
     adv_api_status_online: 'Conectado',
-    adv_api_status_offline: 'Sem Conexão',
+    adv_api_status_offline: 'Erro',
     adv_api_status_checking: 'Verificando...',
     adv_test_conn: 'Testar Conexão',
+    adv_api_key_desc: 'A chave de API é gerenciada de forma segura através de variáveis de ambiente para sua proteção.',
     adv_cache_prices: 'Preços Desatualizados?',
     adv_cache_prices_btn: 'Recarregar Preços',
     adv_cache_news: 'Notícias Antigas?',
@@ -423,6 +424,7 @@ export const ptBR = {
 
     // Toasts (Existing + New)
     toast_updating_prices: 'Atualizando preços...',
+    toast_update_failed: 'Falha ao atualizar dados. Tente novamente.',
     toast_share_not_supported: 'Navegador não suporta compartilhar.',
     toast_share_cancelled: 'Cancelado.',
     toast_profile_updated: 'Perfil salvo!',
@@ -448,6 +450,8 @@ export const ptBR = {
     toast_vote_registered: 'Voto registrado!',
     toast_notify_registered: 'Você será avisado!',
     toast_welcome_back: 'Bem-vindo de volta!',
+    toast_api_success: 'Conexão com a API Gemini bem-sucedida!',
+    toast_api_failed: 'Falha na conexão. Verifique se a chave de API está configurada corretamente no ambiente.',
 
     // Error Boundary
     error_boundary_title: 'Ops!',

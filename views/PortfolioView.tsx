@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
@@ -242,9 +241,15 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
     const handleRefreshPrices = async () => {
         setIsRefreshing(true);
         vibrate(20);
-        await refreshMarketData();
-        addToast(t('toast_updating_prices'));
-        setIsRefreshing(false);
+        try {
+            await refreshMarketData();
+            addToast(t('toast_updating_prices'));
+        } catch (error) {
+            console.error("Error refreshing data:", error);
+            addToast(t('toast_update_failed'), 'error');
+        } finally {
+            setIsRefreshing(false);
+        }
     };
 
     const handleShare = async () => {

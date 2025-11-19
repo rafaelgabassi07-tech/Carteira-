@@ -562,14 +562,19 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
     const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline' | 'idle'>('idle');
     const [showRawData, setShowRawData] = useState(false);
 
-    // FIX: Removed key parameter and updated to call parameter-less validateApiKey.
     const checkStatus = useCallback(async () => {
         setApiStatus('checking');
-        const isWorking = await validateApiKey();
-        setApiStatus(isWorking ? 'online' : 'offline');
-    }, []);
+        try {
+            await validateApiKey();
+            setApiStatus('online');
+            addToast(t('toast_api_success'), 'success');
+        } catch (e: any) {
+            setApiStatus('offline');
+            addToast(t('toast_api_failed'), 'error');
+            console.error("API Connection test failed:", e);
+        }
+    }, [addToast, t]);
 
-    // FIX: Removed dependency on preferences.customApiKey.
     useEffect(() => {
         checkStatus();
     }, [checkStatus]);
@@ -591,7 +596,6 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
             version: '1.5.0',
             platform: navigator.userAgent,
             storage: getStorageUsage(),
-            // FIX: Removed customApiKey from debug info.
             prefs: { ...preferences, appPin: '***HIDDEN***' },
             lastSync
         };
@@ -603,7 +607,6 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
         <div>
             <PageHeader title={t('advanced')} onBack={onBack}/>
             <div className="space-y-6 pb-10">
-                 {/* FIX: Removed API Key input section and replaced with a status check only, per guidelines. */}
                 <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
@@ -622,7 +625,7 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
                             )}
                         </div>
                     </div>
-                    <p className="text-xs text-[var(--text-secondary)] mt-2">API key is managed via environment variables and is ready.</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-2">{t('adv_api_key_desc')}</p>
                      <button onClick={() => checkStatus()} className="mt-3 w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
                         {t('adv_test_conn')}
                      </button>
