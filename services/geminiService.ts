@@ -2,54 +2,84 @@
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle } from '../types';
 
-// Helper to determine the API key to use. Prefers custom key, falls back to environment variable.
+// Helper to determine the API key to use. Checks Custom -> Vite -> Process Env safely.
 function getApiKey(customApiKey?: string | null): string {
-    // FIX: Property 'env' does not exist on type 'ImportMeta'. The API key must be obtained from `process.env.API_KEY` as per the coding guidelines.
-    const key = customApiKey || process.env.API_KEY;
-    if (!key) {
-        throw new Error("Chave de API do Gemini não configurada.");
+    // 1. Try Custom User Key
+    if (customApiKey && customApiKey.trim() !== '') {
+        return customApiKey.trim();
     }
-    return key;
+
+    // 2. Try Vite Environment Variable (Browser Standard)
+    try {
+        // @ts-ignore
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+            // @ts-ignore
+            return import.meta.env.VITE_API_KEY;
+        }
+    } catch (e) {
+        // Ignore errors if import.meta is not available
+    }
+
+    // 3. Try Process Environment Variable (Node/Server Standard)
+    try {
+        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+            return process.env.API_KEY;
+        }
+    } catch (e) {
+        // Ignore errors if process is not defined
+    }
+
+    throw new Error("Chave de API não encontrada. Configure VITE_API_KEY na Vercel ou insira manualmente em Configurações > Avançado.");
 }
 
 // Helper for exponential backoff retry
-async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1000): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
     if (retries <= 0) throw error;
     
-    // Don't retry on critical client-side errors (Auth, Bad Request, missing key)
-    if (error.toString().includes('401') || error.toString().includes('400') || /API.*key/i.test(error.toString())) {
+    const msg = error.toString().toLowerCase();
+    // Don't retry on auth errors
+    if (msg.includes('401') || msg.includes('key') || msg.includes('permission')) {
          throw error;
     }
 
-    console.warn(`API Call failed, retrying in ${delay}ms... (${retries} left)`, error);
+    console.warn(`API Call failed, retrying in ${delay}ms...`, error);
     await new Promise(resolve => setTimeout(resolve, delay));
-    return fetchWithRetry(fn, retries - 1, delay * 2);
+    return fetchWithRetry(fn, retries - 1, delay * 1.5);
   }
 }
 
-// Função auxiliar para limpar JSON retornado em markdown
+// Robust JSON cleaner
 function cleanJsonString(text: string): string {
-    // Attempt to extract JSON from a markdown block first
-    const match = text.match(/```(json)?\s*([\s\S]*?)\s*```/);
-    if (match && match[2]) {
-        return match[2].trim();
+    if (!text) return "{}";
+    
+    // 1. Remove Markdown Code Blocks
+    let clean = text.replace(/```json/g, '').replace(/```/g, '');
+    
+    // 2. Find the first '{' or '[' and the last '}' or ']'
+    const firstOpenBrace = clean.indexOf('{');
+    const firstOpenBracket = clean.indexOf('[');
+    
+    let startIndex = -1;
+    if (firstOpenBrace !== -1 && firstOpenBracket !== -1) {
+        startIndex = Math.min(firstOpenBrace, firstOpenBracket);
+    } else {
+        startIndex = Math.max(firstOpenBrace, firstOpenBracket);
     }
 
-    // If no markdown block, find the first occurrence of '{' or '['
-    const jsonStartIndex = text.search(/[{\[]/);
-    if (jsonStartIndex !== -1) {
-        // Find the last occurrence of '}' or ']'
-        const jsonEndIndex = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
-        if (jsonEndIndex > jsonStartIndex) {
-             return text.substring(jsonStartIndex, jsonEndIndex + 1).trim();
-        }
+    if (startIndex === -1) return clean; // No JSON found, return original (will likely fail parse)
+
+    const lastCloseBrace = clean.lastIndexOf('}');
+    const lastCloseBracket = clean.lastIndexOf(']');
+    const endIndex = Math.max(lastCloseBrace, lastCloseBracket);
+
+    if (endIndex > startIndex) {
+        return clean.substring(startIndex, endIndex + 1);
     }
     
-    // Fallback to original text if no JSON structure is found
-    return text.trim();
+    return clean;
 }
 
 export async function fetchMarketNews(tickers: string[] = [], customApiKey?: string | null): Promise<NewsArticle[]> {
@@ -57,47 +87,28 @@ export async function fetchMarketNews(tickers: string[] = [], customApiKey?: str
       const apiKey = getApiKey(customApiKey);
       const ai = new GoogleGenAI({ apiKey });
 
-      const tickerPromptPart = tickers.length > 0
-          ? `Foque estritamente em notícias recentes (últimas 48h) sobre: ${tickers.join(', ')}.`
-          : 'Foque em notícias gerais quentes sobre o mercado de FIIs (Fundos Imobiliários) e economia brasileira.';
-
-      const prompt = `Você é um jornalista financeiro. Use o Google Search para encontrar notícias atuais.
-      ${tickerPromptPart}
-      Responda o mais rápido possível.
+      // Limit tickers to prevent huge prompts
+      const limitedTickers = tickers.slice(0, 10);
       
-      Retorne um ARRAY JSON com 5 notícias. 
-      Formato esperado:
-      [
-        {
-          "source": "Fonte",
-          "title": "Título",
-          "summary": "Resumo breve",
-          "date": "Data (DD/MM/AAAA)",
-          "url": "Link original",
-          "sentiment": "Positive" | "Neutral" | "Negative"
-        }
-      ]
+      const prompt = `Busque notícias recentes do mercado financeiro (últimas 24h).
+      ${limitedTickers.length > 0 ? `Foco prioritário nestes ativos: ${limitedTickers.join(', ')}.` : 'Foco em Fundos Imobiliários (FIIs) e macroeconomia Brasil.'}
       
-      IMPORTANTE: Retorne APENAS o JSON válido, sem texto adicional.`;
+      Retorne APENAS um JSON array válido.
+      Schema: Array<{ source: string, title: string, summary: string, date: string, url: string, sentiment: "Positive" | "Neutral" | "Negative" }>
+      `;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
-          systemInstruction: "Sua única função é retornar dados em formato JSON. Não inclua markdown, explicações ou qualquer texto fora do JSON solicitado.",
-          tools: [{ googleSearch: {} }], // Ativa busca na web
+          responseMimeType: "application/json", // Force JSON
+          tools: [{ googleSearch: {} }],
         }
       });
 
       const jsonString = cleanJsonString(response.text || '');
-
-      try {
-          const data = JSON.parse(jsonString);
-          return Array.isArray(data) ? data : (data.articles || []);
-      } catch (parseError) {
-          console.error("Failed to parse Gemini news response:", jsonString);
-          return [];
-      }
+      const data = JSON.parse(jsonString);
+      return Array.isArray(data) ? data : (data.articles || []);
   };
 
   return fetchWithRetry(executeFetch);
@@ -118,31 +129,19 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
         const apiKey = getApiKey(customApiKey);
         const ai = new GoogleGenAI({ apiKey });
         
-        const prompt = `Pesquise os dados ATUAIS de mercado (B3/Bovespa) para estes FIIs: ${tickers.join(', ')}.
-        Responda o mais rápido possível.
-        
-        Para CADA ativo, preciso de:
-        1. Preço atual da cota (currentPrice)
-        2. Dividend Yield anual (dy)
-        3. P/VP (pvp)
-        4. Setor (sector)
-        5. Administradora (administrator)
-
-        Retorne um Objeto JSON onde a chave é o Ticker. Exemplo:
-        {
-            "KNRI11": { "currentPrice": 150.50, "dy": 8.5, "pvp": 1.01, "sector": "Híbrido", "administrator": "Kinea" }
-        }
-
-        IMPORTANTE: 
-        - Use dados reais encontrados na busca.
-        - Retorne APENAS o JSON válido.`;
+        // Batching logic could go here, but for simplicity we request all (assuming < 30)
+        // Simplified prompt to reduce latency and token usage
+        const prompt = `Dados atuais B3 para: ${tickers.join(', ')}.
+        Retorne JSON objeto: { "TICKER": { "currentPrice": number, "dy": number (anual %), "pvp": number, "sector": string, "administrator": string } }
+        Exemplo: { "XPLG11": { "currentPrice": 105.50, "dy": 8.5, "pvp": 0.98, "sector": "Logística", "administrator": "Vórtx" } }
+        Use dados reais. Se falhar um, ignore-o.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
-                systemInstruction: "Sua única função é retornar dados em formato JSON. Não inclua markdown, explicações ou qualquer texto fora do JSON solicitado.",
-                tools: [{ googleSearch: {} }], // Essencial para dados reais
+                responseMimeType: "application/json", // Force JSON output
+                tools: [{ googleSearch: {} }],
             }
         });
 
@@ -152,18 +151,15 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
             const data = JSON.parse(jsonString);
             const result: Record<string, RealTimeData> = {};
             
-            // Normalizar dados caso a IA retorne estrutura diferente
-            const items = Array.isArray(data) ? data : Object.values(data); // Tenta tratar se vier array
-            
-            // Se for objeto com chaves de ticker (formato solicitado)
-            if (!Array.isArray(data) && Object.keys(data).length > 0) {
-                Object.keys(data).forEach(tickerKey => {
-                    const item = data[tickerKey];
-                    // Normaliza ticker para maiúsculo
-                    const cleanTicker = tickerKey.toUpperCase();
-                    if (item && typeof item.currentPrice === 'number') {
-                        result[cleanTicker] = {
-                            currentPrice: Number(item.currentPrice),
+            // Handle Array response just in case
+            const items = Array.isArray(data) ? data : (Object.values(data).some((v: any) => v.ticker) ? Object.values(data) : data);
+
+            if (Array.isArray(items)) {
+                 items.forEach((item: any) => {
+                    const t = item.ticker || item.symbol;
+                    if (t) {
+                         result[t.toUpperCase()] = {
+                            currentPrice: Number(item.currentPrice || 0),
                             dy: Number(item.dy || 0),
                             pvp: Number(item.pvp || 1),
                             sector: item.sector || 'Outros',
@@ -171,12 +167,13 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
                         };
                     }
                 });
-            } else if (Array.isArray(items)) {
-                // Fallback se a IA retornar lista
-                items.forEach((item: any) => {
-                    if (item.ticker && typeof item.currentPrice === 'number') {
-                         result[item.ticker.toUpperCase()] = {
-                            currentPrice: Number(item.currentPrice),
+            } else {
+                // Object format (preferred)
+                Object.keys(items).forEach(key => {
+                    const item = items[key];
+                    if (item && typeof item === 'object') {
+                         result[key.toUpperCase()] = {
+                            currentPrice: Number(item.currentPrice || 0),
                             dy: Number(item.dy || 0),
                             pvp: Number(item.pvp || 1),
                             sector: item.sector || 'Outros',
@@ -188,29 +185,27 @@ export async function fetchRealTimeData(tickers: string[], customApiKey?: string
             
             return result;
         } catch (error) {
-            console.error("Error parsing real-time data:", error);
+            console.error("JSON Parse Error in RealTimeData:", error);
+            console.log("Raw String:", jsonString);
             return {}; 
         }
     };
 
     try {
-        return await fetchWithRetry(executeFetch);
+        // Single attempt or low retry to fail fast and use cache if needed
+        return await fetchWithRetry(executeFetch, 1);
     } catch (error) {
-        console.error("Error fetching real-time data:", error);
-        return {};
+        console.error("Fatal error fetching market data:", error);
+        throw error;
     }
 }
 
 export async function validateApiKey(customApiKey?: string | null): Promise<void> {
-    try {
-        const apiKey = getApiKey(customApiKey);
-        const ai = new GoogleGenAI({ apiKey });
-        await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: "Ping",
-        });
-    } catch (e) {
-        console.error("API Key validation failed:", e);
-        throw e;
-    }
+    const apiKey = getApiKey(customApiKey);
+    const ai = new GoogleGenAI({ apiKey });
+    // Simple lightweight call
+    await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: "Hi",
+    });
 }

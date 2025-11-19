@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { ToastMessage, AppColor, AppPreferences, TransactionType } from '../types';
 import UserIcon from '../components/icons/UserIcon';
@@ -579,12 +580,13 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
     useEffect(() => {
         // Automatically check status on component mount
         checkStatus();
-    }, []); // Removed checkStatus from deps to avoid loop, it's stable
+    }, []); 
 
     const handleSaveKey = () => {
         updatePreferences({ customApiKey: apiKeyInput });
         addToast(t('toast_api_key_saved'), 'success');
-        checkStatus(apiKeyInput); // Re-validate with the new key
+        // Give it a moment for state to propagate, then test
+        setTimeout(() => checkStatus(apiKeyInput), 100); 
     };
 
     const handleReset = () => {
@@ -645,7 +647,7 @@ const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: strin
                             <button onClick={handleSaveKey} className="w-full text-center text-xs font-bold bg-[var(--accent-color)] text-[var(--accent-color-text)] py-2 rounded-lg hover:opacity-90">
                                 {t('save_key')}
                             </button>
-                             <button onClick={() => checkStatus()} className="w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded-lg hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
+                             <button onClick={() => checkStatus(apiKeyInput || preferences.customApiKey)} className="w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded-lg hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
                                 {t('adv_test_conn')}
                              </button>
                         </div>

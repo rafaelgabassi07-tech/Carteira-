@@ -22,7 +22,7 @@ interface PortfolioContextType {
   deleteTransaction: (id: string) => void;
   importTransactions: (transactions: Transaction[]) => void;
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
-  refreshMarketData: () => Promise<void>;
+  refreshMarketData: (force?: boolean) => Promise<void>;
   getAssetByTicker: (ticker: string) => Asset | undefined;
   getAssetAveragePriceBeforeDate: (ticker: string, date: string) => number;
   setDemoMode: (enabled: boolean) => void;
@@ -130,10 +130,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
   }, [transactions, marketData, isDemoMode]);
 
-  const refreshMarketData = useCallback(async () => {
+  const refreshMarketData = useCallback(async (force = false) => {
     if (isDemoMode) return;
     const tickers = Array.from(new Set(transactions.map(t => t.ticker)));
     if (tickers.length === 0) return;
+
+    // Check cache unless forced
+    if (!force && lastSync && (Date.now() - lastSync < CACHE_TTL.PRICES)) {
+        console.log("Using cached market data (TTL valid)");
+        return;
+    }
 
     setIsRefreshing(true);
     setMarketDataError(null);
@@ -142,6 +148,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const newData = await fetchRealTimeData(tickers, preferences.customApiKey);
         
         // Smart Merge: Only update tickers that returned valid data
+        // IMPORTANT: Preserve existing data if API partially fails or returns empty
         if (Object.keys(newData).length > 0) {
             setMarketData(prev => {
                 const merged = { ...prev };
@@ -149,6 +156,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     if (newData[ticker] && newData[ticker].currentPrice > 0) {
                         const oldHistory = merged[ticker]?.priceHistory || [];
                         const newPrice = newData[ticker].currentPrice;
+                        // Append new price to history
                         const updatedHistory = [...oldHistory.slice(-29), newPrice]; 
                         
                         merged[ticker] = {
@@ -161,30 +169,27 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             });
             setLastSync(Date.now()); // Update timestamp
         } else {
-            // If API returns empty object but was expected to return data
-            if (tickers.length > 0) {
-                 throw new Error("A API não retornou dados válidos.");
-            }
+             console.warn("API returned empty data, keeping old cache.");
         }
     } catch (error: any) {
-        setMarketDataError(error.message || 'Falha ao buscar dados do mercado.');
-        throw error;
+        console.error("Market data refresh failed:", error);
+        setMarketDataError('Não foi possível atualizar cotações. Verifique a conexão ou chave API.');
+        // Do NOT throw here, suppress error to avoid crashing UI components calling this
     } finally {
         setIsRefreshing(false);
     }
-  }, [transactions, isDemoMode, setMarketData, setLastSync, preferences.customApiKey]);
+  }, [transactions, isDemoMode, setMarketData, setLastSync, preferences.customApiKey, lastSync]);
 
-  // Initial and background data loading
+  // Initial load: Check if we actually need to refresh
   useEffect(() => {
-    const needsRefresh = !lastSync || (Date.now() - lastSync > CACHE_TTL.PRICES);
-    
-    if (!isDemoMode && transactions.length > 0 && needsRefresh) {
-        refreshMarketData().catch(() => {
-            // Error is set in the context state by refreshMarketData itself.
-            // We just catch the promise rejection here so it doesn't become an unhandled rejection.
-        });
+    if (!isDemoMode && transactions.length > 0) {
+        // Only auto-refresh if cache is expired
+        const isCacheExpired = !lastSync || (Date.now() - lastSync > CACHE_TTL.PRICES);
+        if (isCacheExpired) {
+            refreshMarketData(true).catch(e => console.error("Initial refresh failed safely", e));
+        }
     }
-  }, [isDemoMode, transactions.length, lastSync, refreshMarketData]);
+  }, [isDemoMode, transactions.length, refreshMarketData, lastSync]);
 
   const monthlyIncome = useMemo<MonthlyIncome[]>(() => {
       const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -280,6 +285,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               if (k.startsWith('cache_')) localStorage.removeItem(k);
           });
           setMarketData({});
+          setLastSync(null);
       }
   };
 
