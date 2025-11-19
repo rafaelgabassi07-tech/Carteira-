@@ -30,7 +30,7 @@ interface PortfolioContextType {
   resetApp: () => void;
   clearCache: (key?: string) => void;
   getStorageUsage: () => number;
-  getRawData: () => any; // New function for debugging
+  getRawData: () => any;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -57,7 +57,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     dateFormat: 'dd/mm/yyyy',
     priceAlertThreshold: 5,
     globalIncomeGoal: 1000,
-    segmentGoals: {}, // Default empty goals
+    segmentGoals: {},
     dndEnabled: false,
     dndStart: '22:00',
     dndEnd: '07:00',
@@ -83,7 +83,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const currentTransactions = isDemoMode ? DEMO_TRANSACTIONS : transactions;
     const grouped: Record<string, { quantity: number; totalCost: number; avgPrice: number }> = {};
 
-    // Sort by date ascending to calculate average price correctly
     const sortedTx = [...currentTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     sortedTx.forEach(tx => {
@@ -93,11 +92,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const cost = (tx.quantity * tx.price) + (tx.costs || 0);
             grouped[tx.ticker].quantity += tx.quantity;
             grouped[tx.ticker].totalCost += cost;
-            // Weighted Average Price
             grouped[tx.ticker].avgPrice = grouped[tx.ticker].totalCost / grouped[tx.ticker].quantity;
         } else {
-            // Sell reduces quantity but doesn't change average price (in Brazilian tax rules mostly)
-            // However, we reduce totalCost proportionally to keep AvgPrice constant
             grouped[tx.ticker].quantity -= tx.quantity;
             grouped[tx.ticker].totalCost = grouped[tx.ticker].quantity * grouped[tx.ticker].avgPrice;
         }
@@ -106,10 +102,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const currentMarketData = isDemoMode ? DEMO_MARKET_DATA : marketData;
 
     return Object.entries(grouped)
-        .filter(([_, data]) => data.quantity > 0) // Filter out closed positions
+        .filter(([_, data]) => data.quantity > 0)
         .map(([ticker, data]) => {
             const mData = currentMarketData[ticker] || {};
-            const currentPrice = mData.currentPrice || data.avgPrice; // Fallback to avg price if no market data
+            const currentPrice = mData.currentPrice || data.avgPrice; 
             const dy = mData.dy || 0;
             
             return {
@@ -117,14 +113,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 quantity: data.quantity,
                 avgPrice: data.avgPrice,
                 currentPrice: currentPrice,
-                priceHistory: mData.priceHistory || [currentPrice], // Mock history if missing
+                priceHistory: mData.priceHistory || [currentPrice],
                 dy: dy,
                 pvp: mData.pvp,
                 segment: mData.sector,
                 administrator: mData.administrator,
-                vacancyRate: 0, // Placeholder
-                liquidity: 0, // Placeholder
-                shareholders: 0, // Placeholder
+                vacancyRate: 0,
+                liquidity: 0,
+                shareholders: 0,
                 yieldOnCost: data.avgPrice > 0 ? (dy * currentPrice / data.avgPrice) : 0,
             };
         });
@@ -132,12 +128,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const refreshMarketData = useCallback(async (force = false) => {
     if (isDemoMode) return;
+    
     const tickers = Array.from(new Set(transactions.map(t => t.ticker)));
     if (tickers.length === 0) return;
 
-    // Check cache unless forced
-    if (!force && lastSync && (Date.now() - lastSync < CACHE_TTL.PRICES)) {
-        console.log("Using cached market data (TTL valid)");
+    // Robust Cache Check: Don't refresh if data is fresh (< 5 min) unless forced
+    if (!force && lastSync && (Date.now() - lastSync < 5 * 60 * 1000)) {
         return;
     }
 
@@ -147,8 +143,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
         const newData = await fetchRealTimeData(tickers, preferences.customApiKey);
         
-        // Smart Merge: Only update tickers that returned valid data
-        // IMPORTANT: Preserve existing data if API partially fails or returns empty
         if (Object.keys(newData).length > 0) {
             setMarketData(prev => {
                 const merged = { ...prev };
@@ -156,7 +150,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     if (newData[ticker] && newData[ticker].currentPrice > 0) {
                         const oldHistory = merged[ticker]?.priceHistory || [];
                         const newPrice = newData[ticker].currentPrice;
-                        // Append new price to history
                         const updatedHistory = [...oldHistory.slice(-29), newPrice]; 
                         
                         merged[ticker] = {
@@ -167,45 +160,40 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 });
                 return merged;
             });
-            setLastSync(Date.now()); // Update timestamp
+            setLastSync(Date.now());
         } else {
-             console.warn("API returned empty data, keeping old cache.");
+            // If API returns empty but succeeds (no throw), we might have an issue, but keep old data
+            if (tickers.length > 0) {
+                setMarketDataError('Dados indisponíveis no momento.');
+            }
         }
     } catch (error: any) {
         console.error("Market data refresh failed:", error);
-        setMarketDataError('Não foi possível atualizar cotações. Verifique a conexão ou chave API.');
-        // Do NOT throw here, suppress error to avoid crashing UI components calling this
+        // IMPORTANT: We do NOT clear marketData on error. We keep showing the old data.
+        // Just set the error flag for UI notification.
+        setMarketDataError('Erro de conexão. Verifique sua chave API em Configurações.');
     } finally {
         setIsRefreshing(false);
     }
   }, [transactions, isDemoMode, setMarketData, setLastSync, preferences.customApiKey, lastSync]);
 
-  // Initial load: Check if we actually need to refresh
+  // Auto-refresh on mount only if cache expired
   useEffect(() => {
     if (!isDemoMode && transactions.length > 0) {
-        // Only auto-refresh if cache is expired
-        const isCacheExpired = !lastSync || (Date.now() - lastSync > CACHE_TTL.PRICES);
-        if (isCacheExpired) {
-            refreshMarketData(true).catch(e => console.error("Initial refresh failed safely", e));
-        }
+        refreshMarketData(false);
     }
-  }, [isDemoMode, transactions.length, refreshMarketData, lastSync]);
+  }, [isDemoMode, transactions.length, refreshMarketData]);
 
+  // ... (Rest of the context remains the same: monthlyIncome, yieldOnCost, etc.)
   const monthlyIncome = useMemo<MonthlyIncome[]>(() => {
       const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       const currentMonthIndex = new Date().getMonth();
-      
-      const rotatedMonths = [
-          ...months.slice(currentMonthIndex + 1),
-          ...months.slice(0, currentMonthIndex + 1)
-      ];
-
+      const rotatedMonths = [...months.slice(currentMonthIndex + 1), ...months.slice(0, currentMonthIndex + 1)];
       return rotatedMonths.map((month) => {
           const total = assets.reduce((acc, asset) => {
               const monthlyYield = (asset.currentPrice * ((asset.dy || 0) / 100)) / 12;
               return acc + (monthlyYield * asset.quantity);
           }, 0);
-          
           return { month, total: isFinite(total) ? total : 0 };
       });
   }, [assets]);
@@ -214,7 +202,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (assets.length === 0) return 0;
       const totalInvested = assets.reduce((acc, a) => acc + (a.avgPrice * a.quantity), 0);
       const totalIncome = assets.reduce((acc, a) => acc + ((a.currentPrice * (a.dy || 0) / 100) * a.quantity), 0);
-      
       const result = totalInvested > 0 ? (totalIncome / totalInvested) * 100 : 0;
       return isFinite(result) ? result : 0;
   }, [assets]);
@@ -227,15 +214,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const addTransaction = (transaction: Transaction) => {
       setTransactions(prev => [...prev, transaction]);
   };
-
   const updateTransaction = (transaction: Transaction) => {
       setTransactions(prev => prev.map(t => t.id === transaction.id ? transaction : t));
   };
-
   const deleteTransaction = (id: string) => {
       setTransactions(prev => prev.filter(t => t.id !== id));
   };
-
   const importTransactions = (newTransactions: Transaction[]) => {
       setTransactions(prev => {
           const existingIds = new Set(prev.map(t => t.id));
@@ -243,39 +227,29 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           return [...prev, ...uniqueNew];
       });
   };
-
   const updatePreferences = (newPrefs: Partial<AppPreferences>) => {
       setPreferences(prev => ({ ...prev, ...newPrefs }));
   };
-
   const getAssetByTicker = (ticker: string) => assets.find(a => a.ticker === ticker);
-
   const getAssetAveragePriceBeforeDate = (ticker: string, date: string) => {
       const txs = transactions
         .filter(t => t.ticker === ticker && new Date(t.date) < new Date(date) && t.type === 'Compra')
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      
       if (txs.length === 0) return 0;
-
       let totalQty = 0;
       let totalCost = 0;
-      
       txs.forEach(tx => {
           totalQty += tx.quantity;
           totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
       });
-
       const result = totalQty > 0 ? totalCost / totalQty : 0;
       return isFinite(result) ? result : 0;
   };
-
   const togglePrivacyMode = () => setPrivacyMode(prev => !prev);
-
   const resetApp = () => {
       localStorage.clear();
       window.location.reload();
   };
-
   const clearCache = (key?: string) => {
       if (key && key !== 'all') {
           CacheManager.clear(key);
@@ -288,7 +262,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setLastSync(null);
       }
   };
-
   const getStorageUsage = () => {
       let total = 0;
       for (let x in localStorage) {
@@ -298,42 +271,13 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       return total;
   };
-
-  const getRawData = () => ({
-      assets,
-      transactions,
-      preferences,
-      marketData,
-      lastSync
-  });
+  const getRawData = () => ({ assets, transactions, preferences, marketData, lastSync });
 
   return (
     <PortfolioContext.Provider value={{
-      assets,
-      transactions,
-      preferences,
-      isDemoMode,
-      privacyMode,
-      yieldOnCost,
-      projectedAnnualIncome,
-      monthlyIncome,
-      lastSync,
-      isRefreshing,
-      marketDataError,
-      addTransaction,
-      updateTransaction,
-      deleteTransaction,
-      importTransactions,
-      updatePreferences,
-      refreshMarketData,
-      getAssetByTicker,
-      getAssetAveragePriceBeforeDate,
-      setDemoMode: setIsDemoMode,
-      togglePrivacyMode,
-      resetApp,
-      clearCache,
-      getStorageUsage,
-      getRawData
+      assets, transactions, preferences, isDemoMode, privacyMode, yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError,
+      addTransaction, updateTransaction, deleteTransaction, importTransactions, updatePreferences, refreshMarketData, getAssetByTicker,
+      getAssetAveragePriceBeforeDate, setDemoMode: setIsDemoMode, togglePrivacyMode, resetApp, clearCache, getStorageUsage, getRawData
     }}>
       {children}
     </PortfolioContext.Provider>
@@ -342,8 +286,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
 export const usePortfolio = () => {
   const context = useContext(PortfolioContext);
-  if (!context) {
-    throw new Error('usePortfolio must be used within a PortfolioProvider');
-  }
+  if (!context) throw new Error('usePortfolio must be used within a PortfolioProvider');
   return context;
 };
