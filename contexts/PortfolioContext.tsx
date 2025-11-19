@@ -215,7 +215,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             .map(([ticker, data]) => {
                 const liveData = sourceMarketData[ticker] || {};
                 const avgPrice = data.quantity > 0 ? data.totalCost / data.quantity : 0;
-                const currentPrice = liveData.currentPrice || 0;
+                
+                // Fallback Logic: If API returns 0 or fails, use AvgPrice to avoid showing -100% loss
+                // This prevents "scares" when offline or API is down.
+                let currentPrice = liveData.currentPrice || 0;
+                if (currentPrice <= 0 && avgPrice > 0) {
+                    currentPrice = avgPrice;
+                }
+                
                 const dy = liveData.dy || 0;
 
                 return {
