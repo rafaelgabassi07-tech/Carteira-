@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle } from '../types';
 
@@ -81,9 +80,9 @@ const marketDataSchema = {
             pvp: { type: Type.NUMBER, description: "Relação Preço/Valor Patrimonial (P/VP). Exemplo: 1.05" },
             sector: { type: Type.STRING, description: "Setor do ativo. Exemplo: Logística, Papel, Shoppings" },
             administrator: { type: Type.STRING, description: "Nome da administradora do fundo." },
-            vacancyRate: { type: Type.NUMBER, description: "Taxa de vacância do fundo em porcentagem. Exemplo: 5.5 para 5.5%. Se não aplicável, retorne 0." },
-            dailyLiquidity: { type: Type.NUMBER, description: "Volume financeiro médio negociado por dia em BRL. Exemplo: 1500000. Se não houver dados, retorne 0." },
-            shareholders: { type: Type.NUMBER, description: "Número total de cotistas do fundo. Exemplo: 850000. Se não houver dados, retorne 0." }
+            vacancyRate: { type: Type.NUMBER, description: "Taxa de vacância física do fundo em porcentagem. Se for um FII de papel ou onde não se aplica, retorne 0. Para os demais, busque o valor real. Exemplo: 5.5" },
+            dailyLiquidity: { type: Type.NUMBER, description: "Volume financeiro médio negociado por dia (liquidez diária) em BRL. Busque o valor real e mais recente. Exemplo: 1500000" },
+            shareholders: { type: Type.NUMBER, description: "Número total de cotistas do fundo. Busque o número real e mais recente. Exemplo: 850000" }
         },
         required: ["ticker", "currentPrice", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
@@ -136,7 +135,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
     const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `Cotação e indicadores fundamentalistas completos para os ativos da B3: ${tickers.join(', ')}.`;
+    const prompt = `Busque dados de mercado precisos e atualizados, incluindo indicadores fundamentalistas (P/VP, DY, vacância, liquidez, cotistas), para os seguintes ativos da B3: ${tickers.join(', ')}. Preencha todos os campos do schema com valores reais.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
