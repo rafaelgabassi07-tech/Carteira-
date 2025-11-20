@@ -50,7 +50,6 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
 
 // --- SCHEMAS (Structured Outputs for Speed) ---
 
-// Fix: The 'Schema' type is not exported from '@google/genai'. The type will be inferred.
 const newsSchema = {
     type: Type.ARRAY,
     description: "List of financial news articles",
@@ -69,19 +68,19 @@ const newsSchema = {
 
 const marketDataSchema = {
     type: Type.ARRAY,
-    description: "Lista de dados de mercado para ativos financeiros da B3, consultando fontes confiáveis como StatusInvest ou FundsExplorer.",
+    description: "Lista de dados de mercado para ativos financeiros da B3. A precisão é crítica.",
     items: {
         type: Type.OBJECT,
         properties: {
             ticker: { type: Type.STRING, description: "Símbolo do ativo (ticker), em maiúsculas. Exemplo: MXRF11" },
-            currentPrice: { type: Type.NUMBER, description: "Preço atual de mercado em BRL, como um número float. Exemplo: 10.55" },
-            dy: { type: Type.NUMBER, description: "Dividend Yield percentual dos últimos 12 meses. Exemplo: 12.5" },
-            pvp: { type: Type.NUMBER, description: "Relação Preço/Valor Patrimonial (P/VP). Exemplo: 1.05" },
+            currentPrice: { type: Type.NUMBER, description: "Preço de fechamento mais recente em BRL, como um número float. CONSULTE O STATUS INVEST. Exemplo para SNAG11 em 19/nov: 9.99" },
+            dy: { type: Type.NUMBER, description: "Dividend Yield percentual dos últimos 12 meses, conforme StatusInvest. Exemplo: 12.5" },
+            pvp: { type: Type.NUMBER, description: "Relação Preço/Valor Patrimonial (P/VP) exata do StatusInvest. Exemplo: 1.05" },
             sector: { type: Type.STRING, description: "Setor do ativo. Exemplo: Logística, Papel, Shoppings" },
-            administrator: { type: Type.STRING, description: "Nome da administradora do fundo." },
+            administrator: { type: Type.STRING, description: "Nome completo da administradora/gestora OFICIAL do fundo, conforme consta no StatusInvest. Exemplo para SNAG11: Suno Asset. NÃO confunda com o escriturador (ex: BTG Pactual)." },
             vacancyRate: { type: Type.NUMBER, description: "Taxa de vacância física do fundo em porcentagem. Se o indicador não for aplicável (ex: FII de papel), retorne -1. Para os demais, busque o valor real. Exemplo: 5.5" },
-            dailyLiquidity: { type: Type.NUMBER, description: "Volume financeiro médio negociado por dia (liquidez diária) em BRL. Busque o valor numérico real e mais recente. Não use abreviações como '1.5M'. Exemplo: 1500000" },
-            shareholders: { type: Type.NUMBER, description: "Número total de cotistas do fundo. Busque o número inteiro real e mais recente. Não use aproximações como '850k'. Exemplo: 850000" }
+            dailyLiquidity: { type: Type.NUMBER, description: "Liquidez média diária (2M) em BRL. Busque o valor numérico EXATO no StatusInvest. Sem abreviações. Exemplo: 1543210.12" },
+            shareholders: { type: Type.NUMBER, description: "Número total de cotistas mais recente. Busque o número inteiro EXATO no StatusInvest. Exemplo: 95432" }
         },
         required: ["ticker", "currentPrice", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
@@ -134,7 +133,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
     const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `Busque dados de mercado precisos e atualizados de fontes confiáveis (StatusInvest, FundsExplorer) para os seguintes ativos da B3: ${tickers.join(', ')}. Preencha todos os campos do schema com valores numéricos reais, sem aproximações ou abreviações.`;
+    const prompt = `ATENÇÃO: Busque dados de mercado exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Preencha todos os campos do schema com os valores exatos encontrados no StatusInvest, sem aproximações.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({

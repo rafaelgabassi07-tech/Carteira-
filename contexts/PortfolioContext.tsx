@@ -135,7 +135,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
     // FIX: Add explicit type annotation to the map callback to ensure correct type inference.
-    const uniqueTickers = [...new Set(sourceTransactions.map((t: Transaction) => t.ticker))];
+    const uniqueTickers = [...new Set(sourceTransactions.map(t => t.ticker))];
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);
