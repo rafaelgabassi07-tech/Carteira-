@@ -18,14 +18,15 @@ function getBrapiToken(prefs: AppPreferences): string {
         return prefs.brapiToken;
     }
     
-    // Priority 2: Environment variable (Direct access)
+    // Priority 2: Environment variable (Vite's way)
+    // The `(import.meta as any)` is a workaround for TS environments where vite/client types aren't explicitly included
     const envToken = (import.meta as any).env?.VITE_BRAPI_TOKEN;
     
     if (envToken && envToken.trim() !== '') {
         return envToken;
     }
 
-    throw new Error("Token VITE_BRAPI_TOKEN não encontrado. Verifique Configurações ou Vercel.");
+    throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado no ambiente ou nas configurações do app.");
 }
 
 // Utility delay function
@@ -38,78 +39,56 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
     const token = getBrapiToken(prefs);
     const result: Record<string, { currentPrice: number }> = {};
-    
-    // Configuration - Optimized for stability
-    const BATCH_SIZE = 5; // Reduced batch size to prevent heavy load
-    let currentDelay = 500; // Increased base delay
-
     let lastError: string | null = null;
-
-    // Helper function to fetch a single batch
-    const fetchBatch = async (batchTickers: string[], isRetry = false): Promise<boolean> => {
-        const url = `https://brapi.dev/api/quote/${batchTickers.join(',')}?token=${token}`;
-        
-        const response = await fetch(url);
-
-        if (response.status === 429) {
-            if (!isRetry) {
-                console.warn(`Brapi Rate Limit (429) for ${batchTickers[0]}... Pausing and retrying.`);
-                // Exponential backoff for rate limits
-                await delay(3500); 
-                currentDelay = 1500; // Permanently slow down for this session
-                return fetchBatch(batchTickers, true); // Retry once
-            } else {
-                throw new Error("Limite de requisições excedido (429).");
-            }
-        }
-
-        if (!response.ok) {
-            const status = response.status;
-            if (status === 404) throw new Error(`Ativos não encontrados (404).`);
-            throw new Error(`Erro ${status} na API.`);
-        }
-
-        const data: BrapiResponse = await response.json();
-
-        if (data.error) {
-            throw new Error(data.message || "Erro na resposta da API");
-        }
-
-        if (data && Array.isArray(data.results)) {
-            data.results.forEach(quote => {
-                if (quote.symbol && typeof quote.regularMarketPrice === 'number') {
-                    result[quote.symbol.toUpperCase()] = {
-                        currentPrice: quote.regularMarketPrice
-                    };
-                }
-            });
-        }
-        return true;
-    };
-
-    // Process tickers in batches
-    for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
-        const batch = tickers.slice(i, i + BATCH_SIZE);
-        
+    
+    // Process tickers one by one with a delay to respect rate limits
+    for (const ticker of tickers) {
         try {
-            // Apply delay between batches
-            if (i > 0) {
-                // Progressive delay: adds a small amount for each subsequent batch
-                // to mimic human behavior and avoid burst detection
-                const progressiveDelay = currentDelay + (i * 50); 
-                await delay(progressiveDelay);
+            const url = `https://brapi.dev/api/quote/${ticker}?token=${token}`;
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                if (response.status === 429) {
+                     console.warn(`Brapi Rate Limit (429) for ${ticker}. Pausing and retrying once...`);
+                     await delay(2000); // Wait 2s on rate limit and retry
+                     const retryResponse = await fetch(url);
+                     if (!retryResponse.ok) {
+                        throw new Error(`Limite de requisições excedido (429)`);
+                     }
+                     const retryData: BrapiResponse = await retryResponse.json();
+                     if (retryData.results && retryData.results[0]) {
+                        const quote = retryData.results[0];
+                        result[quote.symbol.toUpperCase()] = { currentPrice: quote.regularMarketPrice };
+                        await delay(150);
+                        continue;
+                     }
+                }
+                throw new Error(`Falha ao buscar ${ticker}: ${response.statusText}`);
             }
 
-            await fetchBatch(batch);
+            const data: BrapiResponse = await response.json();
+            
+            if (data.error || !data.results || data.results.length === 0) {
+                throw new Error(data.message || `Sem resultados para ${ticker}`);
+            }
+            
+            const quote = data.results[0];
+            if (quote.symbol && typeof quote.regularMarketPrice === 'number') {
+                result[quote.symbol.toUpperCase()] = {
+                    currentPrice: quote.regularMarketPrice
+                };
+            }
+
+            // The crucial delay to be "polite" to the API
+            await delay(150);
 
         } catch (error: any) {
-            console.error(`Brapi Batch Error (${batch.join(',')}):`, error.message);
-            lastError = error.message;
-            // Continue to next batch to get at least partial data
+            console.error(`Erro ao buscar dados para ${ticker}:`, error.message);
+            lastError = error.message; // Store the last error but continue with other tickers
         }
     }
 
-    // If result is empty but we had tickers, it means ALL batches failed.
+    // If result is empty but we had tickers, it means ALL requests failed.
     if (Object.keys(result).length === 0 && tickers.length > 0) {
          throw new Error(lastError || "Falha ao buscar cotações na Brapi API.");
     }
