@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
-// FIX: Corrected import path from non-existent aiService to geminiService.
 import { fetchMarketNews } from '../services/geminiService';
 import StarIcon from '../components/icons/StarIcon';
 import ShareIcon from '../components/icons/ShareIcon';
@@ -122,7 +121,7 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  const { assets } = usePortfolio();
+  const { assets, preferences } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -172,7 +171,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     setError(null);
     
     try {
-      // Check Cache first
       const cacheKey = 'news_feed';
       if (!isRefresh) {
           const cachedNews = CacheManager.get<NewsArticle[]>(cacheKey, CACHE_TTL.NEWS);
@@ -184,13 +182,12 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           }
       }
 
-      const articles = await fetchMarketNews(assetTickers);
+      const articles = await fetchMarketNews(preferences, assetTickers);
       setNews(articles);
-      CacheManager.set(cacheKey, articles); // Save to cache
+      CacheManager.set(cacheKey, articles);
 
     } catch (err: any) {
       setError(err.message || t('unknown_error'));
-      // Try to load expired cache as fallback if error
       const expiredCache = localStorage.getItem('cache_news_feed');
       if(expiredCache) {
           try {
@@ -207,7 +204,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setIsRefreshing(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, addToast]);
+  }, [t, assetTickers, addToast, preferences]);
   
   const handleTouchStart = (e: React.TouchEvent) => {
       if(containerRef.current && containerRef.current.scrollTop === 0) {
@@ -220,7 +217,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           const touchY = e.targetTouches[0].clientY;
           const pullDistance = touchY - touchStartY.current;
           if(pullDistance > 0) {
-              // Only prevent default if we are actually pulling (scrolling up past 0)
               if (e.cancelable) e.preventDefault();
               setPullPosition(Math.min(pullDistance, 100));
           }
@@ -278,7 +274,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         />
       </div>
       
-      {/* Tabs */}
       <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
           <button 
             onClick={() => { setActiveTab('all'); vibrate(); }}

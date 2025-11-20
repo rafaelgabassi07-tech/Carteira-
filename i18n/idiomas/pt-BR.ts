@@ -182,7 +182,7 @@ export const ptBR = {
     import_data: 'Importar',
     unsupported_file_type: 'Tipo de arquivo não suportado.',
     invalid_file_format: 'Formato de arquivo inválido.',
-
+    
     about_app: 'Sobre o App',
     help_about: 'Informações sobre versão e licenças.',
     version: 'Versão',
@@ -219,6 +219,17 @@ export const ptBR = {
     logout: 'Sair',
     logout_confirm: 'Tem certeza que deseja sair? Seus dados locais serão mantidos.',
 
+    // API Connections
+    api_connections: 'Conexões de API',
+    api_connections_desc: 'Gerencie suas chaves de API para conectar aos serviços de dados.',
+    gemini_api_key: 'Chave de API do Gemini',
+    gemini_api_desc: 'Necessária para notícias e dados fundamentalistas.',
+    brapi_token: 'Token da Brapi API',
+    brapi_desc: 'Necessária para cotações de mercado em tempo real.',
+    api_key_placeholder: 'Cole sua chave aqui',
+    test_connection: 'Testar Conexão',
+    save_key: 'Salvar Chave',
+
     // Update Modal
     latest: 'Atual',
     
@@ -242,6 +253,9 @@ export const ptBR = {
     toast_transaction_deleted: 'Excluído.',
     toast_check_form_errors: 'Verifique o formulário.',
     cache_cleared: 'Cache limpo!',
+    toast_connection_success: 'Conexão bem-sucedida!',
+    toast_connection_failed: 'Falha na conexão. Verifique sua chave.',
+    toast_key_saved: 'Chave salva com sucesso!',
 
     // Tour
     tour_step1_title: 'Resumo',

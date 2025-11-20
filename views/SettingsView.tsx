@@ -21,13 +21,86 @@ import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import TransactionIcon from '../components/icons/TransactionIcon';
 import LogoutIcon from '../components/icons/LogoutIcon';
+import { validateApiKey } from '../services/geminiService';
+import { validateBrapiToken } from '../services/brapiService';
 
+const LinkIcon: React.FC<{ className?: string }> = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"/></svg>;
 const PaletteIcon: React.FC<{ className?: string }> = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>;
 const SlidersIcon: React.FC<{ className?: string }> = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg>;
 
-type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions';
+type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections';
 
 // --- Sub-screen components ---
+const ApiConnectionSettings: React.FC<{ onBack: () => void, addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ onBack, addToast }) => {
+    const { t } = useI18n();
+    const { preferences, updatePreferences } = usePortfolio();
+    const [geminiKey, setGeminiKey] = useState(preferences.geminiApiKey || '');
+    const [brapiToken, setBrapiToken] = useState(preferences.brapiToken || '');
+    const [isTestingGemini, setIsTestingGemini] = useState(false);
+    const [isTestingBrapi, setIsTestingBrapi] = useState(false);
+
+    const handleSave = () => {
+        updatePreferences({ geminiApiKey: geminiKey, brapiToken: brapiToken });
+        addToast(t('toast_key_saved'), 'success');
+        vibrate();
+    };
+
+    const handleTestGemini = async () => {
+        setIsTestingGemini(true);
+        vibrate();
+        const isValid = await validateApiKey(geminiKey);
+        setIsTestingGemini(false);
+        if (isValid) {
+            addToast(t('toast_connection_success'), 'success');
+        } else {
+            addToast(t('toast_connection_failed'), 'error');
+        }
+    };
+    
+    const handleTestBrapi = async () => {
+        setIsTestingBrapi(true);
+        vibrate();
+        const isValid = await validateBrapiToken(brapiToken);
+        setIsTestingBrapi(false);
+        if (isValid) {
+            addToast(t('toast_connection_success'), 'success');
+        } else {
+            addToast(t('toast_connection_failed'), 'error');
+        }
+    };
+
+    return (
+        <div>
+            <PageHeader title={t('api_connections')} helpText={t('api_connections_desc')} onBack={onBack} />
+            <div className="space-y-6">
+                {/* Gemini API */}
+                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
+                    <h3 className="font-bold mb-1">{t('gemini_api_key')}</h3>
+                    <p className="text-xs text-[var(--text-secondary)] mb-3">{t('gemini_api_desc')}</p>
+                    <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} placeholder={t('api_key_placeholder')} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded p-2 mb-3"/>
+                    <button onClick={handleTestGemini} disabled={isTestingGemini} className="w-full bg-gray-600 text-white font-bold py-2 rounded-lg text-sm disabled:opacity-50">
+                        {isTestingGemini ? 'Testando...' : t('test_connection')}
+                    </button>
+                </div>
+
+                {/* Brapi API */}
+                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
+                    <h3 className="font-bold mb-1">{t('brapi_token')}</h3>
+                    <p className="text-xs text-[var(--text-secondary)] mb-3">{t('brapi_desc')}</p>
+                    <input type="password" value={brapiToken} onChange={(e) => setBrapiToken(e.target.value)} placeholder={t('api_key_placeholder')} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded p-2 mb-3"/>
+                    <button onClick={handleTestBrapi} disabled={isTestingBrapi} className="w-full bg-gray-600 text-white font-bold py-2 rounded-lg text-sm disabled:opacity-50">
+                        {isTestingBrapi ? 'Testando...' : t('test_connection')}
+                    </button>
+                </div>
+
+                <button onClick={handleSave} className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3 rounded-xl shadow-lg active:scale-95 transition-transform">
+                    {t('save_key')}
+                </button>
+            </div>
+        </div>
+    );
+};
+// ... (rest of the sub-components remain the same: UserProfileDetail, SecuritySettings, etc.)
 
 const UserProfileDetail: React.FC<{ onBack: () => void, addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ onBack, addToast }) => {
     const { t } = useI18n();
@@ -466,6 +539,7 @@ const MainMenu: React.FC<{
         data: [
              { label: t('transactions_data'), icon: <TransactionIcon className="w-5 h-5" />, action: () => setScreen('transactions') },
              { label: t('backup_restore'), icon: <DatabaseIcon className="w-5 h-5" />, action: () => setScreen('backup') },
+             { label: t('api_connections'), icon: <LinkIcon className="w-5 h-5" />, action: () => setScreen('apiConnections') },
         ],
         app: [
              { label: t('check_for_update'), icon: <UpdateIcon className="w-5 h-5" />, action: onShowUpdateModal },
@@ -537,6 +611,7 @@ const SettingsView: React.FC<{ addToast: (message: string, type?: ToastMessage['
             case 'appearance': return <AppearanceSettings onBack={onBack} />;
             case 'general': return <GeneralSettings onBack={onBack} />;
             case 'transactions': return <TransactionSettings onBack={onBack} />;
+            case 'apiConnections': return <ApiConnectionSettings onBack={onBack} addToast={addToast} />;
             case 'about': return <AboutApp onBack={onBack} />;
             default: return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
         }

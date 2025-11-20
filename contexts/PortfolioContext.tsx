@@ -44,8 +44,9 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     defaultBrokerage: 0, csvSeparator: ',', decimalPrecision: 2, defaultSort: 'valueDesc',
     dateFormat: 'dd/mm/yyyy', priceAlertThreshold: 5, globalIncomeGoal: 1000,
     segmentGoals: {}, dndEnabled: false, dndStart: '22:00', dndEnd: '07:00',
-    notificationChannels: { push: true, email: false }, autoBackup: false,
-    betaFeatures: false, devMode: false
+    notificationChannels: { push: true, email: false }, 
+    geminiApiKey: null, brapiToken: null,
+    autoBackup: false, betaFeatures: false, devMode: false
 };
 const EPSILON = 0.000001; // For floating point comparisons
 
@@ -135,7 +136,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    // FIX: Add type assertion to ensure `uniqueTickers` is `string[]`.
     const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker))) as string[];
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
@@ -143,7 +143,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setMarketDataError(null);
     try {
         // Step 1: Fetch fast, critical price data from Brapi
-        const priceData = await fetchBrapiQuotes(uniqueTickers);
+        const priceData = await fetchBrapiQuotes(preferences, uniqueTickers);
         setMarketData(prev => {
             const updated = { ...prev };
             Object.keys(priceData).forEach(ticker => {
@@ -153,8 +153,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
 
         // Step 2: Fetch richer, slower data from AI in the background
-        // This will enrich the existing data without blocking the UI
-        fetchAdvancedAssetData(uniqueTickers).then(advancedData => {
+        fetchAdvancedAssetData(preferences, uniqueTickers).then(advancedData => {
             setMarketData(prev => {
                 const updated = { ...prev };
                 Object.keys(advancedData).forEach(ticker => {
@@ -164,8 +163,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             });
         }).catch(err => {
             console.warn("AI data enrichment failed:", err);
-            // Non-critical error, we can still function with just price data
-            // We could set a partial error state here if needed
         });
         
         setLastSync(Date.now());
@@ -178,18 +175,18 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
       if (!silent) setIsRefreshing(false);
     }
-  }, [sourceTransactions, isRefreshing, lastSync]);
+  }, [sourceTransactions, isRefreshing, lastSync, preferences]);
   
   const refreshSingleAsset = useCallback(async (ticker: string) => {
     if (!ticker) return;
     setMarketDataError(null);
     try {
-        const priceData = await fetchBrapiQuotes([ticker]);
+        const priceData = await fetchBrapiQuotes(preferences, [ticker]);
         if (priceData && priceData[ticker]) {
             setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...priceData[ticker] } }));
         }
 
-        const advancedData = await fetchAdvancedAssetData([ticker]);
+        const advancedData = await fetchAdvancedAssetData(preferences, [ticker]);
         if (advancedData && advancedData[ticker]) {
             setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...advancedData[ticker] } }));
         }
@@ -201,7 +198,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(errorMessage);
       throw new Error(errorMessage);
     }
-  }, [setMarketData, setLastSync]);
+  }, [setMarketData, setLastSync, preferences]);
 
 
   useEffect(() => { refreshMarketData(false, true).catch(() => {}); }, [sourceTransactions, refreshMarketData]);

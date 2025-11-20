@@ -1,15 +1,19 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import type { NewsArticle } from '../types';
+import type { NewsArticle, AppPreferences } from '../types';
 
-function getApiKey(): string {
-    // In a Vite project, environment variables exposed to the client MUST start with VITE_
-    const apiKey = (import.meta as any).env.VITE_API_KEY;
-    if (!apiKey) {
-      throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente.");
+function getApiKey(prefs: AppPreferences): string {
+    // Priority 1: User-provided key from settings
+    if (prefs.geminiApiKey) {
+        return prefs.geminiApiKey;
     }
-    return apiKey;
+    // Priority 2: Environment variable
+    const envApiKey = (import.meta as any).env?.VITE_API_KEY;
+    if (envApiKey) {
+        return envApiKey;
+    }
+    // If neither is found, throw an error
+    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente ou nas configurações do app.");
 }
-
 
 // --- API Call Resiliency ---
 async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
@@ -29,7 +33,7 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
       } else {
         console.error("AI API Critical Failure:", error);
         if (error?.message?.includes("API key not valid") || error?.message?.includes("API key must be set")) {
-            throw new Error("Chave de API do Gemini (VITE_API_KEY) inválida ou não configurada no ambiente.");
+            throw new Error("Chave de API do Gemini inválida ou não configurada.");
         }
         throw error; // Re-throw to be handled by the caller
       }
@@ -77,10 +81,10 @@ const advancedAssetDataSchema = {
 
 // --- SERVICES ---
 
-export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
+export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] = []): Promise<NewsArticle[]> {
   let apiKey: string;
   try {
-    apiKey = getApiKey();
+    apiKey = getApiKey(prefs);
   } catch (error: any) {
     console.warn("Could not fetch market news:", error.message);
     return []; // Return empty instead of throwing to not break the UI
@@ -122,10 +126,10 @@ export interface AdvancedAssetData {
     shareholders: number;
 }
 
-export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
-    const apiKey = getApiKey();
+    const apiKey = getApiKey(prefs);
     const ai = new GoogleGenAI({ apiKey });
     
     const prompt = `ATENÇÃO: Busque dados fundamentalistas exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Preencha todos os campos do schema com os valores exatos encontrados no StatusInvest, sem aproximações.`;
@@ -162,4 +166,16 @@ export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<
         
         return result;
     });
+}
+
+export async function validateApiKey(apiKey: string): Promise<boolean> {
+    if (!apiKey) return false;
+    try {
+        const ai = new GoogleGenAI({ apiKey });
+        await ai.models.generateContent({ model: "gemini-2.5-flash", contents: "ping" });
+        return true;
+    } catch (error) {
+        console.error("Gemini API Key validation failed:", error);
+        return false;
+    }
 }

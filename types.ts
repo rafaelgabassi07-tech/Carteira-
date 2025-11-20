@@ -118,7 +118,9 @@ export interface AppPreferences {
       email: boolean;
   };
 
-  // Advanced
+  // Advanced & API
+  geminiApiKey: string | null;
+  brapiToken: string | null;
   autoBackup: boolean;
   betaFeatures: boolean;
   devMode: boolean;
