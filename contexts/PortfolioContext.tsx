@@ -136,13 +136,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t) => t.ticker))) as string[];
+    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker))) as string[];
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);
     setMarketDataError(null);
     try {
-        // Step 1: Fetch fast, critical price data from Brapi
         const priceData = await fetchBrapiQuotes(preferences, uniqueTickers);
         setMarketData(prev => {
             const updated = { ...prev };
@@ -152,7 +151,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return updated;
         });
 
-        // Step 2: Fetch richer, slower data from AI in the background
         fetchAdvancedAssetData(preferences, uniqueTickers).then(advancedData => {
             setMarketData(prev => {
                 const updated = { ...prev };
@@ -248,21 +246,21 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
     const yoc = totalCost > 0 ? (income / totalCost) * 100 : 0;
 
-    // Calculate Monthly Income Projection
     const monthly: MonthlyIncome[] = [];
-    if (income > 0) {
-        const avgMonthly = income / 12;
-        const today = new Date();
-        for(let i = 0; i < 12; i++) {
-             const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-             const monthName = d.toLocaleDateString('pt-BR', { month: 'short' });
-             // Add a slight random variation to simulate realistic fluctuation (+/- 10%)
-             const variation = 0.9 + Math.random() * 0.2; 
-             monthly.push({
-                 month: monthName.replace('.', ''),
-                 total: avgMonthly * variation
-             });
-        }
+    const avgMonthly = income / 12;
+    const today = new Date();
+    
+    for(let i = 0; i < 12; i++) {
+        const futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        const monthName = futureDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+        
+        const variation = 0.9 + Math.random() * 0.2; 
+        const projectedValue = income > 0 ? avgMonthly * variation : 0;
+
+        monthly.push({
+            month: monthName,
+            total: projectedValue
+        });
     }
 
     return { projectedAnnualIncome: income, yieldOnCost: yoc, monthlyIncome: monthly };

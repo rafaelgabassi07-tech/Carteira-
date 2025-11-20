@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -17,14 +18,18 @@ const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?
 );
 
 const PerformanceCard: React.FC = () => {
-    const { t } = useI18n();
+    const { t, locale } = useI18n();
     const { assets } = usePortfolio();
     const [timeRange, setTimeRange] = useState('12M');
 
-    const portfolioData = useMemo(() => {
-        if (assets.length === 0) return [];
-        const maxHistoryLength = Math.max(...assets.map(a => a.priceHistory.length));
-        if (maxHistoryLength === 0) return [];
+    const { portfolioData, dateLabels } = useMemo(() => {
+        if (assets.length === 0) return { portfolioData: [], dateLabels: [] };
+        
+        // Simulação de dados históricos baseada no histórico de preços atual
+        // Na vida real, isso viria de um endpoint de histórico de patrimônio
+        const maxHistoryLength = Math.max(...assets.map(a => a.priceHistory.length), 0);
+        if (maxHistoryLength === 0) return { portfolioData: [], dateLabels: [] };
+        
         const aggregatedHistory = Array(maxHistoryLength).fill(0);
 
         assets.forEach(asset => {
@@ -40,9 +45,19 @@ const PerformanceCard: React.FC = () => {
                 aggregatedHistory[i] += price * asset.quantity;
             }
         });
+
+        // Gerar datas retroativas reais para o Eixo X
+        const labels: string[] = [];
+        const today = new Date();
+        for (let i = 0; i < maxHistoryLength; i++) {
+            const d = new Date();
+            d.setDate(today.getDate() - (maxHistoryLength - 1 - i));
+            // Formato curto: 19 nov
+            labels.push(d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', ''));
+        }
         
-        return aggregatedHistory;
-    }, [assets]);
+        return { portfolioData: aggregatedHistory, dateLabels: labels };
+    }, [assets, locale]);
 
     const Selector = (
         <div className="flex bg-[var(--bg-primary)] rounded-lg p-1 border border-[var(--border-color)]">
@@ -60,9 +75,15 @@ const PerformanceCard: React.FC = () => {
 
     return (
         <AnalysisCard title={t('performance')} action={Selector} delay={0}>
-             <div className="h-64 w-full">
+             <div className="h-64 w-full pt-2">
                 {portfolioData.length > 1 ? (
-                     <PortfolioLineChart data={portfolioData} isPositive={portfolioData[portfolioData.length - 1] >= portfolioData[0]} label={t('my_portfolio_performance')} color="var(--accent-color)" />
+                     <PortfolioLineChart 
+                        data={portfolioData} 
+                        labels={dateLabels}
+                        isPositive={portfolioData[portfolioData.length - 1] >= portfolioData[0]} 
+                        label={t('my_portfolio_performance')} 
+                        color="var(--accent-color)" 
+                    />
                 ) : (
                     <div className="flex items-center justify-center h-full text-[var(--text-secondary)] text-sm">
                         {t('no_transactions_found')}
