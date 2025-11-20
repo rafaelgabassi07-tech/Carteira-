@@ -39,9 +39,9 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     const token = getBrapiToken(prefs);
     const result: Record<string, { currentPrice: number }> = {};
     
-    // Configuration
-    const BATCH_SIZE = 10;
-    let currentDelay = 300; // Começa rápido (300ms)
+    // Configuration - Optimized for stability
+    const BATCH_SIZE = 5; // Reduced batch size to prevent heavy load
+    let currentDelay = 500; // Increased base delay
 
     let lastError: string | null = null;
 
@@ -54,10 +54,10 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         if (response.status === 429) {
             if (!isRetry) {
                 console.warn(`Brapi Rate Limit (429) for ${batchTickers[0]}... Pausing and retrying.`);
-                // Se der Rate Limit, espera 2.5 segundos e aumenta o delay padrão para os próximos
-                await delay(2500);
-                currentDelay = 1000; // Reduz a velocidade global para evitar novos erros
-                return fetchBatch(batchTickers, true); // Tenta novamente
+                // Exponential backoff for rate limits
+                await delay(3500); 
+                currentDelay = 1500; // Permanently slow down for this session
+                return fetchBatch(batchTickers, true); // Retry once
             } else {
                 throw new Error("Limite de requisições excedido (429).");
             }
@@ -92,9 +92,12 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         const batch = tickers.slice(i, i + BATCH_SIZE);
         
         try {
-            // Apply delay between batches (but not before the first one)
+            // Apply delay between batches
             if (i > 0) {
-                await delay(currentDelay);
+                // Progressive delay: adds a small amount for each subsequent batch
+                // to mimic human behavior and avoid burst detection
+                const progressiveDelay = currentDelay + (i * 50); 
+                await delay(progressiveDelay);
             }
 
             await fetchBatch(batch);
