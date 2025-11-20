@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Schema } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle } from '../types';
 
 function getApiKey(): string {
@@ -51,7 +51,8 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
 
 // --- SCHEMAS (Structured Outputs for Speed) ---
 
-const newsSchema: Schema = {
+// Fix: The 'Schema' type is not exported from '@google/genai'. The type will be inferred.
+const newsSchema = {
     type: Type.ARRAY,
     description: "List of financial news articles",
     items: {
@@ -67,7 +68,8 @@ const newsSchema: Schema = {
     }
 };
 
-const marketDataSchema: Schema = {
+// Fix: The 'Schema' type is not exported from '@google/genai'. The type will be inferred.
+const marketDataSchema = {
     type: Type.ARRAY,
     description: "Lista de dados de mercado para ativos financeiros listados na B3.",
     items: {
@@ -78,9 +80,12 @@ const marketDataSchema: Schema = {
             dy: { type: Type.NUMBER, description: "Dividend Yield percentual dos últimos 12 meses. Exemplo: 12.5 para 12.5%" },
             pvp: { type: Type.NUMBER, description: "Relação Preço/Valor Patrimonial (P/VP). Exemplo: 1.05" },
             sector: { type: Type.STRING, description: "Setor do ativo. Exemplo: Logística, Papel, Shoppings" },
-            administrator: { type: Type.STRING, description: "Nome da administradora do fundo." }
+            administrator: { type: Type.STRING, description: "Nome da administradora do fundo." },
+            vacancyRate: { type: Type.NUMBER, description: "Taxa de vacância do fundo em porcentagem. Exemplo: 5.5 para 5.5%. Se não aplicável, retorne 0." },
+            dailyLiquidity: { type: Type.NUMBER, description: "Volume financeiro médio negociado por dia em BRL. Exemplo: 1500000. Se não houver dados, retorne 0." },
+            shareholders: { type: Type.NUMBER, description: "Número total de cotistas do fundo. Exemplo: 850000. Se não houver dados, retorne 0." }
         },
-        required: ["ticker", "currentPrice", "dy", "pvp", "sector"]
+        required: ["ticker", "currentPrice", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
 };
 
@@ -120,6 +125,9 @@ export interface RealTimeData {
     pvp: number;
     sector: string;
     administrator: string;
+    vacancyRate: number;
+    dailyLiquidity: number;
+    shareholders: number;
 }
 
 export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
@@ -128,7 +136,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
     const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `Cotação e indicadores para os ativos da B3: ${tickers.join(', ')}.`;
+    const prompt = `Cotação e indicadores fundamentalistas completos para os ativos da B3: ${tickers.join(', ')}.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
@@ -152,7 +160,10 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
                         dy: Number(item.dy || 0),
                         pvp: Number(item.pvp || 1),
                         sector: item.sector || 'Outros',
-                        administrator: item.administrator || 'N/A'
+                        administrator: item.administrator || 'N/A',
+                        vacancyRate: Number(item.vacancyRate || 0),
+                        dailyLiquidity: Number(item.dailyLiquidity || 0),
+                        shareholders: Number(item.shareholders || 0),
                     };
                 }
             });

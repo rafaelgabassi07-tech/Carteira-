@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
 import { fetchRealTimeData } from '../services/geminiService';
@@ -133,8 +134,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    // FIX: Explicitly type the map's return value to guide type inference for the Set.
-    const uniqueTickers = [...new Set(sourceTransactions.map((t): string => t.ticker))];
+    // FIX: The type annotation for the map callback was incorrect, causing a type error.
+    const uniqueTickers = [...new Set(sourceTransactions.map((t) => t.ticker))];
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);
@@ -186,6 +187,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             pvp: liveData.pvp || 0,
             segment: liveData.sector || liveData.segment || 'Outros',
             administrator: liveData.administrator || 'N/A',
+            vacancyRate: liveData.vacancyRate || 0,
+            liquidity: liveData.dailyLiquidity || 0,
+            shareholders: liveData.shareholders || 0,
         };
     });
   }, [portfolioMetrics, marketData, isDemoMode]);
@@ -224,8 +228,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     updatePreferences, refreshMarketData, getAveragePriceForTransaction, setDemoMode,
     togglePrivacyMode, resetApp, clearCache,
     getAssetByTicker: useCallback((ticker: string) => assets.find(a => a.ticker === ticker), [assets]),
-    getRawData: () => ({ assets, transactions, preferences, marketData, lastSync }),
-    getStorageUsage: () => Object.keys(localStorage).reduce((acc, key) => acc + (localStorage.getItem(key)?.length || 0), 0)
   };
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;
