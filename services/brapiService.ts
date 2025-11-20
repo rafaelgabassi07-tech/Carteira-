@@ -1,5 +1,3 @@
-import { config } from '../config';
-
 interface BrapiQuote {
     symbol: string;
     regularMarketPrice: number;
@@ -14,9 +12,10 @@ export async function fetchBrapiQuotes(tickers: string[]): Promise<Record<string
         return {};
     }
 
-    const token = config.brapiToken;
+    // In a Vite project, environment variables exposed to the client MUST start with VITE_
+    const token = (import.meta as any).env.VITE_BRAPI_TOKEN;
     if (!token) {
-        throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN ou BRAPI_TOKEN) não configurado no ambiente.");
+        throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado no ambiente.");
     }
     
     const url = `https://brapi.dev/api/quote/${tickers.join(',')}?token=${token}`;

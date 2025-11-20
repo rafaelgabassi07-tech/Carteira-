@@ -1,11 +1,11 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle } from '../types';
-import { config } from '../config';
 
 function getApiKey(): string {
-    const apiKey = config.geminiApiKey;
+    // In a Vite project, environment variables exposed to the client MUST start with VITE_
+    const apiKey = (import.meta as any).env.VITE_API_KEY;
     if (!apiKey) {
-      throw new Error("Chave de API do Gemini (VITE_API_KEY ou API_KEY) não configurada no ambiente.");
+      throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente.");
     }
     return apiKey;
 }
@@ -29,7 +29,7 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
       } else {
         console.error("AI API Critical Failure:", error);
         if (error?.message?.includes("API key not valid") || error?.message?.includes("API key must be set")) {
-            throw new Error("Chave de API do Gemini (VITE_API_KEY ou API_KEY) inválida ou não configurada no ambiente.");
+            throw new Error("Chave de API do Gemini (VITE_API_KEY) inválida ou não configurada no ambiente.");
         }
         throw error; // Re-throw to be handled by the caller
       }
