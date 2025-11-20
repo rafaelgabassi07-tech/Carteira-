@@ -8,6 +8,8 @@ interface BrapiQuote {
 
 interface BrapiResponse {
     results: BrapiQuote[];
+    error?: boolean;
+    message?: string;
 }
 
 function getBrapiToken(prefs: AppPreferences): string {
@@ -43,9 +45,12 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     const BATCH_SIZE = 10; // Safer chunk size for URL length and API limits
     const DELAY_MS = 350;  // Delay between requests to avoid rate limiting
 
+    let lastError: string | null = null;
+
     // Process tickers in batches
     for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
         const batch = tickers.slice(i, i + BATCH_SIZE);
+        // Brapi accepts comma-separated tickers
         const url = `https://brapi.dev/api/quote/${batch.join(',')}?token=${token}`;
 
         try {
@@ -57,14 +62,25 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             const response = await fetch(url);
             
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.warn(`Brapi Batch Error (${batch.join(',')}):`, errorData);
-                // We continue to the next batch instead of throwing immediately, 
-                // so partial data is better than no data.
+                const status = response.status;
+                const errorText = await response.text();
+                let errorMessage = `Erro ${status}`;
+                
+                if (status === 429) errorMessage = "Limite de requisições excedido (429).";
+                if (status === 404) errorMessage = "Ativos não encontrados (404).";
+                
+                console.warn(`Brapi Batch Error (${batch.join(',')}): ${errorMessage}`, errorText);
+                lastError = errorMessage;
+                // Continue to next batch to attempt partial recovery
                 continue; 
             }
             
             const data: BrapiResponse = await response.json();
+
+            if (data.error) {
+                 lastError = data.message || "Erro na resposta da API";
+                 continue;
+            }
 
             if (data && Array.isArray(data.results)) {
                 data.results.forEach(quote => {
@@ -78,14 +94,15 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
         } catch (error: any) {
             console.error(`Brapi Connection Error on batch ${batch.join(',')}:`, error);
-            // Continue to next batch to attempt partial recovery
+            lastError = error.message || "Erro de conexão";
         }
     }
 
-    // Check if we got any data back. If result is empty but we had tickers, 
-    // it means ALL batches failed, so we throw the last error or a generic one.
+    // Check if we got any data back. 
+    // If result is empty but we had tickers, it means ALL batches failed.
     if (Object.keys(result).length === 0 && tickers.length > 0) {
-         throw new Error("Falha ao buscar cotações na Brapi API. Verifique sua conexão ou limite de requisições.");
+         // Throw the specific error encountered, not a generic one
+         throw new Error(lastError || "Falha desconhecida ao buscar cotações na Brapi API.");
     }
     
     return result;
