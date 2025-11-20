@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -40,15 +41,16 @@ const PieRing: React.FC<{ data: { percentage: number, name: string }[], radius: 
                         r={radius}
                         fill="transparent"
                         stroke={colors[index % colors.length]}
-                        strokeWidth={isHovered ? strokeWidth + 4 : strokeWidth}
+                        strokeWidth={isHovered ? strokeWidth + 2 : strokeWidth}
                         strokeDasharray={`${arcLength} ${circumference}`}
-                        strokeDashoffset={animate ? -offset * (circumference / 100) : 0} 
+                        strokeDashoffset={-offset * (circumference / 100)} 
                         transform="rotate(-90 50 50)"
                         strokeLinecap="butt"
                         className="transition-all duration-300 cursor-pointer"
                         style={{
-                            opacity: hoveredIndex !== null && !isHovered ? 0.5 : 1,
-                            transition: 'stroke-width 0.3s, opacity 0.3s',
+                            transition: 'stroke-width 0.3s, opacity 0.3s, stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1)',
+                            strokeDashoffset: animate ? -offset * (circumference / 100) : circumference,
+                            opacity: hoveredIndex !== null && !isHovered ? 0.4 : 1,
                         }}
                         onMouseEnter={() => setHoveredIndex(index)}
                         onMouseLeave={() => setHoveredIndex(null)}
@@ -76,16 +78,14 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
     const hasGoals = Object.values(goals).some(g => Number(g) > 0);
 
     return (
-        <div className="flex flex-col md:flex-row items-center gap-6 p-2 animate-fade-in">
-            <div className="relative w-48 h-48 flex-shrink-0 transform transition-transform duration-700 ease-out" style={{ transform: animate ? 'scale(1)' : 'scale(0.8)', opacity: animate ? 1 : 0 }}>
+        <div className="flex flex-col md:flex-row items-center gap-6 p-2 animate-fade-in h-full">
+            <div className="relative w-48 h-48 flex-shrink-0">
                 <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
                     <circle cx="50" cy="50" r={40} fill="transparent" stroke="var(--border-color)" strokeWidth={18} opacity={0.1}/>
                     {hasGoals && <circle cx="50" cy="50" r={25} fill="transparent" stroke="var(--border-color)" strokeWidth={12} opacity={0.1}/>}
                     
-                    {/* Outer Ring: Goals */}
                     {hasGoals && <PieRing data={goalData} radius={40} strokeWidth={10} animate={animate} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex} />}
                     
-                    {/* Inner Ring: Current Allocation */}
                     <PieRing data={data} radius={hasGoals ? 25 : 40} strokeWidth={hasGoals ? 12 : 18} animate={animate} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex}/>
                 </svg>
                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -94,7 +94,7 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                     </div>
                 </div>
             </div>
-             <div className="w-full flex-1 space-y-2">
+             <div className="w-full flex-1 space-y-2 overflow-y-auto no-scrollbar pr-2 min-h-0">
                 {data.map((slice, index) => (
                     <div 
                         key={slice.name} 

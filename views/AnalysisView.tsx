@@ -6,6 +6,7 @@ import PortfolioLineChart from '../components/PortfolioLineChart';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 import BarChart from '../components/BarChart';
 import ScaleIcon from '../components/icons/ScaleIcon';
+import CompoundInterestChart from '../components/CompoundInterestChart';
 
 const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number }> = ({ title, children, action, delay = 0 }) => (
     <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mb-4 border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
@@ -25,8 +26,6 @@ const PerformanceCard: React.FC = () => {
     const { portfolioData, dateLabels } = useMemo(() => {
         if (assets.length === 0) return { portfolioData: [], dateLabels: [] };
         
-        // Simulação de dados históricos baseada no histórico de preços atual
-        // Na vida real, isso viria de um endpoint de histórico de patrimônio
         const maxHistoryLength = Math.max(...assets.map(a => a.priceHistory.length), 0);
         if (maxHistoryLength === 0) return { portfolioData: [], dateLabels: [] };
         
@@ -46,13 +45,11 @@ const PerformanceCard: React.FC = () => {
             }
         });
 
-        // Gerar datas retroativas reais para o Eixo X
         const labels: string[] = [];
         const today = new Date();
         for (let i = 0; i < maxHistoryLength; i++) {
             const d = new Date();
             d.setDate(today.getDate() - (maxHistoryLength - 1 - i));
-            // Formato curto: 19 nov
             labels.push(d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', ''));
         }
         
@@ -147,201 +144,214 @@ const DiversificationCard: React.FC = () => {
 };
 
 const SmartRebalancingCard: React.FC = () => {
-    const { t, formatCurrency } = useI18n();
+    const { t } = useI18n();
     const { assets, preferences, updatePreferences } = usePortfolio();
     const [contribution, setContribution] = useState(1000);
-    const [isOpen, setIsOpen] = useState(false);
 
-    const segments = useMemo(() => {
-        const segs = Array.from(new Set(assets.map(a => a.segment || t('outros'))));
-        return segs;
-    }, [assets, t]);
-
-    const currentAllocation = useMemo(() => {
-        const alloc: Record<string, number> = {};
-        let total = 0;
+    const { segments, totalValue } = useMemo(() => {
+        const segs: Record<string, { current: number, target: number, value: number }> = {};
+        let totalPortfolioValue = assets.reduce((sum, a) => sum + (a.quantity * a.currentPrice), 0);
+        
         assets.forEach(a => {
-            const val = a.quantity * a.currentPrice;
-            const seg = a.segment || t('outros');
-            alloc[seg] = (alloc[seg] || 0) + val;
-            total += val;
+            const segmentName = a.segment || t('outros');
+            if (!segs[segmentName]) {
+                segs[segmentName] = { current: 0, target: preferences.segmentGoals?.[segmentName] || 0, value: 0 };
+            }
+            const assetValue = a.quantity * a.currentPrice;
+            segs[segmentName].value += assetValue;
         });
-        return { alloc, total };
-    }, [assets, t]);
 
-    const goals = (preferences.segmentGoals || {}) as Record<string, number>;
-
-    const handleGoalChange = (segment: string, value: number) => {
-        const newGoals = { ...goals, [segment]: value };
-        updatePreferences({ segmentGoals: newGoals });
-    };
-
-    const suggestions = useMemo(() => {
-        const totalWeight = Object.values(goals).reduce((a: number, b: number) => a + b, 0);
-        if (totalWeight === 0) return [];
-
-        const futureTotal = currentAllocation.total + contribution;
-        const recommendations: { segment: string, amount: number }[] = [];
-
-        segments.forEach(seg => {
-            const targetPct = (goals[seg] || 0) / 100;
-            const targetValue = futureTotal * targetPct;
-            const currentValue = currentAllocation.alloc[seg] || 0;
-            const deficit = targetValue - currentValue;
-            
-            if (deficit > 0) {
-                recommendations.push({ segment: seg, amount: deficit });
+        // Add segments from goals that are not in assets yet
+        Object.keys(preferences.segmentGoals || {}).forEach(goalSegment => {
+            if (!segs[goalSegment]) {
+                 segs[goalSegment] = { current: 0, target: preferences.segmentGoals?.[goalSegment] || 0, value: 0 };
             }
         });
         
-        const totalDeficit = recommendations.reduce((acc, r) => acc + r.amount, 0);
-        if (totalDeficit > contribution) {
-             return recommendations.map(r => ({
-                 ...r,
-                 amount: (r.amount / totalDeficit) * contribution
-             })).sort((a,b) => b.amount - a.amount);
+        if (totalPortfolioValue === 0) totalPortfolioValue = 1;
+
+        Object.keys(segs).forEach(name => {
+            segs[name].current = (segs[name].value / totalPortfolioValue) * 100;
+        });
+        
+        return {
+            segments: Object.entries(segs).map(([name, values]) => ({ name, ...values })),
+            totalValue: totalPortfolioValue
+        };
+    }, [assets, preferences.segmentGoals, t]);
+
+    const handleGoalChange = (segment: string, value: number) => {
+        const newGoals = { ...preferences.segmentGoals, [segment]: value };
+        updatePreferences({ segmentGoals: newGoals });
+    };
+
+    const suggestion = useMemo(() => {
+        if (contribution <= 0) return null;
+
+        let bestSegment = null;
+        let maxDeficit = -Infinity;
+
+        segments.forEach(seg => {
+            const deficit = seg.target - seg.current;
+            if (deficit > maxDeficit) {
+                maxDeficit = deficit;
+                bestSegment = seg.name;
+            }
+        });
+        
+        if (!bestSegment || maxDeficit <= 0) {
+            return { text: t('rebalance_perfect') };
         }
+        
+        return { text: `${t('suggestion')}: ${bestSegment}`, segment: bestSegment };
 
-        return recommendations.sort((a,b) => b.amount - a.amount);
+    }, [contribution, segments, t]);
 
-    }, [goals, contribution, currentAllocation, segments]);
-
-    const totalGoalPct = Object.values(goals).reduce((a: number, b: number) => a + b, 0);
+    const totalGoalPct = segments.reduce((sum, seg) => sum + Number(seg.target || 0), 0);
 
     return (
         <AnalysisCard title={t('smart_rebalancing')} delay={250} action={<ScaleIcon className="w-5 h-5 text-[var(--accent-color)]"/>}>
+            <p className="text-xs text-[var(--text-secondary)] mb-4">{t('rebalance_desc')}</p>
             <div className="space-y-4">
-                <p className="text-xs text-[var(--text-secondary)]">{t('rebalance_desc')}</p>
-                
-                <div className="flex items-center bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-color)]">
-                    <span className="text-[var(--text-secondary)] mr-2 text-sm">R$</span>
-                    <input 
-                        type="number" 
-                        value={contribution} 
-                        onChange={e => setContribution(Number(e.target.value))} 
-                        className="bg-transparent w-full outline-none font-bold"
-                        placeholder={t('contribution_amount')}
-                    />
-                </div>
-
-                <div className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-color)]">
-                    <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
-                        <h4 className="font-bold text-xs uppercase tracking-wider">{t('set_targets')}</h4>
-                        <span className={`text-xs font-bold ${totalGoalPct !== 100 ? 'text-orange-400' : 'text-green-400'}`}>
-                            {t('total_percentage', { value: totalGoalPct })}
-                        </span>
+                {segments.map(seg => (
+                    <div key={seg.name}>
+                        <div className="flex justify-between items-center text-xs mb-1.5">
+                            <span className="font-bold">{t(seg.name.toLowerCase().replace(/ /g, '_')) || seg.name}</span>
+                            <div className="flex gap-2 items-center">
+                                <input 
+                                    type="number" 
+                                    value={seg.target}
+                                    onChange={e => handleGoalChange(seg.name, Number(e.target.value))}
+                                    className="w-12 bg-[var(--bg-primary)] border border-[var(--border-color)] text-center rounded text-xs p-0.5"
+                                />
+                                <span className="font-bold">% {t('target')}</span>
+                            </div>
+                        </div>
+                         <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] w-8 text-[var(--text-secondary)]">{t('current_short')}</span>
+                                <div className="w-full bg-[var(--bg-primary)] rounded-full h-2 border border-[var(--border-color)]">
+                                     <div className="bg-gray-500 h-full rounded-full" style={{ width: `${seg.current}%` }}></div>
+                                </div>
+                                <span className="text-[10px] w-8 text-right font-mono">{seg.current.toFixed(1)}%</span>
+                            </div>
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] w-8 text-[var(--accent-color)]">{t('target_short')}</span>
+                                <div className="w-full bg-[var(--bg-primary)] rounded-full h-2 border border-[var(--border-color)]">
+                                    <div className="bg-[var(--accent-color)] h-full rounded-full" style={{ width: `${seg.target}%` }}></div>
+                                </div>
+                                 <span className="text-[10px] w-8 text-right font-mono">{seg.target.toFixed(1)}%</span>
+                            </div>
+                        </div>
                     </div>
-                    
-                    {isOpen && (
-                        <div className="space-y-3 mt-3 animate-fade-in">
-                            {segments.map(seg => (
-                                <div key={seg} className="flex items-center justify-between text-xs">
-                                    <span className="w-1/3 truncate">{t(seg.toLowerCase().replace(/ /g, '_')) || seg}</span>
-                                    <input 
-                                        type="range" 
-                                        min="0" 
-                                        max="100" 
-                                        value={goals[seg] || 0} 
-                                        onChange={e => handleGoalChange(seg, Number(e.target.value))}
-                                        className="w-1/3 accent-[var(--accent-color)]"
-                                    />
-                                    <span className="w-10 text-right font-bold">{(goals[seg] || 0)}%</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="mt-4">
-                    <h4 className="font-bold text-xs uppercase tracking-wider mb-2 text-[var(--accent-color)]">{t('suggestion')}</h4>
-                    {suggestions.length > 0 ? (
-                        <div className="space-y-2">
-                            {suggestions.map(s => (
-                                <div key={s.segment} className="flex justify-between items-center bg-[var(--bg-tertiary-hover)] p-2 rounded-lg border border-[var(--border-color)]">
-                                    <span className="text-sm font-medium">{t(s.segment.toLowerCase().replace(/ /g, '_')) || s.segment}</span>
-                                    <span className="font-bold text-[var(--green-text)]">+{formatCurrency(s.amount)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-center text-[var(--text-secondary)] py-2">
-                            {totalGoalPct !== 100 ? t('rebalance_error_total') : t('rebalance_perfect')}
-                        </p>
-                    )}
-                </div>
+                ))}
             </div>
+             <div className="text-right text-xs font-bold mt-3 pr-2" style={{ color: totalGoalPct.toFixed(0) !== '100' ? '#f97316' : '#4ade80'}}>
+                 {t('total_percentage', { value: totalGoalPct.toFixed(0) })}
+             </div>
+             
+             {/* Contribution Suggestion */}
+             <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
+                <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-1 block">{t('contribution_amount')}</label>
+                <input type="number" value={contribution} onChange={e => setContribution(Number(e.target.value))} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 font-bold" />
+                {suggestion && (
+                    <div className={`mt-3 p-3 rounded-lg border text-center text-sm font-bold ${suggestion.segment ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-sky-500/10 border-sky-500/30 text-sky-400'}`}>
+                        {suggestion.text}
+                    </div>
+                )}
+             </div>
         </AnalysisCard>
     );
 };
 
+
 const MagicNumberCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
+    const { assets } = usePortfolio();
     const [desiredIncome, setDesiredIncome] = useState(1000);
-    const [dy, setDy] = useState(10);
+    const [monthlyContribution, setMonthlyContribution] = useState(500);
+    const [annualRate, setAnnualRate] = useState(8);
+
+    const portfolioTotal = useMemo(() => assets.reduce((sum, a) => sum + (a.quantity * a.currentPrice), 0), [assets]);
     
-    const capitalRequired = (desiredIncome * 12) / (dy / 100);
-    const approxShares = Math.ceil(capitalRequired / 10);
+    const { timeToGoal, capitalRequired, projectionData } = useMemo(() => {
+        const required = (desiredIncome * 12) / (annualRate / 100);
+        let total = portfolioTotal;
+        let months = 0;
+        const monthlyRate = annualRate / 100 / 12;
+
+        if (monthlyRate <= 0 || (monthlyContribution <= 0 && total < required)) {
+            return { timeToGoal: Infinity, capitalRequired: required, projectionData: null };
+        }
+        
+        if (total >= required) {
+             return { timeToGoal: 0, capitalRequired: required, projectionData: { years: 0 } };
+        }
+
+        while (total < required) {
+            total = total * (1 + monthlyRate) + monthlyContribution;
+            months++;
+            if (months > 50 * 12) { // Safety break for 50 years
+                return { timeToGoal: Infinity, capitalRequired: required, projectionData: null };
+            }
+        }
+        
+        return { timeToGoal: months / 12, capitalRequired: required, projectionData: { years: Math.ceil(months/12) } };
+    }, [desiredIncome, annualRate, portfolioTotal, monthlyContribution]);
 
     return (
         <AnalysisCard title={t('magic_number_calculator')} delay={300}>
             <div className="space-y-4">
                 <p className="text-xs text-[var(--text-secondary)]">{t('magic_number_desc')}</p>
+
+                {/* Goal Definition */}
+                <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-[var(--border-color)] space-y-3">
+                    <div>
+                        <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-1 block">{t('desired_monthly_income')}</label>
+                        <input type="number" value={desiredIncome} onChange={e => setDesiredIncome(Number(e.target.value))} className="w-full bg-transparent outline-none font-bold p-1" />
+                    </div>
+                    <div>
+                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-1 block">{t('desired_dy')}</label>
+                         <input type="range" min="6" max="16" step="0.5" value={annualRate} onChange={e => setAnnualRate(Number(e.target.value))} className="w-full accent-[var(--accent-color)]" />
+                         <span className="text-xs font-bold text-[var(--accent-color)]">{annualRate}%</span>
+                    </div>
+                     <div className="pt-2 border-t border-[var(--border-color)]">
+                         <p className="text-xs text-[var(--text-secondary)] text-center uppercase tracking-widest">{t('capital_required')}</p>
+                         <p className="text-2xl font-bold text-center text-[var(--text-primary)]">{formatCurrency(capitalRequired)}</p>
+                    </div>
+                </div>
                 
-                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {[
-                        { val: 100, label: t('mn_goal_internet') },
-                        { val: 1000, label: t('mn_goal_rent') },
-                        { val: 5000, label: t('mn_goal_salary') }
-                    ].map(preset => (
-                         <button 
-                            key={preset.val}
-                            onClick={() => setDesiredIncome(preset.val)}
-                            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all ${desiredIncome === preset.val ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-color)]'}`}
-                        >
-                            {preset.label} (R$ {preset.val})
-                        </button>
-                    ))}
-                </div>
-
-                <div>
-                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-1 block">{t('desired_monthly_income')}</label>
-                    <div className="flex items-center bg-[var(--bg-primary)] rounded-lg p-2 border border-[var(--border-color)]">
-                         <span className="text-[var(--text-secondary)] mr-2">R$</span>
-                         <input 
-                            type="number" 
-                            value={desiredIncome} 
-                            onChange={e => setDesiredIncome(Number(e.target.value))} 
-                            className="bg-transparent w-full outline-none font-bold"
-                        />
+                {/* Projection */}
+                <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-[var(--border-color)] space-y-3">
+                     <h4 className="font-bold text-xs text-[var(--accent-color)] uppercase">{t('projection_title')}</h4>
+                    <div>
+                        <label className="text-xs text-[var(--text-secondary)]">{t('initial_investment')}</label>
+                        <p className="font-bold">{formatCurrency(portfolioTotal)}</p>
+                    </div>
+                    <div>
+                         <label className="text-xs text-[var(--text-secondary)]">{t('monthly_contribution')}</label>
+                         <input type="number" value={monthlyContribution} onChange={e => setMonthlyContribution(Number(e.target.value))} className="w-full bg-transparent outline-none font-bold p-1 border-b border-[var(--border-color)]" />
+                    </div>
+                     <div className="pt-3 border-t border-[var(--border-color)] mt-2 text-center">
+                         <p className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">{t('time_to_goal')}</p>
+                          {isFinite(timeToGoal) ? (
+                              <p className="text-xl font-bold text-[var(--accent-color)]">
+                                  {timeToGoal.toFixed(1)} {t('years')}
+                              </p>
+                          ) : (
+                              <p className="text-sm font-bold text-amber-500 mt-1">{t('goal_unreachable')}</p>
+                          )}
                     </div>
                 </div>
 
-                <div>
-                     <div className="flex justify-between items-end mb-1">
-                        <label className="text-xs font-bold text-[var(--text-secondary)] uppercase block">{t('desired_dy')}</label>
-                        <span className="text-xs font-bold text-[var(--accent-color)]">{dy}%</span>
-                     </div>
-                     <input 
-                        type="range" 
-                        min="6" 
-                        max="16" 
-                        step="0.5" 
-                        value={dy} 
-                        onChange={e => setDy(Number(e.target.value))}
-                        className="w-full accent-[var(--accent-color)]"
-                    />
-                    <div className="flex justify-between text-[10px] text-[var(--text-secondary)] mt-1">
-                        <span>{t('mn_conservative')} (6%)</span>
-                        <span>{t('mn_aggressive')} (16%)</span>
-                    </div>
-                </div>
-
-                <div className="pt-4 border-t border-[var(--border-color)] mt-4 bg-[var(--bg-tertiary-hover)]/30 -mx-5 -mb-5 p-5 rounded-b-2xl">
-                     <p className="text-xs text-[var(--text-secondary)] text-center mb-1 uppercase tracking-widest">{t('capital_required')}</p>
-                     <p className="text-3xl font-bold text-center text-[var(--text-primary)] mb-1">{formatCurrency(capitalRequired)}</p>
-                     <p className="text-center text-xs text-[var(--text-secondary)] bg-[var(--bg-secondary)] inline-block px-3 py-1 rounded-full mx-auto table shadow-sm border border-[var(--border-color)]">
-                        {t('mn_approx_shares', { count: approxShares.toLocaleString() })}
-                     </p>
+                <div className="h-64">
+                    {projectionData ? (
+                        <CompoundInterestChart initial={portfolioTotal} monthly={monthlyContribution} rate={annualRate} years={projectionData.years} />
+                    ) : (
+                         <div className="flex items-center justify-center h-full text-center text-sm text-amber-500 bg-amber-500/10 rounded-lg p-4">
+                            {t('goal_unreachable_long')}
+                         </div>
+                    )}
                 </div>
             </div>
         </AnalysisCard>

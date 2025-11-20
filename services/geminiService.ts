@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -15,7 +16,7 @@ function getApiKey(prefs: AppPreferences): string {
     }
 
     // If neither is found, throw a clear error
-    throw new Error("API Key VITE_API_KEY não encontrada. Verifique Configurações ou Vercel.");
+    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada. Verifique as Configurações no app ou as Variáveis de Ambiente na Vercel.");
 }
 
 // --- API Call Resiliency ---

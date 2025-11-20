@@ -19,14 +19,13 @@ function getBrapiToken(prefs: AppPreferences): string {
     }
     
     // Priority 2: Environment variable (Vite's way)
-    // The `(import.meta as any)` is a workaround for TS environments where vite/client types aren't explicitly included
     const envToken = (import.meta as any).env?.VITE_BRAPI_TOKEN;
     
     if (envToken && envToken.trim() !== '') {
         return envToken;
     }
 
-    throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado no ambiente ou nas configurações do app.");
+    throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado. Verifique as Configurações no app ou as Variáveis de Ambiente na Vercel.");
 }
 
 // Utility delay function
@@ -90,7 +89,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
     // If result is empty but we had tickers, it means ALL requests failed.
     if (Object.keys(result).length === 0 && tickers.length > 0) {
-         throw new Error(lastError || "Falha ao buscar cotações na Brapi API.");
+         throw new Error(lastError || "Falha ao buscar cotações na Brapi API. Verifique sua conexão ou limite de requisições.");
     }
     
     return result;

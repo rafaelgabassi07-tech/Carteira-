@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -14,14 +15,14 @@ const CompoundInterestChart: React.FC<ChartProps> = ({ initial, monthly, rate, y
   const svgRef = useRef<SVGSVGElement>(null);
 
   const data = useMemo(() => {
-    if (years <= 0 || rate < 0) return []; // Allow 0 rate
+    if (years <= 0 || rate < 0) return [];
     const points = Array.from({ length: years + 1 }, (_, i) => {
       const P = initial;
       const PMT = monthly;
       const r = rate / 100 / 12;
       const n = i * 12;
       
-      const futureValue = P * Math.pow(1 + r, n) + (PMT > 0 && r > 0 ? PMT * ((Math.pow(1 + r, n) - 1) / r) : (PMT * n));
+      const futureValue = P * Math.pow(1 + r, n) + (PMT > 0 && r > 0 ? PMT * ((Math.pow(1 + r, n) - 1) / r) : (P + PMT * n));
       const invested = P + PMT * n;
       
       return { year: i, total: futureValue, invested };
@@ -38,7 +39,7 @@ const CompoundInterestChart: React.FC<ChartProps> = ({ initial, monthly, rate, y
   const padding = { top: 10, right: 10, bottom: 20, left: 10 };
   
   const maxValue = Math.max(...data.map(d => d.total));
-  const effectiveMaxValue = maxValue === 0 ? 1 : maxValue; // Avoid division by zero
+  const effectiveMaxValue = maxValue === 0 ? 1 : maxValue;
   
   const toSvgCoords = (point: { year: number; value: number }) => {
     const x = padding.left + (point.year / years) * (width - padding.left - padding.right);
@@ -88,7 +89,7 @@ const CompoundInterestChart: React.FC<ChartProps> = ({ initial, monthly, rate, y
         )}
         <text x={padding.left} y={height-5} fontSize="10" fill="var(--text-secondary)">0</text>
         <text x={width/2} y={height-5} textAnchor="middle" fontSize="10" fill="var(--text-secondary)">{Math.floor(years/2)} {t('years_axis')}</text>
-        <text x={width - padding.right} y={height-5} textAnchor="end" fontSize="10" fill="var(--text-secondary)">{years}</text>
+        <text x={width - padding.right} y={height-5} textAnchor="end" fontSize="10" fill="var(--text-secondary)">{years} {t('years_axis')}</text>
       </svg>
       <div className="flex justify-center space-x-4 text-xs mt-2">
         <div className="flex items-center space-x-1.5"><div className="w-3 h-3 rounded" style={{backgroundColor: 'var(--accent-color)', opacity: 0.5}}></div><span>{t('total_invested_chart')}</span></div>

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
@@ -250,10 +251,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const avgMonthly = income / 12;
     const today = new Date();
     
-    for(let i = 0; i < 12; i++) {
+    // Gera projeção para os próximos 12 meses
+    for (let i = 1; i <= 12; i++) {
         const futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        const monthName = futureDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+        const monthName = futureDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
         
+        // Adiciona uma leve variação para um visual mais orgânico, mas mantém a média
         const variation = 0.9 + Math.random() * 0.2; 
         const projectedValue = income > 0 ? avgMonthly * variation : 0;
 
