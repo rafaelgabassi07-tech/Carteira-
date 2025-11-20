@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import PortfolioLineChart from '../components/PortfolioLineChart';
@@ -17,19 +16,15 @@ const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?
     </div>
 );
 
-const PerformanceAnalysis: React.FC = () => {
+const PerformanceCard: React.FC = () => {
     const { t } = useI18n();
     const { assets } = usePortfolio();
     const [timeRange, setTimeRange] = useState('12M');
 
     const portfolioData = useMemo(() => {
         if (assets.length === 0) return [];
-        
-        // Find the maximum history length available
         const maxHistoryLength = Math.max(...assets.map(a => a.priceHistory.length));
         if (maxHistoryLength === 0) return [];
-
-        // Initialize array
         const aggregatedHistory = Array(maxHistoryLength).fill(0);
 
         assets.forEach(asset => {
@@ -78,7 +73,7 @@ const PerformanceAnalysis: React.FC = () => {
     );
 };
 
-const IncomeAnalysis: React.FC = () => {
+const IncomeCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
     const { monthlyIncome } = usePortfolio();
     
@@ -100,7 +95,7 @@ const IncomeAnalysis: React.FC = () => {
     );
 };
 
-const DiversificationAnalysis: React.FC = () => {
+const DiversificationCard: React.FC = () => {
     const { t } = useI18n();
     const { assets, preferences } = usePortfolio();
     
@@ -130,7 +125,7 @@ const DiversificationAnalysis: React.FC = () => {
     );
 };
 
-const SmartRebalancing: React.FC = () => {
+const SmartRebalancingCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
     const { assets, preferences, updatePreferences } = usePortfolio();
     const [contribution, setContribution] = useState(1000);
@@ -178,7 +173,6 @@ const SmartRebalancing: React.FC = () => {
             }
         });
         
-        // Normalize recommendations to fit contribution if sum > contribution
         const totalDeficit = recommendations.reduce((acc, r) => acc + r.amount, 0);
         if (totalDeficit > contribution) {
              return recommendations.map(r => ({
@@ -259,13 +253,12 @@ const SmartRebalancing: React.FC = () => {
     );
 };
 
-const MagicNumberCalculator: React.FC = () => {
+const MagicNumberCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
     const [desiredIncome, setDesiredIncome] = useState(1000);
     const [dy, setDy] = useState(10);
     
     const capitalRequired = (desiredIncome * 12) / (dy / 100);
-    // Assuming avg quota price approx R$ 10 for base 10 funds
     const approxShares = Math.ceil(capitalRequired / 10);
 
     return (
@@ -340,11 +333,11 @@ const AnalysisView: React.FC = () => {
         <div className="p-4 pb-24">
             <h1 className="text-2xl font-bold mb-6">{t('nav_analysis')}</h1>
             <div className="max-w-2xl mx-auto">
-                <PerformanceAnalysis />
-                <IncomeAnalysis />
-                <DiversificationAnalysis />
-                <SmartRebalancing />
-                <MagicNumberCalculator />
+                <PerformanceCard />
+                <IncomeCard />
+                <DiversificationCard />
+                <SmartRebalancingCard />
+                <MagicNumberCard />
             </div>
         </div>
     );

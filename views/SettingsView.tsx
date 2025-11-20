@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { ToastMessage, AppColor, AppPreferences, TransactionType, Transaction } from '../types';
 import UserIcon from '../components/icons/UserIcon';
@@ -17,19 +16,16 @@ import Modal from '../components/modals/Modal';
 import PageHeader from '../components/PageHeader';
 import UpdateCheckModal from '../components/modals/UpdateCheckModal';
 import { MOCK_USER_PROFILE } from '../constants';
-import { usePersistentState, vibrate, copyToClipboard } from '../utils';
+import { usePersistentState, vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import TransactionIcon from '../components/icons/TransactionIcon';
 import LogoutIcon from '../components/icons/LogoutIcon';
-import { validateApiKey } from '../services/geminiService';
 
 const PaletteIcon: React.FC<{ className?: string }> = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>;
 const SlidersIcon: React.FC<{ className?: string }> = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg>;
-const CodeIcon: React.FC<{ className?: string }> = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>;
-const ServerIcon: React.FC<{ className?: string }> = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>;
 
-type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'advanced';
+type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions';
 
 // --- Sub-screen components ---
 
@@ -441,86 +437,6 @@ const TransactionSettings: React.FC<{ onBack: () => void }> = ({ onBack }) => {
      )
 }
 
-const AdvancedSettings: React.FC<{ onBack: () => void, addToast: (message: string, type?: ToastMessage['type']) => void }> = ({ onBack, addToast }) => {
-    const { t } = useI18n();
-    const { resetApp, clearCache } = usePortfolio();
-    const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline' | 'idle'>('idle');
-
-    const checkStatus = useCallback(async () => {
-        setApiStatus('checking');
-        try {
-            await validateApiKey();
-            setApiStatus('online');
-            addToast(t('toast_api_success'), 'success');
-        } catch (e: any) {
-            setApiStatus('offline');
-            addToast(t('toast_api_failed'), 'error');
-        }
-    }, [addToast, t]);
-
-    const handleReset = () => {
-        if(window.confirm(t('reset_app_confirm'))) {
-            resetApp();
-        }
-    };
-    
-    return (
-        <div>
-            <PageHeader title={t('advanced')} onBack={onBack}/>
-            <div className="space-y-6 pb-10">
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                             <CodeIcon className="w-5 h-5 text-[var(--accent-color)]"/>
-                             <h3 className="font-bold">Gemini API Status</h3>
-                        </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                            apiStatus === 'online' ? 'bg-green-500/20 text-green-400' : 
-                            apiStatus === 'offline' ? 'bg-red-500/20 text-red-400' : 
-                            'bg-yellow-500/20 text-yellow-400 animate-pulse'
-                        }`}>
-                            {apiStatus === 'idle' ? 'Não Verificado' : (apiStatus === 'checking' ? t('adv_api_status_checking') : t(`adv_api_status_${apiStatus}`))}
-                        </span>
-                    </div>
-                    <p className="text-xs text-[var(--text-secondary)] mt-2">{t('adv_api_key_desc')}</p>
-                    <div className="mt-3">
-                         <button onClick={checkStatus} className="w-full text-center text-xs font-bold bg-[var(--bg-primary)] py-2 rounded-lg hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
-                            {t('adv_test_conn')}
-                         </button>
-                    </div>
-                </div>
-                
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                    <div className="flex items-center space-x-2 mb-3">
-                        <DatabaseIcon className="w-5 h-5 text-emerald-400"/>
-                        <h3 className="font-bold">{t('clear_cache')}</h3>
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center bg-[var(--bg-primary)] p-2 rounded border border-[var(--border-color)]">
-                            <span className="text-xs font-semibold">{t('adv_cache_prices')}</span>
-                            <button onClick={() => { clearCache('asset_prices'); addToast(t('cache_cleared'), 'success'); }} className="bg-[var(--bg-tertiary-hover)] hover:bg-slate-600 px-3 py-1 rounded text-xs font-bold">{t('adv_cache_prices_btn')}</button>
-                        </div>
-                         <div className="flex justify-between items-center bg-[var(--bg-primary)] p-2 rounded border border-[var(--border-color)]">
-                            <span className="text-xs font-semibold">{t('adv_cache_all')}</span>
-                            <button onClick={() => { clearCache('all'); addToast(t('cache_cleared'), 'success'); }} className="bg-red-500/10 text-red-400 hover:bg-red-500/20 px-3 py-1 rounded text-xs font-bold border border-red-500/30">{t('adv_cache_all_btn')}</button>
-                        </div>
-                     </div>
-                </div>
-
-                <div className="bg-red-500/10 p-4 rounded-lg border border-red-500/30">
-                     <h3 className="font-bold text-red-400 mb-2 uppercase text-xs tracking-widest">DANGER ZONE</h3>
-                     <div className="flex justify-between items-center">
-                         <div>
-                            <p className="font-bold text-sm">{t('reset_app')}</p>
-                         </div>
-                         <button onClick={handleReset} className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 rounded-lg text-xs">{t('reset_app')}</button>
-                     </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 // --- Main Component ---
 const MainMenu: React.FC<{ 
     setScreen: (screen: MenuScreen) => void; 
@@ -550,7 +466,6 @@ const MainMenu: React.FC<{
         data: [
              { label: t('transactions_data'), icon: <TransactionIcon className="w-5 h-5" />, action: () => setScreen('transactions') },
              { label: t('backup_restore'), icon: <DatabaseIcon className="w-5 h-5" />, action: () => setScreen('backup') },
-             { label: t('advanced'), icon: <ServerIcon className="w-5 h-5" />, action: () => setScreen('advanced') },
         ],
         app: [
              { label: t('check_for_update'), icon: <UpdateIcon className="w-5 h-5" />, action: onShowUpdateModal },
@@ -622,7 +537,6 @@ const SettingsView: React.FC<{ addToast: (message: string, type?: ToastMessage['
             case 'appearance': return <AppearanceSettings onBack={onBack} />;
             case 'general': return <GeneralSettings onBack={onBack} />;
             case 'transactions': return <TransactionSettings onBack={onBack} />;
-            case 'advanced': return <AdvancedSettings onBack={onBack} addToast={addToast} />;
             case 'about': return <AboutApp onBack={onBack} />;
             default: return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
         }

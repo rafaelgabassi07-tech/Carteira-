@@ -212,22 +212,7 @@ export const ptBR = {
     default_brokerage: 'Corretagem Padrão',
     default_sort: 'Ordenação Padrão',
     hide_cents: 'Ocultar Centavos',
-
-    advanced: 'Avançado',
-    adv_api_status_online: 'Conectado',
-    adv_api_status_offline: 'Erro',
-    adv_api_status_checking: 'Verificando...',
-    adv_test_conn: 'Testar Conexão',
-    adv_api_key_desc: 'A chave de API é gerenciada de forma segura através de variáveis de ambiente para sua proteção.',
-    clear_cache: 'Manutenção de Dados',
-    adv_cache_prices: 'Preços Desatualizados?',
-    adv_cache_prices_btn: 'Recarregar',
-    adv_cache_all: 'App Lento ou Travando?',
-    adv_cache_all_btn: 'Limpeza Total',
-    danger_zone: 'Zona de Perigo',
-    reset_app: 'Restaurar Padrões',
-    reset_app_confirm: 'PERIGO: Isso apagará TODAS as suas transações e configurações. Esta ação não pode ser desfeita. Continuar?',
-
+    
     app: 'Aplicativo',
     data: 'Dados',
     check_for_update: 'Atualizações',
@@ -256,8 +241,6 @@ export const ptBR = {
     toast_transaction_added: 'Adicionado!',
     toast_transaction_deleted: 'Excluído.',
     toast_check_form_errors: 'Verifique o formulário.',
-    toast_api_success: 'Conexão com a API Gemini bem-sucedida!',
-    toast_api_failed: 'Falha na conexão. Verifique a chave de API no seu ambiente Vercel (VITE_API_KEY).',
     cache_cleared: 'Cache limpo!',
 
     // Tour

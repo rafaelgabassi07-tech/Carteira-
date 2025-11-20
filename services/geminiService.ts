@@ -1,26 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle } from '../types';
 
-function getApiKey(): string {
-    // This function assumes the environment polyfills process.env or it's running in Node.
-    // The strict guideline is to use process.env.API_KEY.
-    try {
-        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-            return process.env.API_KEY;
-        }
-    } catch (e) {
-      // process is not defined in browser, this is expected
-    }
-    // As per user's setup, VITE_API_KEY is the way for browser deployment
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
-      // @ts-ignore
-      return import.meta.env.VITE_API_KEY;
-    }
-
-    throw new Error("Chave de API do Gemini não configurada no ambiente.");
-}
-
 // --- API Call Resiliency ---
 async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
   let attempt = 0;
@@ -34,18 +14,18 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
 
       if ((isServerError || isOverloaded) && attempt < maxRetries) {
         const delay = initialDelay * Math.pow(2, attempt - 1);
-        console.warn(`Gemini API busy. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
+        console.warn(`AI API busy. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
-        console.error("Gemini API Critical Failure:", error);
-        if (error?.status === 400 || error?.message?.includes("API key")) {
-            throw new Error("Chave de API inválida.");
+        console.error("AI API Critical Failure:", error);
+        if (error?.message?.includes("API key not valid")) {
+            throw new Error("Chave de API (Gemini) inválida ou não configurada no ambiente.");
         }
         throw error; // Re-throw to be handled by the caller
       }
     }
   }
-  throw new Error("Serviço indisponível no momento.");
+  throw new Error("Serviço de IA indisponível no momento.");
 }
 
 // --- SCHEMAS (Structured Outputs for Speed) ---
@@ -66,14 +46,13 @@ const newsSchema = {
     }
 };
 
-const marketDataSchema = {
+const advancedAssetDataSchema = {
     type: Type.ARRAY,
-    description: "Lista de dados de mercado para ativos financeiros da B3. A precisão é crítica.",
+    description: "Lista de dados fundamentalistas para ativos financeiros da B3. A precisão é crítica.",
     items: {
         type: Type.OBJECT,
         properties: {
             ticker: { type: Type.STRING, description: "Símbolo do ativo (ticker), em maiúsculas. Exemplo: MXRF11" },
-            currentPrice: { type: Type.NUMBER, description: "Preço de fechamento mais recente em BRL, como um número float. CONSULTE O STATUS INVEST. Exemplo para SNAG11 em 19/nov: 9.99" },
             dy: { type: Type.NUMBER, description: "Dividend Yield percentual dos últimos 12 meses, conforme StatusInvest. Exemplo: 12.5" },
             pvp: { type: Type.NUMBER, description: "Relação Preço/Valor Patrimonial (P/VP) exata do StatusInvest. Exemplo: 1.05" },
             sector: { type: Type.STRING, description: "Setor do ativo. Exemplo: Logística, Papel, Shoppings" },
@@ -82,15 +61,14 @@ const marketDataSchema = {
             dailyLiquidity: { type: Type.NUMBER, description: "Liquidez média diária (2M) em BRL. Busque o valor numérico EXATO no StatusInvest. Sem abreviações. Exemplo: 1543210.12" },
             shareholders: { type: Type.NUMBER, description: "Número total de cotistas mais recente. Busque o número inteiro EXATO no StatusInvest. Exemplo: 95432" }
         },
-        required: ["ticker", "currentPrice", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
+        required: ["ticker", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
 };
 
 // --- SERVICES ---
 
 export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
   const contextTickers = tickers.slice(0, 5).join(', ');
   const prompt = `Notícias recentes do mercado financeiro brasileiro (FIIs). Foco: ${contextTickers || 'Geral'}.`;
@@ -116,8 +94,7 @@ export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArtic
   }
 }
 
-export interface RealTimeData {
-    currentPrice: number;
+export interface AdvancedAssetData {
     dy: number;
     pvp: number;
     sector: string;
@@ -127,13 +104,12 @@ export interface RealTimeData {
     shareholders: number;
 }
 
-export async function fetchRealTimeData(tickers: string[]): Promise<Record<string, RealTimeData>> {
+export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
-    const apiKey = getApiKey();
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     
-    const prompt = `ATENÇÃO: Busque dados de mercado exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Preencha todos os campos do schema com os valores exatos encontrados no StatusInvest, sem aproximações.`;
+    const prompt = `ATENÇÃO: Busque dados fundamentalistas exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Preencha todos os campos do schema com os valores exatos encontrados no StatusInvest, sem aproximações.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
@@ -141,24 +117,23 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
-                responseSchema: marketDataSchema,
+                responseSchema: advancedAssetDataSchema,
                 temperature: 0,
             }
         });
 
         const data = JSON.parse(response.text || '[]');
-        const result: Record<string, RealTimeData> = {};
+        const result: Record<string, AdvancedAssetData> = {};
 
         if (Array.isArray(data)) {
             data.forEach((item: any) => {
                 if (item.ticker) {
                     result[item.ticker.toUpperCase()] = {
-                        currentPrice: Number(item.currentPrice || 0),
                         dy: Number(item.dy || 0),
                         pvp: Number(item.pvp || 1),
                         sector: item.sector || 'Outros',
                         administrator: item.administrator || 'N/A',
-                        vacancyRate: Number(item.vacancyRate), // No default, -1 is a valid value now
+                        vacancyRate: Number(item.vacancyRate),
                         dailyLiquidity: Number(item.dailyLiquidity || 0),
                         shareholders: Number(item.shareholders || 0),
                     };
@@ -168,17 +143,4 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
         
         return result;
     });
-}
-
-export async function validateApiKey(): Promise<boolean> {
-     return withRetry(async () => {
-        const apiKey = getApiKey();
-        const ai = new GoogleGenAI({ apiKey });
-        await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: "Hi",
-            config: { maxOutputTokens: 1 } 
-        });
-        return true;
-    }, 1, 500);
 }

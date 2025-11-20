@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
-import { fetchRealTimeData } from '../services/geminiService';
+// FIX: Corrected import path from non-existent aiService to geminiService.
+import { fetchAdvancedAssetData } from '../services/geminiService';
+import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_MARKET_DATA, CACHE_TTL } from '../constants';
 
@@ -51,7 +53,7 @@ const EPSILON = 0.000001; // For floating point comparisons
 // --- Unified Calculation Engine ---
 const calculatePortfolioMetrics = (transactions: Transaction[]) => {
     const metrics: Record<string, { quantity: number; totalCost: number }> = {};
-    const tickers = Array.from(new Set(transactions.map(t => t.ticker)));
+    const tickers = [...new Set(transactions.map(t => t.ticker))];
 
     tickers.forEach(ticker => {
         let quantity = 0;
@@ -134,24 +136,46 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    // FIX: Add explicit type annotation to the map callback to ensure correct type inference.
-    const uniqueTickers = [...new Set(sourceTransactions.map(t => t.ticker))];
+    // FIX: Changed from spread syntax to Array.from for creating the unique tickers array. This can help avoid potential subtle type inference issues in some environments which may have caused the 'unknown[]' error.
+    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker)));
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);
     setMarketDataError(null);
     try {
-      const data = await fetchRealTimeData(uniqueTickers);
-      if (data && Object.keys(data).length > 0) {
-          setMarketData(prev => ({ ...prev, ...data }));
-          setLastSync(Date.now());
-      } else {
-          console.warn("Market data refresh returned empty result.");
-      }
+        // Step 1: Fetch fast, critical price data from Brapi
+        const priceData = await fetchBrapiQuotes(uniqueTickers);
+        setMarketData(prev => {
+            const updated = { ...prev };
+            Object.keys(priceData).forEach(ticker => {
+                updated[ticker] = { ...(updated[ticker] || {}), ...priceData[ticker] };
+            });
+            return updated;
+        });
+
+        // Step 2: Fetch richer, slower data from AI in the background
+        // This will enrich the existing data without blocking the UI
+        fetchAdvancedAssetData(uniqueTickers).then(advancedData => {
+            setMarketData(prev => {
+                const updated = { ...prev };
+                Object.keys(advancedData).forEach(ticker => {
+                    updated[ticker] = { ...(updated[ticker] || {}), ...advancedData[ticker] };
+                });
+                return updated;
+            });
+        }).catch(err => {
+            console.warn("AI data enrichment failed:", err);
+            // Non-critical error, we can still function with just price data
+            // We could set a partial error state here if needed
+        });
+        
+        setLastSync(Date.now());
+
     } catch (error: any) {
-      console.error("Market refresh failed:", error);
-      setMarketDataError(error.message || "Falha na conexão com API.");
-      if (force) throw error; 
+      console.error("Primary market data (Brapi) refresh failed:", error);
+      const errorMessage = error.message || "Falha na conexão com API de cotações.";
+      setMarketDataError(errorMessage);
+      if (force) throw new Error(errorMessage);
     } finally {
       if (!silent) setIsRefreshing(false);
     }
@@ -159,25 +183,29 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   const refreshSingleAsset = useCallback(async (ticker: string) => {
     if (!ticker) return;
-
     setMarketDataError(null);
     try {
-      const data = await fetchRealTimeData([ticker]);
-      if (data && data[ticker]) {
-          setMarketData(prev => ({ ...prev, [ticker]: data[ticker] }));
-          setLastSync(Date.now());
-      } else {
-          console.warn(`Single asset refresh for ${ticker} returned empty result.`);
-      }
+        const priceData = await fetchBrapiQuotes([ticker]);
+        if (priceData && priceData[ticker]) {
+            setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...priceData[ticker] } }));
+        }
+
+        const advancedData = await fetchAdvancedAssetData([ticker]);
+        if (advancedData && advancedData[ticker]) {
+            setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...advancedData[ticker] } }));
+        }
+        
+        setLastSync(Date.now());
     } catch (error: any) {
       console.error(`Market refresh for ${ticker} failed:`, error);
-      setMarketDataError(error.message || "Falha na conexão com API.");
-      throw error;
+      const errorMessage = error.message || "Falha na conexão com API.";
+      setMarketDataError(errorMessage);
+      throw new Error(errorMessage);
     }
   }, [setMarketData, setLastSync]);
 
 
-  useEffect(() => { refreshMarketData(false, true).catch(() => {}); }, [sourceTransactions.length, refreshMarketData]);
+  useEffect(() => { refreshMarketData(false, true).catch(() => {}); }, [sourceTransactions, refreshMarketData]);
 
   // --- Derived State (Calculations) ---
   const portfolioMetrics = useMemo(() => calculatePortfolioMetrics(sourceTransactions), [sourceTransactions]);
@@ -227,10 +255,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [assets]);
   
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
-      const relevantTxs = sourceTransactions.filter(t => t.ticker === targetTx.ticker);
-      const metrics = calculatePortfolioMetrics(relevantTxs.filter(t => t.date < targetTx.date || (t.date === targetTx.date && t.id !== targetTx.id)));
+      const relevantTxs = sourceTransactions.filter(t => 
+        t.ticker === targetTx.ticker && 
+        (t.date < targetTx.date || (t.date === targetTx.date && t.id < targetTx.id))
+      );
+      const metrics = calculatePortfolioMetrics(relevantTxs);
       const tickerMetrics = metrics[targetTx.ticker];
-      return tickerMetrics ? tickerMetrics.totalCost / tickerMetrics.quantity : 0;
+      if (tickerMetrics && tickerMetrics.quantity > EPSILON) {
+          return tickerMetrics.totalCost / tickerMetrics.quantity;
+      }
+      return 0;
   }, [sourceTransactions]);
 
   const setDemoMode = (enabled: boolean) => {

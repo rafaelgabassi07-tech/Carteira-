@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import BottomNav from './components/BottomNav';
 import PortfolioView from './views/PortfolioView';
@@ -44,7 +43,7 @@ const App: React.FC = () => {
     if (marketDataError) {
         // Avoid showing redundant "API key not configured" toast, as Settings view handles it.
         if (!marketDataError.includes("Chave de API")) {
-            addToast(`${t('toast_update_failed')}`, 'error');
+            addToast(`${t('toast_update_failed')}: ${marketDataError}`, 'error');
         }
     }
   }, [marketDataError, addToast, t]);

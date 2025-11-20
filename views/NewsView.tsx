@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
+// FIX: Corrected import path from non-existent aiService to geminiService.
 import { fetchMarketNews } from '../services/geminiService';
 import StarIcon from '../components/icons/StarIcon';
 import ShareIcon from '../components/icons/ShareIcon';
@@ -183,8 +184,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           }
       }
 
-      // If no cache or forced refresh, fetch API
-      // FIX: Removed invalid second argument and non-existent preference property.
       const articles = await fetchMarketNews(assetTickers);
       setNews(articles);
       CacheManager.set(cacheKey, articles); // Save to cache
@@ -208,7 +207,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setIsRefreshing(false);
       setPullPosition(0);
     }
-  // FIX: Removed non-existent preference property from the dependency array.
   }, [t, assetTickers, addToast]);
   
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -244,12 +242,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   const filteredNews = useMemo(() => {
     const source = activeTab === 'favorites' 
-        ? news.filter(n => favorites.has(n.title)) // Only favorites, but from current list. 
-        // Ideally we should persist full articles for favorites, but for now we filter current feed.
-        // IMPROVEMENT: If favorites persist but are not in current feed, they might be lost visually.
-        // In a real app, favorites would be stored as full objects, not just IDs.
-        // For this demo, we assume news feed is somewhat consistent or we rely on what's loaded.
-        // To make it robust, let's merge loaded news with any persistent favorite objects if we implemented that.
+        ? news.filter(n => favorites.has(n.title))
         : news;
 
     return source.filter(article => {
