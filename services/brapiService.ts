@@ -11,17 +11,25 @@ interface BrapiResponse {
 
 function getBrapiToken(prefs: AppPreferences): string {
     // Priority 1: User-provided token from settings
-    if (prefs.brapiToken) {
+    if (prefs.brapiToken && prefs.brapiToken.trim() !== '') {
         return prefs.brapiToken;
     }
+    
     // Priority 2: Environment variable
-    const envToken = (import.meta as any).env?.VITE_BRAPI_TOKEN;
-    if (envToken) {
+    const metaEnv = (import.meta as any).env;
+    if (!metaEnv) {
+        throw new Error("Falha crítica: O ambiente Vite (import.meta.env) não foi encontrado. O build pode estar quebrado.");
+    }
+
+    const envToken = metaEnv.VITE_BRAPI_TOKEN;
+    if (envToken && envToken.trim() !== '') {
         return envToken;
     }
+
     // If neither is found, throw an error
-    throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado no ambiente ou nas configurações do app.");
+    throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado. Verifique as Configurações -> Conexões de API, ou a variável de ambiente no seu provedor de hospedagem (Vercel).");
 }
+
 
 export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { currentPrice: number }>> {
     if (tickers.length === 0) {
@@ -60,7 +68,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 }
 
 export async function validateBrapiToken(token: string): Promise<boolean> {
-    if (!token) return false;
+    if (!token || token.trim() === '') return false;
     // Brapi's validation is usually just making a successful call. We'll test with a common ticker.
     const url = `https://brapi.dev/api/quote/PETR4?token=${token}`;
     try {

@@ -3,16 +3,23 @@ import type { NewsArticle, AppPreferences } from '../types';
 
 function getApiKey(prefs: AppPreferences): string {
     // Priority 1: User-provided key from settings
-    if (prefs.geminiApiKey) {
+    if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
         return prefs.geminiApiKey;
     }
+    
     // Priority 2: Environment variable
-    const envApiKey = (import.meta as any).env?.VITE_API_KEY;
-    if (envApiKey) {
+    const metaEnv = (import.meta as any).env;
+    if (!metaEnv) {
+        throw new Error("Falha crítica: O ambiente Vite (import.meta.env) não foi encontrado. O build pode estar quebrado.");
+    }
+    
+    const envApiKey = metaEnv.VITE_API_KEY;
+    if (envApiKey && envApiKey.trim() !== '') {
         return envApiKey;
     }
+
     // If neither is found, throw an error
-    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente ou nas configurações do app.");
+    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada. Verifique as Configurações -> Conexões de API, ou a variável de ambiente no seu provedor de hospedagem (Vercel).");
 }
 
 // --- API Call Resiliency ---
@@ -169,7 +176,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 }
 
 export async function validateApiKey(apiKey: string): Promise<boolean> {
-    if (!apiKey) return false;
+    if (!apiKey || apiKey.trim() === '') return false;
     try {
         const ai = new GoogleGenAI({ apiKey });
         await ai.models.generateContent({ model: "gemini-2.5-flash", contents: "ping" });
