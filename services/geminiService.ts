@@ -67,22 +67,21 @@ const newsSchema = {
     }
 };
 
-// Fix: The 'Schema' type is not exported from '@google/genai'. The type will be inferred.
 const marketDataSchema = {
     type: Type.ARRAY,
-    description: "Lista de dados de mercado para ativos financeiros listados na B3.",
+    description: "Lista de dados de mercado para ativos financeiros da B3, consultando fontes confiáveis como StatusInvest ou FundsExplorer.",
     items: {
         type: Type.OBJECT,
         properties: {
             ticker: { type: Type.STRING, description: "Símbolo do ativo (ticker), em maiúsculas. Exemplo: MXRF11" },
-            currentPrice: { type: Type.NUMBER, description: "Preço atual de mercado em BRL, como um número float. Exemplo: 10.55 para dez reais e cinquenta e cinco centavos." },
-            dy: { type: Type.NUMBER, description: "Dividend Yield percentual dos últimos 12 meses. Exemplo: 12.5 para 12.5%" },
+            currentPrice: { type: Type.NUMBER, description: "Preço atual de mercado em BRL, como um número float. Exemplo: 10.55" },
+            dy: { type: Type.NUMBER, description: "Dividend Yield percentual dos últimos 12 meses. Exemplo: 12.5" },
             pvp: { type: Type.NUMBER, description: "Relação Preço/Valor Patrimonial (P/VP). Exemplo: 1.05" },
             sector: { type: Type.STRING, description: "Setor do ativo. Exemplo: Logística, Papel, Shoppings" },
             administrator: { type: Type.STRING, description: "Nome da administradora do fundo." },
-            vacancyRate: { type: Type.NUMBER, description: "Taxa de vacância física do fundo em porcentagem. Se for um FII de papel ou onde não se aplica, retorne 0. Para os demais, busque o valor real. Exemplo: 5.5" },
-            dailyLiquidity: { type: Type.NUMBER, description: "Volume financeiro médio negociado por dia (liquidez diária) em BRL. Busque o valor real e mais recente. Exemplo: 1500000" },
-            shareholders: { type: Type.NUMBER, description: "Número total de cotistas do fundo. Busque o número real e mais recente. Exemplo: 850000" }
+            vacancyRate: { type: Type.NUMBER, description: "Taxa de vacância física do fundo em porcentagem. Se o indicador não for aplicável (ex: FII de papel), retorne -1. Para os demais, busque o valor real. Exemplo: 5.5" },
+            dailyLiquidity: { type: Type.NUMBER, description: "Volume financeiro médio negociado por dia (liquidez diária) em BRL. Busque o valor numérico real e mais recente. Não use abreviações como '1.5M'. Exemplo: 1500000" },
+            shareholders: { type: Type.NUMBER, description: "Número total de cotistas do fundo. Busque o número inteiro real e mais recente. Não use aproximações como '850k'. Exemplo: 850000" }
         },
         required: ["ticker", "currentPrice", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
@@ -135,7 +134,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
     const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `Busque dados de mercado precisos e atualizados, incluindo indicadores fundamentalistas (P/VP, DY, vacância, liquidez, cotistas), para os seguintes ativos da B3: ${tickers.join(', ')}. Preencha todos os campos do schema com valores reais.`;
+    const prompt = `Busque dados de mercado precisos e atualizados de fontes confiáveis (StatusInvest, FundsExplorer) para os seguintes ativos da B3: ${tickers.join(', ')}. Preencha todos os campos do schema com valores numéricos reais, sem aproximações ou abreviações.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
@@ -160,7 +159,7 @@ export async function fetchRealTimeData(tickers: string[]): Promise<Record<strin
                         pvp: Number(item.pvp || 1),
                         sector: item.sector || 'Outros',
                         administrator: item.administrator || 'N/A',
-                        vacancyRate: Number(item.vacancyRate || 0),
+                        vacancyRate: Number(item.vacancyRate), // No default, -1 is a valid value now
                         dailyLiquidity: Number(item.dailyLiquidity || 0),
                         shareholders: Number(item.shareholders || 0),
                     };

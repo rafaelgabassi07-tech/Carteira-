@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
 import { fetchRealTimeData } from '../services/geminiService';
@@ -24,6 +23,7 @@ interface PortfolioContextType {
   importTransactions: (transactions: Transaction[]) => void;
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
   refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
+  refreshSingleAsset: (ticker: string) => Promise<void>;
   getAssetByTicker: (ticker: string) => Asset | undefined;
   getAveragePriceForTransaction: (transaction: Transaction) => number;
   setDemoMode: (enabled: boolean) => void;
@@ -156,6 +156,26 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!silent) setIsRefreshing(false);
     }
   }, [sourceTransactions, isRefreshing, lastSync]);
+  
+  const refreshSingleAsset = useCallback(async (ticker: string) => {
+    if (!ticker) return;
+
+    setMarketDataError(null);
+    try {
+      const data = await fetchRealTimeData([ticker]);
+      if (data && data[ticker]) {
+          setMarketData(prev => ({ ...prev, [ticker]: data[ticker] }));
+          setLastSync(Date.now());
+      } else {
+          console.warn(`Single asset refresh for ${ticker} returned empty result.`);
+      }
+    } catch (error: any) {
+      console.error(`Market refresh for ${ticker} failed:`, error);
+      setMarketDataError(error.message || "Falha na conexão com API.");
+      throw error;
+    }
+  }, [setMarketData, setLastSync]);
+
 
   useEffect(() => { refreshMarketData(false, true).catch(() => {}); }, [sourceTransactions.length, refreshMarketData]);
 
@@ -176,6 +196,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const dy = liveData.dy || 0;
         const yieldOnCost = avgPrice > 0 && dy > 0 ? ((currentPrice * (dy / 100)) / avgPrice) * 100 : 0;
         
+        const vacancy = liveData.vacancyRate;
+
         return {
             ticker,
             quantity: metrics.quantity,
@@ -187,7 +209,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             pvp: liveData.pvp || 0,
             segment: liveData.sector || liveData.segment || 'Outros',
             administrator: liveData.administrator || 'N/A',
-            vacancyRate: liveData.vacancyRate || 0,
+            vacancyRate: vacancy === -1 ? undefined : vacancy,
             liquidity: liveData.dailyLiquidity || 0,
             shareholders: liveData.shareholders || 0,
         };
@@ -225,7 +247,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     assets, transactions: sourceTransactions, preferences, isDemoMode, privacyMode,
     yieldOnCost, projectedAnnualIncome, monthlyIncome: [], lastSync, isRefreshing, marketDataError,
     addTransaction, updateTransaction, deleteTransaction, importTransactions,
-    updatePreferences, refreshMarketData, getAveragePriceForTransaction, setDemoMode,
+    updatePreferences, refreshMarketData, refreshSingleAsset, getAveragePriceForTransaction, setDemoMode,
     togglePrivacyMode, resetApp, clearCache,
     getAssetByTicker: useCallback((ticker: string) => assets.find(a => a.ticker === ticker), [assets]),
   };

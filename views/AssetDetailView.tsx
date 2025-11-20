@@ -1,10 +1,10 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import PageHeader from '../components/PageHeader';
 import PortfolioLineChart from '../components/PortfolioLineChart';
-import type { Transaction } from '../types';
+import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
+import RefreshIcon from '../components/icons/RefreshIcon';
+import { vibrate } from '../utils';
 
 interface AssetDetailViewProps {
     ticker: string;
@@ -12,34 +12,100 @@ interface AssetDetailViewProps {
     onViewTransactions: (ticker: string) => void;
 }
 
+// Skeleton for loading state
+const IndicatorSkeleton: React.FC = () => (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-5 text-sm animate-pulse">
+        {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i}>
+                <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-3/4 mb-1.5"></div>
+                <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-1/2"></div>
+            </div>
+        ))}
+    </div>
+);
+
+
 const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onViewTransactions }) => {
     const { t, formatCurrency, locale } = useI18n();
-    const { getAssetByTicker, transactions } = usePortfolio();
+    const { getAssetByTicker, transactions, refreshSingleAsset } = usePortfolio();
     const [activeTab, setActiveTab] = useState('summary');
+    const [isRefreshing, setIsRefreshing] = useState(true);
     
     const asset = getAssetByTicker(ticker);
 
+    const handleRefresh = useCallback(async () => {
+        if (isRefreshing) return;
+        vibrate();
+        setIsRefreshing(true);
+        try {
+            await refreshSingleAsset(ticker);
+        } catch (error) {
+            console.error("Failed to refresh asset details:", error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [ticker, refreshSingleAsset, isRefreshing]);
+
+    useEffect(() => {
+        const initialLoad = async () => {
+             setIsRefreshing(true);
+             try {
+                await refreshSingleAsset(ticker);
+             } finally {
+                setIsRefreshing(false);
+             }
+        };
+        initialLoad();
+    }, [ticker, refreshSingleAsset]);
+
     const assetTransactions = useMemo(() => {
-        return transactions.filter(tx => tx.ticker === asset?.ticker).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return transactions.filter(tx => tx.ticker === asset?.ticker).sort((a, b) => b.date.localeCompare(a.date));
     }, [transactions, asset?.ticker]);
 
-    if (!asset) {
+    if (!asset && !isRefreshing) {
         return (
             <div className="p-4">
-                <PageHeader title={t('error')} helpText="" onBack={onBack} />
+                <div className="flex items-center mb-6">
+                     <button onClick={onBack} className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)]"><ChevronLeftIcon className="w-6 h-6" /></button>
+                     <h2 className="text-2xl font-bold">{t('error')}</h2>
+                </div>
                 <p>{t('asset_not_found')}</p>
             </div>
         );
     }
     
-    const totalInvested = asset.quantity * asset.avgPrice;
-    const currentValue = asset.quantity * asset.currentPrice;
+    const totalInvested = asset ? asset.quantity * asset.avgPrice : 0;
+    const currentValue = asset ? asset.quantity * asset.currentPrice : 0;
     const variation = currentValue - totalInvested;
     const variationPercent = totalInvested > 0 ? (variation / totalInvested) * 100 : 0;
     
+    const renderIndicator = (label: string, value: string | number | undefined, unit: string = '') => {
+        const displayValue = (value === null || value === undefined) ? 'N/A' : `${value}${unit}`;
+        return (
+            <div>
+                <span className="text-xs text-[var(--text-secondary)]">{label}</span>
+                <p className="font-bold text-sm">{displayValue}</p>
+            </div>
+        );
+    };
+
     return (
-        <div className="p-4">
-            <PageHeader title={ticker} helpText="" onBack={onBack} />
+        <div className="p-4 pb-20">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                    <button 
+                        onClick={onBack} 
+                        className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-all duration-200 active:scale-95"
+                        aria-label={t('back')}
+                    >
+                        <ChevronLeftIcon className="w-6 h-6" />
+                    </button>
+                    <h2 className="text-2xl font-bold">{ticker}</h2>
+                </div>
+                <button onClick={handleRefresh} disabled={isRefreshing} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
+                    <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
             
             <div className="flex border-b border-[var(--border-color)] mb-4">
                 <button
@@ -58,7 +124,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             
             {activeTab === 'summary' && (
                 <div className="space-y-4 animate-fade-in">
-                    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
+                    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
                         <div className="flex justify-between items-center">
                             <div>
                                 <p className="text-sm text-[var(--text-secondary)]">{t('current_position')}</p>
@@ -73,48 +139,66 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         </div>
                     </div>
 
-                    <div>
-                        <h3 className="text-sm text-[var(--text-secondary)] font-bold mb-2">{t('price_history_7d')}</h3>
-                        <div className="h-32 bg-[var(--bg-secondary)] rounded-lg p-2">
-                            <PortfolioLineChart data={asset.priceHistory} isPositive={asset.priceHistory[asset.priceHistory.length -1] > asset.priceHistory[0]} simpleMode={true} />
+                    <div className="bg-[var(--bg-secondary)] p-2 rounded-lg border border-[var(--border-color)]">
+                        <h3 className="text-xs text-[var(--text-secondary)] font-bold mb-1 px-2">{t('price_history_7d')}</h3>
+                        <div className="h-32">
+                           {asset && <PortfolioLineChart data={asset.priceHistory} isPositive={asset.priceHistory[asset.priceHistory.length -1] >= asset.priceHistory[0]} simpleMode={true} />}
                         </div>
                     </div>
                     
-                    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
-                         <h3 className="font-bold text-lg mb-2">{t('key_indicators')}</h3>
-                         <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div><span className="text-[var(--text-secondary)]">{t('quantity')}:</span> <span className="font-bold">{asset.quantity.toFixed(4)}</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('current_price')}:</span> <span className="font-bold">{formatCurrency(asset.currentPrice)}</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('avg_price')}:</span> <span className="font-bold">{formatCurrency(asset.avgPrice)}</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('yield_on_cost')}:</span> <span className="font-bold">{asset.yieldOnCost?.toFixed(2)}%</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('dy_12m')}:</span> <span className="font-bold">{asset.dy ? `${asset.dy.toFixed(2)}%` : 'N/A'}</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('pvp')}:</span> <span className="font-bold">{asset.pvp ? asset.pvp.toFixed(2) : 'N/A'}</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('administrator')}:</span> <span className="font-bold">{asset.administrator || 'N/A'}</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('vacancy')}:</span> <span className="font-bold">{asset.vacancyRate?.toFixed(2) || 'N/A'}%</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('daily_liquidity')}:</span> <span className="font-bold">{formatCurrency(asset.liquidity || 0)}</span></div>
-                            <div><span className="text-[var(--text-secondary)]">{t('shareholders')}:</span> <span className="font-bold">{asset.shareholders?.toLocaleString(locale) || 'N/A'}</span></div>
-                        </div>
+                    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
+                         <h3 className="font-bold text-base mb-4">{t('key_indicators')}</h3>
+                         {isRefreshing || !asset ? <IndicatorSkeleton /> : (
+                             <div className="space-y-4">
+                                <div className="p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-color)]">
+                                    <h4 className="text-xs font-bold text-[var(--accent-color)] mb-2 uppercase">Sua Posição</h4>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                        {renderIndicator(t('quantity'), asset.quantity.toFixed(4))}
+                                        {renderIndicator(t('avg_price'), formatCurrency(asset.avgPrice))}
+                                        {renderIndicator(t('current_price'), formatCurrency(asset.currentPrice))}
+                                        {renderIndicator(t('yield_on_cost'), asset.yieldOnCost?.toFixed(2), '%')}
+                                    </div>
+                                </div>
+                                <div className="p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-color)]">
+                                     <h4 className="text-xs font-bold text-[var(--accent-color)] mb-2 uppercase">Valuation</h4>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                         {renderIndicator(t('dy_12m'), asset.dy?.toFixed(2), '%')}
+                                         {renderIndicator(t('pvp'), asset.pvp?.toFixed(2))}
+                                    </div>
+                                </div>
+                                <div className="p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-color)]">
+                                     <h4 className="text-xs font-bold text-[var(--accent-color)] mb-2 uppercase">Dados do Fundo</h4>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                        {renderIndicator(t('administrator'), asset.administrator)}
+                                        {renderIndicator(t('vacancy'), asset.vacancyRate?.toFixed(2), '%')}
+                                        {renderIndicator(t('daily_liquidity'), formatCurrency(asset.liquidity || 0))}
+                                        {renderIndicator(t('shareholders'), asset.shareholders?.toLocaleString(locale))}
+                                    </div>
+                                </div>
+                             </div>
+                         )}
                     </div>
-                    <button onClick={() => onViewTransactions(asset.ticker)} className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 rounded-lg">{t('view_transactions')}</button>
+                    <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3 rounded-lg mt-2 active:scale-95 transition-transform">
+                        {t('view_transactions')}
+                    </button>
                 </div>
             )}
             {activeTab === 'history' && (
-                <div className="space-y-2 animate-fade-in">
+                <div className="space-y-3 animate-fade-in pb-4">
                     {assetTransactions.length > 0 ? assetTransactions.map(tx => (
-                        <div key={tx.id} className="bg-[var(--bg-secondary)] p-3 rounded-lg text-sm">
+                        <div key={tx.id} className="bg-[var(--bg-secondary)] p-3 rounded-lg text-sm border border-[var(--border-color)]">
                             <div className="flex justify-between items-center">
                                 <div>
-                                    <p className={`font-bold ${tx.type === 'Compra' ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{t(tx.type === 'Compra' ? 'buy' : 'sell')}</p>
+                                    <p className={`font-bold text-sm ${tx.type === 'Compra' ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{t(tx.type === 'Compra' ? 'buy' : 'sell')}</p>
                                     <p className="text-xs text-[var(--text-secondary)]">{new Date(tx.date).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p>{t('shares_times_price', { count: tx.quantity, price: formatCurrency(tx.price) })}</p>
                                     <p className="font-bold">{formatCurrency(tx.quantity * tx.price)}</p>
+                                    <p className="text-xs text-[var(--text-secondary)]">{`${tx.quantity} × ${formatCurrency(tx.price)}`}</p>
                                 </div>
                             </div>
-                            {tx.notes && <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-[var(--border-color)] italic">"{tx.notes}"</p>}
                         </div>
-                    )) : <p className="text-sm text-center text-[var(--text-secondary)] py-4">{t('no_transactions_for_asset')}</p>}
+                    )) : <p className="text-sm text-center text-[var(--text-secondary)] py-8">{t('no_transactions_for_asset')}</p>}
                 </div>
             )}
         </div>
