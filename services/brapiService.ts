@@ -12,9 +12,9 @@ export async function fetchBrapiQuotes(tickers: string[]): Promise<Record<string
         return {};
     }
 
-    const token = (import.meta as any).env.VITE_BRAPI_TOKEN;
+    const token = process.env.BRAPI_TOKEN;
     if (!token) {
-        throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado no ambiente.");
+        throw new Error("Token da API Brapi (BRAPI_TOKEN) não configurado no ambiente.");
     }
     
     const url = `https://brapi.dev/api/quote/${tickers.join(',')}?token=${token}`;

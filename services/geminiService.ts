@@ -19,7 +19,7 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
       } else {
         console.error("AI API Critical Failure:", error);
         if (error?.message?.includes("API key not valid") || error?.message?.includes("API key must be set")) {
-            throw new Error("Chave de API do Gemini (VITE_API_KEY) inválida ou não configurada no ambiente.");
+            throw new Error("Chave de API do Gemini (API_KEY) inválida ou não configurada no ambiente.");
         }
         throw error; // Re-throw to be handled by the caller
       }
@@ -68,9 +68,9 @@ const advancedAssetDataSchema = {
 // --- SERVICES ---
 
 export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
-  const apiKey = (import.meta as any).env.VITE_API_KEY;
+  const apiKey = process.env.API_KEY;
   if (!apiKey) {
-      console.warn("Gemini API key (VITE_API_KEY) not found.");
+      console.warn("Gemini API key (API_KEY) not found.");
       return []; // Return empty instead of throwing to not break the UI
   }
   const ai = new GoogleGenAI({ apiKey });
@@ -112,9 +112,9 @@ export interface AdvancedAssetData {
 export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
-    const apiKey = (import.meta as any).env.VITE_API_KEY;
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente.");
+      throw new Error("Chave de API do Gemini (API_KEY) não configurada no ambiente.");
     }
     const ai = new GoogleGenAI({ apiKey });
     

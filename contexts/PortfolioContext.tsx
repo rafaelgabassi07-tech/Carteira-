@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
-// FIX: Corrected import path from non-existent aiService to geminiService.
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager } from '../utils';
@@ -136,8 +135,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    // FIX: The type of `t` can be inferred from `sourceTransactions`, removing the explicit `Transaction` type annotation resolves the type inference issue for `uniqueTickers`.
-    const uniqueTickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
+    // FIX: Explicitly type `t` as `Transaction` to ensure `uniqueTickers` is `string[]`.
+    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker)));
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);

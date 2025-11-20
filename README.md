@@ -12,17 +12,15 @@ Para que o aplicativo funcione corretamente, é **essencial** configurar duas va
 
 Utilizada para buscar notícias e dados fundamentalistas dos ativos.
 
--   **Name (Nome)**: `VITE_API_KEY`
+-   **Name (Nome)**: `API_KEY`
 -   **Value (Valor)**: `SUA_CHAVE_DE_API_DO_GEMINI`
 
 #### 2. Token da API da Brapi
 
 Utilizado para buscar as cotações em tempo real dos ativos de forma rápida e precisa.
 
--   **Name (Nome)**: `VITE_BRAPI_TOKEN`
+-   **Name (Nome)**: `BRAPI_TOKEN`
 -   **Value (Valor)**: `SEU_TOKEN_DA_BRAPI_API`
-
-**Importante:** O prefixo `VITE_` é obrigatório. O Vite só expõe variáveis de ambiente que começam com `VITE_` para o código do lado do cliente por motivos de segurança.
 
 **Como configurar:**
 
