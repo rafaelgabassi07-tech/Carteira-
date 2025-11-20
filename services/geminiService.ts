@@ -1,18 +1,11 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle } from '../types';
+import { config } from '../config';
 
 function getApiKey(): string {
-    // Diagnostic Check for Vite environment
-    // FIX: Cast `import.meta` to `any` to access the Vite-specific `env` property.
-    if (typeof (import.meta as any)?.env === 'undefined') {
-        const errorMsg = "Erro de Configuração: O ambiente Vite (import.meta.env) não foi detectado. Verifique se o projeto está configurado como 'Vite' na Vercel.";
-        console.error(errorMsg);
-        throw new Error(errorMsg);
-    }
-
-    const apiKey = (import.meta as any).env.VITE_API_KEY;
+    const apiKey = config.geminiApiKey;
     if (!apiKey) {
-      throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente. Verifique o nome e valor da variável na Vercel.");
+      throw new Error("Chave de API do Gemini (VITE_API_KEY ou API_KEY) não configurada no ambiente.");
     }
     return apiKey;
 }
@@ -36,7 +29,7 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
       } else {
         console.error("AI API Critical Failure:", error);
         if (error?.message?.includes("API key not valid") || error?.message?.includes("API key must be set")) {
-            throw new Error("Chave de API do Gemini (VITE_API_KEY) inválida ou não configurada no ambiente.");
+            throw new Error("Chave de API do Gemini (VITE_API_KEY ou API_KEY) inválida ou não configurada no ambiente.");
         }
         throw error; // Re-throw to be handled by the caller
       }

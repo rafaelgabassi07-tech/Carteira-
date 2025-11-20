@@ -1,3 +1,5 @@
+import { config } from '../config';
+
 interface BrapiQuote {
     symbol: string;
     regularMarketPrice: number;
@@ -12,17 +14,9 @@ export async function fetchBrapiQuotes(tickers: string[]): Promise<Record<string
         return {};
     }
 
-    // Diagnostic Check for Vite environment
-    // FIX: Cast `import.meta` to `any` to access the Vite-specific `env` property.
-    if (typeof (import.meta as any)?.env === 'undefined') {
-        const errorMsg = "Erro de Configuração: O ambiente Vite (import.meta.env) não foi detectado. Verifique se o projeto está configurado como 'Vite' na Vercel.";
-        console.error(errorMsg);
-        throw new Error(errorMsg);
-    }
-
-    const token = (import.meta as any).env.VITE_BRAPI_TOKEN;
+    const token = config.brapiToken;
     if (!token) {
-        throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado no ambiente. Verifique o nome e valor da variável na Vercel.");
+        throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN ou BRAPI_TOKEN) não configurado no ambiente.");
     }
     
     const url = `https://brapi.dev/api/quote/${tickers.join(',')}?token=${token}`;
