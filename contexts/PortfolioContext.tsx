@@ -136,7 +136,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker))) as string[];
+    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t) => t.ticker))) as string[];
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);
@@ -240,14 +240,32 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   }, [portfolioMetrics, marketData, isDemoMode]);
 
-  const { projectedAnnualIncome, yieldOnCost } = useMemo(() => {
+  const { projectedAnnualIncome, yieldOnCost, monthlyIncome } = useMemo(() => {
     let income = 0, totalCost = 0;
     assets.forEach(asset => {
         if (asset.dy && asset.dy > 0) income += asset.quantity * asset.currentPrice * (asset.dy / 100);
         totalCost += asset.quantity * asset.avgPrice;
     });
     const yoc = totalCost > 0 ? (income / totalCost) * 100 : 0;
-    return { projectedAnnualIncome: income, yieldOnCost: yoc };
+
+    // Calculate Monthly Income Projection
+    const monthly: MonthlyIncome[] = [];
+    if (income > 0) {
+        const avgMonthly = income / 12;
+        const today = new Date();
+        for(let i = 0; i < 12; i++) {
+             const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+             const monthName = d.toLocaleDateString('pt-BR', { month: 'short' });
+             // Add a slight random variation to simulate realistic fluctuation (+/- 10%)
+             const variation = 0.9 + Math.random() * 0.2; 
+             monthly.push({
+                 month: monthName.replace('.', ''),
+                 total: avgMonthly * variation
+             });
+        }
+    }
+
+    return { projectedAnnualIncome: income, yieldOnCost: yoc, monthlyIncome: monthly };
   }, [assets]);
   
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
@@ -275,7 +293,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const value = {
     assets, transactions: sourceTransactions, preferences, isDemoMode, privacyMode,
-    yieldOnCost, projectedAnnualIncome, monthlyIncome: [], lastSync, isRefreshing, marketDataError,
+    yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError,
     addTransaction, updateTransaction, deleteTransaction, importTransactions,
     updatePreferences, refreshMarketData, refreshSingleAsset, getAveragePriceForTransaction, setDemoMode,
     togglePrivacyMode, resetApp, clearCache,

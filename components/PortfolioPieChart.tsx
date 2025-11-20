@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -14,18 +13,11 @@ interface PortfolioPieChartProps {
 }
 
 const colors = [
-    '#3b82f6', // blue-500
-    '#22c55e', // green-500
-    '#f97316', // orange-500
-    '#8b5cf6', // violet-500
-    '#ec4899', // pink-500
-    '#14b8a6', // teal-500
-    '#e11d48', // rose-600
-    '#f59e0b', // amber-500
+    '#3b82f6', '#22c55e', '#f97316', '#8b5cf6', 
+    '#ec4899', '#14b8a6', '#e11d48', '#f59e0b',
 ];
 
-
-const PieRing: React.FC<{ data: { percentage: number }[], radius: number, strokeWidth: number, animate: boolean }> = ({ data, radius, strokeWidth, animate }) => {
+const PieRing: React.FC<{ data: { percentage: number, name: string }[], radius: number, strokeWidth: number, animate: boolean, hoveredIndex: number | null, setHoveredIndex: (i: number | null) => void }> = ({ data, radius, strokeWidth, animate, hoveredIndex, setHoveredIndex }) => {
     let cumulativePercentage = 0;
     const circumference = 2 * Math.PI * radius;
     
@@ -36,8 +28,9 @@ const PieRing: React.FC<{ data: { percentage: number }[], radius: number, stroke
                 cumulativePercentage += slice.percentage;
                 const arcLength = (slice.percentage / 100) * circumference;
                 
-                // If calculating empty or zero slices, avoid rendering artifacts
                 if (slice.percentage <= 0) return null;
+                
+                const isHovered = hoveredIndex === index;
 
                 return (
                     <circle
@@ -47,15 +40,18 @@ const PieRing: React.FC<{ data: { percentage: number }[], radius: number, stroke
                         r={radius}
                         fill="transparent"
                         stroke={colors[index % colors.length]}
-                        strokeWidth={strokeWidth}
-                        strokeDasharray={`${circumference}`}
-                        strokeDashoffset={animate ? circumference - (arcLength) : circumference} 
-                        transform={`rotate(${(offset * 3.6) - 90}, 50, 50)`}
-                        strokeLinecap="round"
+                        strokeWidth={isHovered ? strokeWidth + 4 : strokeWidth}
+                        strokeDasharray={`${arcLength} ${circumference}`}
+                        strokeDashoffset={animate ? -offset * (circumference / 100) : 0} 
+                        transform="rotate(-90 50 50)"
+                        strokeLinecap="butt"
+                        className="transition-all duration-300 cursor-pointer"
                         style={{
-                            transition: 'stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1)',
-                            transitionDelay: `${index * 100}ms`
+                            opacity: hoveredIndex !== null && !isHovered ? 0.5 : 1,
+                            transition: 'stroke-width 0.3s, opacity 0.3s',
                         }}
+                        onMouseEnter={() => setHoveredIndex(index)}
+                        onMouseLeave={() => setHoveredIndex(null)}
                     />
                 );
             })}
@@ -66,6 +62,7 @@ const PieRing: React.FC<{ data: { percentage: number }[], radius: number, stroke
 const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) => {
     const { t, formatCurrency } = useI18n();
     const [animate, setAnimate] = useState(false);
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
     useEffect(() => {
         const timer = setTimeout(() => setAnimate(true), 100);
@@ -80,16 +77,16 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
 
     return (
         <div className="flex flex-col md:flex-row items-center gap-6 p-2 animate-fade-in">
-            <div className="relative w-48 h-48 flex-shrink-0 transform transition-transform duration-700 ease-out" style={{ transform: animate ? 'scale(1) rotate(0deg)' : 'scale(0.8) rotate(-90deg)', opacity: animate ? 1 : 0 }}>
-                <svg viewBox="0 0 100 100" className="w-full h-full">
-                    <circle cx="50" cy="50" r={40} fill="transparent" stroke="var(--border-color)" strokeWidth={18} opacity={0.2}/>
-                    {hasGoals && <circle cx="50" cy="50" r={25} fill="transparent" stroke="var(--border-color)" strokeWidth={12} opacity={0.2}/>}
+            <div className="relative w-48 h-48 flex-shrink-0 transform transition-transform duration-700 ease-out" style={{ transform: animate ? 'scale(1)' : 'scale(0.8)', opacity: animate ? 1 : 0 }}>
+                <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                    <circle cx="50" cy="50" r={40} fill="transparent" stroke="var(--border-color)" strokeWidth={18} opacity={0.1}/>
+                    {hasGoals && <circle cx="50" cy="50" r={25} fill="transparent" stroke="var(--border-color)" strokeWidth={12} opacity={0.1}/>}
                     
                     {/* Outer Ring: Goals */}
-                    {hasGoals && <PieRing data={goalData} radius={40} strokeWidth={10} animate={animate}/>}
+                    {hasGoals && <PieRing data={goalData} radius={40} strokeWidth={10} animate={animate} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex} />}
                     
                     {/* Inner Ring: Current Allocation */}
-                    <PieRing data={data} radius={hasGoals ? 25 : 40} strokeWidth={hasGoals ? 12 : 18} animate={animate}/>
+                    <PieRing data={data} radius={hasGoals ? 25 : 40} strokeWidth={hasGoals ? 12 : 18} animate={animate} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex}/>
                 </svg>
                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="text-center">
@@ -97,22 +94,13 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                     </div>
                 </div>
             </div>
-             <div className="w-full flex-1 space-y-3">
-                {hasGoals && (
-                    <div className="flex justify-around text-xs mb-3 border-b border-[var(--border-color)] pb-2">
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[var(--text-secondary)] opacity-50"/>{t('current')}</div>
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[var(--text-secondary)]"/>{t('goal')}</div>
-                    </div>
-                )}
+             <div className="w-full flex-1 space-y-2">
                 {data.map((slice, index) => (
                     <div 
                         key={slice.name} 
-                        className="flex items-center justify-between text-sm transition-all duration-500 transform translate-y-0 opacity-100" 
-                        style={{ 
-                            transitionDelay: `${300 + index * 50}ms`,
-                            opacity: animate ? 1 : 0,
-                            transform: animate ? 'translateY(0)' : 'translateY(10px)'
-                        }}
+                        className={`flex items-center justify-between text-sm transition-all duration-200 p-1.5 rounded-lg cursor-pointer ${hoveredIndex === index ? 'bg-[var(--bg-tertiary-hover)] scale-[1.02]' : 'hover:bg-[var(--bg-primary)]'}`}
+                        onMouseEnter={() => setHoveredIndex(index)}
+                        onMouseLeave={() => setHoveredIndex(null)}
                     >
                         <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: colors[index % colors.length] }}></div>
@@ -120,7 +108,6 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                         </div>
                         <div className="text-right">
                            <span className="font-bold">{slice.percentage.toFixed(1)}%</span>
-                           {hasGoals && <span className="text-xs text-[var(--text-secondary)]"> / {(goals[slice.name] || 0).toFixed(0)}%</span>}
                            <p className="text-[10px] text-[var(--text-secondary)]">{formatCurrency(slice.value)}</p>
                         </div>
                     </div>

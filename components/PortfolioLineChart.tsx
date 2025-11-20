@@ -13,23 +13,20 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, isPositiv
   const { formatCurrency } = useI18n();
   const [activePoint, setActivePoint] = useState<{ x: number, y: number, value: number, index: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  // Generate a stable ID for this component instance's gradient
   const gradientId = useRef(`gradient-${Math.random().toString(36).substr(2, 9)}`).current;
   
   if (!data || data.length < 2) return <div className="flex items-center justify-center h-full text-sm text-[var(--text-secondary)]">Dados insuficientes.</div>;
 
   const width = 300;
-  const height = simpleMode ? 100 : 150; // Increased default height for better aspect ratio
+  const height = simpleMode ? 100 : 150;
   const padding = { top: 20, bottom: 20, left: 10, right: 10 };
 
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min === 0 ? 1 : max - min;
   
-  // Normalize points to chart dimensions
   const getCoords = (value: number, index: number) => {
       const x = padding.left + (index / (data.length - 1)) * (width - padding.left - padding.right);
-      // Invert Y because SVG origin is top-left
       const y = (height - padding.bottom) - ((value - min) / range) * (height - padding.top - padding.bottom);
       return {x, y};
   }
@@ -39,14 +36,13 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, isPositiv
       return `${coords.x},${coords.y}`;
   }).join(' ');
 
+  const startCoords = getCoords(data[0], 0);
+  const endCoords = getCoords(data[data.length - 1], data.length - 1);
+
   const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
-    
-    // Ratio of pixel to SVG unit
-    // const ratio = width / rect.width; 
-    
     const relativeX = Math.max(0, Math.min(1, (x / rect.width)));
     const index = Math.round(relativeX * (data.length - 1));
 
@@ -57,10 +53,7 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, isPositiv
     }
   };
 
-  const handleMouseLeave = () => {
-    setActivePoint(null);
-  };
-
+  const handleMouseLeave = () => setActivePoint(null);
   const strokeColor = color || (isPositive ? 'var(--green-text)' : 'var(--red-text)');
 
   return (
@@ -98,12 +91,13 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, isPositiv
         strokeLinecap="round"
         strokeLinejoin="round"
         points={points}
-        style={{
-          strokeDasharray: 1000,
-          strokeDashoffset: 1000,
-          animation: 'draw 1.5s ease-out forwards',
-        }}
       />
+      
+      {/* Start Dot */}
+      <circle cx={startCoords.x} cy={startCoords.y} r="3" fill="var(--bg-secondary)" stroke={strokeColor} strokeWidth="2" />
+      {/* End Dot */}
+      <circle cx={endCoords.x} cy={endCoords.y} r="3" fill={strokeColor} stroke="var(--bg-secondary)" strokeWidth="1" />
+
       {activePoint && !simpleMode && (
         <g className="pointer-events-none">
           <line
@@ -116,7 +110,7 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, isPositiv
             vectorEffect="non-scaling-stroke"
             strokeDasharray="4 4"
           />
-          <circle cx={activePoint.x} cy={activePoint.y} r="4" fill={strokeColor} stroke="var(--bg-secondary)" strokeWidth="2" />
+          <circle cx={activePoint.x} cy={activePoint.y} r="5" fill={strokeColor} stroke="var(--bg-secondary)" strokeWidth="2" />
            <g transform={`translate(${activePoint.x > width / 2 ? activePoint.x - 90 : activePoint.x + 10}, ${Math.max(padding.top, activePoint.y - 30)})`}>
               <rect x="0" y="0" width="80" height="25" rx="4" fill="var(--bg-secondary)" stroke="var(--border-color)" strokeWidth="1" opacity="0.95" />
               <text x="40" y="16" textAnchor="middle" fill="var(--text-primary)" fontSize="10" fontWeight="bold">
