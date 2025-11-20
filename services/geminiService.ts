@@ -68,7 +68,6 @@ const advancedAssetDataSchema = {
 // --- SERVICES ---
 
 export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
-  // FIX: Cast import.meta to any to access env property, resolving TypeScript error.
   const apiKey = (import.meta as any).env.VITE_API_KEY;
   if (!apiKey) {
       console.warn("Gemini API key (VITE_API_KEY) not found.");
@@ -113,7 +112,6 @@ export interface AdvancedAssetData {
 export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
-    // FIX: Cast import.meta to any to access env property, resolving TypeScript error.
     const apiKey = (import.meta as any).env.VITE_API_KEY;
     if (!apiKey) {
       throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente.");

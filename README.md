@@ -6,7 +6,7 @@ Este projeto está configurado para ser implantado na Vercel utilizando o preset
 
 ### Configuração Essencial: Variáveis de Ambiente
 
-Para que o aplicativo funcione corretamente, é **essencial** configurar duas variáveis de ambiente no seu projeto na Vercel. **Atenção:** Como este é um projeto Vite, todas as variáveis de ambiente que precisam ser acessadas no navegador **DEVEM** começar com o prefixo `VITE_`.
+Para que o aplicativo funcione corretamente, é **essencial** configurar duas variáveis de ambiente no seu projeto na Vercel.
 
 #### 1. Chave da API do Google Gemini
 
@@ -22,12 +22,14 @@ Utilizado para buscar as cotações em tempo real dos ativos de forma rápida e 
 -   **Name (Nome)**: `VITE_BRAPI_TOKEN`
 -   **Value (Valor)**: `SEU_TOKEN_DA_BRAPI_API`
 
+**Importante:** O prefixo `VITE_` é obrigatório. O Vite só expõe variáveis de ambiente que começam com `VITE_` para o código do lado do cliente por motivos de segurança.
+
 **Como configurar:**
 
 1.  Acesse o painel do seu projeto na Vercel.
 2.  Vá para a aba **Settings**.
 3.  No menu lateral, clique em **Environment Variables**.
-4.  Crie as duas variáveis conforme descrito acima, prestando atenção ao prefixo `VITE_`.
+4.  Crie as duas variáveis conforme descrito acima.
 5.  Certifique-se de que as variáveis estejam disponíveis para todos os ambientes (Production, Preview, e Development).
 6.  Salve as variáveis. A Vercel iniciará um novo deploy automaticamente para aplicar as alterações.
 

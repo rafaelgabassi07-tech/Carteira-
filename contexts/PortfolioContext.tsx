@@ -136,9 +136,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    // FIX: Changed from spread syntax to Array.from and added explicit typing for the map function argument
-    // to resolve a type inference issue where uniqueTickers was inferred as 'unknown[]' instead of 'string[]'.
-    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker)));
+    // FIX: The type of `t` can be inferred from `sourceTransactions`, removing the explicit `Transaction` type annotation resolves the type inference issue for `uniqueTickers`.
+    const uniqueTickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);
