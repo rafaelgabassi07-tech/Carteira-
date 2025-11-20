@@ -135,8 +135,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isRefreshing) return;
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
-    // FIX: Explicitly type `t` as `Transaction` to ensure `uniqueTickers` is `string[]`.
-    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker)));
+    // FIX: Add type assertion to ensure `uniqueTickers` is `string[]`.
+    const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker))) as string[];
     if (uniqueTickers.length === 0) { setMarketData({}); setLastSync(Date.now()); return; }
 
     if (!silent) setIsRefreshing(true);

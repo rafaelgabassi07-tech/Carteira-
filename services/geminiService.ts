@@ -1,6 +1,23 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle } from '../types';
 
+function getApiKey(): string {
+    // Diagnostic Check for Vite environment
+    // FIX: Cast `import.meta` to `any` to access the Vite-specific `env` property.
+    if (typeof (import.meta as any)?.env === 'undefined') {
+        const errorMsg = "Erro de Configuração: O ambiente Vite (import.meta.env) não foi detectado. Verifique se o projeto está configurado como 'Vite' na Vercel.";
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+    }
+
+    const apiKey = (import.meta as any).env.VITE_API_KEY;
+    if (!apiKey) {
+      throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente. Verifique o nome e valor da variável na Vercel.");
+    }
+    return apiKey;
+}
+
+
 // --- API Call Resiliency ---
 async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
   let attempt = 0;
@@ -19,7 +36,7 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
       } else {
         console.error("AI API Critical Failure:", error);
         if (error?.message?.includes("API key not valid") || error?.message?.includes("API key must be set")) {
-            throw new Error("Chave de API do Gemini (API_KEY) inválida ou não configurada no ambiente.");
+            throw new Error("Chave de API do Gemini (VITE_API_KEY) inválida ou não configurada no ambiente.");
         }
         throw error; // Re-throw to be handled by the caller
       }
@@ -68,11 +85,14 @@ const advancedAssetDataSchema = {
 // --- SERVICES ---
 
 export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-      console.warn("Gemini API key (API_KEY) not found.");
-      return []; // Return empty instead of throwing to not break the UI
+  let apiKey: string;
+  try {
+    apiKey = getApiKey();
+  } catch (error: any) {
+    console.warn("Could not fetch market news:", error.message);
+    return []; // Return empty instead of throwing to not break the UI
   }
+  
   const ai = new GoogleGenAI({ apiKey });
 
   const contextTickers = tickers.slice(0, 5).join(', ');
@@ -112,10 +132,7 @@ export interface AdvancedAssetData {
 export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      throw new Error("Chave de API do Gemini (API_KEY) não configurada no ambiente.");
-    }
+    const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey });
     
     const prompt = `ATENÇÃO: Busque dados fundamentalistas exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Preencha todos os campos do schema com os valores exatos encontrados no StatusInvest, sem aproximações.`;

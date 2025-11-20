@@ -12,9 +12,17 @@ export async function fetchBrapiQuotes(tickers: string[]): Promise<Record<string
         return {};
     }
 
-    const token = process.env.BRAPI_TOKEN;
+    // Diagnostic Check for Vite environment
+    // FIX: Cast `import.meta` to `any` to access the Vite-specific `env` property.
+    if (typeof (import.meta as any)?.env === 'undefined') {
+        const errorMsg = "Erro de Configuração: O ambiente Vite (import.meta.env) não foi detectado. Verifique se o projeto está configurado como 'Vite' na Vercel.";
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+    }
+
+    const token = (import.meta as any).env.VITE_BRAPI_TOKEN;
     if (!token) {
-        throw new Error("Token da API Brapi (BRAPI_TOKEN) não configurado no ambiente.");
+        throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado no ambiente. Verifique o nome e valor da variável na Vercel.");
     }
     
     const url = `https://brapi.dev/api/quote/${tickers.join(',')}?token=${token}`;
