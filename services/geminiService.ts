@@ -7,19 +7,15 @@ function getApiKey(prefs: AppPreferences): string {
         return prefs.geminiApiKey;
     }
     
-    // Priority 2: Environment variable
-    const metaEnv = (import.meta as any).env;
-    if (!metaEnv) {
-        throw new Error("Falha crítica: O ambiente Vite (import.meta.env) não foi encontrado. O build pode estar quebrado.");
-    }
-    
-    const envApiKey = metaEnv.VITE_API_KEY;
+    // Priority 2: Environment variable (Direct access)
+    const envApiKey = (import.meta as any).env?.VITE_API_KEY;
+
     if (envApiKey && envApiKey.trim() !== '') {
         return envApiKey;
     }
 
-    // If neither is found, throw an error
-    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada. Verifique as Configurações -> Conexões de API, ou a variável de ambiente no seu provedor de hospedagem (Vercel).");
+    // If neither is found, throw a clear error
+    throw new Error("API Key VITE_API_KEY não encontrada. Verifique Configurações ou Vercel.");
 }
 
 // --- API Call Resiliency ---
@@ -39,10 +35,8 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         console.error("AI API Critical Failure:", error);
-        if (error?.message?.includes("API key not valid") || error?.message?.includes("API key must be set")) {
-            throw new Error("Chave de API do Gemini inválida ou não configurada.");
-        }
-        throw error; // Re-throw to be handled by the caller
+        // Propagate the real error
+        throw error; 
       }
     }
   }
@@ -93,8 +87,8 @@ export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] =
   try {
     apiKey = getApiKey(prefs);
   } catch (error: any) {
-    console.warn("Could not fetch market news:", error.message);
-    return []; // Return empty instead of throwing to not break the UI
+    console.warn("Skipping news fetch (No API Key):", error.message);
+    return [];
   }
   
   const ai = new GoogleGenAI({ apiKey });

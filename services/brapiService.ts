@@ -15,19 +15,16 @@ function getBrapiToken(prefs: AppPreferences): string {
         return prefs.brapiToken;
     }
     
-    // Priority 2: Environment variable
-    const metaEnv = (import.meta as any).env;
-    if (!metaEnv) {
-        throw new Error("Falha crítica: O ambiente Vite (import.meta.env) não foi encontrado. O build pode estar quebrado.");
-    }
-
-    const envToken = metaEnv.VITE_BRAPI_TOKEN;
+    // Priority 2: Environment variable (Direct access, no complex checks)
+    // Using 'as any' to bypass potential strict TS config issues with import.meta
+    const envToken = (import.meta as any).env?.VITE_BRAPI_TOKEN;
+    
     if (envToken && envToken.trim() !== '') {
         return envToken;
     }
 
-    // If neither is found, throw an error
-    throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado. Verifique as Configurações -> Conexões de API, ou a variável de ambiente no seu provedor de hospedagem (Vercel).");
+    // If neither is found, throw a clear error
+    throw new Error("Token VITE_BRAPI_TOKEN não encontrado. Verifique Configurações ou Vercel.");
 }
 
 
@@ -36,14 +33,15 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         return {};
     }
 
+    // Allow error to bubble up if token is missing
     const token = getBrapiToken(prefs);
     const url = `https://brapi.dev/api/quote/${tickers.join(',')}?token=${token}`;
 
     try {
         const response = await fetch(url);
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Brapi API returned status ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || errorData.message || `Brapi Error: ${response.status} ${response.statusText}`);
         }
         
         const data: BrapiResponse = await response.json();
@@ -63,13 +61,13 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
     } catch (error: any) {
         console.error("Brapi API fetch error:", error);
-        throw new Error("Falha ao buscar cotações na Brapi API.");
+        // CRITICAL FIX: Throw the REAL error message, not a generic one.
+        throw new Error(error.message || "Erro desconhecido ao conectar com Brapi API");
     }
 }
 
 export async function validateBrapiToken(token: string): Promise<boolean> {
     if (!token || token.trim() === '') return false;
-    // Brapi's validation is usually just making a successful call. We'll test with a common ticker.
     const url = `https://brapi.dev/api/quote/PETR4?token=${token}`;
     try {
         const response = await fetch(url);
