@@ -18,8 +18,8 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         console.error("AI API Critical Failure:", error);
-        if (error?.message?.includes("API key not valid")) {
-            throw new Error("Chave de API (VITE_API_KEY) inválida ou não configurada no ambiente.");
+        if (error?.message?.includes("API key not valid") || error?.message?.includes("API key must be set")) {
+            throw new Error("Chave de API do Gemini (VITE_API_KEY) inválida ou não configurada no ambiente.");
         }
         throw error; // Re-throw to be handled by the caller
       }
@@ -68,8 +68,13 @@ const advancedAssetDataSchema = {
 // --- SERVICES ---
 
 export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
-  // FIX: Use process.env.API_KEY as per guidelines, instead of import.meta.env
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  // FIX: Cast import.meta to any to access env property, resolving TypeScript error.
+  const apiKey = (import.meta as any).env.VITE_API_KEY;
+  if (!apiKey) {
+      console.warn("Gemini API key (VITE_API_KEY) not found.");
+      return []; // Return empty instead of throwing to not break the UI
+  }
+  const ai = new GoogleGenAI({ apiKey });
 
   const contextTickers = tickers.slice(0, 5).join(', ');
   const prompt = `Notícias recentes do mercado financeiro brasileiro (FIIs). Foco: ${contextTickers || 'Geral'}.`;
@@ -108,8 +113,12 @@ export interface AdvancedAssetData {
 export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
-    // FIX: Use process.env.API_KEY as per guidelines, instead of import.meta.env
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    // FIX: Cast import.meta to any to access env property, resolving TypeScript error.
+    const apiKey = (import.meta as any).env.VITE_API_KEY;
+    if (!apiKey) {
+      throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada no ambiente.");
+    }
+    const ai = new GoogleGenAI({ apiKey });
     
     const prompt = `ATENÇÃO: Busque dados fundamentalistas exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Preencha todos os campos do schema com os valores exatos encontrados no StatusInvest, sem aproximações.`;
 

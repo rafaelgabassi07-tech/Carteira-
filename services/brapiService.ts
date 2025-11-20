@@ -12,8 +12,8 @@ export async function fetchBrapiQuotes(tickers: string[]): Promise<Record<string
         return {};
     }
 
-    // FIX: Replaced import.meta.env with process.env to resolve TypeScript error.
-    const token = process.env.VITE_BRAPI_TOKEN;
+    // FIX: Cast import.meta to any to access env property, resolving TypeScript error.
+    const token = (import.meta as any).env.VITE_BRAPI_TOKEN;
     if (!token) {
         throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado no ambiente.");
     }
