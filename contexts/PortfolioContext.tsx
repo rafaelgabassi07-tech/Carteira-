@@ -1,10 +1,12 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { Asset, Transaction, AppPreferences, MonthlyIncome } from '../types';
+// FIX: Import UserProfile type
+import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager } from '../utils';
-import { DEMO_TRANSACTIONS, DEMO_MARKET_DATA, CACHE_TTL } from '../constants';
+// FIX: Import MOCK_USER_PROFILE
+import { DEMO_TRANSACTIONS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE } from '../constants';
 
 // --- Types ---
 interface PortfolioContextType {
@@ -19,11 +21,14 @@ interface PortfolioContextType {
   lastSync: number | null;
   isRefreshing: boolean;
   marketDataError: string | null;
+  // FIX: Add userProfile and updateUserProfile to context type
+  userProfile: UserProfile;
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (transaction: Transaction) => void;
   deleteTransaction: (id: string) => void;
   importTransactions: (transactions: Transaction[]) => void;
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
+  updateUserProfile: (profile: Partial<UserProfile>) => void;
   refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
   refreshSingleAsset: (ticker: string) => Promise<void>;
   getAssetByTicker: (ticker: string) => Asset | undefined;
@@ -100,6 +105,8 @@ const calculatePortfolioMetrics = (transactions: Transaction[]) => {
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [transactions, setTransactions] = usePersistentState<Transaction[]>('transactions', []);
   const [preferences, setPreferences] = usePersistentState<AppPreferences>('app_preferences', DEFAULT_PREFERENCES);
+  // FIX: Add userProfile state
+  const [userProfile, setUserProfile] = usePersistentState<UserProfile>('user_profile', MOCK_USER_PROFILE);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [privacyMode, setPrivacyMode] = usePersistentState('privacy_mode', false);
   const [marketData, setMarketData] = usePersistentState<Record<string, any>>('market_data', {});
@@ -121,6 +128,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
   };
   const updatePreferences = (newPrefs: Partial<AppPreferences>) => setPreferences(prev => ({ ...prev, ...newPrefs }));
+  // FIX: Add updateUserProfile function
+  const updateUserProfile = (newProfile: Partial<UserProfile>) => setUserProfile(prev => ({ ...prev, ...newProfile }));
   const togglePrivacyMode = () => setPrivacyMode(prev => !prev);
   const resetApp = () => { localStorage.clear(); window.location.reload(); };
   const clearCache = (key?: string) => {
@@ -295,9 +304,13 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const value = {
     assets, transactions: sourceTransactions, preferences, isDemoMode, privacyMode,
     yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError,
+    // FIX: Add userProfile to context value
+    userProfile,
     addTransaction, updateTransaction, deleteTransaction, importTransactions,
     updatePreferences, refreshMarketData, refreshSingleAsset, getAveragePriceForTransaction, setDemoMode,
     togglePrivacyMode, resetApp, clearCache,
+    // FIX: Add updateUserProfile to context value
+    updateUserProfile,
     getAssetByTicker: useCallback((ticker: string) => assets.find(a => a.ticker === ticker), [assets]),
   };
 

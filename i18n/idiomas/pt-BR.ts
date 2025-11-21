@@ -1,3 +1,4 @@
+
 export const ptBR = {
     // Navigation
     nav_portfolio: 'Carteira',
