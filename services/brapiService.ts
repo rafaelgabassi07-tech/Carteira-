@@ -1,9 +1,14 @@
-
 import type { AppPreferences } from '../types';
+
+interface BrapiHistoricalData {
+    date: number; // Unix timestamp
+    close: number;
+}
 
 interface BrapiQuote {
     symbol: string;
     regularMarketPrice: number;
+    historicalDataPrice?: BrapiHistoricalData[];
 }
 
 interface BrapiResponse {
@@ -31,13 +36,13 @@ function getBrapiToken(prefs: AppPreferences): string {
 // Utility delay function
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { currentPrice: number }>> {
+export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }>> {
     if (tickers.length === 0) {
         return {};
     }
 
     const token = getBrapiToken(prefs);
-    const result: Record<string, { currentPrice: number }> = {};
+    const result: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }> = {};
     let lastError: string | null = null;
     
     // Process tickers one by one with a delay to respect rate limits
@@ -57,7 +62,17 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                      const retryData: BrapiResponse = await retryResponse.json();
                      if (retryData.results && retryData.results[0]) {
                         const quote = retryData.results[0];
-                        result[quote.symbol.toUpperCase()] = { currentPrice: quote.regularMarketPrice };
+                        const priceHistory = (quote.historicalDataPrice || [])
+                            .map(item => ({
+                                date: new Date(item.date * 1000).toISOString().split('T')[0],
+                                price: item.close,
+                            }))
+                            .sort((a, b) => a.date.localeCompare(b.date));
+
+                        result[quote.symbol.toUpperCase()] = { 
+                            currentPrice: quote.regularMarketPrice,
+                            priceHistory,
+                        };
                         await delay(150);
                         continue;
                      }
@@ -73,8 +88,16 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             
             const quote = data.results[0];
             if (quote.symbol && typeof quote.regularMarketPrice === 'number') {
+                const priceHistory = (quote.historicalDataPrice || [])
+                    .map(item => ({
+                        date: new Date(item.date * 1000).toISOString().split('T')[0],
+                        price: item.close,
+                    }))
+                    .sort((a, b) => a.date.localeCompare(b.date));
+
                 result[quote.symbol.toUpperCase()] = {
-                    currentPrice: quote.regularMarketPrice
+                    currentPrice: quote.regularMarketPrice,
+                    priceHistory,
                 };
             }
 

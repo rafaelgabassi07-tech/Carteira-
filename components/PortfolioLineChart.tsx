@@ -1,8 +1,7 @@
 
 
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useLayoutEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
-import { debounce } from '../utils';
 
 interface PortfolioLineChartProps {
   data: number[];
@@ -18,34 +17,35 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
   const [activePoint, setActivePoint] = useState<{ x: number, y: number, value: number, label?: string, index: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState({ width: 300, height: 150 }); // Default size
   const gradientId = useRef(`gradient-${Math.random().toString(36).substr(2, 9)}`).current;
 
-  useEffect(() => {
-    const updateDimensions = () => {
-        if (containerRef.current) {
-            setDimensions({
-                width: containerRef.current.offsetWidth,
-                height: containerRef.current.offsetHeight
-            });
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setDimensions({ width, height });
         }
-    };
-    const debouncedUpdate = debounce(updateDimensions, 200);
-    updateDimensions();
-    window.addEventListener('resize', debouncedUpdate);
-    return () => window.removeEventListener('resize', debouncedUpdate);
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
   }, []);
   
   if (!data || data.length < 2) {
     return (
-        <div ref={containerRef} className="flex items-center justify-center h-full text-xs text-[var(--text-secondary)]">
+        <div ref={containerRef} className="w-full h-full flex items-center justify-center text-xs text-[var(--text-secondary)]">
             Dados insuficientes para gráfico.
         </div>
     );
   }
 
-  const width = dimensions.width || 300;
-  const height = dimensions.height || 150;
+  const { width, height } = dimensions;
   
   const padding = simpleMode 
     ? { top: 5, bottom: 5, left: 0, right: 0 } 
@@ -69,7 +69,7 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
   const xLabelsToShow = useMemo(() => {
       if (!labels || simpleMode) return [];
       const count = labels.length;
-      const maxLabels = 4;
+      const maxLabels = Math.floor(width / 80); // Dynamic label count based on width
       if (count <= maxLabels) return labels.map((text, i) => ({ text, x: getCoords(data[i], i).x, align: i === 0 ? 'start' : i === count - 1 ? 'end' : 'middle' }));
       
       const step = Math.floor((count - 1) / (maxLabels - 1));
@@ -78,12 +78,12 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
       indices.push(count - 1);
 
       return [...new Set(indices)].map(i => ({ text: labels[i], x: getCoords(data[i], i).x, align: i === 0 ? 'start' : i === count - 1 ? 'end' : 'middle' }));
-  }, [labels, data, simpleMode, width, height]);
+  }, [labels, data, simpleMode, width, height, getCoords]);
   
   const yLabelsToShow = useMemo(() => {
       if (simpleMode) return [];
       return [min, min + range/2, max];
-  }, [min, range, simpleMode]);
+  }, [min, range, max, simpleMode]);
 
   const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current || simpleMode) return;
@@ -132,8 +132,10 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
                 onMouseLeave={handleMouseLeave}
                 onTouchMove={(e) => {
                     const touch = e.touches[0];
-                    const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY } as any;
-                    handleMouseMove(fakeEvent);
+                    if (touch) {
+                        const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY } as any;
+                        handleMouseMove(fakeEvent);
+                    }
                 }}
                 shapeRendering="geometricPrecision"
             >

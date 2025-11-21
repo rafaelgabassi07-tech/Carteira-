@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -6,6 +5,7 @@ import PortfolioLineChart from '../components/PortfolioLineChart';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 import BarChart from '../components/BarChart';
 import CountUp from '../components/CountUp';
+import { calculatePortfolioMetrics, fromISODate } from '../utils';
 
 const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number }> = ({ title, children, action, delay = 0 }) => (
     <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mb-4 border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
@@ -19,56 +19,111 @@ const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?
 
 const PerformanceCard: React.FC = () => {
     const { t, locale, formatCurrency } = useI18n();
-    const { assets } = usePortfolio();
+    const { assets, transactions } = usePortfolio();
     const [timeRange, setTimeRange] = useState('12M');
 
     const { portfolioData, dateLabels, endValue, gain, percentageGain } = useMemo(() => {
-        if (assets.length === 0) return { portfolioData: [], dateLabels: [], endValue: 0, gain: 0, percentageGain: 0 };
-        
-        const maxHistoryLength = Math.max(...assets.map(a => a.priceHistory.length), 0);
-        if (maxHistoryLength === 0) return { portfolioData: [], dateLabels: [], endValue: 0, gain: 0, percentageGain: 0 };
-        
-        const aggregatedHistory = Array(maxHistoryLength).fill(0);
+        if (transactions.length === 0 || assets.length === 0) {
+            return { portfolioData: [], dateLabels: [], endValue: 0, gain: 0, percentageGain: 0 };
+        }
 
+        const priceMap = new Map<string, Map<string, number>>();
         assets.forEach(asset => {
-            const history = asset.priceHistory;
-            const offset = maxHistoryLength - history.length;
-            const oldestPrice = history[0] || 0;
-            
-            for (let i = 0; i < maxHistoryLength; i++) {
-                let price = oldestPrice;
-                if (i >= offset) {
-                    price = history[i - offset];
-                }
-                aggregatedHistory[i] += price * asset.quantity;
+            const assetPrices = new Map<string, number>();
+            if (asset.priceHistory) {
+                asset.priceHistory.forEach(historyPoint => {
+                    assetPrices.set(historyPoint.date, historyPoint.price);
+                });
             }
+            priceMap.set(asset.ticker, assetPrices);
         });
 
-        if (aggregatedHistory.length < 2) {
-             return { portfolioData: [], dateLabels: [], endValue: 0, gain: 0, percentageGain: 0 };
-        }
-
-        const labels: string[] = [];
+        const sortedTxs = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+        const firstTxDate = fromISODate(sortedTxs[0].date);
         const today = new Date();
-        for (let i = 0; i < maxHistoryLength; i++) {
-            const d = new Date();
-            d.setDate(today.getDate() - (maxHistoryLength - 1 - i));
-            labels.push(d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', ''));
+
+        const MAX_HISTORY_YEARS = 5;
+        const maxHistoryDate = new Date();
+        maxHistoryDate.setFullYear(today.getFullYear() - MAX_HISTORY_YEARS);
+        const startDate = firstTxDate > maxHistoryDate ? firstTxDate : maxHistoryDate;
+
+        const fullPortfolioValueHistory: { date: Date; value: number }[] = [];
+        let relevantTxs: typeof transactions = [];
+        let txIndex = 0;
+
+        for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+            const currentDate = new Date(d);
+            const currentDateStr = currentDate.toISOString().split('T')[0];
+
+            while (txIndex < sortedTxs.length && sortedTxs[txIndex].date <= currentDateStr) {
+                relevantTxs.push(sortedTxs[txIndex]);
+                txIndex++;
+            }
+
+            if (relevantTxs.length === 0) continue;
+
+            const dailyHoldings = calculatePortfolioMetrics(relevantTxs);
+            let dailyTotalValue = 0;
+
+            for (const ticker in dailyHoldings) {
+                const holding = dailyHoldings[ticker];
+                const assetPriceHistory = priceMap.get(ticker);
+                let priceForDay = assetPriceHistory?.get(currentDateStr);
+
+                if (!priceForDay && assetPriceHistory) {
+                    const availableDates = Array.from(assetPriceHistory.keys()).filter(date => date <= currentDateStr).sort();
+                    if (availableDates.length > 0) {
+                        const lastAvailableDate = availableDates[availableDates.length - 1];
+                        priceForDay = assetPriceHistory.get(lastAvailableDate);
+                    }
+                }
+                if (!priceForDay) {
+                    const asset = assets.find(a => a.ticker === ticker);
+                    priceForDay = asset?.currentPrice || 0;
+                }
+
+                dailyTotalValue += holding.quantity * priceForDay;
+            }
+            fullPortfolioValueHistory.push({ date: currentDate, value: dailyTotalValue });
         }
         
-        const start = aggregatedHistory[0];
-        const end = aggregatedHistory[aggregatedHistory.length - 1];
-        const absoluteGain = end - start;
-        const percentGain = start > 0 ? (absoluteGain / start) * 100 : 0;
+        if (fullPortfolioValueHistory.length < 2) {
+             return { portfolioData: [], dateLabels: [], endValue: 0, gain: 0, percentageGain: 0 };
+        }
+        
+        let rangedHistory = fullPortfolioValueHistory;
+        const lastDate = new Date(fullPortfolioValueHistory[fullPortfolioValueHistory.length - 1].date);
+
+        if (timeRange === '6M') {
+            const rangeStartDate = new Date(lastDate);
+            rangeStartDate.setMonth(lastDate.getMonth() - 6);
+            rangedHistory = fullPortfolioValueHistory.filter(p => p.date >= rangeStartDate);
+        } else if (timeRange === '12M') {
+            const rangeStartDate = new Date(lastDate);
+            rangeStartDate.setFullYear(lastDate.getFullYear() - 1);
+            rangedHistory = fullPortfolioValueHistory.filter(p => p.date >= rangeStartDate);
+        } else if (timeRange === 'YTD') {
+            const startOfYear = new Date(lastDate.getFullYear(), 0, 1);
+            rangedHistory = fullPortfolioValueHistory.filter(p => p.date >= startOfYear);
+        }
+
+        if (rangedHistory.length < 2) rangedHistory = fullPortfolioValueHistory.slice(-2);
+        
+        const finalPortfolioData = rangedHistory.map(p => p.value);
+        const finalDateLabels = rangedHistory.map(p => p.date.toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).replace('.', ''));
+        const startValue = finalPortfolioData[0];
+        const finalEndValue = finalPortfolioData[finalPortfolioData.length - 1];
+        const absoluteGain = finalEndValue - startValue;
+        const percentGain = startValue > 0 ? (absoluteGain / startValue) * 100 : 0;
 
         return { 
-            portfolioData: aggregatedHistory, 
-            dateLabels: labels, 
-            endValue: end, 
+            portfolioData: finalPortfolioData, 
+            dateLabels: finalDateLabels, 
+            endValue: finalEndValue, 
             gain: absoluteGain, 
             percentageGain: percentGain 
         };
-    }, [assets, locale]);
+    }, [assets, transactions, locale, timeRange]);
 
     const Selector = (
         <div className="flex bg-[var(--bg-primary)] rounded-lg p-1 border border-[var(--border-color)]">
@@ -98,7 +153,7 @@ const PerformanceCard: React.FC = () => {
                             <span className="opacity-80">({percentageGain.toFixed(2)}%)</span>
                         </p>
                     </div>
-                    <div className="h-56 w-full pt-2">
+                    <div className="h-72 w-full pt-2">
                          <PortfolioLineChart 
                             data={portfolioData} 
                             labels={dateLabels}

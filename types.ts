@@ -3,7 +3,7 @@ export interface Asset {
   quantity: number;
   avgPrice: number;
   currentPrice: number;
-  priceHistory: number[];
+  priceHistory: { date: string, price: number }[];
   dy?: number; // Dividend Yield 12M
   pvp?: number; // Price / Book Value
   segment?: string;

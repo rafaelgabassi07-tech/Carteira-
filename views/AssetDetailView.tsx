@@ -147,7 +147,13 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     <div className="bg-[var(--bg-secondary)] p-2 rounded-lg border border-[var(--border-color)]">
                         <h3 className="text-xs text-[var(--text-secondary)] font-bold mb-1 px-2">{t('price_history_7d')}</h3>
                         <div className="h-32">
-                           {asset && <PortfolioLineChart data={asset.priceHistory} isPositive={asset.priceHistory[asset.priceHistory.length -1] >= asset.priceHistory[0]} simpleMode={true} />}
+                           {asset && asset.priceHistory.length > 1 && (
+                               <PortfolioLineChart 
+                                   data={asset.priceHistory.map(p => p.price)} 
+                                   isPositive={asset.priceHistory[asset.priceHistory.length - 1].price >= asset.priceHistory[0].price} 
+                                   simpleMode={true} 
+                               />
+                           )}
                         </div>
                     </div>
                     

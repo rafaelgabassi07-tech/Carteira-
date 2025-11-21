@@ -46,10 +46,21 @@ export const DEMO_DIVIDENDS: Dividend[] = [
     { ticker: 'KNRI11', paymentDate: '2023-04-14', amountPerShare: 0.95, quantity: 5 },
 ];
 
+const generateDemoHistory = (prices: number[]) => {
+    const today = new Date();
+    return prices.map((price, i) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - (prices.length - 1 - i));
+        return {
+            date: date.toISOString().split('T')[0],
+            price,
+        };
+    });
+};
 
 export const DEMO_MARKET_DATA = {
-    'MXRF11': { currentPrice: 10.95, dy: 12.5, pvp: 1.05, sector: 'Papel', administrator: 'BTG Pactual', priceHistory: [10.2, 10.3, 10.5, 10.4, 10.6, 10.8, 10.95] },
-    'HGLG11': { currentPrice: 165.50, dy: 8.2, pvp: 1.02, sector: 'Logística', administrator: 'Credit Suisse', priceHistory: [158, 160, 162, 161, 163, 164, 165.5] },
-    'VISC11': { currentPrice: 120.10, dy: 9.1, pvp: 0.98, sector: 'Shoppings', administrator: 'Vinci', priceHistory: [112, 115, 118, 117, 119, 120, 120.1] },
-    'KNRI11': { currentPrice: 158.30, dy: 7.8, pvp: 1.00, sector: 'Híbrido', administrator: 'Kinea', priceHistory: [150, 152, 155, 154, 156, 158, 158.3] },
+    'MXRF11': { currentPrice: 10.95, dy: 12.5, pvp: 1.05, sector: 'Papel', administrator: 'BTG Pactual', priceHistory: generateDemoHistory([10.2, 10.3, 10.5, 10.4, 10.6, 10.8, 10.95]) },
+    'HGLG11': { currentPrice: 165.50, dy: 8.2, pvp: 1.02, sector: 'Logística', administrator: 'Credit Suisse', priceHistory: generateDemoHistory([158, 160, 162, 161, 163, 164, 165.5]) },
+    'VISC11': { currentPrice: 120.10, dy: 9.1, pvp: 0.98, sector: 'Shoppings', administrator: 'Vinci', priceHistory: generateDemoHistory([112, 115, 118, 117, 119, 120, 120.1]) },
+    'KNRI11': { currentPrice: 158.30, dy: 7.8, pvp: 1.00, sector: 'Híbrido', administrator: 'Kinea', priceHistory: generateDemoHistory([150, 152, 155, 154, 156, 158, 158.3]) },
 };

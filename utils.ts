@@ -1,5 +1,5 @@
-
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import type { Transaction } from './types';
 
 // --- Hook para estado persistente no localStorage ---
 export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatch<SetStateAction<T>>] {
@@ -141,4 +141,50 @@ export const CacheManager = {
     clear: (key: string): void => {
         localStorage.removeItem(`cache_${key}`);
     }
+};
+
+const EPSILON = 0.000001; // For floating point comparisons
+
+export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<string, { quantity: number; totalCost: number }> => {
+    const metrics: Record<string, { quantity: number; totalCost: number }> = {};
+    const tickers = [...new Set(transactions.map(t => t.ticker))];
+
+    tickers.forEach(ticker => {
+        let quantity = 0;
+        let totalCost = 0;
+
+        transactions
+            .filter(t => t.ticker === ticker)
+            .sort((a, b) => {
+                if (a.date !== b.date) return a.date.localeCompare(b.date);
+                if (a.type === 'Compra' && b.type === 'Venda') return -1;
+                if (a.type === 'Venda' && b.type === 'Compra') return 1;
+                return 0;
+            })
+            .forEach(tx => {
+                if (tx.type === 'Compra') {
+                    const cost = (tx.quantity * tx.price) + (tx.costs || 0);
+                    totalCost += cost;
+                    quantity += tx.quantity;
+                } else if (tx.type === 'Venda') {
+                    const sellQuantity = Math.min(tx.quantity, quantity);
+                    if (quantity > EPSILON) {
+                        const avgPrice = totalCost / quantity;
+                        const costReduction = sellQuantity * avgPrice;
+                        totalCost -= costReduction;
+                        quantity -= sellQuantity;
+                    }
+                }
+                if (quantity < EPSILON) {
+                    quantity = 0;
+                    totalCost = 0;
+                }
+            });
+        
+        if (quantity > EPSILON) {
+            metrics[ticker] = { quantity, totalCost };
+        }
+    });
+
+    return metrics;
 };

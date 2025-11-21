@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
-import { usePersistentState, CacheManager, fromISODate } from '../utils';
+import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE } from '../constants';
 
 // --- Types ---
@@ -53,51 +53,6 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     autoBackup: false, betaFeatures: false, devMode: false
 };
 const EPSILON = 0.000001; // For floating point comparisons
-
-// --- Unified Calculation Engine ---
-const calculatePortfolioMetrics = (transactions: Transaction[]) => {
-    const metrics: Record<string, { quantity: number; totalCost: number }> = {};
-    const tickers = [...new Set(transactions.map(t => t.ticker))];
-
-    tickers.forEach(ticker => {
-        let quantity = 0;
-        let totalCost = 0;
-
-        transactions
-            .filter(t => t.ticker === ticker)
-            .sort((a, b) => {
-                if (a.date !== b.date) return a.date.localeCompare(b.date);
-                if (a.type === 'Compra' && b.type === 'Venda') return -1;
-                if (a.type === 'Venda' && b.type === 'Compra') return 1;
-                return 0;
-            })
-            .forEach(tx => {
-                if (tx.type === 'Compra') {
-                    const cost = (tx.quantity * tx.price) + (tx.costs || 0);
-                    totalCost += cost;
-                    quantity += tx.quantity;
-                } else if (tx.type === 'Venda') {
-                    const sellQuantity = Math.min(tx.quantity, quantity); // Prevent selling more than owned
-                    if (quantity > EPSILON) {
-                        const avgPrice = totalCost / quantity;
-                        const costReduction = sellQuantity * avgPrice;
-                        totalCost -= costReduction;
-                        quantity -= sellQuantity;
-                    }
-                }
-                if (quantity < EPSILON) {
-                    quantity = 0;
-                    totalCost = 0;
-                }
-            });
-        
-        if (quantity > EPSILON) {
-            metrics[ticker] = { quantity, totalCost };
-        }
-    });
-
-    return metrics;
-};
 
 // --- Provider ---
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -233,7 +188,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             quantity: metrics.quantity,
             avgPrice,
             currentPrice,
-            priceHistory: liveData.priceHistory || [avgPrice, currentPrice],
+            priceHistory: liveData.priceHistory || [],
             dy,
             yieldOnCost,
             pvp: liveData.pvp || 0,

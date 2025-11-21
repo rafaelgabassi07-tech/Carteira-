@@ -1,8 +1,8 @@
 
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+
+import React, { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import type { MonthlyIncome } from '../types';
-import { debounce } from '../utils';
 
 interface BarChartProps {
     data: MonthlyIncome[];
@@ -13,27 +13,26 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
     const [tooltip, setTooltip] = useState<{ month: string, total: number, x: number, y: number } | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const [dimensions, setDimensions] = useState({ width: 300, height: 200 }); // Default size
 
-    useEffect(() => {
-        const updateDimensions = () => {
-            if (containerRef.current) {
-                setDimensions({
-                    width: containerRef.current.offsetWidth,
-                    height: containerRef.current.offsetHeight
-                });
+    useLayoutEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const observer = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const { width, height } = entry.contentRect;
+                if (width > 0 && height > 0) {
+                    setDimensions({ width, height });
+                }
             }
-        };
-        
-        const debouncedUpdate = debounce(updateDimensions, 200);
-        
-        updateDimensions();
-        window.addEventListener('resize', debouncedUpdate);
-        return () => window.removeEventListener('resize', debouncedUpdate);
+        });
+
+        observer.observe(container);
+        return () => observer.disconnect();
     }, []);
 
-    const width = dimensions.width || 300;
-    const height = dimensions.height || 200;
+    const { width, height } = dimensions;
     const padding = { top: 20, right: 10, bottom: 25, left: 35 }; // Increased left padding for Y-axis
     
     const maxValue = useMemo(() => Math.max(...data.map(d => d.total), 0), [data]);
@@ -42,8 +41,9 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
     // Generate Y-axis ticks
     const yTicks = useMemo(() => {
         if (effectiveMaxValue <= 1) return [0, 0.5, 1];
-        const niceMaxValue = Math.ceil(effectiveMaxValue / 100) * 100;
-        return [0, niceMaxValue / 2, niceMaxValue];
+        const numTicks = 3;
+        const step = effectiveMaxValue / (numTicks - 1);
+        return Array.from({ length: numTicks }, (_, i) => i * step);
     }, [effectiveMaxValue]);
 
 
