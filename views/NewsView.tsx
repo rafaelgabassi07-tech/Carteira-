@@ -201,6 +201,12 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       debouncedLoadNews(e.target.value);
   };
   
+  const handleRefresh = () => {
+    vibrate();
+    setLoading(true);
+    loadNews(true, searchQuery);
+  };
+  
   const handleTouchStart = (e: React.TouchEvent) => {
       if(containerRef.current && containerRef.current.scrollTop === 0) {
           touchStartY.current = e.targetTouches[0].clientY;
@@ -253,7 +259,17 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
       </div>
       
-      <h1 className="text-2xl font-bold mb-4">{t('market_news')}</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">{t('market_news')}</h1>
+        <button 
+            onClick={handleRefresh} 
+            disabled={loading}
+            className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50"
+            aria-label={t('refresh_prices')}
+        >
+            <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+        </button>
+      </div>
       
       <div className="mb-4">
         <input 

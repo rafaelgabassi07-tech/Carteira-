@@ -157,7 +157,7 @@ const App: React.FC = () => {
             addToast={addToast}
         />;
        case 'analise':
-        return <AnalysisView />;
+        return <AnalysisView addToast={addToast} />;
       case 'noticias':
         return <NewsView addToast={addToast} />;
       case 'settings':

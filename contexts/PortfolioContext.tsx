@@ -163,7 +163,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const portfolioMetrics = calculatePortfolioMetrics(sourceTransactions);
     return Object.keys(portfolioMetrics).map(ticker => {
       const metric = portfolioMetrics[ticker];
-      const liveData: any = sourceMarketData[ticker.toUpperCase()] || {};
+      const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
       const avgPrice = metric.quantity > 0 ? metric.totalCost / metric.quantity : 0;
       const currentPrice = liveData.currentPrice || 0;
       const totalInvested = metric.quantity * avgPrice;
@@ -245,7 +245,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         Object.keys(portfolioAtMonthEnd).forEach(ticker => {
             const holdings = portfolioAtMonthEnd[ticker];
-            const liveData: any = sourceMarketData[ticker.toUpperCase()] || {};
+            const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
             const currentPrice = liveData.currentPrice || 0;
             const dy = liveData.dy || 0;
 
@@ -307,7 +307,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             Object.keys(portfolioAtMonthEnd).forEach(ticker => {
                 const holdings = portfolioAtMonthEnd[ticker];
-                const liveData: any = sourceMarketData[ticker.toUpperCase()] || {};
+                const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
                 const segment = liveData.sector || 'Outros';
 
                 const historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);

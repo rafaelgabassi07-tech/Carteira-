@@ -5,7 +5,9 @@ import PatrimonyEvolutionCard from '../components/PatrimonyEvolutionCard';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 import BarChart from '../components/BarChart';
 import CountUp from '../components/CountUp';
-import { calculatePortfolioMetrics, fromISODate } from '../utils';
+import { vibrate } from '../utils';
+import RefreshIcon from '../components/icons/RefreshIcon';
+import type { ToastMessage } from '../types';
 
 const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number }> = ({ title, children, action, delay = 0 }) => (
     <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mb-4 border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
@@ -77,11 +79,38 @@ const DiversificationCard: React.FC = () => {
     );
 };
 
-const AnalysisView: React.FC = () => {
+interface AnalysisViewProps {
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+}
+
+const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
     const { t } = useI18n();
+    const { refreshMarketData, isRefreshing } = usePortfolio();
+
+    const handleRefresh = async () => {
+        vibrate();
+        addToast(t('toast_updating_prices'));
+        try {
+            await refreshMarketData(true);
+            addToast(t('toast_update_success'), 'success');
+        } catch (error: any) {
+            addToast(error.message || t('toast_update_failed'), 'error');
+        }
+    };
+    
     return (
         <div className="p-4 pb-24">
-            <h1 className="text-2xl font-bold mb-6">{t('nav_analysis')}</h1>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold">{t('nav_analysis')}</h1>
+                 <button 
+                    onClick={handleRefresh} 
+                    disabled={isRefreshing}
+                    className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50"
+                    aria-label={t('refresh_prices')}
+                >
+                    <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+                </button>
+            </div>
             <div className="max-w-2xl mx-auto">
                 <PatrimonyEvolutionCard />
                 <IncomeCard />
