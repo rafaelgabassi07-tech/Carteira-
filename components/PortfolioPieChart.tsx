@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -98,15 +97,15 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                 {data.map((slice, index) => (
                     <div 
                         key={slice.name} 
-                        className={`flex items-center justify-between text-sm transition-all duration-200 p-1.5 rounded-lg cursor-pointer ${hoveredIndex === index ? 'bg-[var(--bg-tertiary-hover)] scale-[1.02]' : 'hover:bg-[var(--bg-primary)]'}`}
+                        className={`flex items-center justify-between text-sm transition-all duration-200 p-1.5 rounded-lg cursor-pointer gap-2 ${hoveredIndex === index ? 'bg-[var(--bg-tertiary-hover)] scale-[1.02]' : 'hover:bg-[var(--bg-primary)]'}`}
                         onMouseEnter={() => setHoveredIndex(index)}
                         onMouseLeave={() => setHoveredIndex(null)}
                     >
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: colors[index % colors.length] }}></div>
-                            <span className="text-[var(--text-primary)] font-medium">{t(slice.name.toLowerCase().replace(/ /g, '_')) || slice.name}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-3 h-3 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: colors[index % colors.length] }}></div>
+                            <span className="text-[var(--text-primary)] font-medium truncate">{t(slice.name.toLowerCase().replace(/ /g, '_')) || slice.name}</span>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex-shrink-0">
                            <span className="font-bold">{slice.percentage.toFixed(1)}%</span>
                            <p className="text-[10px] text-[var(--text-secondary)]">{formatCurrency(slice.value)}</p>
                         </div>
