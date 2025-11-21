@@ -20,6 +20,9 @@ const EyeOffIcon: React.FC<{className?:string}> = ({className}) => (
 const SortIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
 );
+const WalletIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+);
 
 // --- Components ---
 
@@ -290,7 +293,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
         return filtered.sort((a, b) => {
             switch (sortOption) {
                 case 'valueDesc': return (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity);
-                case 'valueAsc': return (a.currentPrice * a.quantity) - (b.currentPrice * b.quantity);
+                case 'valueAsc': return (a.currentPrice * a.quantity) - (b.currentPrice * a.quantity);
                 case 'tickerAsc': return a.ticker.localeCompare(b.ticker);
                 case 'performanceDesc':
                     const perfA = a.avgPrice > 0 ? (a.currentPrice - a.avgPrice) / a.avgPrice : 0;
@@ -394,13 +397,10 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             ) : (
                 <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
                     <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
-                        <SortIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                        <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
                     </div>
                     <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
                     <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
-                    <button id="add-first-transaction-button" onClick={() => setActiveView('transacoes')} className="bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-4 px-10 rounded-2xl shadow-xl shadow-[var(--accent-color)]/20 hover:shadow-[var(--accent-color)]/40 transition-all active:scale-95 transform hover:-translate-y-1">
-                        {t('add_transaction')}
-                    </button>
                 </div>
             )}
         </div>

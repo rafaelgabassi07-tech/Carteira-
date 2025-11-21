@@ -85,7 +85,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const updateUserProfile = (newProfile: Partial<UserProfile>) => setUserProfile(prev => ({ ...prev, ...newProfile }));
   const togglePrivacyMode = () => setPrivacyMode(prev => !prev);
   const resetApp = () => { 
-      if(window.confirm("Tem certeza que deseja sair? Todos os seus dados locais serão apagados.")) {
+      if(window.confirm("Tem certeza que deseja sair? Todos os seus dados locais (transações, preferências) serão apagados permanentemente. Esta ação não pode ser desfeita.")) {
         localStorage.clear(); 
         window.location.reload(); 
       }
@@ -285,63 +285,64 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [dividends]);
 
   const portfolioEvolution = useMemo((): SegmentEvolutionData => {
-        if (sourceTransactions.length === 0) return {};
+    if (sourceTransactions.length === 0) return {};
 
-        const results: SegmentEvolutionData = { all_types: [] };
-        const firstTxDate = fromISODate(sourceTransactions.sort((a, b) => a.date.localeCompare(b.date))[0].date);
-        const today = new Date();
+    const results: SegmentEvolutionData = { all_types: [] };
+    const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
+    const firstTxDate = fromISODate(sortedTransactions[0].date);
+    const today = new Date();
+    
+    let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+
+    while (currentDate <= today) {
+        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
+
+        const transactionsUpToMonth = sourceTransactions.filter(tx => tx.date <= endOfMonthISO);
+        const portfolioAtMonthEnd = calculatePortfolioMetrics(transactionsUpToMonth);
+
+        let monthInvestedTotal = 0;
+        let monthMarketValueTotal = 0;
+        const segmentInvested: Record<string, number> = {};
+        const segmentMarketValue: Record<string, number> = {};
+
+        Object.keys(portfolioAtMonthEnd).forEach(ticker => {
+            const holdings = portfolioAtMonthEnd[ticker];
+            const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
+            const segment = liveData.sector || 'Outros';
+
+            const historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+            const marketValue = historicalPrice !== null ? holdings.quantity * historicalPrice : holdings.totalCost;
+
+            monthInvestedTotal += holdings.totalCost;
+            monthMarketValueTotal += marketValue;
+
+            segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
+            segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
+        });
+
+        const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
         
-        let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+        results.all_types.push({
+            month: monthLabel,
+            invested: monthInvestedTotal,
+            marketValue: monthMarketValueTotal
+        });
 
-        while (currentDate <= today) {
-            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-            const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
-
-            const transactionsUpToMonth = sourceTransactions.filter(tx => tx.date <= endOfMonthISO);
-            const portfolioAtMonthEnd = calculatePortfolioMetrics(transactionsUpToMonth);
-
-            let monthInvestedTotal = 0;
-            let monthMarketValueTotal = 0;
-            const segmentInvested: Record<string, number> = {};
-            const segmentMarketValue: Record<string, number> = {};
-
-            Object.keys(portfolioAtMonthEnd).forEach(ticker => {
-                const holdings = portfolioAtMonthEnd[ticker];
-                const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
-                const segment = liveData.sector || 'Outros';
-
-                const historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
-                const marketValue = historicalPrice !== null ? holdings.quantity * historicalPrice : holdings.totalCost;
-
-                monthInvestedTotal += holdings.totalCost;
-                monthMarketValueTotal += marketValue;
-
-                segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
-                segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
-            });
-
-            const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
-            
-            results.all_types.push({
+        Object.keys(segmentInvested).forEach(segment => {
+            if (!results[segment]) results[segment] = [];
+            results[segment].push({
                 month: monthLabel,
-                invested: monthInvestedTotal,
-                marketValue: monthMarketValueTotal
+                invested: segmentInvested[segment],
+                marketValue: segmentMarketValue[segment]
             });
+        });
 
-            Object.keys(segmentInvested).forEach(segment => {
-                if (!results[segment]) results[segment] = [];
-                results[segment].push({
-                    month: monthLabel,
-                    invested: segmentInvested[segment],
-                    marketValue: segmentMarketValue[segment]
-                });
-            });
+        currentDate.setMonth(currentDate.getMonth() + 1);
+    }
 
-            currentDate.setMonth(currentDate.getMonth() + 1);
-        }
-
-        return results;
-    }, [sourceTransactions, sourceMarketData]);
+    return results;
+}, [sourceTransactions, sourceMarketData]);
 
   useEffect(() => {
     if (preferences.privacyOnStart) {

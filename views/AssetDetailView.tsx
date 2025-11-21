@@ -4,7 +4,7 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import PortfolioLineChart from '../components/PortfolioLineChart';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import { vibrate } from '../utils';
+import { vibrate, fromISODate } from '../utils';
 
 interface AssetDetailViewProps {
     ticker: string;
@@ -67,8 +67,19 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     }, [dividends, ticker]);
 
     const priceHistory7d = useMemo(() => {
-        if (!asset || !asset.priceHistory) return [];
-        return asset.priceHistory.slice(-7);
+        if (!asset || !asset.priceHistory || asset.priceHistory.length === 0) return [];
+        
+        // Get the most recent date from the history
+        const lastDateStr = asset.priceHistory[asset.priceHistory.length - 1].date;
+        const lastDate = fromISODate(lastDateStr);
+
+        // Calculate the date 7 days ago
+        const sevenDaysAgo = new Date(lastDate);
+        sevenDaysAgo.setDate(lastDate.getDate() - 6); // -6 to include the last day, making it a 7 day window
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+        
+        // Filter the history for dates within the last 7 days
+        return asset.priceHistory.filter(p => p.date >= sevenDaysAgoStr);
     }, [asset]);
 
 

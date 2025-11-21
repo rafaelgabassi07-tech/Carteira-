@@ -43,7 +43,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
     const token = getBrapiToken(prefs);
     const result: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }> = {};
-    let lastError: string | null = null;
+    const failedTickers: string[] = [];
     
     // Process tickers one by one with a delay to respect rate limits
     for (const ticker of tickers) {
@@ -106,13 +106,14 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
         } catch (error: any) {
             console.error(`Erro ao buscar dados para ${ticker}:`, error.message);
-            lastError = error.message; // Store the last error but continue with other tickers
+            failedTickers.push(ticker);
         }
     }
 
-    // If result is empty but we had tickers, it means ALL requests failed.
+    // If all tickers failed, throw a comprehensive error.
     if (Object.keys(result).length === 0 && tickers.length > 0) {
-         throw new Error(lastError || "Falha ao buscar cotações na Brapi API. Verifique sua conexão ou limite de requisições.");
+        const failedList = failedTickers.join(', ');
+        throw new Error(`Falha ao atualizar: ${failedList}. Verifique os tickers ou a API.`);
     }
     
     return result;

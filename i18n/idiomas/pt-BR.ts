@@ -20,7 +20,7 @@ export const ptBR = {
     position: 'Posição',
     search_asset_placeholder: 'Buscar ativo...',
     portfolio_empty_title: 'Sua carteira está vazia',
-    portfolio_empty_subtitle: 'Comece adicionando uma transação para ver seus ativos aqui.',
+    portfolio_empty_subtitle: 'Vá para a aba "Transações" para adicionar seu primeiro ativo e começar.',
     add_transaction: 'Adicionar Transação',
     price_history_7d: 'Histórico de Preço (7d)',
     current_price: 'Preço Atual',
