@@ -42,22 +42,22 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     for (const ticker of tickers) {
         const url = `https://brapi.dev/api/quote/${ticker}?range=5y&token=${token}`;
         try {
-            const response = await fetch(url);
+            let response = await fetch(url);
 
+            // Handle invalid token immediately, as it's a fatal error for the entire batch.
             if (response.status === 401) {
                 throw new Error("Token da API Brapi inválido ou expirado. Verifique as configurações.");
             }
 
+            // If we are rate-limited, wait and retry once.
+            if (response.status === 429) {
+                await delay(1500); 
+                response = await fetch(url); // Re-fetch and overwrite the response variable
+            }
+
+            // After potential retry, check if the response is OK now.
             if (!response.ok) {
-                if (response.status === 429) { // Rate limit
-                    await delay(1500);
-                    const retryResponse = await fetch(url);
-                    if (!retryResponse.ok) throw new Error(`Limite de requisições excedido para ${ticker}.`);
-                    const data: BrapiResponse = await retryResponse.json();
-                    if (data.error || !data.results || data.results.length === 0) throw new Error(data.message || `Nenhum resultado para ${ticker}`);
-                } else {
-                    throw new Error(`Falha na rede: ${response.statusText}`);
-                }
+                throw new Error(`Falha ao obter dados para ${ticker} (status: ${response.status})`);
             }
 
             const data: BrapiResponse = await response.json();
@@ -85,10 +85,16 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             }
 
         } catch (error: any) {
+            // If it's the fatal token error, re-throw it to stop the whole process.
+            if (error.message.includes("Token da API Brapi inválido")) {
+                throw error;
+            }
+            // For other errors, just collect the failed ticker and continue.
             console.error(`Erro ao buscar dados para ${ticker}:`, error.message);
             failedTickers.push(ticker);
         }
         
+        // Proactive delay between requests to avoid rate limiting
         await delay(300); 
     }
 
