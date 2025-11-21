@@ -1,6 +1,3 @@
-
-
-
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -49,14 +46,14 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
 
 const newsSchema = {
     type: Type.ARRAY,
-    description: "List of financial news articles",
+    description: "List of financial news articles summarized from search results.",
     items: {
         type: Type.OBJECT,
         properties: {
-            source: { type: Type.STRING, description: "Name of the news source/website" },
-            title: { type: Type.STRING, description: "Headline of the news" },
-            summary: { type: Type.STRING, description: "Concise summary in Portuguese (max 20 words)" },
-            date: { type: Type.STRING, description: "Date in YYYY-MM-DD format" },
+            source: { type: Type.STRING, description: "Name of the news source/website (e.g., 'InfoMoney', 'Suno Notícias')." },
+            title: { type: Type.STRING, description: "The original, exact headline of the news article." },
+            summary: { type: Type.STRING, description: "Concise summary in Portuguese (max 30 words)." },
+            date: { type: Type.STRING, description: "Publication date in YYYY-MM-DD format." },
             sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] }
         },
         required: ["source", "title", "summary", "date", "sentiment"]
@@ -84,7 +81,39 @@ const advancedAssetDataSchema = {
 
 // --- SERVICES ---
 
-export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] = []): Promise<NewsArticle[]> {
+/**
+ * Finds the most likely URL for a summarized article by comparing its title to the titles of grounded search results.
+ * @param articleTitle The title of the AI-summarized article.
+ * @param sources An array of web sources from Gemini's grounding metadata.
+ * @returns The best-matching URL or undefined.
+ */
+function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?: string }>): string | undefined {
+    const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const normalizedArticleTitle = normalize(articleTitle);
+    if (!normalizedArticleTitle) return undefined;
+
+    let bestMatch: { uri: string; score: number } | null = null;
+
+    for (const source of sources) {
+        if (!source || !source.title || !source.uri) continue;
+        const normalizedSourceTitle = normalize(source.title);
+
+        const articleWords = new Set(normalizedArticleTitle.split(' ').filter(w => w.length > 2));
+        const sourceWords = new Set(normalizedSourceTitle.split(' '));
+        const intersection = new Set([...articleWords].filter(x => sourceWords.has(x)));
+        
+        const score = intersection.size;
+
+        if (!bestMatch || score > bestMatch.score) {
+            bestMatch = { uri: source.uri, score };
+        }
+    }
+
+    return (bestMatch && bestMatch.score > 0) ? bestMatch.uri : undefined;
+}
+
+
+export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] = [], searchQuery: string = ''): Promise<NewsArticle[]> {
   let apiKey: string;
   try {
     apiKey = getGeminiApiKey(prefs);
@@ -96,23 +125,40 @@ export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] =
   const ai = new GoogleGenAI({ apiKey });
 
   const contextTickers = tickers.slice(0, 5).join(', ');
-  const prompt = `Notícias recentes do mercado financeiro brasileiro (FIIs). Foco: ${contextTickers || 'Geral'}.`;
+  
+  let prompt: string;
+  if (searchQuery.trim()) {
+      prompt = `Usando a busca do Google, encontre notícias financeiras sobre "${searchQuery}" publicadas na semana atual. Foque em FIIs se for relevante. Retorne um resumo para cada notícia encontrada.`;
+  } else {
+      prompt = `Usando a busca do Google, encontre as 5 notícias mais importantes sobre o mercado de Fundos Imobiliários (FIIs) do Brasil, publicadas na semana atual. Tickers para contexto: ${contextTickers || 'Geral'}. Retorne um resumo para cada notícia.`;
+  }
+
 
   try {
       return await withRetry(async () => {
           const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
+            tools: [{googleSearch: {}}],
             config: {
               responseMimeType: "application/json",
               responseSchema: newsSchema,
-              temperature: 0.1,
             }
           });
           
           const jsonText = response.text;
-          const data = JSON.parse(jsonText || '[]');
-          return Array.isArray(data) ? data : [];
+          const parsedArticles: NewsArticle[] = JSON.parse(jsonText || '[]');
+
+          const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
+
+          if (webSources.length > 0 && Array.isArray(parsedArticles)) {
+              return parsedArticles.map(article => ({
+                  ...article,
+                  url: findBestUrl(article.title, webSources),
+              }));
+          }
+
+          return Array.isArray(parsedArticles) ? parsedArticles : [];
       });
   } catch (error) {
       console.warn("News fetch failed:", error);

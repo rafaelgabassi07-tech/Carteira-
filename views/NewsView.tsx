@@ -6,7 +6,7 @@ import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import { CacheManager, vibrate } from '../utils';
+import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
 const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
@@ -93,7 +93,7 @@ const NewsCard: React.FC<{
         <div className="flex justify-between items-center mt-3 pt-2 border-t border-[var(--border-color)]">
           <div className="flex items-center space-x-3">
             <SentimentBadge sentiment={article.sentiment} />
-             {article.url && <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">{t('view_original')}</a>}
+             {article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">{t('view_original')}</a> : <span className="text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider opacity-50">{t('view_original')}</span>}
           </div>
           <button onClick={() => setIsExpanded(!isExpanded)} className="text-[var(--accent-color)] text-xs font-bold hover:underline">
                 {isExpanded ? t('read_less') : t('read_more')}
@@ -124,7 +124,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const { assets, preferences } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try {
@@ -165,46 +164,42 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       }
   }
 
-  const loadNews = useCallback(async (isRefresh = false) => {
+  const loadNews = useCallback(async (isRefresh = false, query: string) => {
     if(!isRefresh) setLoading(true);
-    setIsRefreshing(true);
     setError(null);
     
     try {
-      const cacheKey = 'news_feed';
+      const cacheKey = `news_feed_${query.trim().toLowerCase().replace(/\s+/g, '_') || 'general'}`;
       if (!isRefresh) {
           const cachedNews = CacheManager.get<NewsArticle[]>(cacheKey, CACHE_TTL.NEWS);
           if (cachedNews) {
               setNews(cachedNews);
               setLoading(false);
-              setIsRefreshing(false);
+              setPullPosition(0);
               return;
           }
       }
 
-      const articles = await fetchMarketNews(preferences, assetTickers);
+      const articles = await fetchMarketNews(preferences, assetTickers, query);
       setNews(articles);
-      CacheManager.set(cacheKey, articles);
+      if(articles.length > 0) CacheManager.set(cacheKey, articles);
 
     } catch (err: any) {
       setError(err.message || t('unknown_error'));
-      const expiredCache = localStorage.getItem('cache_news_feed');
-      if(expiredCache) {
-          try {
-             const parsed = JSON.parse(expiredCache);
-             if(parsed.data) {
-                 setNews(parsed.data);
-                 addToast('Exibindo notícias em cache (offline/erro)', 'info');
-             }
-          } catch(e) {}
-      }
-
     } finally {
-      if(!isRefresh) setLoading(false);
-      setIsRefreshing(false);
+      setLoading(false);
       setPullPosition(0);
     }
   }, [t, assetTickers, addToast, preferences]);
+  
+  const debouncedLoadNews = useCallback(debounce((q: string) => loadNews(true, q), 600), [loadNews]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(e.target.value);
+      setLoading(true);
+      setError(null);
+      debouncedLoadNews(e.target.value);
+  };
   
   const handleTouchStart = (e: React.TouchEvent) => {
       if(containerRef.current && containerRef.current.scrollTop === 0) {
@@ -213,7 +208,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-      if(touchStartY.current > 0) {
+      if(touchStartY.current > 0 && !loading) {
           const touchY = e.targetTouches[0].clientY;
           const pullDistance = touchY - touchStartY.current;
           if(pullDistance > 0) {
@@ -225,7 +220,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   
   const handleTouchEnd = () => {
       if(pullPosition > 70) {
-          loadNews(true);
+          setLoading(true);
+          loadNews(true, searchQuery);
       } else {
           setPullPosition(0);
       }
@@ -233,19 +229,14 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   };
 
   useEffect(() => {
-    loadNews();
+    loadNews(false, ''); // Initial load
   }, [loadNews]);
 
-  const filteredNews = useMemo(() => {
-    const source = activeTab === 'favorites' 
+  const displayedNews = useMemo(() => {
+      return activeTab === 'favorites' 
         ? news.filter(n => favorites.has(n.title))
         : news;
-
-    return source.filter(article => {
-        const matchesSearch = article.title.toLowerCase().includes(searchQuery.toLowerCase()) || article.summary.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesSearch;
-    });
-  }, [news, searchQuery, activeTab, favorites]);
+  }, [news, activeTab, favorites]);
 
   return (
     <div 
@@ -259,7 +250,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
         style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
       >
-        <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${isRefreshing || pullPosition > 70 ? 'animate-spin' : ''}`}/>
+        <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
       </div>
       
       <h1 className="text-2xl font-bold mb-4">{t('market_news')}</h1>
@@ -269,7 +260,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           type="text"
           placeholder={t('search_news_placeholder')}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={handleSearchChange}
           className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors"
         />
       </div>
@@ -296,7 +287,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
           <p className="font-bold">{t('error')}</p>
           <p className="text-sm">{error}</p>
-          <button onClick={() => loadNews(true)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
+          <button onClick={() => loadNews(true, searchQuery)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
             {t('try_again')}
           </button>
         </div>
@@ -304,9 +295,9 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
       {!loading && !error && (
         <div className="space-y-4 flex-1 overflow-y-auto no-scrollbar">
-          {filteredNews.length > 0 ? (
+          {displayedNews.length > 0 ? (
             <>
-                {filteredNews.map((article, index) => (
+                {displayedNews.map((article, index) => (
                 <div 
                     key={`${article.title}-${index}`} 
                     className="animate-fade-in-up" 
