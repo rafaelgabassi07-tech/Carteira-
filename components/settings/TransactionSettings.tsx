@@ -19,9 +19,9 @@ const TransactionSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
         <div>
             <PageHeader title={t('transactions_data')} onBack={onBack} />
 
-            <div className="space-y-6">
-                 <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                    <label htmlFor="brokerage" className="font-bold">{t('default_brokerage')}</label>
+            <div className="space-y-4">
+                 <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)]">
+                    <label htmlFor="brokerage" className="font-bold text-sm">{t('default_brokerage')}</label>
                     <input
                         id="brokerage"
                         type="number"
@@ -31,14 +31,14 @@ const TransactionSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     />
                 </div>
                 
-                <div>
-                    <h4 className="font-bold mb-2 px-1">{t('default_sort')}</h4>
-                    <div className="bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)]">
+                <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)]">
+                    <h4 className="font-bold mb-3 text-sm">{t('default_sort')}</h4>
+                    <div className="bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--border-color)] space-y-1">
                         {sortOptions.map(opt => (
                             <button 
                                 key={opt.id} 
                                 onClick={() => updatePreferences({ defaultSort: opt.id })} 
-                                className={`w-full text-left p-2 my-0.5 text-sm rounded-lg ${preferences.defaultSort === opt.id ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'}`}
+                                className={`w-full text-left p-2 my-0.5 text-sm rounded-lg ${preferences.defaultSort === opt.id ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'}`}
                             >
                                 {opt.label}
                             </button>
@@ -47,9 +47,7 @@ const TransactionSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                 </div>
 
                 <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
-                    <div>
-                        <p className="font-bold">{t('hide_cents')}</p>
-                    </div>
+                    <p className="font-bold text-sm">{t('hide_cents')}</p>
                     <ToggleSwitch enabled={preferences.hideCents} setEnabled={(val) => updatePreferences({ hideCents: val })} />
                 </div>
             </div>

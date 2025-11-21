@@ -7,8 +7,6 @@ import { usePortfolio } from '../../contexts/PortfolioContext';
 import { usePersistentState, vibrate } from '../../utils';
 import PinLockScreen from '../PinLockScreen';
 
-// A new component designed specifically for setting a PIN.
-// This avoids misusing the `PinLockScreen` and resolves the type error.
 const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => void; }> = ({ onPinSet, onCancel }) => {
     const [pin, setPin] = useState('');
     const { t } = useI18n();
@@ -49,7 +47,7 @@ const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => 
                 <div />
                 <button onClick={() => handleDigit('0')} className="w-16 h-16 rounded-full bg-[var(--bg-secondary)] text-2xl font-bold text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-95 border border-[var(--border-color)]">0</button>
                 <button onClick={handleDelete} className="w-16 h-16 rounded-full flex items-center justify-center text-[var(--text-primary)] hover:text-red-400 transition-colors active:scale-95">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
                 </button>
             </div>
             <button onClick={onCancel} className="mt-8 text-sm text-[var(--text-secondary)]">{t('cancel')}</button>
@@ -122,10 +120,6 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
                 </div>
             </div>
             
-            {/* FIX: The `PinLockScreen` component was misused for setting a PIN, causing a type error
-                 because its `onUnlock` prop doesn't pass the entered PIN. This has been replaced
-                 with a new, purpose-built `PinSetScreen` component that correctly handles
-                 the PIN setting logic and calls back with the new PIN. */}
             {showPinModal && (
                  <PinSetScreen 
                     onPinSet={handlePinSet}

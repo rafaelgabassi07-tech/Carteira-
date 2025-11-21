@@ -1,10 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-// FIX: Import UserProfile type
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
-import { usePersistentState, CacheManager } from '../utils';
-// FIX: Import MOCK_USER_PROFILE
+import { usePersistentState, CacheManager, fromISODate } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE } from '../constants';
 
 // --- Types ---
@@ -21,7 +19,6 @@ interface PortfolioContextType {
   lastSync: number | null;
   isRefreshing: boolean;
   marketDataError: string | null;
-  // FIX: Add userProfile and updateUserProfile to context type
   userProfile: UserProfile;
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (transaction: Transaction) => void;
@@ -51,7 +48,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     dateFormat: 'dd/mm/yyyy', priceAlertThreshold: 5, globalIncomeGoal: 1000,
     segmentGoals: {}, dndEnabled: false, dndStart: '22:00', dndEnd: '07:00',
     notificationChannels: { push: true, email: false }, 
-    // FIX: Removed geminiApiKey as per security guidelines.
+    geminiApiKey: null,
     brapiToken: null,
     autoBackup: false, betaFeatures: false, devMode: false
 };
@@ -107,7 +104,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [transactions, setTransactions] = usePersistentState<Transaction[]>('transactions', []);
   const [dividends, setDividends] = usePersistentState<Dividend[]>('dividends', []);
   const [preferences, setPreferences] = usePersistentState<AppPreferences>('app_preferences', DEFAULT_PREFERENCES);
-  // FIX: Add userProfile state
   const [userProfile, setUserProfile] = usePersistentState<UserProfile>('user_profile', MOCK_USER_PROFILE);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [privacyMode, setPrivacyMode] = usePersistentState('privacy_mode', false);
@@ -131,7 +127,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
   };
   const updatePreferences = (newPrefs: Partial<AppPreferences>) => setPreferences(prev => ({ ...prev, ...newPrefs }));
-  // FIX: Add updateUserProfile function
   const updateUserProfile = (newProfile: Partial<UserProfile>) => setUserProfile(prev => ({ ...prev, ...newProfile }));
   const togglePrivacyMode = () => setPrivacyMode(prev => !prev);
   const resetApp = () => { localStorage.clear(); window.location.reload(); };
@@ -164,8 +159,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return updated;
         });
 
-        // FIX: Removed `preferences` argument as it's no longer needed.
-        fetchAdvancedAssetData(uniqueTickers).then(advancedData => {
+        fetchAdvancedAssetData(preferences, uniqueTickers).then(advancedData => {
             setMarketData(prev => {
                 const updated = { ...prev };
                 Object.keys(advancedData).forEach(ticker => {
@@ -198,8 +192,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...priceData[ticker] } }));
         }
 
-        // FIX: Removed `preferences` argument as it's no longer needed.
-        const advancedData = await fetchAdvancedAssetData([ticker]);
+        const advancedData = await fetchAdvancedAssetData(preferences, [ticker]);
         if (advancedData && advancedData[ticker]) {
             setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...advancedData[ticker] } }));
         }
@@ -261,27 +254,56 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
     const yoc = totalCost > 0 ? (income / totalCost) * 100 : 0;
 
-    const monthly: MonthlyIncome[] = [];
-    const avgMonthly = income / 12;
-    const today = new Date();
-    
-    // Gera projeção para os próximos 12 meses
-    for (let i = 1; i <= 12; i++) {
-        const futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        const monthName = futureDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+    const calculateHistoricalMonthlyIncome = (): MonthlyIncome[] => {
+        if (sourceTransactions.length === 0) {
+            return [];
+        }
+
+        const firstTxDateStr = sourceTransactions.reduce((oldest, tx) => {
+            return tx.date < oldest ? tx.date : oldest;
+        }, sourceTransactions[0].date);
         
-        // Adiciona uma leve variação para um visual mais orgânico, mas mantém a média
-        const variation = 0.9 + Math.random() * 0.2; 
-        const projectedValue = income > 0 ? avgMonthly * variation : 0;
+        const firstTxDate = fromISODate(firstTxDateStr);
+        const today = new Date();
+        const startDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
 
-        monthly.push({
-            month: monthName,
-            total: projectedValue
+        const incomeByMonth: Record<string, number> = {};
+        
+        let currentDate = new Date(startDate);
+        while (currentDate <= today) {
+            const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+            incomeByMonth[monthKey] = 0;
+            currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+        
+        sourceDividends.forEach(dividend => {
+            const paymentDate = fromISODate(dividend.paymentDate);
+            if (paymentDate >= startDate) {
+                const monthKey = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}`;
+                if (incomeByMonth.hasOwnProperty(monthKey)) {
+                    incomeByMonth[monthKey] += dividend.amountPerShare * dividend.quantity;
+                }
+            }
         });
-    }
 
-    return { projectedAnnualIncome: income, yieldOnCost: yoc, monthlyIncome: monthly };
-  }, [assets]);
+        return Object.entries(incomeByMonth)
+            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+            .map(([key, total]) => {
+                const [year, month] = key.split('-');
+                const date = new Date(Number(year), Number(month) - 1, 1);
+                const monthName = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace(/\./g, '');
+                
+                return {
+                    month: monthName,
+                    total: total
+                };
+            });
+    };
+
+    const historicalMonthlyIncome = calculateHistoricalMonthlyIncome();
+
+    return { projectedAnnualIncome: income, yieldOnCost: yoc, monthlyIncome: historicalMonthlyIncome };
+  }, [assets, sourceTransactions, sourceDividends]);
   
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
       const relevantTxs = sourceTransactions.filter(t => 
@@ -309,12 +331,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const value = {
     assets, transactions: sourceTransactions, dividends: sourceDividends, preferences, isDemoMode, privacyMode,
     yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError,
-    // FIX: Add userProfile to context value
     userProfile,
     addTransaction, updateTransaction, deleteTransaction, importTransactions,
     updatePreferences, refreshMarketData, refreshSingleAsset, getAveragePriceForTransaction, setDemoMode,
     togglePrivacyMode, resetApp, clearCache,
-    // FIX: Add updateUserProfile to context value
     updateUserProfile,
     getAssetByTicker: useCallback((ticker: string) => assets.find(a => a.ticker === ticker), [assets]),
   };

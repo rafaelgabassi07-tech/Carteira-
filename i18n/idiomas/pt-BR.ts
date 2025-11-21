@@ -62,7 +62,7 @@ export const ptBR = {
     // Analysis View
     performance: 'Performance',
     monthly_income: 'Renda Mensal',
-    avg_monthly_income_12m: 'Média Mensal (Projetado)',
+    avg_monthly_income_12m: 'Média Mensal Histórica',
     my_portfolio_performance: 'Minha Carteira',
     diversification: 'Diversificação',
     segments: 'Segmentos',

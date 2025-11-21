@@ -6,7 +6,13 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatc
   const [state, setState] = useState<T>(() => {
     try {
       const storedValue = localStorage.getItem(key);
-      return storedValue ? JSON.parse(storedValue) : defaultValue;
+      if (storedValue === null) {
+        return defaultValue;
+      }
+      const parsedValue = JSON.parse(storedValue);
+      // Ensure that a stored "null" value falls back to the default,
+      // preventing crashes from expecting an object where null is found.
+      return parsedValue !== null ? parsedValue : defaultValue;
     } catch (error) {
       console.error(`Error reading localStorage key “${key}”:`, error);
       return defaultValue;

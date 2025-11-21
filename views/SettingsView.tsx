@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ToastMessage } from '../types';
+import { useI18n } from '../contexts/I18nContext';
 
 // Import sub-components
 import MainMenu from '../components/settings/MainMenu';
@@ -19,6 +20,7 @@ export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'ba
 const SettingsView: React.FC<{ addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ addToast }) => {
     const [screen, setScreen] = useState<MenuScreen>('main');
     const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const { t } = useI18n();
 
     const renderScreen = () => {
         const onBack = () => setScreen('main');
@@ -38,7 +40,10 @@ const SettingsView: React.FC<{ addToast: (message: string, type?: ToastMessage['
     };
 
     return (
-        <div className="p-4">
+        <div className="p-4 pb-24">
+             {screen === 'main' && (
+                <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_settings')}</h1>
+            )}
             <div key={screen} className="animate-fade-in">
                 {renderScreen()}
             </div>

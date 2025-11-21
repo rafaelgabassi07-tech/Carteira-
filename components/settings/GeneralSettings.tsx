@@ -16,7 +16,6 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     
     const handleRestartTutorial = () => {
         updatePreferences({ restartTutorial: true });
-        // A simple reload is the easiest way to re-trigger the tour logic in App.tsx
         window.location.reload();
     };
 
@@ -24,15 +23,15 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
         <div>
             <PageHeader title={t('general')} onBack={onBack} />
 
-            <div className="space-y-6">
-                <div>
-                    <h4 className="font-bold mb-2">{t('start_screen')}</h4>
-                    <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)]">
+            <div className="space-y-4">
+                <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)]">
+                    <h4 className="font-bold mb-3 text-sm">{t('start_screen')}</h4>
+                    <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--border-color)]">
                         {startScreens.map(screen => (
                             <button 
                                 key={screen.id} 
                                 onClick={() => updatePreferences({ startScreen: screen.id as any })} 
-                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${preferences.startScreen === screen.id ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${preferences.startScreen === screen.id ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
                             >
                                 {screen.label}
                             </button>
@@ -41,9 +40,7 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                 </div>
                 
                  <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
-                    <div>
-                        <p className="font-bold">{t('haptic_feedback')}</p>
-                    </div>
+                    <p className="font-bold text-sm">{t('haptic_feedback')}</p>
                     <ToggleSwitch enabled={preferences.hapticFeedback} setEnabled={(val) => updatePreferences({ hapticFeedback: val })} />
                 </div>
 

@@ -2,23 +2,23 @@
 
 
 import { GoogleGenAI, Type } from '@google/genai';
-import type { NewsArticle } from '../types';
+import type { NewsArticle, AppPreferences } from '../types';
 
-// FIX: The getApiKey function has been simplified to adhere to security guidelines,
-// which mandate that the API key must be sourced exclusively from environment variables.
-// User-configurable keys have been removed.
-function getApiKey(): string {
-    // Using `(import.meta as any)` to bypass TypeScript type error for `env`.
-    // In Vite, environment variables are accessed via `import.meta.env`.
+function getGeminiApiKey(prefs: AppPreferences): string {
+    // Priority 1: User-provided key from settings
+    if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
+        return prefs.geminiApiKey;
+    }
+    
+    // Priority 2: Environment variable (Vite's way)
     const envApiKey = (import.meta as any).env.VITE_API_KEY;
-
     if (envApiKey && envApiKey.trim() !== '') {
         return envApiKey;
     }
 
-    // If not found, throw a clear error
-    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada. Verifique as Variáveis de Ambiente.");
+    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada.");
 }
+
 
 // --- API Call Resiliency ---
 async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
@@ -84,11 +84,10 @@ const advancedAssetDataSchema = {
 
 // --- SERVICES ---
 
-// FIX: Removed the `prefs` parameter as the API key is now sourced directly from environment variables.
-export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
+export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] = []): Promise<NewsArticle[]> {
   let apiKey: string;
   try {
-    apiKey = getApiKey();
+    apiKey = getGeminiApiKey(prefs);
   } catch (error: any) {
     console.warn("Skipping news fetch (No API Key):", error.message);
     return [];
@@ -131,13 +130,12 @@ export interface AdvancedAssetData {
     shareholders: number;
 }
 
-// FIX: Removed the `prefs` parameter as the API key is now sourced directly from environment variables.
-export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
     let apiKey: string;
     try {
-        apiKey = getApiKey();
+        apiKey = getGeminiApiKey(prefs);
     } catch (error) {
         // Silently fail if no key is configured, as this is an enhancement feature.
         return {};
@@ -180,4 +178,20 @@ export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<
         
         return result;
     });
+}
+
+export async function validateGeminiKey(key: string): Promise<boolean> {
+    if (!key || key.trim() === '') return false;
+    try {
+        const ai = new GoogleGenAI({ apiKey: key });
+        // Use a simple, non-streaming, low-cost model and prompt
+        await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: "test",
+        });
+        return true;
+    } catch (error) {
+        console.error("Gemini key validation failed:", error);
+        return false;
+    }
 }

@@ -5,6 +5,7 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import PortfolioLineChart from '../components/PortfolioLineChart';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 import BarChart from '../components/BarChart';
+import CountUp from '../components/CountUp';
 
 const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number }> = ({ title, children, action, delay = 0 }) => (
     <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mb-4 border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
@@ -17,15 +18,15 @@ const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?
 );
 
 const PerformanceCard: React.FC = () => {
-    const { t, locale } = useI18n();
+    const { t, locale, formatCurrency } = useI18n();
     const { assets } = usePortfolio();
     const [timeRange, setTimeRange] = useState('12M');
 
-    const { portfolioData, dateLabels } = useMemo(() => {
-        if (assets.length === 0) return { portfolioData: [], dateLabels: [] };
+    const { portfolioData, dateLabels, endValue, gain, percentageGain } = useMemo(() => {
+        if (assets.length === 0) return { portfolioData: [], dateLabels: [], endValue: 0, gain: 0, percentageGain: 0 };
         
         const maxHistoryLength = Math.max(...assets.map(a => a.priceHistory.length), 0);
-        if (maxHistoryLength === 0) return { portfolioData: [], dateLabels: [] };
+        if (maxHistoryLength === 0) return { portfolioData: [], dateLabels: [], endValue: 0, gain: 0, percentageGain: 0 };
         
         const aggregatedHistory = Array(maxHistoryLength).fill(0);
 
@@ -43,6 +44,10 @@ const PerformanceCard: React.FC = () => {
             }
         });
 
+        if (aggregatedHistory.length < 2) {
+             return { portfolioData: [], dateLabels: [], endValue: 0, gain: 0, percentageGain: 0 };
+        }
+
         const labels: string[] = [];
         const today = new Date();
         for (let i = 0; i < maxHistoryLength; i++) {
@@ -51,7 +56,18 @@ const PerformanceCard: React.FC = () => {
             labels.push(d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', ''));
         }
         
-        return { portfolioData: aggregatedHistory, dateLabels: labels };
+        const start = aggregatedHistory[0];
+        const end = aggregatedHistory[aggregatedHistory.length - 1];
+        const absoluteGain = end - start;
+        const percentGain = start > 0 ? (absoluteGain / start) * 100 : 0;
+
+        return { 
+            portfolioData: aggregatedHistory, 
+            dateLabels: labels, 
+            endValue: end, 
+            gain: absoluteGain, 
+            percentageGain: percentGain 
+        };
     }, [assets, locale]);
 
     const Selector = (
@@ -70,28 +86,40 @@ const PerformanceCard: React.FC = () => {
 
     return (
         <AnalysisCard title={t('performance')} action={Selector} delay={0}>
-             <div className="h-64 w-full pt-2">
-                {portfolioData.length > 1 ? (
-                     <PortfolioLineChart 
-                        data={portfolioData} 
-                        labels={dateLabels}
-                        isPositive={portfolioData[portfolioData.length - 1] >= portfolioData[0]} 
-                        label={t('my_portfolio_performance')} 
-                        color="var(--accent-color)" 
-                    />
-                ) : (
-                    <div className="flex items-center justify-center h-full text-[var(--text-secondary)] text-sm">
-                        {t('no_transactions_found')}
+             {portfolioData.length > 1 ? (
+                <>
+                    <div className="mb-4">
+                        <p className="text-3xl font-bold tracking-tight">
+                            <CountUp end={endValue} formatter={formatCurrency} />
+                        </p>
+                        <p className={`text-sm font-semibold flex items-center gap-1 ${gain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                            {gain >= 0 ? '▲' : '▼'}
+                            <CountUp end={Math.abs(gain)} formatter={formatCurrency} /> 
+                            <span className="opacity-80">({percentageGain.toFixed(2)}%)</span>
+                        </p>
                     </div>
-                )}
-             </div>
+                    <div className="h-56 w-full pt-2">
+                         <PortfolioLineChart 
+                            data={portfolioData} 
+                            labels={dateLabels}
+                            isPositive={gain >= 0} 
+                            label={t('my_portfolio_performance')} 
+                            color="var(--accent-color)" 
+                        />
+                    </div>
+                </>
+             ) : (
+                <div className="flex items-center justify-center h-64 text-[var(--text-secondary)] text-sm">
+                    {t('no_transactions_found')}
+                </div>
+            )}
         </AnalysisCard>
     );
 };
 
 const IncomeCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
-    const { monthlyIncome } = usePortfolio();
+    const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
     
     const average = useMemo(() => {
          const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
@@ -100,10 +128,20 @@ const IncomeCard: React.FC = () => {
 
     return (
         <AnalysisCard title={t('monthly_income')} delay={100}>
-             <div className="mb-4 flex items-baseline gap-2">
-                 <span className="text-2xl font-bold text-[var(--green-text)]">{formatCurrency(average)}</span>
-                 <span className="text-xs text-[var(--text-secondary)]">{t('avg_monthly_income_12m')}</span>
-             </div>
+            <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
+                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                        <CountUp end={average} formatter={formatCurrency} />
+                    </span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
+                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                        <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
+                    </span>
+                </div>
+            </div>
              <div className="h-48 w-full">
                  <BarChart data={monthlyIncome} />
              </div>

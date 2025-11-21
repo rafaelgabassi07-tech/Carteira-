@@ -17,9 +17,8 @@ const CountUp: React.FC<CountUpProps> = ({
   prefix = '', 
   suffix = '' 
 }) => {
-  // FIX: The `useState` hook requires an initial value. Initializing with 0 resolves the error.
-  const [count, setCount] = useState(0);
-  const startRef = useRef(0);
+  const [count, setCount] = useState(end);
+  const startRef = useRef(end);
   const animationRef = useRef<number>();
 
   useEffect(() => {
