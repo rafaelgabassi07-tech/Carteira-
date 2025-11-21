@@ -48,7 +48,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     // Process tickers one by one with a delay to respect rate limits
     for (const ticker of tickers) {
         try {
-            const url = `https://brapi.dev/api/quote/${ticker}?token=${token}`;
+            const url = `https://brapi.dev/api/quote/${ticker}?range=5y&token=${token}`;
             const response = await fetch(url);
 
             if (!response.ok) {
