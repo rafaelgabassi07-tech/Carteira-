@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -140,9 +141,8 @@ export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] =
             model: "gemini-2.5-flash",
             contents: prompt,
             tools: [{googleSearch: {}}],
+            // FIX: Per Gemini API guidelines, responseMimeType and responseSchema are not allowed when using the googleSearch tool.
             config: {
-              responseMimeType: "application/json",
-              responseSchema: newsSchema,
             }
           });
           

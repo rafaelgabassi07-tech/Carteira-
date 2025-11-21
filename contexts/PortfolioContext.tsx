@@ -57,7 +57,6 @@ const EPSILON = 0.000001; // For floating point comparisons
 // --- Provider ---
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [transactions, setTransactions] = usePersistentState<Transaction[]>('transactions', []);
-  const [dividends, setDividends] = usePersistentState<Dividend[]>('dividends', []);
   const [preferences, setPreferences] = usePersistentState<AppPreferences>('app_preferences', DEFAULT_PREFERENCES);
   const [userProfile, setUserProfile] = usePersistentState<UserProfile>('user_profile', MOCK_USER_PROFILE);
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -68,7 +67,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
 
   const sourceTransactions = useMemo(() => isDemoMode ? DEMO_TRANSACTIONS : transactions, [isDemoMode, transactions]);
-  const sourceDividends = useMemo(() => isDemoMode ? DEMO_DIVIDENDS : dividends, [isDemoMode, dividends]);
 
   // --- Actions ---
   const addTransaction = (transaction: Transaction) => setTransactions(prev => [...prev, transaction]);
@@ -170,9 +168,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const assets: Asset[] = useMemo(() => {
     const sourceMarketData = isDemoMode ? DEMO_MARKET_DATA : marketData;
 
-    return Object.keys(portfolioMetrics).map(ticker => {
+    return Object.keys(portfolioMetrics).map((ticker: string) => {
         const metrics = portfolioMetrics[ticker];
-        const liveData = sourceMarketData[ticker] || {};
+        const liveData = sourceMarketData[ticker as keyof typeof sourceMarketData] || {};
         const avgPrice = metrics.totalCost / metrics.quantity;
         
         let currentPrice = liveData.currentPrice || 0;
@@ -200,6 +198,49 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
     });
   }, [portfolioMetrics, marketData, isDemoMode]);
+
+  const dividends: Dividend[] = useMemo(() => {
+    if (isDemoMode) return DEMO_DIVIDENDS;
+    if (sourceTransactions.length === 0 || assets.length === 0) return [];
+
+    const simulatedDividends: Dividend[] = [];
+    const assetDataMap = new Map<string, Asset>(assets.map(a => [a.ticker, a]));
+    const tickers = [...new Set(sourceTransactions.map(t => t.ticker))];
+
+    tickers.forEach(ticker => {
+        const assetTxs = sourceTransactions.filter(t => t.ticker === ticker).sort((a, b) => a.date.localeCompare(b.date));
+        if (assetTxs.length === 0) return;
+
+        const firstTxDate = fromISODate(assetTxs[0].date);
+        const today = new Date();
+        let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+
+        while (currentDate <= today) {
+            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+            const txsUpToMonth = assetTxs.filter(tx => fromISODate(tx.date) <= endOfMonth);
+            const monthlyPortfolio = calculatePortfolioMetrics(txsUpToMonth);
+            
+            const holding = monthlyPortfolio[ticker];
+            if (holding && holding.quantity > 0) {
+                const marketInfo = assetDataMap.get(ticker);
+                if (marketInfo && marketInfo.dy && marketInfo.dy > 0) {
+                    const amountPerShare = (marketInfo.currentPrice * (marketInfo.dy / 100)) / 12;
+                    simulatedDividends.push({
+                        ticker: ticker,
+                        amountPerShare: amountPerShare,
+                        quantity: holding.quantity,
+                        paymentDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 15).toISOString(),
+                    });
+                }
+            }
+            
+            currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+    });
+
+    return simulatedDividends;
+}, [isDemoMode, sourceTransactions, assets]);
+
 
   const { projectedAnnualIncome, yieldOnCost, monthlyIncome } = useMemo(() => {
     let income = 0, totalCost = 0;
@@ -285,7 +326,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const value = {
-    assets, transactions: sourceTransactions, dividends: sourceDividends, preferences, isDemoMode, privacyMode,
+    assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
     yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError,
     userProfile,
     addTransaction, updateTransaction, deleteTransaction, importTransactions,

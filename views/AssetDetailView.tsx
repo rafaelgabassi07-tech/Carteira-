@@ -66,6 +66,11 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         return dividends.filter(d => d.ticker === ticker).sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
     }, [dividends, ticker]);
 
+    const priceHistory7d = useMemo(() => {
+        if (!asset || !asset.priceHistory) return [];
+        return asset.priceHistory.slice(-7);
+    }, [asset]);
+
 
     if (!asset && !isRefreshing) {
         return (
@@ -147,12 +152,16 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     <div className="bg-[var(--bg-secondary)] p-2 rounded-lg border border-[var(--border-color)]">
                         <h3 className="text-xs text-[var(--text-secondary)] font-bold mb-1 px-2">{t('price_history_7d')}</h3>
                         <div className="h-32">
-                           {asset && asset.priceHistory.length > 1 && (
+                           {priceHistory7d.length > 1 ? (
                                <PortfolioLineChart 
-                                   data={asset.priceHistory.map(p => p.price)} 
-                                   isPositive={asset.priceHistory[asset.priceHistory.length - 1].price >= asset.priceHistory[0].price} 
+                                   data={priceHistory7d.map(p => p.price)} 
+                                   isPositive={priceHistory7d[priceHistory7d.length - 1].price >= priceHistory7d[0].price} 
                                    simpleMode={true} 
                                />
+                           ) : (
+                               <div className="flex items-center justify-center h-full text-xs text-[var(--text-secondary)]">
+                                   {t('price_history_unavailable')}
+                               </div>
                            )}
                         </div>
                     </div>
@@ -205,7 +214,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                         <div key={index} className="grid grid-cols-4 gap-2 items-center bg-[var(--bg-primary)] p-2 rounded-md border border-[var(--border-color)]">
                                             <div className="text-left">{new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC', day: '2-digit', month: 'short', year: '2-digit' })}</div>
                                             <div className="text-right">{formatCurrency(div.amountPerShare)}</div>
-                                            <div className="text-right">{div.quantity}</div>
+                                            <div className="text-right">{div.quantity.toFixed(2)}</div>
                                             <div className="text-right font-bold text-sm text-[var(--green-text)]">{formatCurrency(div.amountPerShare * div.quantity)}</div>
                                         </div>
                                     ))}
