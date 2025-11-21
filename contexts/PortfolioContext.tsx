@@ -163,25 +163,25 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const portfolioMetrics = calculatePortfolioMetrics(sourceTransactions);
     return Object.keys(portfolioMetrics).map(ticker => {
       const metric = portfolioMetrics[ticker];
-      const data = sourceMarketData[ticker.toUpperCase()] || {};
+      const liveData: any = sourceMarketData[ticker.toUpperCase()] || {};
       const avgPrice = metric.quantity > 0 ? metric.totalCost / metric.quantity : 0;
-      const currentPrice = data.currentPrice || 0;
+      const currentPrice = liveData.currentPrice || 0;
       const totalInvested = metric.quantity * avgPrice;
-      const yieldOnCost = totalInvested > 0 && data.dy > 0 ? ((currentPrice * (data.dy / 100)) / avgPrice) * 100 : 0;
+      const yieldOnCost = totalInvested > 0 && liveData.dy > 0 ? ((currentPrice * (liveData.dy / 100)) / avgPrice) * 100 : 0;
       
       return {
         ticker,
         quantity: metric.quantity,
         avgPrice,
         currentPrice,
-        priceHistory: data.priceHistory || [],
-        dy: data.dy,
-        pvp: data.pvp,
-        segment: data.sector || 'Outros',
-        administrator: data.administrator,
-        vacancyRate: data.vacancyRate,
-        liquidity: data.dailyLiquidity,
-        shareholders: data.shareholders,
+        priceHistory: liveData.priceHistory || [],
+        dy: liveData.dy,
+        pvp: liveData.pvp,
+        segment: liveData.sector || 'Outros',
+        administrator: liveData.administrator,
+        vacancyRate: liveData.vacancyRate,
+        liquidity: liveData.dailyLiquidity,
+        shareholders: liveData.shareholders,
         yieldOnCost,
       };
     }).filter(asset => asset.quantity > EPSILON); // Filter out assets that have been sold off
@@ -245,7 +245,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         Object.keys(portfolioAtMonthEnd).forEach(ticker => {
             const holdings = portfolioAtMonthEnd[ticker];
-            const liveData = sourceMarketData[ticker.toUpperCase()] || {};
+            const liveData: any = sourceMarketData[ticker.toUpperCase()] || {};
             const currentPrice = liveData.currentPrice || 0;
             const dy = liveData.dy || 0;
 
@@ -307,7 +307,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             Object.keys(portfolioAtMonthEnd).forEach(ticker => {
                 const holdings = portfolioAtMonthEnd[ticker];
-                const liveData = sourceMarketData[ticker.toUpperCase()] || {};
+                const liveData: any = sourceMarketData[ticker.toUpperCase()] || {};
                 const segment = liveData.sector || 'Outros';
 
                 const historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);

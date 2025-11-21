@@ -221,7 +221,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-sm text-center text-[var(--text-secondary)] py-4">{t('no_dividends_for_asset')}</p>
+                            <p className="text-sm text-center text-[var(--text-secondary)] py-4">{t('no_dividends_projected')}</p>
                         )}
                     </div>
 

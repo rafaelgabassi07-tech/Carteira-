@@ -43,12 +43,11 @@ const SectionHeader: React.FC<{title: string}> = ({title}) => (
 
 const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdateModal: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ setScreen, onShowUpdateModal, addToast }) => {
     const { t } = useI18n();
-    const { userProfile: user } = usePortfolio();
+    const { userProfile: user, resetApp } = usePortfolio();
 
     const handleLogout = () => {
-        if (window.confirm(t('logout_confirm'))) {
-            addToast(t('toast_logging_out'));
-        }
+        vibrate();
+        resetApp();
     };
 
     return (

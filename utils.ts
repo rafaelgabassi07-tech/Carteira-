@@ -192,11 +192,16 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
 /**
  * Finds the price for a given date from a sorted price history.
  * If the exact date is not found, it returns the price of the most recent previous date.
+ * If the target date is before any history, it returns the first available price.
  */
 export const getClosestPrice = (history: { date: string; price: number }[], targetDate: string): number | null => {
     if (!history || history.length === 0) return null;
+    
+    // If target date is before the first record, use the first record.
+    if (targetDate < history[0].date) {
+        return history[0].price;
+    }
 
-    // Use a binary search approach for efficiency if needed, but a simple loop is fine for typical history lengths.
     let closestPrice = null;
     for (const point of history) {
         if (point.date <= targetDate) {

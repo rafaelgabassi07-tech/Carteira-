@@ -58,6 +58,7 @@ export const ptBR = {
     quantity_at_payment: 'Cotas',
     total_received: 'Total',
     no_dividends_for_asset: 'Nenhum dividendo registrado para este ativo.',
+    no_dividends_projected: 'Nenhum dividendo projetado para este período.',
     price_history_unavailable: 'Histórico de preço indisponível.',
 
     // Analysis View
