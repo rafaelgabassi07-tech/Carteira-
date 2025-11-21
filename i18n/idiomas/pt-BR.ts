@@ -220,7 +220,7 @@ export const ptBR = {
     data: 'Dados',
     check_for_update: 'Atualizações',
     logout: 'Sair',
-    logout_confirm: 'Tem certeza que deseja sair? Seus dados locais serão mantidos.',
+    logout_confirm: 'Tem certeza que deseja sair? Todos os seus dados locais (transações, preferências) serão apagados permanentemente. Esta ação não pode ser desfeita.',
 
     // API Connections
     api_connections: 'Conexões de API',

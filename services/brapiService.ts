@@ -110,10 +110,9 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         }
     }
 
-    // If all tickers failed, throw a comprehensive error.
-    if (Object.keys(result).length === 0 && tickers.length > 0) {
-        const failedList = failedTickers.join(', ');
-        throw new Error(`Falha ao atualizar: ${failedList}. Verifique os tickers ou a API.`);
+    // If there were any failures, throw a comprehensive error.
+    if (failedTickers.length > 0) {
+        throw new Error(`Falha ao atualizar: ${failedTickers.join(', ')}.`);
     }
     
     return result;

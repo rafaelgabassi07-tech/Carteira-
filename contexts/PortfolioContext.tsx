@@ -218,61 +218,104 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { yieldOnCost: yoc, projectedAnnualIncome: projectedIncome };
   }, [assets]);
   
-  const dividends = useMemo((): Dividend[] => {
-    if (isDemoMode) {
-        return DEMO_DIVIDENDS;
-    }
-    
+  const { portfolioEvolution, dividends } = useMemo(() => {
     if (sourceTransactions.length === 0) {
-        return [];
+        return { portfolioEvolution: {}, dividends: [] };
+    }
+    if (isDemoMode) {
+        // This part is complex to simulate, return empty for demo or a simplified version
+        return { portfolioEvolution: {}, dividends: DEMO_DIVIDENDS };
     }
 
+    const evolution: SegmentEvolutionData = { all_types: [] };
     const simulatedDividends: Dividend[] = [];
-    const firstTxDate = new Date(
-        Math.min(...sourceTransactions.map(tx => fromISODate(tx.date).getTime()))
-    );
+    const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
+    const firstTxDate = fromISODate(sortedTransactions[0].date);
     const today = new Date();
-
+    
     let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+    let txIndex = 0;
+    const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
 
     while (currentDate <= today) {
-        // The end of the current month is our simulated "ex-dividend date"
-        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
 
-        const transactionsUpToMonth = sourceTransactions.filter(tx => fromISODate(tx.date) <= endOfMonth);
+        // Process transactions for the current month
+        while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
+            const tx = sortedTransactions[txIndex];
+            if (!portfolioState[tx.ticker]) {
+                portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
+            }
+            if (tx.type === 'Compra') {
+                portfolioState[tx.ticker].quantity += tx.quantity;
+                portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
+            } else { // Venda
+                const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
+                if (portfolioState[tx.ticker].quantity > EPSILON) {
+                    const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
+                    portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
+                    portfolioState[tx.ticker].quantity -= sellQuantity;
+                }
+            }
+            if (portfolioState[tx.ticker].quantity < EPSILON) {
+                delete portfolioState[tx.ticker];
+            }
+            txIndex++;
+        }
+
+        // --- At the end of the month, calculate metrics and dividends ---
         
-        const portfolioAtMonthEnd = calculatePortfolioMetrics(transactionsUpToMonth);
+        // 1. Calculate Portfolio Evolution
+        let monthInvestedTotal = 0;
+        let monthMarketValueTotal = 0;
+        const segmentInvested: Record<string, number> = {};
+        const segmentMarketValue: Record<string, number> = {};
 
-        Object.keys(portfolioAtMonthEnd).forEach(ticker => {
-            const holdings = portfolioAtMonthEnd[ticker];
+        Object.keys(portfolioState).forEach(ticker => {
+            const holdings = portfolioState[ticker];
             const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
-            const currentPrice = liveData.currentPrice || 0;
-            const dy = liveData.dy || 0;
+            const segment = liveData.sector || 'Outros';
 
+            const historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+            const marketValue = historicalPrice !== null ? holdings.quantity * historicalPrice : holdings.totalCost;
+
+            monthInvestedTotal += holdings.totalCost;
+            monthMarketValueTotal += marketValue;
+            segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
+            segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
+
+            // 2. Simulate Dividends
+            const dy = liveData.dy || 0;
+            const currentPrice = liveData.currentPrice || 0;
             if (holdings.quantity > EPSILON && dy > 0 && currentPrice > 0) {
                 const amountPerShare = (currentPrice * (dy / 100)) / 12;
-                
-                // Payment date is simulated as the 15th of the NEXT month
                 const paymentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 15);
-
-                // Only generate payments for dates that have already passed or are in the current month
                 if (paymentDate <= today) {
                     simulatedDividends.push({
                         ticker,
                         quantity: holdings.quantity,
                         amountPerShare,
-                        paymentDate: paymentDate.toISOString().split('T')[0], // YYYY-MM-DD
+                        paymentDate: paymentDate.toISOString().split('T')[0],
                     });
                 }
             }
         });
+
+        const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
         
-        // Move to the first day of the next month
+        evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
+
+        Object.keys(segmentInvested).forEach(segment => {
+            if (!evolution[segment]) evolution[segment] = [];
+            evolution[segment].push({ month: monthLabel, invested: segmentInvested[segment], marketValue: segmentMarketValue[segment] });
+        });
+
         currentDate.setMonth(currentDate.getMonth() + 1);
     }
     
-    return simulatedDividends;
-  }, [sourceTransactions, sourceMarketData, isDemoMode]);
+    return { portfolioEvolution: evolution, dividends: simulatedDividends };
+}, [sourceTransactions, sourceMarketData, isDemoMode]);
 
   const monthlyIncome = useMemo((): MonthlyIncome[] => {
       const incomeMap: Record<string, number> = {};
@@ -283,66 +326,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
       return Object.entries(incomeMap).map(([month, total]) => ({ month, total }));
   }, [dividends]);
-
-  const portfolioEvolution = useMemo((): SegmentEvolutionData => {
-    if (sourceTransactions.length === 0) return {};
-
-    const results: SegmentEvolutionData = { all_types: [] };
-    const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
-    const firstTxDate = fromISODate(sortedTransactions[0].date);
-    const today = new Date();
-    
-    let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
-
-    while (currentDate <= today) {
-        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
-
-        const transactionsUpToMonth = sourceTransactions.filter(tx => tx.date <= endOfMonthISO);
-        const portfolioAtMonthEnd = calculatePortfolioMetrics(transactionsUpToMonth);
-
-        let monthInvestedTotal = 0;
-        let monthMarketValueTotal = 0;
-        const segmentInvested: Record<string, number> = {};
-        const segmentMarketValue: Record<string, number> = {};
-
-        Object.keys(portfolioAtMonthEnd).forEach(ticker => {
-            const holdings = portfolioAtMonthEnd[ticker];
-            const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
-            const segment = liveData.sector || 'Outros';
-
-            const historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
-            const marketValue = historicalPrice !== null ? holdings.quantity * historicalPrice : holdings.totalCost;
-
-            monthInvestedTotal += holdings.totalCost;
-            monthMarketValueTotal += marketValue;
-
-            segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
-            segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
-        });
-
-        const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
-        
-        results.all_types.push({
-            month: monthLabel,
-            invested: monthInvestedTotal,
-            marketValue: monthMarketValueTotal
-        });
-
-        Object.keys(segmentInvested).forEach(segment => {
-            if (!results[segment]) results[segment] = [];
-            results[segment].push({
-                month: monthLabel,
-                invested: segmentInvested[segment],
-                marketValue: segmentMarketValue[segment]
-            });
-        });
-
-        currentDate.setMonth(currentDate.getMonth() + 1);
-    }
-
-    return results;
-}, [sourceTransactions, sourceMarketData]);
 
   useEffect(() => {
     if (preferences.privacyOnStart) {
