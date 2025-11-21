@@ -6,7 +6,6 @@ import PortfolioLineChart from '../components/PortfolioLineChart';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 import BarChart from '../components/BarChart';
 import ScaleIcon from '../components/icons/ScaleIcon';
-import CompoundInterestChart from '../components/CompoundInterestChart';
 
 const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number }> = ({ title, children, action, delay = 0 }) => (
     <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mb-4 border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
@@ -264,100 +263,6 @@ const SmartRebalancingCard: React.FC = () => {
     );
 };
 
-
-const MagicNumberCard: React.FC = () => {
-    const { t, formatCurrency } = useI18n();
-    const { assets } = usePortfolio();
-    const [desiredIncome, setDesiredIncome] = useState(1000);
-    const [monthlyContribution, setMonthlyContribution] = useState(500);
-    const [annualRate, setAnnualRate] = useState(8);
-
-    const portfolioTotal = useMemo(() => assets.reduce((sum, a) => sum + (a.quantity * a.currentPrice), 0), [assets]);
-    
-    const { timeToGoal, capitalRequired, projectionData } = useMemo(() => {
-        const required = (desiredIncome * 12) / (annualRate / 100);
-        let total = portfolioTotal;
-        let months = 0;
-        const monthlyRate = annualRate / 100 / 12;
-
-        if (monthlyRate <= 0 || (monthlyContribution <= 0 && total < required)) {
-            return { timeToGoal: Infinity, capitalRequired: required, projectionData: null };
-        }
-        
-        if (total >= required) {
-             return { timeToGoal: 0, capitalRequired: required, projectionData: { years: 0 } };
-        }
-
-        while (total < required) {
-            total = total * (1 + monthlyRate) + monthlyContribution;
-            months++;
-            if (months > 50 * 12) { // Safety break for 50 years
-                return { timeToGoal: Infinity, capitalRequired: required, projectionData: null };
-            }
-        }
-        
-        return { timeToGoal: months / 12, capitalRequired: required, projectionData: { years: Math.ceil(months/12) } };
-    }, [desiredIncome, annualRate, portfolioTotal, monthlyContribution]);
-
-    return (
-        <AnalysisCard title={t('magic_number_calculator')} delay={300}>
-            <div className="space-y-4">
-                <p className="text-xs text-[var(--text-secondary)]">{t('magic_number_desc')}</p>
-
-                {/* Goal Definition */}
-                <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-[var(--border-color)] space-y-3">
-                    <div>
-                        <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-1 block">{t('desired_monthly_income')}</label>
-                        <input type="number" value={desiredIncome} onChange={e => setDesiredIncome(Number(e.target.value))} className="w-full bg-transparent outline-none font-bold p-1" />
-                    </div>
-                    <div>
-                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-1 block">{t('desired_dy')}</label>
-                         <input type="range" min="6" max="16" step="0.5" value={annualRate} onChange={e => setAnnualRate(Number(e.target.value))} className="w-full accent-[var(--accent-color)]" />
-                         <span className="text-xs font-bold text-[var(--accent-color)]">{annualRate}%</span>
-                    </div>
-                     <div className="pt-2 border-t border-[var(--border-color)]">
-                         <p className="text-xs text-[var(--text-secondary)] text-center uppercase tracking-widest">{t('capital_required')}</p>
-                         <p className="text-2xl font-bold text-center text-[var(--text-primary)]">{formatCurrency(capitalRequired)}</p>
-                    </div>
-                </div>
-                
-                {/* Projection */}
-                <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-[var(--border-color)] space-y-3">
-                     <h4 className="font-bold text-xs text-[var(--accent-color)] uppercase">{t('projection_title')}</h4>
-                    <div>
-                        <label className="text-xs text-[var(--text-secondary)]">{t('initial_investment')}</label>
-                        <p className="font-bold">{formatCurrency(portfolioTotal)}</p>
-                    </div>
-                    <div>
-                         <label className="text-xs text-[var(--text-secondary)]">{t('monthly_contribution')}</label>
-                         <input type="number" value={monthlyContribution} onChange={e => setMonthlyContribution(Number(e.target.value))} className="w-full bg-transparent outline-none font-bold p-1 border-b border-[var(--border-color)]" />
-                    </div>
-                     <div className="pt-3 border-t border-[var(--border-color)] mt-2 text-center">
-                         <p className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">{t('time_to_goal')}</p>
-                          {isFinite(timeToGoal) ? (
-                              <p className="text-xl font-bold text-[var(--accent-color)]">
-                                  {timeToGoal.toFixed(1)} {t('years')}
-                              </p>
-                          ) : (
-                              <p className="text-sm font-bold text-amber-500 mt-1">{t('goal_unreachable')}</p>
-                          )}
-                    </div>
-                </div>
-
-                <div className="h-64">
-                    {projectionData ? (
-                        <CompoundInterestChart initial={portfolioTotal} monthly={monthlyContribution} rate={annualRate} years={projectionData.years} />
-                    ) : (
-                         <div className="flex items-center justify-center h-full text-center text-sm text-amber-500 bg-amber-500/10 rounded-lg p-4">
-                            {t('goal_unreachable_long')}
-                         </div>
-                    )}
-                </div>
-            </div>
-        </AnalysisCard>
-    );
-}
-
 const AnalysisView: React.FC = () => {
     const { t } = useI18n();
     return (
@@ -368,7 +273,6 @@ const AnalysisView: React.FC = () => {
                 <IncomeCard />
                 <DiversificationCard />
                 <SmartRebalancingCard />
-                <MagicNumberCard />
             </div>
         </div>
     );
