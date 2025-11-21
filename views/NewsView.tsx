@@ -121,7 +121,7 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  const { assets, preferences } = usePortfolio();
+  const { assets } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -182,7 +182,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           }
       }
 
-      const articles = await fetchMarketNews(preferences, assetTickers);
+      // FIX: The `preferences` object is no longer needed as the API key is sourced from environment variables.
+      const articles = await fetchMarketNews(assetTickers);
       setNews(articles);
       CacheManager.set(cacheKey, articles);
 
@@ -204,7 +205,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setIsRefreshing(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, addToast, preferences]);
+  // FIX: Removed `preferences` from the dependency array as it's no longer used.
+  }, [t, assetTickers, addToast]);
   
   const handleTouchStart = (e: React.TouchEvent) => {
       if(containerRef.current && containerRef.current.scrollTop === 0) {

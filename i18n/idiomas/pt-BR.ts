@@ -1,4 +1,3 @@
-
 export const ptBR = {
     // Navigation
     nav_portfolio: 'Carteira',
@@ -53,6 +52,12 @@ export const ptBR = {
     daily_liquidity: 'Liquidez Diária',
     shareholders: 'Nº de Cotistas',
     no_transactions_for_asset: 'Nenhuma transação para este ativo.',
+    dividends_received: 'Dividendos Recebidos',
+    payment_date: 'Data Pag.',
+    value_per_share: 'Valor/Cota',
+    quantity_at_payment: 'Cotas',
+    total_received: 'Total',
+    no_dividends_for_asset: 'Nenhum dividendo registrado para este ativo.',
 
     // Analysis View
     performance: 'Performance',
@@ -211,6 +216,7 @@ export const ptBR = {
     api_key_placeholder: 'Cole sua chave aqui',
     test_connection: 'Testar Conexão',
     save_key: 'Salvar Chave',
+    testing: 'Testando',
 
     // Update Modal
     latest: 'Atual',

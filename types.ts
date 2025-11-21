@@ -119,7 +119,7 @@ export interface AppPreferences {
   };
 
   // Advanced & API
-  geminiApiKey: string | null;
+  // FIX: Removed geminiApiKey as per security guidelines. Key must come from environment variables.
   brapiToken: string | null;
   autoBackup: boolean;
   betaFeatures: boolean;

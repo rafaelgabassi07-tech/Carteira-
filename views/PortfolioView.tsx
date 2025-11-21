@@ -1,8 +1,6 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
-import FloatingActionButton from '../components/FloatingActionButton';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
@@ -392,8 +390,6 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                             </div>
                         )}
                     </div>
-                    
-                    <FloatingActionButton onClick={() => setActiveView('transacoes')} id="fab-add-transaction" />
                 </>
             ) : (
                 <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">

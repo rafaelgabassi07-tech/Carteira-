@@ -1,4 +1,3 @@
-
 import type { Asset, UserProfile, Transaction, Dividend, CalendarEvent, MonthlyIncome } from './types';
 
 // --- Cache Time-To-Live (TTLs) em Milissegundos ---
@@ -38,6 +37,15 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
     { id: 'demo4', ticker: 'KNRI11', type: 'Compra', quantity: 5, price: 155.00, date: '2023-04-20', costs: 0, notes: 'Demo' },
     { id: 'demo5', ticker: 'MXRF11', type: 'Compra', quantity: 50, price: 10.80, date: '2023-05-15', costs: 0, notes: 'Demo' },
 ];
+
+export const DEMO_DIVIDENDS: Dividend[] = [
+    { ticker: 'MXRF11', paymentDate: '2023-05-14', amountPerShare: 0.11, quantity: 100 },
+    { ticker: 'HGLG11', paymentDate: '2023-05-14', amountPerShare: 1.10, quantity: 10 },
+    { ticker: 'VISC11', paymentDate: '2023-05-14', amountPerShare: 0.85, quantity: 15 },
+    { ticker: 'MXRF11', paymentDate: '2023-04-14', amountPerShare: 0.12, quantity: 100 },
+    { ticker: 'KNRI11', paymentDate: '2023-04-14', amountPerShare: 0.95, quantity: 5 },
+];
+
 
 export const DEMO_MARKET_DATA = {
     'MXRF11': { currentPrice: 10.95, dy: 12.5, pvp: 1.05, sector: 'Papel', administrator: 'BTG Pactual', priceHistory: [10.2, 10.3, 10.5, 10.4, 10.6, 10.8, 10.95] },

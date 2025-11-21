@@ -27,7 +27,10 @@ const CountUp: React.FC<CountUpProps> = ({
     const startValue = startRef.current;
     const change = end - startValue;
 
-    if (change === 0) return;
+    if (change === 0) {
+      setCount(end);
+      return;
+    }
 
     const animate = (timestamp: number) => {
       if (!startTime) startTime = timestamp;
@@ -54,6 +57,7 @@ const CountUp: React.FC<CountUpProps> = ({
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      startRef.current = count;
     };
   }, [end, duration]);
 

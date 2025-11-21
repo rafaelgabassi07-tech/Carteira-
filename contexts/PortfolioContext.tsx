@@ -1,17 +1,17 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 // FIX: Import UserProfile type
-import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile } from '../types';
+import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager } from '../utils';
 // FIX: Import MOCK_USER_PROFILE
-import { DEMO_TRANSACTIONS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE } from '../constants';
+import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE } from '../constants';
 
 // --- Types ---
 interface PortfolioContextType {
   assets: Asset[];
   transactions: Transaction[];
+  dividends: Dividend[];
   preferences: AppPreferences;
   isDemoMode: boolean;
   privacyMode: boolean;
@@ -51,7 +51,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     dateFormat: 'dd/mm/yyyy', priceAlertThreshold: 5, globalIncomeGoal: 1000,
     segmentGoals: {}, dndEnabled: false, dndStart: '22:00', dndEnd: '07:00',
     notificationChannels: { push: true, email: false }, 
-    geminiApiKey: null, brapiToken: null,
+    // FIX: Removed geminiApiKey as per security guidelines.
+    brapiToken: null,
     autoBackup: false, betaFeatures: false, devMode: false
 };
 const EPSILON = 0.000001; // For floating point comparisons
@@ -104,6 +105,7 @@ const calculatePortfolioMetrics = (transactions: Transaction[]) => {
 // --- Provider ---
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [transactions, setTransactions] = usePersistentState<Transaction[]>('transactions', []);
+  const [dividends, setDividends] = usePersistentState<Dividend[]>('dividends', []);
   const [preferences, setPreferences] = usePersistentState<AppPreferences>('app_preferences', DEFAULT_PREFERENCES);
   // FIX: Add userProfile state
   const [userProfile, setUserProfile] = usePersistentState<UserProfile>('user_profile', MOCK_USER_PROFILE);
@@ -115,6 +117,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
 
   const sourceTransactions = useMemo(() => isDemoMode ? DEMO_TRANSACTIONS : transactions, [isDemoMode, transactions]);
+  const sourceDividends = useMemo(() => isDemoMode ? DEMO_DIVIDENDS : dividends, [isDemoMode, dividends]);
 
   // --- Actions ---
   const addTransaction = (transaction: Transaction) => setTransactions(prev => [...prev, transaction]);
@@ -161,7 +164,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return updated;
         });
 
-        fetchAdvancedAssetData(preferences, uniqueTickers).then(advancedData => {
+        // FIX: Removed `preferences` argument as it's no longer needed.
+        fetchAdvancedAssetData(uniqueTickers).then(advancedData => {
             setMarketData(prev => {
                 const updated = { ...prev };
                 Object.keys(advancedData).forEach(ticker => {
@@ -194,7 +198,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...priceData[ticker] } }));
         }
 
-        const advancedData = await fetchAdvancedAssetData(preferences, [ticker]);
+        // FIX: Removed `preferences` argument as it's no longer needed.
+        const advancedData = await fetchAdvancedAssetData([ticker]);
         if (advancedData && advancedData[ticker]) {
             setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...advancedData[ticker] } }));
         }
@@ -302,7 +307,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const value = {
-    assets, transactions: sourceTransactions, preferences, isDemoMode, privacyMode,
+    assets, transactions: sourceTransactions, dividends: sourceDividends, preferences, isDemoMode, privacyMode,
     yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError,
     // FIX: Add userProfile to context value
     userProfile,

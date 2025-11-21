@@ -1,22 +1,23 @@
 
-import { GoogleGenAI, Type } from '@google/genai';
-import type { NewsArticle, AppPreferences } from '../types';
 
-function getApiKey(prefs: AppPreferences): string {
-    // Priority 1: User-provided key from settings
-    if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
-        return prefs.geminiApiKey;
-    }
-    
-    // Priority 2: Environment variable (Direct access)
-    const envApiKey = (import.meta as any).env?.VITE_API_KEY;
+
+import { GoogleGenAI, Type } from '@google/genai';
+import type { NewsArticle } from '../types';
+
+// FIX: The getApiKey function has been simplified to adhere to security guidelines,
+// which mandate that the API key must be sourced exclusively from environment variables.
+// User-configurable keys have been removed.
+function getApiKey(): string {
+    // Using `(import.meta as any)` to bypass TypeScript type error for `env`.
+    // In Vite, environment variables are accessed via `import.meta.env`.
+    const envApiKey = (import.meta as any).env.VITE_API_KEY;
 
     if (envApiKey && envApiKey.trim() !== '') {
         return envApiKey;
     }
 
-    // If neither is found, throw a clear error
-    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada. Verifique as Configurações no app ou as Variáveis de Ambiente na Vercel.");
+    // If not found, throw a clear error
+    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada. Verifique as Variáveis de Ambiente.");
 }
 
 // --- API Call Resiliency ---
@@ -83,10 +84,11 @@ const advancedAssetDataSchema = {
 
 // --- SERVICES ---
 
-export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] = []): Promise<NewsArticle[]> {
+// FIX: Removed the `prefs` parameter as the API key is now sourced directly from environment variables.
+export async function fetchMarketNews(tickers: string[] = []): Promise<NewsArticle[]> {
   let apiKey: string;
   try {
-    apiKey = getApiKey(prefs);
+    apiKey = getApiKey();
   } catch (error: any) {
     console.warn("Skipping news fetch (No API Key):", error.message);
     return [];
@@ -108,8 +110,9 @@ export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] =
               temperature: 0.1,
             }
           });
-
-          const data = JSON.parse(response.text || '[]');
+          
+          const jsonText = response.text;
+          const data = JSON.parse(jsonText || '[]');
           return Array.isArray(data) ? data : [];
       });
   } catch (error) {
@@ -128,10 +131,18 @@ export interface AdvancedAssetData {
     shareholders: number;
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
+// FIX: Removed the `prefs` parameter as the API key is now sourced directly from environment variables.
+export async function fetchAdvancedAssetData(tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
-    const apiKey = getApiKey(prefs);
+    let apiKey: string;
+    try {
+        apiKey = getApiKey();
+    } catch (error) {
+        // Silently fail if no key is configured, as this is an enhancement feature.
+        return {};
+    }
+
     const ai = new GoogleGenAI({ apiKey });
     
     const prompt = `ATENÇÃO: Busque dados fundamentalistas exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Preencha todos os campos do schema com os valores exatos encontrados no StatusInvest, sem aproximações.`;
@@ -146,8 +157,9 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                 temperature: 0,
             }
         });
-
-        const data = JSON.parse(response.text || '[]');
+        
+        const jsonText = response.text;
+        const data = JSON.parse(jsonText || '[]');
         const result: Record<string, AdvancedAssetData> = {};
 
         if (Array.isArray(data)) {
@@ -168,16 +180,4 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         
         return result;
     });
-}
-
-export async function validateApiKey(apiKey: string): Promise<boolean> {
-    if (!apiKey || apiKey.trim() === '') return false;
-    try {
-        const ai = new GoogleGenAI({ apiKey });
-        await ai.models.generateContent({ model: "gemini-2.5-flash", contents: "ping" });
-        return true;
-    } catch (error) {
-        console.error("Gemini API Key validation failed:", error);
-        return false;
-    }
 }

@@ -11,13 +11,12 @@ const UserProfileDetail: React.FC<{ onBack: () => void; addToast: (message: stri
     const { userProfile, updateUserProfile } = usePortfolio();
     // FIX: Initialize state with userProfile from context instead of mock data.
     const [user, setUser] = useState(userProfile);
-    const [isEditing, setIsEditing] = useState(false);
 
     const handleSave = () => {
         // FIX: Update the user profile in the global context.
         updateUserProfile(user);
         addToast(t('toast_profile_updated'), 'success');
-        setIsEditing(false);
+        onBack();
     };
 
     return (

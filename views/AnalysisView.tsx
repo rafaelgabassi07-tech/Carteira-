@@ -134,9 +134,7 @@ const DiversificationCard: React.FC = () => {
 
     return (
         <AnalysisCard title={t('diversification')} delay={200}>
-            <div className="h-64">
-                <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
-            </div>
+            <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
         </AnalysisCard>
     );
 };

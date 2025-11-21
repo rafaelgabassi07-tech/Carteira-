@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -77,7 +78,7 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
     const hasGoals = Object.values(goals).some(g => Number(g) > 0);
 
     return (
-        <div className="flex flex-col md:flex-row items-center gap-6 p-2 animate-fade-in h-full">
+        <div className="flex flex-col md:flex-row items-center gap-6 p-2 animate-fade-in">
             <div className="relative w-48 h-48 flex-shrink-0">
                 <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
                     <circle cx="50" cy="50" r={40} fill="transparent" stroke="var(--border-color)" strokeWidth={18} opacity={0.1}/>
@@ -93,7 +94,7 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                     </div>
                 </div>
             </div>
-             <div className="w-full flex-1 space-y-2 overflow-y-auto no-scrollbar pr-2 min-h-0">
+             <div className="w-full flex-1 space-y-2 pr-2">
                 {data.map((slice, index) => (
                     <div 
                         key={slice.name} 
