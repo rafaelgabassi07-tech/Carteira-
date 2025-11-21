@@ -41,8 +41,11 @@ const App: React.FC = () => {
   // Global handler for background data sync errors
   useEffect(() => {
     if (marketDataError) {
-        // Avoid showing redundant "API key not configured" toast, as Settings view handles it.
-        if (!marketDataError.includes("Chave de API")) {
+        // More intelligent toast display: if the message is already user-friendly, show it directly.
+        const isCompleteMessage = marketDataError.includes("Falha ao atualizar:") || marketDataError.includes("Token da API");
+        if (isCompleteMessage) {
+            addToast(marketDataError, 'error');
+        } else if (!marketDataError.includes("Chave de API")) { // Avoid redundant Gemini key message
             addToast(`${t('toast_update_failed')}: ${marketDataError}`, 'error');
         }
     }

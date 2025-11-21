@@ -18,19 +18,14 @@ interface BrapiResponse {
 }
 
 function getBrapiToken(prefs: AppPreferences): string {
-    // Priority 1: User-provided token from settings
     if (prefs.brapiToken && prefs.brapiToken.trim() !== '') {
         return prefs.brapiToken;
     }
-    
-    // Priority 2: Environment variable (Vite's way)
     const envToken = (import.meta as any).env?.VITE_BRAPI_TOKEN;
-    
     if (envToken && envToken.trim() !== '') {
         return envToken;
     }
-
-    throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado. Verifique as Configurações no app ou as Variáveis de Ambiente na Vercel.");
+    throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado.");
 }
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -47,18 +42,21 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     for (const ticker of tickers) {
         const url = `https://brapi.dev/api/quote/${ticker}?range=5y&token=${token}`;
         try {
-            let response = await fetch(url);
+            const response = await fetch(url);
+
+            if (response.status === 401) {
+                throw new Error("Token da API Brapi inválido ou expirado. Verifique as configurações.");
+            }
 
             if (!response.ok) {
-                if (response.status === 429) {
-                    console.warn(`Brapi Rate Limit (429) for ${ticker}. Pausing and retrying...`);
-                    await delay(1500); // Wait 1.5s
-                    response = await fetch(url);
-                    if (!response.ok) {
-                        throw new Error(`Limite de requisições excedido (429)`);
-                    }
+                if (response.status === 429) { // Rate limit
+                    await delay(1500);
+                    const retryResponse = await fetch(url);
+                    if (!retryResponse.ok) throw new Error(`Limite de requisições excedido para ${ticker}.`);
+                    const data: BrapiResponse = await retryResponse.json();
+                    if (data.error || !data.results || data.results.length === 0) throw new Error(data.message || `Nenhum resultado para ${ticker}`);
                 } else {
-                    throw new Error(`Falha: ${response.statusText}`);
+                    throw new Error(`Falha na rede: ${response.statusText}`);
                 }
             }
 
@@ -91,7 +89,6 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             failedTickers.push(ticker);
         }
         
-        // Proactively add a small delay between requests to avoid hitting rate limits.
         await delay(300); 
     }
 
@@ -108,6 +105,7 @@ export async function validateBrapiToken(token: string): Promise<boolean> {
     const url = `https://brapi.dev/api/quote/PETR4?token=${token}`;
     try {
         const response = await fetch(url);
+        if(response.status === 401) return false;
         return response.ok;
     } catch (error) {
         console.error("Brapi token validation failed:", error);
