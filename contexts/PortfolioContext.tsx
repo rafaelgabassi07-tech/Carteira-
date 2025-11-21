@@ -254,37 +254,42 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
     const yoc = totalCost > 0 ? (income / totalCost) * 100 : 0;
 
-    const calculateHistoricalMonthlyIncome = (): MonthlyIncome[] => {
-        if (sourceTransactions.length === 0) {
-            return [];
-        }
+    const calculateProjectedHistoricalIncome = (): MonthlyIncome[] => {
+        if (sourceTransactions.length === 0) return [];
 
-        const firstTxDateStr = sourceTransactions.reduce((oldest, tx) => {
-            return tx.date < oldest ? tx.date : oldest;
-        }, sourceTransactions[0].date);
-        
-        const firstTxDate = fromISODate(firstTxDateStr);
+        const sortedTxs = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
+        const firstTxDate = fromISODate(sortedTxs[0].date);
         const today = new Date();
         const startDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
-
+        
         const incomeByMonth: Record<string, number> = {};
         
+        const assetDataMap: Record<string, { dy?: number; currentPrice?: number }> = {};
+        assets.forEach(asset => {
+            assetDataMap[asset.ticker] = { dy: asset.dy, currentPrice: asset.currentPrice };
+        });
+
         let currentDate = new Date(startDate);
         while (currentDate <= today) {
             const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-            incomeByMonth[monthKey] = 0;
+            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+
+            const txsUpToMonth = sortedTxs.filter(tx => fromISODate(tx.date) <= endOfMonth);
+            const monthlyPortfolio = calculatePortfolioMetrics(txsUpToMonth);
+            
+            let monthlyIncomeTotal = 0;
+            Object.keys(monthlyPortfolio).forEach(ticker => {
+                const holding = monthlyPortfolio[ticker];
+                const marketInfo = assetDataMap[ticker];
+                if (holding && marketInfo?.dy && marketInfo?.currentPrice) {
+                    const estimatedMonthlyDividend = holding.quantity * marketInfo.currentPrice * (marketInfo.dy / 100) / 12;
+                    monthlyIncomeTotal += estimatedMonthlyDividend;
+                }
+            });
+
+            incomeByMonth[monthKey] = monthlyIncomeTotal;
             currentDate.setMonth(currentDate.getMonth() + 1);
         }
-        
-        sourceDividends.forEach(dividend => {
-            const paymentDate = fromISODate(dividend.paymentDate);
-            if (paymentDate >= startDate) {
-                const monthKey = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}`;
-                if (incomeByMonth.hasOwnProperty(monthKey)) {
-                    incomeByMonth[monthKey] += dividend.amountPerShare * dividend.quantity;
-                }
-            }
-        });
 
         return Object.entries(incomeByMonth)
             .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
@@ -292,18 +297,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 const [year, month] = key.split('-');
                 const date = new Date(Number(year), Number(month) - 1, 1);
                 const monthName = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace(/\./g, '');
-                
-                return {
-                    month: monthName,
-                    total: total
-                };
+                return { month: monthName, total };
             });
     };
 
-    const historicalMonthlyIncome = calculateHistoricalMonthlyIncome();
+    const historicalMonthlyIncome = calculateProjectedHistoricalIncome();
 
     return { projectedAnnualIncome: income, yieldOnCost: yoc, monthlyIncome: historicalMonthlyIncome };
-  }, [assets, sourceTransactions, sourceDividends]);
+  }, [assets, sourceTransactions]);
   
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
       const relevantTxs = sourceTransactions.filter(t => 
