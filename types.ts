@@ -125,3 +125,11 @@ export interface AppPreferences {
   betaFeatures: boolean;
   devMode: boolean;
 }
+
+export interface PortfolioEvolutionPoint {
+    month: string;
+    invested: number;
+    marketValue: number;
+}
+
+export type SegmentEvolutionData = Record<string, PortfolioEvolutionPoint[]>;

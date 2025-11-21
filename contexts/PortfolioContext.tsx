@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend } from '../types';
+import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
-import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics } from '../utils';
+import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics, getClosestPrice } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE } from '../constants';
 
 // --- Types ---
@@ -16,6 +16,7 @@ interface PortfolioContextType {
   yieldOnCost: number;
   projectedAnnualIncome: number;
   monthlyIncome: MonthlyIncome[];
+  portfolioEvolution: SegmentEvolutionData;
   lastSync: number | null;
   isRefreshing: boolean;
   marketDataError: string | null;
@@ -67,6 +68,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
 
   const sourceTransactions = useMemo(() => isDemoMode ? DEMO_TRANSACTIONS : transactions, [isDemoMode, transactions]);
+  const sourceMarketData = useMemo(() => isDemoMode ? DEMO_MARKET_DATA : marketData, [isDemoMode, marketData]);
 
   // --- Actions ---
   const addTransaction = (transaction: Transaction) => setTransactions(prev => [...prev, transaction]);
@@ -82,7 +84,13 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const updatePreferences = (newPrefs: Partial<AppPreferences>) => setPreferences(prev => ({ ...prev, ...newPrefs }));
   const updateUserProfile = (newProfile: Partial<UserProfile>) => setUserProfile(prev => ({ ...prev, ...newProfile }));
   const togglePrivacyMode = () => setPrivacyMode(prev => !prev);
-  const resetApp = () => { localStorage.clear(); window.location.reload(); };
+  const resetApp = () => { 
+      if(window.confirm("Tem certeza que deseja sair? Todos os seus dados locais serão apagados.")) {
+        localStorage.clear(); 
+        window.location.reload(); 
+      }
+  };
+  const setDemoMode = (enabled: boolean) => setIsDemoMode(enabled);
   const clearCache = (key?: string) => {
     if (key === 'all') {
       Object.keys(localStorage).forEach(k => { if(k.startsWith('cache_')) localStorage.removeItem(k); });
@@ -112,235 +120,282 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return updated;
         });
 
-        fetchAdvancedAssetData(preferences, uniqueTickers).then(advancedData => {
-            setMarketData(prev => {
-                const updated = { ...prev };
-                Object.keys(advancedData).forEach(ticker => {
-                    updated[ticker] = { ...(updated[ticker] || {}), ...advancedData[ticker] };
-                });
-                return updated;
+        const advancedData = await fetchAdvancedAssetData(preferences, uniqueTickers);
+        setMarketData(prev => {
+            const updated = { ...prev };
+            Object.keys(advancedData).forEach(ticker => {
+                updated[ticker] = { ...(prev[ticker] || {}), ...advancedData[ticker] };
             });
-        }).catch(err => {
-            console.warn("AI data enrichment failed:", err);
+            return updated;
         });
-        
-        setLastSync(Date.now());
 
+        setLastSync(Date.now());
     } catch (error: any) {
-      console.error("Primary market data (Brapi) refresh failed:", error);
-      const errorMessage = error.message || "Falha na conexão com API de cotações.";
-      setMarketDataError(errorMessage);
-      if (force) throw new Error(errorMessage);
+        console.error("Market data refresh failed:", error);
+        setMarketDataError(error.message || "Unknown error fetching market data");
     } finally {
-      if (!silent) setIsRefreshing(false);
+        if (!silent) setIsRefreshing(false);
     }
-  }, [sourceTransactions, isRefreshing, lastSync, preferences]);
-  
+  }, [isRefreshing, lastSync, sourceTransactions, preferences]);
+
   const refreshSingleAsset = useCallback(async (ticker: string) => {
     if (!ticker) return;
-    setMarketDataError(null);
     try {
         const priceData = await fetchBrapiQuotes(preferences, [ticker]);
-        if (priceData && priceData[ticker]) {
-            setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...priceData[ticker] } }));
-        }
-
         const advancedData = await fetchAdvancedAssetData(preferences, [ticker]);
-        if (advancedData && advancedData[ticker]) {
-            setMarketData(prev => ({ ...prev, [ticker]: { ...(prev[ticker] || {}), ...advancedData[ticker] } }));
-        }
-        
-        setLastSync(Date.now());
-    } catch (error: any) {
-      console.error(`Market refresh for ${ticker} failed:`, error);
-      const errorMessage = error.message || "Falha na conexão com API.";
-      setMarketDataError(errorMessage);
-      throw new Error(errorMessage);
+        setMarketData(prev => {
+            const updated = { ...prev };
+            updated[ticker] = { 
+                ...(prev[ticker] || {}), 
+                ...priceData[ticker], 
+                ...advancedData[ticker] 
+            };
+            return updated;
+        });
+    } catch(error: any) {
+        setMarketDataError(error.message);
+        throw error;
     }
-  }, [setMarketData, setLastSync, preferences]);
+  }, [preferences]);
 
+  // --- Derived State Calculations ---
+  const assets = useMemo((): Asset[] => {
+    const portfolioMetrics = calculatePortfolioMetrics(sourceTransactions);
+    return Object.keys(portfolioMetrics).map(ticker => {
+      const metric = portfolioMetrics[ticker];
+      const data = sourceMarketData[ticker.toUpperCase()] || {};
+      const avgPrice = metric.quantity > 0 ? metric.totalCost / metric.quantity : 0;
+      const currentPrice = data.currentPrice || 0;
+      const totalInvested = metric.quantity * avgPrice;
+      const yieldOnCost = totalInvested > 0 && data.dy > 0 ? ((currentPrice * (data.dy / 100)) / avgPrice) * 100 : 0;
+      
+      return {
+        ticker,
+        quantity: metric.quantity,
+        avgPrice,
+        currentPrice,
+        priceHistory: data.priceHistory || [],
+        dy: data.dy,
+        pvp: data.pvp,
+        segment: data.sector || 'Outros',
+        administrator: data.administrator,
+        vacancyRate: data.vacancyRate,
+        liquidity: data.dailyLiquidity,
+        shareholders: data.shareholders,
+        yieldOnCost,
+      };
+    }).filter(asset => asset.quantity > EPSILON); // Filter out assets that have been sold off
+  }, [sourceTransactions, sourceMarketData]);
 
-  useEffect(() => { refreshMarketData(false, true).catch(() => {}); }, [sourceTransactions, refreshMarketData]);
+  const getAssetByTicker = useCallback((ticker: string): Asset | undefined => {
+    return assets.find(a => a.ticker.toUpperCase() === ticker.toUpperCase());
+  }, [assets]);
+  
+  const getAveragePriceForTransaction = useCallback((transaction: Transaction): number => {
+    const transactionsBefore = sourceTransactions
+        .filter(t => t.ticker === transaction.ticker && new Date(t.date) <= new Date(transaction.date))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    
+    const txIndex = transactionsBefore.findIndex(t => t.id === transaction.id);
+    const relevantTransactions = txIndex !== -1 ? transactionsBefore.slice(0, txIndex) : transactionsBefore;
 
-  // --- Derived State (Calculations) ---
-  const portfolioMetrics = useMemo(() => calculatePortfolioMetrics(sourceTransactions), [sourceTransactions]);
+    const metrics = calculatePortfolioMetrics(relevantTransactions);
+    const assetMetrics = metrics[transaction.ticker];
 
-  const assets: Asset[] = useMemo(() => {
-    const sourceMarketData = isDemoMode ? DEMO_MARKET_DATA : marketData;
+    if (assetMetrics && assetMetrics.quantity > EPSILON) {
+        return assetMetrics.totalCost / assetMetrics.quantity;
+    }
+    return 0;
+  }, [sourceTransactions]);
 
-    return Object.keys(portfolioMetrics).map((ticker: string) => {
-        const metrics = portfolioMetrics[ticker];
-        const liveData = sourceMarketData[ticker as keyof typeof sourceMarketData] || {};
-        const avgPrice = metrics.totalCost / metrics.quantity;
-        
-        let currentPrice = liveData.currentPrice || 0;
-        if (currentPrice <= 0 && avgPrice > 0) currentPrice = avgPrice;
-
-        const dy = liveData.dy || 0;
-        const yieldOnCost = avgPrice > 0 && dy > 0 ? ((currentPrice * (dy / 100)) / avgPrice) * 100 : 0;
-        
-        const vacancy = liveData.vacancyRate;
-
-        return {
-            ticker,
-            quantity: metrics.quantity,
-            avgPrice,
-            currentPrice,
-            priceHistory: liveData.priceHistory || [],
-            dy,
-            yieldOnCost,
-            pvp: liveData.pvp || 0,
-            segment: liveData.sector || liveData.segment || 'Outros',
-            administrator: liveData.administrator || 'N/A',
-            vacancyRate: vacancy === -1 ? undefined : vacancy,
-            liquidity: liveData.dailyLiquidity || 0,
-            shareholders: liveData.shareholders || 0,
-        };
-    });
-  }, [portfolioMetrics, marketData, isDemoMode]);
-
-  const dividends: Dividend[] = useMemo(() => {
-    if (isDemoMode) return DEMO_DIVIDENDS;
-    if (sourceTransactions.length === 0 || assets.length === 0) return [];
+  const { yieldOnCost, projectedAnnualIncome } = useMemo(() => {
+    const totalInvested = assets.reduce((acc, asset) => acc + (asset.quantity * asset.avgPrice), 0);
+    const projectedIncome = assets.reduce((acc, asset) => {
+        const annualDividendPerShare = asset.currentPrice * ((asset.dy || 0) / 100);
+        return acc + (annualDividendPerShare * asset.quantity);
+    }, 0);
+    const yoc = totalInvested > 0 ? (projectedIncome / totalInvested) * 100 : 0;
+    return { yieldOnCost: yoc, projectedAnnualIncome: projectedIncome };
+  }, [assets]);
+  
+  const dividends = useMemo((): Dividend[] => {
+    if (isDemoMode) {
+        return DEMO_DIVIDENDS;
+    }
+    
+    if (sourceTransactions.length === 0) {
+        return [];
+    }
 
     const simulatedDividends: Dividend[] = [];
-    const assetDataMap = new Map<string, Asset>(assets.map(a => [a.ticker, a]));
-    const tickers = [...new Set(sourceTransactions.map(t => t.ticker))];
+    const firstTxDate = new Date(
+        Math.min(...sourceTransactions.map(tx => fromISODate(tx.date).getTime()))
+    );
+    const today = new Date();
 
-    tickers.forEach(ticker => {
-        const assetTxs = sourceTransactions.filter(t => t.ticker === ticker).sort((a, b) => a.date.localeCompare(b.date));
-        if (assetTxs.length === 0) return;
+    let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
 
-        const firstTxDate = fromISODate(assetTxs[0].date);
-        const today = new Date();
-        let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+    while (currentDate <= today) {
+        // The end of the current month is our simulated "ex-dividend date"
+        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
 
-        while (currentDate <= today) {
-            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
-            const txsUpToMonth = assetTxs.filter(tx => fromISODate(tx.date) <= endOfMonth);
-            const monthlyPortfolio = calculatePortfolioMetrics(txsUpToMonth);
-            
-            const holding = monthlyPortfolio[ticker];
-            if (holding && holding.quantity > 0) {
-                const marketInfo = assetDataMap.get(ticker);
-                if (marketInfo && marketInfo.dy && marketInfo.dy > 0) {
-                    const amountPerShare = (marketInfo.currentPrice * (marketInfo.dy / 100)) / 12;
+        const transactionsUpToMonth = sourceTransactions.filter(tx => fromISODate(tx.date) <= endOfMonth);
+        
+        const portfolioAtMonthEnd = calculatePortfolioMetrics(transactionsUpToMonth);
+
+        Object.keys(portfolioAtMonthEnd).forEach(ticker => {
+            const holdings = portfolioAtMonthEnd[ticker];
+            const liveData = sourceMarketData[ticker.toUpperCase()] || {};
+            const currentPrice = liveData.currentPrice || 0;
+            const dy = liveData.dy || 0;
+
+            if (holdings.quantity > EPSILON && dy > 0 && currentPrice > 0) {
+                const amountPerShare = (currentPrice * (dy / 100)) / 12;
+                
+                // Payment date is simulated as the 15th of the NEXT month
+                const paymentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 15);
+
+                // Only generate payments for dates that have already passed or are in the current month
+                if (paymentDate <= today) {
                     simulatedDividends.push({
-                        ticker: ticker,
-                        amountPerShare: amountPerShare,
-                        quantity: holding.quantity,
-                        paymentDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 15).toISOString(),
+                        ticker,
+                        quantity: holdings.quantity,
+                        amountPerShare,
+                        paymentDate: paymentDate.toISOString().split('T')[0], // YYYY-MM-DD
                     });
                 }
             }
-            
-            currentDate.setMonth(currentDate.getMonth() + 1);
-        }
-    });
-
-    return simulatedDividends;
-}, [isDemoMode, sourceTransactions, assets]);
-
-
-  const { projectedAnnualIncome, yieldOnCost, monthlyIncome } = useMemo(() => {
-    let income = 0, totalCost = 0;
-    assets.forEach(asset => {
-        if (asset.dy && asset.dy > 0) income += asset.quantity * asset.currentPrice * (asset.dy / 100);
-        totalCost += asset.quantity * asset.avgPrice;
-    });
-    const yoc = totalCost > 0 ? (income / totalCost) * 100 : 0;
-
-    const calculateProjectedHistoricalIncome = (): MonthlyIncome[] => {
-        if (sourceTransactions.length === 0) return [];
-
-        const sortedTxs = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
-        const firstTxDate = fromISODate(sortedTxs[0].date);
-        const today = new Date();
-        const startDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
-        
-        const incomeByMonth: Record<string, number> = {};
-        
-        const assetDataMap: Record<string, { dy?: number; currentPrice?: number }> = {};
-        assets.forEach(asset => {
-            assetDataMap[asset.ticker] = { dy: asset.dy, currentPrice: asset.currentPrice };
         });
+        
+        // Move to the first day of the next month
+        currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+    
+    return simulatedDividends;
+  }, [sourceTransactions, sourceMarketData, isDemoMode]);
 
-        let currentDate = new Date(startDate);
+  const monthlyIncome = useMemo((): MonthlyIncome[] => {
+      const incomeMap: Record<string, number> = {};
+      dividends.forEach(div => {
+          const date = fromISODate(div.paymentDate);
+          const monthKey = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' }).replace('. de ', '/');
+          incomeMap[monthKey] = (incomeMap[monthKey] || 0) + (div.amountPerShare * div.quantity);
+      });
+      return Object.entries(incomeMap).map(([month, total]) => ({ month, total }));
+  }, [dividends]);
+
+  const portfolioEvolution = useMemo((): SegmentEvolutionData => {
+        if (sourceTransactions.length === 0) return {};
+
+        const results: SegmentEvolutionData = { all_types: [] };
+        const firstTxDate = fromISODate(sourceTransactions.sort((a, b) => a.date.localeCompare(b.date))[0].date);
+        const today = new Date();
+        
+        let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+
         while (currentDate <= today) {
-            const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+            const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
 
-            const txsUpToMonth = sortedTxs.filter(tx => fromISODate(tx.date) <= endOfMonth);
-            const monthlyPortfolio = calculatePortfolioMetrics(txsUpToMonth);
-            
-            let monthlyIncomeTotal = 0;
-            Object.keys(monthlyPortfolio).forEach(ticker => {
-                const holding = monthlyPortfolio[ticker];
-                const marketInfo = assetDataMap[ticker];
-                if (holding && marketInfo?.dy && marketInfo?.currentPrice) {
-                    const estimatedMonthlyDividend = holding.quantity * marketInfo.currentPrice * (marketInfo.dy / 100) / 12;
-                    monthlyIncomeTotal += estimatedMonthlyDividend;
-                }
+            const transactionsUpToMonth = sourceTransactions.filter(tx => tx.date <= endOfMonthISO);
+            const portfolioAtMonthEnd = calculatePortfolioMetrics(transactionsUpToMonth);
+
+            let monthInvestedTotal = 0;
+            let monthMarketValueTotal = 0;
+            const segmentInvested: Record<string, number> = {};
+            const segmentMarketValue: Record<string, number> = {};
+
+            Object.keys(portfolioAtMonthEnd).forEach(ticker => {
+                const holdings = portfolioAtMonthEnd[ticker];
+                const liveData = sourceMarketData[ticker.toUpperCase()] || {};
+                const segment = liveData.sector || 'Outros';
+
+                const historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+                const marketValue = historicalPrice !== null ? holdings.quantity * historicalPrice : holdings.totalCost;
+
+                monthInvestedTotal += holdings.totalCost;
+                monthMarketValueTotal += marketValue;
+
+                segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
+                segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
             });
 
-            incomeByMonth[monthKey] = monthlyIncomeTotal;
+            const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
+            
+            results.all_types.push({
+                month: monthLabel,
+                invested: monthInvestedTotal,
+                marketValue: monthMarketValueTotal
+            });
+
+            Object.keys(segmentInvested).forEach(segment => {
+                if (!results[segment]) results[segment] = [];
+                results[segment].push({
+                    month: monthLabel,
+                    invested: segmentInvested[segment],
+                    marketValue: segmentMarketValue[segment]
+                });
+            });
+
             currentDate.setMonth(currentDate.getMonth() + 1);
         }
 
-        return Object.entries(incomeByMonth)
-            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-            .map(([key, total]) => {
-                const [year, month] = key.split('-');
-                const date = new Date(Number(year), Number(month) - 1, 1);
-                const monthName = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace(/\./g, '');
-                return { month: monthName, total };
-            });
-    };
+        return results;
+    }, [sourceTransactions, sourceMarketData]);
 
-    const historicalMonthlyIncome = calculateProjectedHistoricalIncome();
-
-    return { projectedAnnualIncome: income, yieldOnCost: yoc, monthlyIncome: historicalMonthlyIncome };
-  }, [assets, sourceTransactions]);
-  
-  const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
-      const relevantTxs = sourceTransactions.filter(t => 
-        t.ticker === targetTx.ticker && 
-        (t.date < targetTx.date || (t.date === targetTx.date && t.id < targetTx.id))
-      );
-      const metrics = calculatePortfolioMetrics(relevantTxs);
-      const tickerMetrics = metrics[targetTx.ticker];
-      if (tickerMetrics && tickerMetrics.quantity > EPSILON) {
-          return tickerMetrics.totalCost / tickerMetrics.quantity;
-      }
-      return 0;
-  }, [sourceTransactions]);
-
-  const setDemoMode = (enabled: boolean) => {
-    setIsDemoMode(enabled);
-    if(enabled) {
-        setMarketData(DEMO_MARKET_DATA);
-    } else {
-        setMarketData({});
-        refreshMarketData(true).catch(() => {});
+  useEffect(() => {
+    if (preferences.privacyOnStart) {
+      setPrivacyMode(true);
     }
-  };
+  }, [preferences.privacyOnStart]);
 
-  const value = {
-    assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-    yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError,
+  const value = useMemo(() => ({
+    assets,
+    transactions: sourceTransactions,
+    dividends,
+    preferences,
+    isDemoMode,
+    privacyMode,
+    yieldOnCost,
+    projectedAnnualIncome,
+    monthlyIncome,
+    portfolioEvolution,
+    lastSync,
+    isRefreshing,
+    marketDataError,
     userProfile,
-    addTransaction, updateTransaction, deleteTransaction, importTransactions,
-    updatePreferences, refreshMarketData, refreshSingleAsset, getAveragePriceForTransaction, setDemoMode,
-    togglePrivacyMode, resetApp, clearCache,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    importTransactions,
+    updatePreferences,
     updateUserProfile,
-    getAssetByTicker: useCallback((ticker: string) => assets.find(a => a.ticker === ticker), [assets]),
-  };
+    refreshMarketData,
+    refreshSingleAsset,
+    getAssetByTicker,
+    getAveragePriceForTransaction,
+    setDemoMode,
+    togglePrivacyMode,
+    resetApp,
+    clearCache,
+  }), [
+    assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
+    yieldOnCost, projectedAnnualIncome, monthlyIncome, portfolioEvolution,
+    lastSync, isRefreshing, marketDataError, userProfile, refreshMarketData,
+    refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction
+  ]);
 
-  return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;
+  return (
+    <PortfolioContext.Provider value={value}>
+      {children}
+    </PortfolioContext.Provider>
+  );
 };
 
 export const usePortfolio = (): PortfolioContextType => {
   const context = useContext(PortfolioContext);
-  if (!context) throw new Error('usePortfolio must be used within a PortfolioProvider');
+  if (context === undefined) {
+    throw new Error('usePortfolio must be used within a PortfolioProvider');
+  }
   return context;
 };

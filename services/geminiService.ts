@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -70,7 +71,7 @@ const advancedAssetDataSchema = {
             ticker: { type: Type.STRING, description: "Símbolo do ativo (ticker), em maiúsculas. Exemplo: MXRF11" },
             dy: { type: Type.NUMBER, description: "Dividend Yield percentual dos últimos 12 meses, conforme StatusInvest. Exemplo: 12.5" },
             pvp: { type: Type.NUMBER, description: "Relação Preço/Valor Patrimonial (P/VP) exata do StatusInvest. Exemplo: 1.05" },
-            sector: { type: Type.STRING, description: "Setor do ativo. Exemplo: Logística, Papel, Shoppings" },
+            sector: { type: Type.STRING, description: "Segmento PRINCIPAL do FII, conforme classificação do StatusInvest. Use uma das seguintes categorias padronizadas: 'Tijolo - Shoppings', 'Tijolo - Lajes Corporativas', 'Tijolo - Logística', 'Tijolo - Híbrido', 'Papel', 'Fundo de Fundos (FOF)', 'Agro (Fiagro)'. Se não se encaixar claramente em nenhuma, use 'Outros'." },
             administrator: { type: Type.STRING, description: "Nome completo da administradora/gestora OFICIAL do fundo, conforme consta no StatusInvest. Exemplo para SNAG11: Suno Asset. NÃO confunda com o escriturador (ex: BTG Pactual)." },
             vacancyRate: { type: Type.NUMBER, description: "Taxa de vacância física do fundo em porcentagem. Se o indicador não for aplicável (ex: FII de papel), retorne -1. Para os demais, busque o valor real. Exemplo: 5.5" },
             dailyLiquidity: { type: Type.NUMBER, description: "Liquidez média diária (2M) em BRL. Busque o valor numérico EXATO no StatusInvest. Sem abreviações. Exemplo: 1543210.12" },
@@ -113,6 +114,27 @@ function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?
     return (bestMatch && bestMatch.score > 0) ? bestMatch.uri : undefined;
 }
 
+/**
+ * Extracts a JSON array from a string, even if it's embedded in markdown.
+ * @param text The string to parse.
+ * @returns An array of objects, or an empty array if parsing fails.
+ */
+function extractJson(text: string): any[] {
+    const jsonRegex = /(?:```json\s*)?(\[.*\])/s;
+    const match = text.match(jsonRegex);
+    
+    if (match && match[1]) {
+        try {
+            return JSON.parse(match[1]);
+        } catch (e) {
+            console.error("Failed to parse extracted JSON:", e);
+            return [];
+        }
+    }
+    
+    console.warn("Could not find a JSON array in the AI response.");
+    return [];
+}
 
 export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] = [], searchQuery: string = ''): Promise<NewsArticle[]> {
   let apiKey: string;
@@ -129,25 +151,23 @@ export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] =
   
   let prompt: string;
   if (searchQuery.trim()) {
-      prompt = `Usando a busca do Google, encontre notícias financeiras sobre "${searchQuery}" publicadas na semana atual. Foque em FIIs se for relevante. Retorne um resumo para cada notícia encontrada.`;
+      prompt = `Usando a busca do Google, encontre notícias financeiras sobre "${searchQuery}" publicadas na semana atual. Foque em FIIs se for relevante. Responda ESTRITAMENTE com um array JSON contendo um resumo para cada notícia encontrada. Não adicione nenhum texto ou explicação fora do array JSON.`;
   } else {
-      prompt = `Usando a busca do Google, encontre as 5 notícias mais importantes sobre o mercado de Fundos Imobiliários (FIIs) do Brasil, publicadas na semana atual. Tickers para contexto: ${contextTickers || 'Geral'}. Retorne um resumo para cada notícia.`;
+      prompt = `Usando a busca do Google, encontre as 5 notícias mais importantes sobre o mercado de Fundos Imobiliários (FIIs) do Brasil, publicadas na semana atual. Tickers para contexto: ${contextTickers || 'Geral'}. Responda ESTRITAMENTE com um array JSON contendo um resumo para cada notícia encontrada. Não adicione nenhum texto ou explicação fora do array JSON.`;
   }
-
 
   try {
       return await withRetry(async () => {
           const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
-            tools: [{googleSearch: {}}],
-            // FIX: Per Gemini API guidelines, responseMimeType and responseSchema are not allowed when using the googleSearch tool.
             config: {
+                tools: [{googleSearch: {}}],
             }
           });
           
-          const jsonText = response.text;
-          const parsedArticles: NewsArticle[] = JSON.parse(jsonText || '[]');
+          const rawText = response.text || '';
+          const parsedArticles: NewsArticle[] = extractJson(rawText);
 
           const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
 
@@ -189,7 +209,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `ATENÇÃO: Busque dados fundamentalistas exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Preencha todos os campos do schema com os valores exatos encontrados no StatusInvest, sem aproximações.`;
+    const prompt = `ATENÇÃO: Busque dados fundamentalistas exclusivamente do site StatusInvest para os seguintes ativos da B3: ${tickers.join(', ')}. A precisão é crítica. Para o campo 'sector', utilize OBRIGATORIAMENTE uma das categorias definidas no schema. Preencha todos os campos com os valores exatos encontrados, sem aproximações.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({

@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -77,6 +78,14 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
 
     const hasGoals = Object.values(goals).some(g => Number(g) > 0);
 
+    const getTranslationKey = (segmentName: string) => {
+        return segmentName
+            .toLowerCase()
+            .replace(' - ', '_')
+            .replace(/ /g, '_')
+            .replace(/\(|\)/g, '');
+    };
+
     return (
         <div className="flex flex-col md:flex-row items-center gap-6 p-2 animate-fade-in">
             <div className="relative w-48 h-48 flex-shrink-0">
@@ -104,7 +113,7 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                     >
                         <div className="flex items-center gap-2 min-w-0">
                             <div className="w-3 h-3 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: colors[index % colors.length] }}></div>
-                            <span className="text-[var(--text-primary)] font-medium truncate">{t(slice.name.toLowerCase().replace(/ /g, '_')) || slice.name}</span>
+                            <span className="text-[var(--text-primary)] font-medium truncate">{t(getTranslationKey(slice.name)) || slice.name}</span>
                         </div>
                         <div className="text-right flex-shrink-0">
                            <span className="font-bold">{slice.percentage.toFixed(1)}%</span>
