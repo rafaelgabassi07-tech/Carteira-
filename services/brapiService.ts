@@ -33,7 +33,6 @@ function getBrapiToken(prefs: AppPreferences): string {
     throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado. Verifique as Configurações no app ou as Variáveis de Ambiente na Vercel.");
 }
 
-// Utility delay function
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }>> {
@@ -42,52 +41,36 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     }
 
     const token = getBrapiToken(prefs);
-    const result: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }> = {};
+    const allQuotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }> = {};
     const failedTickers: string[] = [];
-    
-    // Process tickers one by one with a delay to respect rate limits
+
     for (const ticker of tickers) {
+        const url = `https://brapi.dev/api/quote/${ticker}?range=5y&token=${token}`;
         try {
-            const url = `https://brapi.dev/api/quote/${ticker}?range=5y&token=${token}`;
-            const response = await fetch(url);
+            let response = await fetch(url);
 
             if (!response.ok) {
                 if (response.status === 429) {
-                     console.warn(`Brapi Rate Limit (429) for ${ticker}. Pausing and retrying once...`);
-                     await delay(2000); // Wait 2s on rate limit and retry
-                     const retryResponse = await fetch(url);
-                     if (!retryResponse.ok) {
+                    console.warn(`Brapi Rate Limit (429) for ${ticker}. Pausing and retrying...`);
+                    await delay(1500); // Wait 1.5s
+                    response = await fetch(url);
+                    if (!response.ok) {
                         throw new Error(`Limite de requisições excedido (429)`);
-                     }
-                     const retryData: BrapiResponse = await retryResponse.json();
-                     if (retryData.results && retryData.results[0]) {
-                        const quote = retryData.results[0];
-                        const priceHistory = (quote.historicalDataPrice || [])
-                            .map(item => ({
-                                date: new Date(item.date * 1000).toISOString().split('T')[0],
-                                price: item.close,
-                            }))
-                            .sort((a, b) => a.date.localeCompare(b.date));
-
-                        result[quote.symbol.toUpperCase()] = { 
-                            currentPrice: quote.regularMarketPrice,
-                            priceHistory,
-                        };
-                        await delay(150);
-                        continue;
-                     }
+                    }
+                } else {
+                    throw new Error(`Falha: ${response.statusText}`);
                 }
-                throw new Error(`Falha ao buscar ${ticker}: ${response.statusText}`);
             }
 
             const data: BrapiResponse = await response.json();
             
             if (data.error || !data.results || data.results.length === 0) {
-                throw new Error(data.message || `Sem resultados para ${ticker}`);
+                throw new Error(data.message || `Nenhum resultado para ${ticker}`);
             }
-            
+
             const quote = data.results[0];
-            if (quote.symbol && typeof quote.regularMarketPrice === 'number') {
+            if (quote && quote.symbol && typeof quote.regularMarketPrice === 'number') {
+                const upperCaseTicker = quote.symbol.toUpperCase();
                 const priceHistory = (quote.historicalDataPrice || [])
                     .map(item => ({
                         date: new Date(item.date * 1000).toISOString().split('T')[0],
@@ -95,28 +78,30 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                     }))
                     .sort((a, b) => a.date.localeCompare(b.date));
 
-                result[quote.symbol.toUpperCase()] = {
+                allQuotes[upperCaseTicker] = {
                     currentPrice: quote.regularMarketPrice,
                     priceHistory,
                 };
+            } else {
+                 throw new Error(`Resposta inválida para ${ticker}`);
             }
-
-            // The crucial delay to be "polite" to the API
-            await delay(150);
 
         } catch (error: any) {
             console.error(`Erro ao buscar dados para ${ticker}:`, error.message);
             failedTickers.push(ticker);
         }
+        
+        // Proactively add a small delay between requests to avoid hitting rate limits.
+        await delay(300); 
     }
 
-    // If there were any failures, throw a comprehensive error.
     if (failedTickers.length > 0) {
         throw new Error(`Falha ao atualizar: ${failedTickers.join(', ')}.`);
     }
-    
-    return result;
+
+    return allQuotes;
 }
+
 
 export async function validateBrapiToken(token: string): Promise<boolean> {
     if (!token || token.trim() === '') return false;
