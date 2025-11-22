@@ -40,120 +40,91 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     const allQuotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }> = {};
     const failedTickers: string[] = [];
 
-    // Ranges to try. Start with longer ranges. 
-    // '5d' is included because Brapi Free Tier often allows 5 days history but blocks longer ones.
-    // We will attempt to downgrade gracefully if a 403 occurs.
-    const ranges = ['1y', '6mo', '1mo', '5d']; 
-
     for (const ticker of tickers) {
         let success = false;
-        let lastError: any = null;
+        let historyData: any[] = [];
+        let currentPrice = 0;
+        const urlBase = `https://brapi.dev/api/quote/${ticker}`;
 
-        // 1. Attempt to fetch Historical Data
-        for (const range of ranges) {
-            const url = `https://brapi.dev/api/quote/${ticker}?range=${range}&token=${token}`;
-            try {
-                let response = await fetch(url);
-
-                // Handle 429 (Rate Limit)
-                if (response.status === 429) {
-                    console.warn(`Rate limit hit for ${ticker} (${range}), waiting...`);
-                    await delay(2000);
-                    response = await fetch(url);
-                }
-
-                // If 403 (Forbidden), it usually means the range is too long for the plan (Free Tier).
-                // We throw a specific error to catch it below and continue to the next (shorter) range.
-                if (response.status === 403) {
-                    throw new Error("RANGE_FORBIDDEN");
-                }
-
-                if (response.status === 404) {
-                    throw new Error("NOT_FOUND");
-                }
-
-                if (!response.ok) {
-                    throw new Error(`Status: ${response.status}`);
-                }
-
-                const data: BrapiResponse = await response.json();
-                
-                if (data.error || !data.results || data.results.length === 0) {
-                    throw new Error(data.message || `Nenhum resultado`);
-                }
-
-                const quote = data.results[0];
-                if (quote && quote.symbol) {
-                    const upperCaseTicker = quote.symbol.toUpperCase();
-                    const priceHistory = (quote.historicalDataPrice || [])
-                        .map(item => ({
-                            date: new Date(item.date * 1000).toISOString().split('T')[0],
-                            price: item.close,
-                        }))
-                        .sort((a, b) => a.date.localeCompare(b.date));
-
-                    allQuotes[upperCaseTicker] = {
-                        currentPrice: quote.regularMarketPrice || priceHistory[priceHistory.length - 1]?.price || 0,
-                        priceHistory,
-                    };
+        // Strategy: Try 1y (Premium/Full) -> 5d (Free/Short) -> Current Price (Fallback)
+        
+        // 1. Try Long Range (1y)
+        try {
+            const response = await fetch(`${urlBase}?range=1y&token=${token}`);
+            
+            if (response.status === 403 || response.status === 401) {
+                throw new Error("FORBIDDEN_TIER");
+            }
+            
+            if (response.ok) {
+                const data = await response.json();
+                const result = data.results?.[0];
+                if (result) {
+                    currentPrice = result.regularMarketPrice;
+                    historyData = result.historicalDataPrice || [];
                     success = true;
-                    break; // Got data, stop range loop
                 }
-
-            } catch (error: any) {
-                lastError = error;
-                
-                if (error.message === "NOT_FOUND") {
-                    break; // Asset doesn't exist, don't retry other ranges
-                }
-                
-                if (error.message === "RANGE_FORBIDDEN") {
-                     // Continue to next shorter range
-                     // console.warn(`Range ${range} forbidden for ${ticker}, trying shorter range...`);
-                     continue;
-                }
-                
-                // For other errors (timeouts, 500), we also continue to try simpler queries
+            }
+        } catch (e: any) {
+            if (e.message !== "FORBIDDEN_TIER") {
+                 console.warn(`Failed to fetch 1y for ${ticker} (Retrying with shorter range...):`, e.message);
             }
         }
 
-        // 2. Fallback: Current Price Only (If ALL history ranges failed)
-        if (!success && lastError?.message !== "NOT_FOUND") {
-            try {
-                // Request without 'range' parameter usually works for free tokens to get just the quote (1d default)
-                const fallbackUrl = `https://brapi.dev/api/quote/${ticker}?token=${token}`;
-                const response = await fetch(fallbackUrl);
+        // 2. Try Short Range (5d) - If 1y failed or was forbidden
+        if (!success) {
+             try {
+                await delay(200); // Small delay to be nice to API
+                const response = await fetch(`${urlBase}?range=5d&token=${token}`);
                 
                 if (response.ok) {
-                    const data: BrapiResponse = await response.json();
-                    const quote = data.results?.[0];
-                    
-                    if (quote) {
-                        console.warn(`History failed for ${ticker}, used current price fallback.`);
-                        allQuotes[ticker.toUpperCase()] = {
-                            currentPrice: quote.regularMarketPrice,
-                            priceHistory: [] // Empty history
-                        };
+                    const data = await response.json();
+                    const result = data.results?.[0];
+                     if (result) {
+                        currentPrice = result.regularMarketPrice;
+                        historyData = result.historicalDataPrice || [];
                         success = true;
                     }
                 }
-            } catch (fallbackError) {
-                console.error(`Fallback fetch failed for ${ticker}`, fallbackError);
+            } catch (e) {
+                console.warn(`Failed to fetch 5d for ${ticker}`, e);
             }
         }
 
+        // 3. Current Price Only (Last Resort)
         if (!success) {
-            // Only log as definitive failure if absolutely no data could be retrieved
-            console.error(`Falha definitiva ao buscar ${ticker}:`, lastError?.message);
-            failedTickers.push(ticker);
+             try {
+                await delay(200);
+                const response = await fetch(`${urlBase}?token=${token}`);
+                 if (response.ok) {
+                    const data = await response.json();
+                    const result = data.results?.[0];
+                     if (result) {
+                        currentPrice = result.regularMarketPrice;
+                        historyData = []; // No history
+                        success = true;
+                    }
+                }
+            } catch (e) {
+                console.error(`Failed fallback for ${ticker}`, e);
+            }
         }
-        
-        await delay(200); 
+
+        if (success) {
+             allQuotes[ticker.toUpperCase()] = {
+                currentPrice: currentPrice || 0,
+                priceHistory: historyData.map((item: any) => ({
+                    date: new Date(item.date * 1000).toISOString().split('T')[0],
+                    price: item.close,
+                })).sort((a: any, b: any) => a.date.localeCompare(b.date))
+            };
+        } else {
+             failedTickers.push(ticker);
+        }
     }
 
-    // Don't throw global error if some assets worked. Only if ALL failed.
-    if (Object.keys(allQuotes).length === 0 && failedTickers.length > 0) {
-        throw new Error(`Falha ao atualizar ativos: ${failedTickers.slice(0,3).join(', ')}... Verifique sua conexão ou token.`);
+    if (failedTickers.length === tickers.length && failedTickers.length > 0) {
+        throw new Error(`Falha ao atualizar ativos: ${failedTickers.slice(0,3).join(', ')}... Verifique conexão.`);
     }
 
     return allQuotes;

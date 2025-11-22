@@ -74,7 +74,7 @@ const Header: React.FC<{
 
 const PortfolioSummary: React.FC = () => {
     const { t, formatCurrency, locale } = useI18n();
-    const { assets, yieldOnCost, projectedAnnualIncome, privacyMode, preferences } = usePortfolio();
+    const { assets, privacyMode, preferences } = usePortfolio();
 
     const summary = useMemo(() => {
         return assets.reduce(
@@ -110,7 +110,7 @@ const PortfolioSummary: React.FC = () => {
                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] border border-[var(--border-color)]">{today}</span>
                 </div>
                 
-                <div className={`mt-2 mb-6 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                <div className={`mt-2 mb-1 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
                     <p className="text-4xl font-bold tracking-tight mb-1 text-[var(--text-primary)]">
                         <CountUp end={summary.currentValue} formatter={format} />
                     </p>
@@ -119,27 +119,6 @@ const PortfolioSummary: React.FC = () => {
                         <CountUp end={Math.abs(unrealizedGain)} formatter={format} /> 
                         <span className="opacity-80">({unrealizedGainPercent.toFixed(2)}%)</span>
                     </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-y-5 gap-x-4 pt-5 border-t border-[var(--border-color)]">
-                    <div className="flex flex-col">
-                         <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('total_invested')}</span>
-                         <span className={`font-semibold text-sm ${privacyMode ? 'blur-sm' : ''}`}><CountUp end={summary.totalInvested} formatter={format} /></span>
-                    </div>
-                     <div className="flex flex-col">
-                        <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('yield_on_cost')}</span>
-                        <span className="font-semibold text-sm text-[var(--accent-color)]"><CountUp end={yieldOnCost} suffix="%" /></span>
-                    </div>
-                     <div className="flex flex-col">
-                        <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
-                        <span className={`font-semibold text-sm ${privacyMode ? 'blur-sm' : ''}`}><CountUp end={projectedAnnualIncome} formatter={format} /></span>
-                    </div>
-                     <div className="flex flex-col">
-                        <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('capital_gain')}</span>
-                         <span className={`font-semibold text-sm ${unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'} ${privacyMode ? 'blur-sm' : ''}`}>
-                             <CountUp end={unrealizedGain} formatter={format} />
-                        </span>
-                    </div>
                 </div>
             </div>
         </div>

@@ -16,10 +16,11 @@ interface AssetDetailViewProps {
 // Skeleton for loading state
 const IndicatorSkeleton: React.FC = () => (
     <div className="space-y-6 animate-pulse">
-        {[1, 2, 3].map((group) => (
+        {[1, 2].map((group) => (
             <div key={group}>
                 <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-1/3 mb-3"></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="h-20 bg-[var(--bg-tertiary-hover)] rounded-xl"></div>
                     <div className="h-20 bg-[var(--bg-tertiary-hover)] rounded-xl"></div>
                     <div className="h-20 bg-[var(--bg-tertiary-hover)] rounded-xl"></div>
                 </div>
@@ -152,7 +153,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     </div>
 
                     <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up">
-                         <div className="flex items-center gap-2 mb-6">
+                         <div className="flex items-center gap-2 mb-4">
                             <div className="p-2 bg-[var(--accent-color)]/10 rounded-lg text-[var(--accent-color)]">
                                 <AnalysisIcon className="w-5 h-5" />
                             </div>
@@ -160,68 +161,56 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                          </div>
                          
                          {isRefreshing || !asset ? <IndicatorSkeleton /> : (
-                             <div className="space-y-6">
-                                {/* Minha Posição */}
-                                <div>
-                                    <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)]"></div>
-                                        Minha Posição
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <MetricItem label={t('quantity')} value={asset.quantity} />
-                                        <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} />
-                                        <MetricItem 
-                                            label={t('yield_on_cost')} 
-                                            value={asset.yieldOnCost?.toFixed(2) ?? '-'} 
-                                            subValue="%" 
-                                            highlight={asset.yieldOnCost && asset.yieldOnCost > 8 ? 'green' : undefined} 
-                                        />
-                                         <MetricItem 
-                                            label="Total Investido" 
-                                            value={formatCurrency(asset.quantity * asset.avgPrice)} 
-                                        />
-                                    </div>
+                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 animate-fade-in-up">
+                                <MetricItem label={t('quantity')} value={asset.quantity} />
+                                <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} />
+                                <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} />
+                                
+                                <MetricItem 
+                                    label="Total Investido" 
+                                    value={formatCurrency(asset.quantity * asset.avgPrice)} 
+                                    className="sm:col-span-1"
+                                />
+                                <MetricItem 
+                                    label="Saldo Atual" 
+                                    value={formatCurrency(asset.quantity * asset.currentPrice)} 
+                                    highlight={variation >= 0 ? 'green' : 'red'}
+                                />
+                                 <MetricItem 
+                                    label={t('result')} 
+                                    value={formatCurrency(variation)} 
+                                    subValue={`(${variationPercent.toFixed(2)}%)`}
+                                    highlight={variation >= 0 ? 'green' : 'red'}
+                                />
+
+                                {/* Analysis Section Header */}
+                                <div className="col-span-2 sm:col-span-3 mt-4 mb-1 flex items-center gap-2">
+                                    <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
+                                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('nav_analysis')} & {t('data')}</span>
+                                    <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
                                 </div>
 
-                                {/* Valuation & Mercado */}
-                                <div>
-                                    <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                                        Valuation & Mercado
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-3">
-                                         <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} />
-                                         <MetricItem 
-                                            label={t('pvp')} 
-                                            value={asset.pvp?.toFixed(2) ?? '-'} 
-                                            highlight={asset.pvp && asset.pvp < 0.95 ? 'green' : (asset.pvp && asset.pvp > 1.1 ? 'red' : 'neutral')}
-                                        />
-                                        <MetricItem 
-                                            label={t('dy_12m')} 
-                                            value={asset.dy?.toFixed(2) ?? '-'} 
-                                            subValue="%"
-                                            highlight={asset.dy && asset.dy > 10 ? 'green' : undefined}
-                                        />
-                                         <MetricItem label={t('daily_liquidity')} value={asset.liquidity ? formatCurrency(asset.liquidity) : '-'} className="truncate" />
-                                    </div>
-                                </div>
-
-                                {/* Dados do Fundo */}
-                                <div>
-                                     <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                                        Dados Operacionais
-                                    </h4>
-                                     <div className="grid grid-cols-2 gap-3">
-                                        <MetricItem label={t('vacancy')} value={asset.vacancyRate?.toFixed(1) ?? '0'} subValue="%" />
-                                        <MetricItem label={t('shareholders')} value={asset.shareholders?.toLocaleString(locale) ?? '-'} />
-                                        <div className="col-span-2 p-3.5 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] flex flex-col justify-center shadow-sm">
-                                            <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1">{t('administrator')}</span>
-                                            <span className="text-sm font-bold truncate leading-tight text-[var(--text-primary)]">{asset.administrator || 'N/A'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                             </div>
+                                <MetricItem 
+                                    label={t('dy_12m')} 
+                                    value={asset.dy?.toFixed(2) ?? '-'} 
+                                    subValue="%" 
+                                    highlight={asset.dy && asset.dy > 10 ? 'green' : undefined}
+                                />
+                                <MetricItem 
+                                    label={t('yield_on_cost')} 
+                                    value={asset.yieldOnCost?.toFixed(2) ?? '-'} 
+                                    subValue="%" 
+                                    highlight={asset.yieldOnCost && asset.yieldOnCost > 8 ? 'green' : undefined}
+                                />
+                                <MetricItem 
+                                    label={t('pvp')} 
+                                    value={asset.pvp?.toFixed(2) ?? '-'} 
+                                    highlight={asset.pvp && asset.pvp < 1.0 ? 'green' : (asset.pvp && asset.pvp > 1.2 ? 'red' : 'neutral')}
+                                />
+                                 <MetricItem label={t('vacancy')} value={asset.vacancyRate?.toFixed(1) ?? '0'} subValue="%" />
+                                 <MetricItem label={t('shareholders')} value={asset.shareholders ? (asset.shareholders/1000).toFixed(1) + 'k' : '-'} />
+                                 <MetricItem label={t('daily_liquidity')} value={asset.liquidity ? (asset.liquidity/1000000).toFixed(1) + 'M' : '-'} />
+                            </div>
                          )}
                     </div>
 
