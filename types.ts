@@ -26,7 +26,7 @@ export interface NewsArticle {
   url?: string;
   imageUrl?: string;
   sentiment?: 'Positive' | 'Neutral' | 'Negative';
-  category?: 'Dividendos' | 'Macroeconomia' | 'Resultados' | 'Mercado' | 'Imóveis' | 'Geral';
+  category?: string;
   impactLevel?: 'High' | 'Medium' | 'Low';
 }
 
