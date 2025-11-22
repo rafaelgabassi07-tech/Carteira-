@@ -5,12 +5,10 @@ import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
-import CalendarIcon from '../components/icons/CalendarIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
-import { generateCalendarEvents } from '../services/dynamicDataService';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -43,10 +41,16 @@ const Header: React.FC<{
     isRefreshing: boolean;
 }> = ({ setActiveView, onShare, onRefresh, isRefreshing }) => {
     const { t } = useI18n();
-    const { privacyMode, togglePrivacyMode } = usePortfolio();
+    const { privacyMode, togglePrivacyMode, preferences } = usePortfolio();
+    
+    const isPremium = preferences.visualStyle === 'premium';
 
     return (
-        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300">
+        <header className={`px-4 py-3 flex justify-between items-center sticky z-30 glass transition-all duration-300 ${
+            isPremium 
+                ? 'top-3 mx-4 rounded-2xl border border-[var(--border-color)] shadow-sm' 
+                : 'top-0 border-b border-[var(--border-color)]'
+        }`}>
             <div className="flex flex-col">
                 <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">Invest</h1>
                 <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
@@ -55,31 +59,18 @@ const Header: React.FC<{
                 <button 
                     id="refresh-btn" 
                     onClick={() => { onRefresh(); vibrate(); }} 
-                    className={`w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)] ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
+                    className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
-                <button 
-                    id="privacy-toggle" 
-                    onClick={() => { togglePrivacyMode(); vibrate(); }} 
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]" 
-                    aria-label="Toggle Privacy"
-                >
+                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
                      {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                 </button>
-                <button 
-                    id="share-btn" 
-                    onClick={() => { onShare(); vibrate(); }} 
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]"
-                >
+                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
                     <ShareIcon className="w-5 h-5" />
                 </button>
-                <button 
-                    id="notifications-btn" 
-                    onClick={() => { setActiveView('notificacoes'); vibrate(); }} 
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]"
-                >
+                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
                     <BellIcon className="w-5 h-5" />
                 </button>
             </div>
@@ -93,66 +84,6 @@ const Metric: React.FC<{ label: string; children: React.ReactNode; }> = ({ label
         <div className="font-semibold text-lg">{children}</div>
     </div>
 );
-
-const DividendCalendar: React.FC<{ assets: Asset[] }> = ({ assets }) => {
-    const { t, formatCurrency, locale } = useI18n();
-    const { privacyMode } = usePortfolio();
-    
-    // Recalculate events when assets change
-    const events = useMemo(() => generateCalendarEvents(assets), [assets]);
-
-    return (
-        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm h-full flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2">
-                    <CalendarIcon className="w-5 h-5 text-[var(--accent-color)]" />
-                    <h3 className="font-bold text-[var(--text-primary)] text-sm">{t('dividend_calendar')}</h3>
-                </div>
-                <span className="text-[10px] font-bold bg-[var(--bg-tertiary-hover)] text-[var(--green-text)] px-2 py-0.5 rounded-full uppercase tracking-wider border border-[var(--border-color)]">
-                    {events.length > 0 ? t('next_payments') : 'Sem anúncios'}
-                </span>
-            </div>
-
-            <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar max-h-[200px]">
-                {events.length > 0 ? events.map((event, idx) => {
-                    const date = new Date(event.date);
-                    const day = date.getDate();
-                    const month = date.toLocaleDateString(locale, { month: 'short' }).toUpperCase().replace('.', '');
-                    const isPaid = event.eventType === 'Pago';
-                    
-                    return (
-                        <div key={`${event.ticker}-${idx}`} className={`flex items-center justify-between p-2.5 rounded-xl border border-[var(--border-color)] transition-colors ${isPaid ? 'bg-[var(--bg-tertiary-hover)]/50 opacity-70' : 'bg-[var(--bg-primary)]'}`}>
-                            <div className="flex items-center gap-3">
-                                <div className={`rounded-lg p-1.5 text-center min-w-[3rem] border border-[var(--border-color)] ${isPaid ? 'bg-[var(--bg-primary)]' : 'bg-[var(--bg-secondary)]'}`}>
-                                    <span className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase">{month}</span>
-                                    <span className={`block text-lg font-bold leading-none ${isPaid ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{day}</span>
-                                </div>
-                                <div>
-                                    <span className={`block font-bold text-sm ${isPaid ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--text-primary)]'}`}>{event.ticker}</span>
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isPaid ? 'text-[var(--text-secondary)]' : 'text-[var(--green-text)]'}`}>
-                                        {isPaid ? 'Pago' : 'Agendado'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className={`text-right ${privacyMode ? 'blur-sm select-none opacity-50' : ''}`}>
-                                <span className={`block font-bold text-sm ${isPaid ? 'text-[var(--text-secondary)]' : 'text-[var(--green-text)]'}`}>
-                                    {event.projectedAmount ? formatCurrency(event.projectedAmount) : '-'}
-                                </span>
-                            </div>
-                        </div>
-                    );
-                }) : (
-                    <div className="flex flex-col items-center justify-center h-full py-4 opacity-50">
-                        <CalendarIcon className="w-8 h-8 mb-2 text-[var(--text-secondary)]" />
-                        <p className="text-xs text-center text-[var(--text-secondary)] max-w-[150px]">
-                            Nenhum dividendo anunciado oficialmente para este mês.
-                        </p>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
 
 const PortfolioSummary: React.FC = () => {
     const { t, formatCurrency, locale } = useI18n();
@@ -182,7 +113,7 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500 h-full flex flex-col justify-between">
+        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
             {/* Decorative Glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
 
@@ -389,16 +320,8 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 
                 {assets.length > 0 ? (
                     <>
-                        <div className="md:max-w-7xl md:mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 px-4 mt-4">
-                            {/* Main Summary - Occupies more space on large screens */}
-                            <div className="lg:col-span-8">
-                                <PortfolioSummary />
-                            </div>
-                            
-                            {/* Dividend Calendar - Occupies side panel on large screens, stacked on mobile */}
-                            <div className="lg:col-span-4 min-h-[250px]">
-                                <DividendCalendar assets={assets} />
-                            </div>
+                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
+                            <PortfolioSummary />
                         </div>
 
                         <div className="px-4 mt-8">
@@ -468,8 +391,8 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
-                        <div className="w-24 h-24 md:w-32 md:h-32 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg flex flex-col items-center justify-center">
-                            <WalletIcon className="w-10 h-10 md:w-14 md:h-14 text-[var(--text-secondary)] opacity-50"/>
+                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
+                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
                         </div>
                         <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
                         <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
