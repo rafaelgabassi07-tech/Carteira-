@@ -11,49 +11,43 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-// --- IMAGENS DE FALLBACK (Expandido para evitar repetição) ---
+// --- IMAGENS DE FALLBACK (Expandido e Otimizado) ---
 const FALLBACK_IMAGES: Record<string, string[]> = {
     Dividendos: [
         'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1633158829585-23ba8f7c8caf?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1565514020175-05171375ef22?auto=format&fit=crop&w=800&q=80',
     ],
     Macroeconomia: [
         'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1526304640152-d4619684e484?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1535320903710-d9cf1158255e?auto=format&fit=crop&w=800&q=80',
     ],
     Imóveis: [
         'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1448630360428-65456885c650?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?auto=format&fit=crop&w=800&q=80',
     ],
     Mercado: [
         'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80',
     ],
     Geral: [
         'https://images.unsplash.com/photo-1593672715438-d88a350374ee?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
     ]
 };
 
 const getFallbackImage = (category: string = 'Geral', title: string): string => {
     const cat = FALLBACK_IMAGES[category] ? category : 'Geral';
     const images = FALLBACK_IMAGES[cat] || FALLBACK_IMAGES['Geral'];
-    // Hash determinístico com "salt" para garantir que titulos parecidos não peguem sempre a mesma
+    // Hash determinístico
     let hash = 0;
-    const salt = title.length;
     for (let i = 0; i < title.length; i++) {
-        hash = title.charCodeAt(i) + ((hash << 5) - hash) + salt;
-        hash = hash & hash; 
+        hash = ((hash << 5) - hash) + title.charCodeAt(i);
+        hash |= 0; 
     }
     const index = Math.abs(hash) % images.length;
     return images[index];
@@ -65,10 +59,10 @@ const ImpactBadge: React.FC<{ level: string }> = ({ level }) => {
         Medium: 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/30',
         Low: 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
     };
-    const labels = { High: 'Impacto Alto', Medium: 'Impacto Médio', Low: 'Impacto Baixo' };
+    const labels = { High: 'Alta Relevância', Medium: 'Médio Impacto', Low: 'Informativo' };
     
     return (
-        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${colors[level as keyof typeof colors] || colors.Low}`}>
+        <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${colors[level as keyof typeof colors] || colors.Low}`}>
             {labels[level as keyof typeof labels] || 'Info'}
         </span>
     );
@@ -94,7 +88,7 @@ const NewsCarousel: React.FC<{
     if (articles.length === 0) return null;
 
     return (
-        <div className="relative w-full mb-8 group">
+        <div className="relative w-full mb-8 group animate-fade-in">
             {/* Scroll Container */}
             <div 
                 ref={scrollRef}
@@ -102,7 +96,12 @@ const NewsCarousel: React.FC<{
                 className="w-full overflow-x-auto flex snap-x snap-mandatory no-scrollbar rounded-3xl shadow-2xl border border-[var(--border-color)]"
             >
                 {articles.map((article, idx) => {
-                    const imageSrc = article.imageUrl || getFallbackImage(article.category, article.title);
+                    const [imageSrc, setImageSrc] = useState(article.imageUrl || getFallbackImage(article.category, article.title));
+                    
+                    const handleError = () => {
+                        setImageSrc(getFallbackImage(article.category, article.title));
+                    };
+
                     return (
                         <div 
                             key={`${article.title}-hero-${idx}`} 
@@ -113,6 +112,7 @@ const NewsCarousel: React.FC<{
                                 src={imageSrc} 
                                 alt={article.title}
                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                onError={handleError}
                                 loading={idx === 0 ? "eager" : "lazy"}
                             />
                             {/* Immersive Gradient Overlay */}
@@ -165,8 +165,11 @@ const ImmersiveNewsCard: React.FC<{
   onToggleFavorite: () => void;
   onClick: () => void;
 }> = ({ article, isFavorited, onToggleFavorite, onClick }) => {
-  const [imgError, setImgError] = useState(false);
-  const imageSrc = (!imgError && article.imageUrl) ? article.imageUrl : getFallbackImage(article.category, article.title);
+  const [imageSrc, setImageSrc] = useState(article.imageUrl || getFallbackImage(article.category, article.title));
+
+  const handleError = () => {
+      setImageSrc(getFallbackImage(article.category, article.title));
+  };
 
   return (
     <div 
@@ -180,7 +183,7 @@ const ImmersiveNewsCard: React.FC<{
             loading="lazy"
             decoding="async"
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-            onError={() => setImgError(true)}
+            onError={handleError}
         />
         
         {/* Standard Gradient Overlay (Escuro em baixo, transparente em cima) */}
@@ -221,14 +224,14 @@ const ImmersiveNewsCard: React.FC<{
   );
 };
 
-// ... (Skeleton component remains similar)
 const NewsCardSkeleton: React.FC = () => (
     <div className="h-64 bg-[var(--bg-secondary)] rounded-2xl animate-pulse border border-[var(--border-color)] relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-tertiary-hover)] to-transparent opacity-50"></div>
         <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
-            <div className="h-4 bg-gray-700 rounded w-1/3"></div>
-            <div className="h-5 bg-gray-700 rounded w-full"></div>
-            <div className="h-5 bg-gray-700 rounded w-2/3"></div>
-            <div className="h-3 bg-gray-700 rounded w-5/6"></div>
+            <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-1/3"></div>
+            <div className="h-5 bg-[var(--bg-tertiary-hover)] rounded w-full"></div>
+            <div className="h-5 bg-[var(--bg-tertiary-hover)] rounded w-2/3"></div>
+            <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-5/6"></div>
         </div>
     </div>
 );
@@ -274,10 +277,10 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   const handleArticleClick = (article: NewsArticle) => {
       vibrate();
-      if (article.url) {
+      if (article.url && article.url.startsWith('http')) {
           window.open(article.url, '_blank', 'noopener,noreferrer');
       } else {
-          // Fallback search if URL is somehow missing despite backend improvements
+          // Fallback seguro
           window.open(`https://www.google.com/search?q=${encodeURIComponent(article.title)}`, '_blank');
       }
   };
@@ -287,10 +290,11 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     setError(null);
     
     try {
-      const filterKey = `news_v2_${currentQuery}_${currentDateRange}_${currentSource}`.toLowerCase().replace(/\s+/g, '_');
+      const filterKey = `news_v3_${currentQuery}_${currentDateRange}_${currentSource}_${assetTickers.join('-')}`.toLowerCase().replace(/\s+/g, '_');
       
+      // Use cache unless forced refresh
       if (!isRefresh) {
-          const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
+          const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS); // Using 1h TTL
           if (cachedNews) {
               setNews(cachedNews);
               setLoading(false);
@@ -306,8 +310,14 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       };
 
       const articles = await fetchMarketNews(preferences, filter);
-      setNews(articles);
-      if(articles.length > 0) CacheManager.set(filterKey, articles);
+      
+      if (articles.length > 0) {
+          setNews(articles);
+          CacheManager.set(filterKey, articles);
+      } else {
+          // Only set error if it was a forced refresh and we got nothing, otherwise keep old data or show empty
+          if(isRefresh) setError(t('no_news_found'));
+      }
 
     } catch (err: any) {
       setError(err.message || t('unknown_error'));
@@ -316,7 +326,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     }
   }, [t, assetTickers, preferences]);
   
-  // ... (Existing Refresh/Search/Filter Handlers kept same) ...
   const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,8 +340,9 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     loadNews(true, searchQuery, dateRange, sourceFilter);
   };
 
+  // Initial Load
   useEffect(() => {
-    loadNews(false, '', 'week', ''); // Initial load
+    loadNews(false, '', 'week', ''); 
   }, [loadNews]);
 
   const displayedNews = useMemo(() => {
@@ -341,15 +351,14 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         : news;
   }, [news, activeTab, favorites]);
 
-  // Logic for Carousel vs Grid
   const carouselArticles = useMemo(() => {
-      if (activeTab === 'favorites' || searchQuery || showFilters) return []; // Show simple grid when filtering
-      return displayedNews.slice(0, 5); // Top 5 for carousel
+      if (activeTab === 'favorites' || searchQuery || showFilters) return []; 
+      return displayedNews.slice(0, 5);
   }, [displayedNews, activeTab, searchQuery, showFilters]);
 
   const gridArticles = useMemo(() => {
       if (activeTab === 'favorites' || searchQuery || showFilters) return displayedNews;
-      return displayedNews.slice(5); // Rest for grid
+      return displayedNews.slice(5); 
   }, [displayedNews, activeTab, searchQuery, showFilters]);
 
   return (
@@ -374,14 +383,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           </div>
         </div>
         
-        {/* Search & Tabs (simplified for brevity, logic kept from original) */}
+        {/* Search & Filters UI */}
         <div className="mb-4 space-y-4">
              {showFilters && (
-                 /* ... Filter UI ... */
                  <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] animate-fade-in-up">
                      <div className="flex gap-2 overflow-x-auto">
                         {(['today', 'week', 'month'] as const).map((r) => (
-                            <button key={r} onClick={() => { setDateRange(r); loadNews(true, searchQuery, r, sourceFilter); }} className={`px-4 py-1 text-xs font-bold rounded-lg ${dateRange === r ? 'bg-[var(--accent-color)] text-white' : 'bg-[var(--bg-primary)]'}`}>
+                            <button key={r} onClick={() => { setDateRange(r); setLoading(true); loadNews(true, searchQuery, r, sourceFilter); }} className={`px-4 py-1 text-xs font-bold rounded-lg ${dateRange === r ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'bg-[var(--bg-primary)]'}`}>
                                 {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
                             </button>
                         ))}
@@ -394,12 +402,12 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                 placeholder={t('search_news_placeholder')} 
                 value={searchQuery} 
                 onChange={handleSearchChange} 
-                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 text-sm focus:border-[var(--accent-color)] outline-none"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 text-sm focus:border-[var(--accent-color)] outline-none shadow-inner transition-colors"
             />
 
             <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)]">
-                <button onClick={() => setActiveTab('all')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t('news_tab_all')}</button>
-                <button onClick={() => setActiveTab('favorites')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t('news_tab_favorites')} ({favorites.size})</button>
+                <button onClick={() => { setActiveTab('all'); vibrate(); }} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t('news_tab_all')}</button>
+                <button onClick={() => { setActiveTab('favorites'); vibrate(); }} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t('news_tab_favorites')} {favorites.size > 0 && `(${favorites.size})`}</button>
             </div>
         </div>
 
@@ -411,7 +419,11 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                 </div>
             </div>
         ) : error ? (
-             <div className="text-center py-10 text-red-400">{error}</div>
+             <div className="text-center py-10 text-red-400 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]">
+                 <p className="font-bold mb-2">Ops!</p>
+                 <p className="text-sm">{error}</p>
+                 <button onClick={handleRefresh} className="mt-4 text-[var(--accent-color)] font-bold text-sm hover:underline">Tentar Novamente</button>
+             </div>
         ) : (
             <div className="animate-fade-in">
                 {/* Hero Carousel */}
@@ -419,7 +431,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                     <NewsCarousel articles={carouselArticles} onArticleClick={handleArticleClick} />
                 )}
 
-                {/* Standardized Grid */}
+                {/* Grid */}
                 {gridArticles.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {gridArticles.map((article, index) => (

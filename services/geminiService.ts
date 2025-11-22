@@ -13,7 +13,7 @@ function getGeminiApiKey(prefs: AppPreferences): string {
     throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada.");
 }
 
-async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
+async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 2, initialDelay = 1000): Promise<T> {
   let attempt = 0;
   while (attempt < maxRetries) {
     try {
@@ -36,29 +36,6 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
   throw new Error("Serviço de IA indisponível no momento.");
 }
 
-const newsArticleSchema: Schema = {
-    type: Type.OBJECT,
-    properties: {
-        source: { type: Type.STRING, description: "Nome do veículo (ex: Brazil Journal, InfoMoney)." },
-        title: { type: Type.STRING, description: "Manchete exata." },
-        summary: { type: Type.STRING, description: "Resumo do fato em 1 frase." },
-        impactAnalysis: { type: Type.STRING, description: "Breve análise: Como isso afeta o investidor?" },
-        date: { type: Type.STRING, description: "Data ISO YYYY-MM-DD." },
-        sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] },
-        category: { type: Type.STRING, enum: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"] },
-        impactLevel: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
-        imageUrl: { type: Type.STRING, description: "URL da imagem de capa encontrada na busca." },
-        url: { type: Type.STRING, description: "Link direto para a notícia." }
-    },
-    required: ["source", "title", "summary", "impactAnalysis", "date", "sentiment", "category", "impactLevel"]
-};
-
-const newsListSchema: Schema = {
-    type: Type.ARRAY,
-    items: newsArticleSchema,
-};
-
-// ... (AdvancedAssetData types remain the same) ...
 export interface AdvancedAssetData {
     dy: number;
     pvp: number;
@@ -88,51 +65,50 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   }
   
   const ai = new GoogleGenAI({ apiKey });
-  const contextTickers = filter.tickers?.slice(0, 8).join(', ');
   
-  let dateConstraint = "";
+  // Otimização: Limitar contexto para os 5 principais ativos para não poluir o prompt
+  const contextTickers = filter.tickers?.slice(0, 5).join(', ');
+  
+  let timePrompt = "";
   switch (filter.dateRange) {
-      case 'today': dateConstraint = "publicadas HOJE"; break;
-      case 'week': dateConstraint = "publicadas nesta semana"; break;
-      case 'month': dateConstraint = "deste mês"; break;
-      default: dateConstraint = "recentes";
+      case 'today': timePrompt = "nas últimas 24 horas"; break;
+      case 'week': timePrompt = "nos últimos 7 dias"; break;
+      case 'month': timePrompt = "neste mês"; break;
+      default: timePrompt = "recente";
   }
 
-  let sourceConstraint = "";
-  if (filter.sources && filter.sources.trim().length > 0) {
-      sourceConstraint = `Fontes preferenciais: ${filter.sources}.`;
-  }
+  const userQuery = filter.query ? `Assunto específico: "${filter.query}".` : "";
+  const sourcePrompt = filter.sources ? `Fontes prioritárias: ${filter.sources}.` : "";
 
-  // Prompt Refinado
+  // Prompt OTIMIZADO para velocidade e estrutura
   const prompt = `
-    Você é um API de notícias financeiras. Busque as 8 notícias mais importantes sobre Fundos Imobiliários (FIIs) e Mercado Financeiro Brasileiro ${dateConstraint}.
+    Atue como um analista financeiro sênior. Busque as 6 notícias mais impactantes sobre o Mercado Financeiro Brasileiro e Fundos Imobiliários (FIIs) ${timePrompt}.
     
-    Foco nos ativos: ${contextTickers || 'Geral do mercado'}.
-    ${sourceConstraint}
+    FOCO: ${contextTickers ? `Prioridade total para notícias sobre: ${contextTickers}.` : "Destaques do IFIX e Ibovespa."}
+    ${userQuery}
+    ${sourcePrompt}
 
-    REGRAS CRÍTICAS PARA LINKS E IMAGENS:
-    1. Use a ferramenta de busca para encontrar URLs REAIS das notícias.
-    2. Extraia o link direto (href) e a imagem de capa (og:image) de cada resultado.
-    3. Se não encontrar imagem, deixe o campo 'imageUrl' em branco (não invente).
-    4. O campo 'url' DEVE ser um link válido para clicar.
-
-    REGRAS DE FORMATO:
-    - Retorne APENAS um JSON Array puro.
-    - Não use blocos de código markdown (\`\`\`json).
+    OBJETIVO:
+    Retorne um JSON Array estritamente válido.
     
-    SCHEMA JSON:
+    PARA CADA NOTÍCIA:
+    1. Encontre o LINK REAL (url) funcional.
+    2. Tente extrair a URL da IMAGEM de capa (thumbnail/og:image). Se não achar, deixe em branco.
+    3. Analise o IMPACTO para o investidor (positivo/negativo/neutro e porquê).
+
+    FORMATO JSON (Array):
     [
       {
         "source": "Nome da Fonte",
-        "title": "Título da Matéria",
-        "summary": "Resumo curto",
-        "impactAnalysis": "Por que isso mexe com o bolso?",
+        "title": "Manchete Curta e Chamativa",
+        "summary": "Resumo em 1 frase direta.",
+        "impactAnalysis": "Ex: 'Alta na Selic prejudica FIIs de tijolo'.",
         "date": "YYYY-MM-DD",
-        "sentiment": "Positive/Neutral/Negative",
-        "category": "Dividendos/Macroeconomia/Resultados/Mercado/Imóveis",
-        "impactLevel": "High/Medium/Low",
-        "url": "https://link-real-da-noticia.com",
-        "imageUrl": "https://link-da-imagem.jpg"
+        "sentiment": "Positive" | "Neutral" | "Negative",
+        "category": "Dividendos" | "Macroeconomia" | "Resultados" | "Mercado" | "Imóveis",
+        "impactLevel": "High" | "Medium" | "Low",
+        "url": "https://...",
+        "imageUrl": "https://..."
       }
     ]
   `;
@@ -140,81 +116,77 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   try {
       return await withRetry(async () => {
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-flash", // Modelo mais rápido e eficiente
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
-                temperature: 0.1, 
+                temperature: 0.3, // Baixa temperatura para respostas mais objetivas e rápidas
+                maxOutputTokens: 2000, // Limita o tamanho para garantir velocidade
             }
           });
           
           const responseText = response.text?.trim() || '';
           if (!responseText) return [];
 
-          // Limpeza agressiva de Markdown e JSON inválido
-          let jsonText = responseText
-            .replace(/^```json\s*/, '') // Remove início de bloco code
-            .replace(/^```\s*/, '') 
-            .replace(/\s*```$/, ''); // Remove fim de bloco code
+          // Limpeza robusta de JSON (remove blocos de código e texto extra)
+          const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+          const jsonText = jsonMatch ? jsonMatch[0] : responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
 
           try {
-            let parsedData = JSON.parse(jsonText);
-            let articles: NewsArticle[] = [];
+            let articles: NewsArticle[] = JSON.parse(jsonText);
+            if (!Array.isArray(articles)) return [];
 
-            if (Array.isArray(parsedData)) {
-                articles = parsedData;
-            } else if (typeof parsedData === 'object' && parsedData !== null) {
-                // Fallback: Tenta encontrar array dentro de alguma propriedade
-                const possibleArray = Object.values(parsedData).find(val => Array.isArray(val));
-                if (possibleArray) articles = possibleArray as NewsArticle[];
-            }
-            
-            if (articles.length === 0) return [];
-
-            // Grounding Check Refinado (Correção de Links)
-            // A API do Gemini retorna 'groundingChunks' que contém os links reais usados para gerar a resposta.
-            // Vamos tentar casar o título da notícia com o título do chunk para garantir o link certo.
-            const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
+            // GROUNDING & LINK RECOVERY (A Mágica da Correção)
+            // O Gemini retorna 'groundingChunks' com os links reais que ele usou para pesquisar.
+            // Vamos usar isso para corrigir links quebrados ou alucinações.
+            const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+                ?.map(c => c.web)
+                .filter(Boolean)
+                .flatMap(w => ({ uri: w?.uri, title: w?.title })) || [];
   
             return articles.map(article => {
                   let finalUrl = article.url;
-                  let finalImage = article.imageUrl;
-
-                  // Se a URL parece falsa ou vazia, tenta encontrar no grounding
-                  const isInvalidUrl = !finalUrl || finalUrl.includes('example.com') || finalUrl.length < 10;
                   
-                  if (isInvalidUrl && webSources.length > 0) {
-                      // Tenta encontrar um source que contenha palavras chave do título
-                      const keywords = article.title.split(' ').filter(w => w.length > 4).slice(0, 3);
+                  // Validação de URL: Se for curta demais, 'example', ou vazia, buscamos no Grounding
+                  const isSuspiciousUrl = !finalUrl || finalUrl.length < 12 || finalUrl.includes('example') || finalUrl.includes('google.com/search');
+                  
+                  if (isSuspiciousUrl && webSources.length > 0) {
+                      // Tenta encontrar um link que tenha palavras do título da notícia
+                      const titleWords = article.title.toLowerCase().split(' ').filter(w => w.length > 4);
+                      
                       const match = webSources.find(src => 
-                          src?.title && keywords.some(k => src.title?.toLowerCase().includes(k.toLowerCase()))
+                          src.title && titleWords.some(word => src.title?.toLowerCase().includes(word))
                       );
                       
                       if (match?.uri) {
                           finalUrl = match.uri;
                       } else {
-                          // Fallback para o primeiro link relacionado se não houver match preciso
-                          // Melhor um link real do assunto do que nada
-                          finalUrl = webSources[0]?.uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
+                          // Fallback para o primeiro link de fonte confiável encontrado
+                          finalUrl = webSources[0].uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
                       }
                   }
+
+                  // Garante categorias válidas para o sistema de ícones/cores
+                  const validCategories = ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"];
+                  const category = validCategories.includes(article.category || '') ? article.category : 'Mercado';
 
                   return {
                     ...article,
                     url: finalUrl,
-                    imageUrl: finalImage, // Mantém a imagem se a IA achou, senão o front usa fallback
-                    category: article.category || 'Mercado',
-                    impactLevel: article.impactLevel || 'Medium'
+                    category: category as any,
+                    impactLevel: article.impactLevel || 'Medium',
+                    // Se a imagem vier vazia ou quebrada, o front-end usará o fallback determinístico
+                    imageUrl: article.imageUrl && article.imageUrl.startsWith('http') ? article.imageUrl : undefined 
                   };
               });
 
           } catch(e) {
-            console.error("Falha no parsing JSON da IA:", e);
+            console.error("Erro ao processar JSON de notícias:", e);
             return [];
           }
       });
   } catch (error) {
-      console.warn("Falha na requisição de notícias:", error);
+      console.warn("Erro na API de Notícias:", error);
       return []; 
   }
 }
@@ -233,9 +205,11 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const now = new Date();
     const currentDate = now.toISOString().split('T')[0];
 
-    const prompt = `Hoje é ${currentDate}. Busque dados fundamentalistas ATUALIZADOS para: ${tickers.join(', ')}.
+    const prompt = `Hoje é ${currentDate}. Aja como um terminal financeiro. Retorne dados fundamentalistas REAIS e ATUALIZADOS para: ${tickers.join(', ')}.
     
-    IMPORTANTE: Busque o "Último Rendimento Anunciado" e a "Data de Pagamento" (Next Payment Date) deste ciclo atual (Mês corrente ou próximo).
+    CRÍTICO:
+    1. Busque "Aviso aos Cotistas" ou "Fato Relevante" deste mês ou mês passado para achar a Data de Pagamento.
+    2. Se já pagou este mês, retorne essa data. Se anunciou para o próximo, retorne a próxima.
     
     Retorne JSON Array puro:
     [{"ticker": "X", "dy": 0, "pvp": 0, "sector": "", "administrator": "", "vacancyRate": 0, "dailyLiquidity": 0, "shareholders": 0, "nextPaymentDate": "YYYY-MM-DD", "lastDividend": 0}]
@@ -269,7 +243,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                             vacancyRate: Number(item.vacancyRate),
                             dailyLiquidity: Number(item.dailyLiquidity || 0),
                             shareholders: Number(item.shareholders || 0),
-                            nextPaymentDate: item.nextPaymentDate, // Mantém string ISO
+                            nextPaymentDate: item.nextPaymentDate,
                             lastDividend: Number(item.lastDividend || 0)
                         };
                     }
