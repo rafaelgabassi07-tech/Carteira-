@@ -110,7 +110,10 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     Período: ${timePrompt}
 
     [FORMATO DE SAÍDA]
+    NÃO use blocos de código Markdown.
+    Comece a resposta diretamente com '[' e termine com ']'.
     Retorne APENAS um Array JSON.
+    
     Campos Obrigatórios: source, title, summary, date (YYYY-MM-DD), url, category, sentiment, impactLevel.
     Tente extrair a 'imageUrl' real se disponível nos metadados.
 
@@ -234,6 +237,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const prompt = `Data: ${now}. Aja como API financeira. JSON para: ${tickers.join(', ')}.
     Busque "Aviso aos Cotistas" recente.
+    NÃO use Markdown. Retorne APENAS JSON.
     JSON: [{"ticker": "X", "dy": 0, "pvp": 0, "sector": "", "administrator": "", "vacancyRate": 0, "dailyLiquidity": 0, "shareholders": 0, "nextPaymentDate": "YYYY-MM-DD", "lastDividend": 0}]`;
 
     return withRetry(async () => {
