@@ -40,10 +40,10 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     const allQuotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }> = {};
     const failedTickers: string[] = [];
 
-    // Ranges to try. Start with shorter ranges to increase success rate on free tier, 
-    // then try longer if successful? No, usually UI wants context.
-    // We keep standard order but handle 403 gracefully.
-    const ranges = ['1y', '6mo', '1mo']; 
+    // Ranges to try. Start with longer ranges. 
+    // '5d' is included because Brapi Free Tier often allows 5 days history but blocks longer ones.
+    // We will attempt to downgrade gracefully if a 403 occurs.
+    const ranges = ['1y', '6mo', '1mo', '5d']; 
 
     for (const ticker of tickers) {
         let success = false;
@@ -57,16 +57,15 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
                 // Handle 429 (Rate Limit)
                 if (response.status === 429) {
-                    console.warn(`Rate limit hit for ${ticker}, waiting...`);
-                    await delay(2500);
+                    console.warn(`Rate limit hit for ${ticker} (${range}), waiting...`);
+                    await delay(2000);
                     response = await fetch(url);
                 }
 
-                // CRITICAL FIX: If 403 (Forbidden), do not retry other ranges.
-                // It implies the token doesn't have historical permissions.
-                // Break loop and go to Fallback (Current Price Only).
+                // If 403 (Forbidden), it usually means the range is too long for the plan (Free Tier).
+                // We throw a specific error to catch it below and continue to the next (shorter) range.
                 if (response.status === 403) {
-                    throw new Error("FORBIDDEN_HISTORY");
+                    throw new Error("RANGE_FORBIDDEN");
                 }
 
                 if (response.status === 404) {
@@ -74,7 +73,6 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                 }
 
                 if (!response.ok) {
-                    // For other errors (500, etc), maybe trying a shorter range helps?
                     throw new Error(`Status: ${response.status}`);
                 }
 
@@ -103,23 +101,26 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                 }
 
             } catch (error: any) {
-                if (error.message === "FORBIDDEN_HISTORY") {
-                    lastError = error;
-                    break; // Exit range loop to trigger fallback
-                }
-                if (error.message === "NOT_FOUND") {
-                    lastError = error;
-                    break; // Asset doesn't exist, don't retry
-                }
                 lastError = error;
-                // Continue to next range (e.g. if 1y fails due to timeouts, maybe 1mo works)
+                
+                if (error.message === "NOT_FOUND") {
+                    break; // Asset doesn't exist, don't retry other ranges
+                }
+                
+                if (error.message === "RANGE_FORBIDDEN") {
+                     // Continue to next shorter range
+                     // console.warn(`Range ${range} forbidden for ${ticker}, trying shorter range...`);
+                     continue;
+                }
+                
+                // For other errors (timeouts, 500), we also continue to try simpler queries
             }
         }
 
-        // 2. Fallback: Current Price Only (If history failed or was forbidden)
+        // 2. Fallback: Current Price Only (If ALL history ranges failed)
         if (!success && lastError?.message !== "NOT_FOUND") {
             try {
-                // Request without 'range' parameter usually works for free tokens to get just the quote
+                // Request without 'range' parameter usually works for free tokens to get just the quote (1d default)
                 const fallbackUrl = `https://brapi.dev/api/quote/${ticker}?token=${token}`;
                 const response = await fetch(fallbackUrl);
                 
@@ -128,10 +129,10 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                     const quote = data.results?.[0];
                     
                     if (quote) {
-                        console.warn(`History forbidden/failed for ${ticker}, using current price fallback.`);
+                        console.warn(`History failed for ${ticker}, used current price fallback.`);
                         allQuotes[ticker.toUpperCase()] = {
                             currentPrice: quote.regularMarketPrice,
-                            priceHistory: [] // Return empty history so UI doesn't crash
+                            priceHistory: [] // Empty history
                         };
                         success = true;
                     }
@@ -142,6 +143,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         }
 
         if (!success) {
+            // Only log as definitive failure if absolutely no data could be retrieved
             console.error(`Falha definitiva ao buscar ${ticker}:`, lastError?.message);
             failedTickers.push(ticker);
         }
@@ -162,7 +164,7 @@ export async function validateBrapiToken(token: string): Promise<boolean> {
     const url = `https://brapi.dev/api/quote/PETR4?token=${token}`;
     try {
         const response = await fetch(url);
-        if(response.status === 401) return false;
+        if(response.status === 401 || response.status === 403) return false;
         return response.ok;
     } catch (error) {
         console.error("Brapi token validation failed:", error);
