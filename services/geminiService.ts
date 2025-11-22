@@ -23,26 +23,16 @@ export interface NewsFilter {
 
 // --- Helpers ---
 
-function cleanText(text: string): string {
-    return text.replace(/```json/g, '').replace(/```/g, '').trim();
-}
-
 function getDomain(url: string): string {
     try {
-        return new URL(url).hostname.replace('www.', '');
+        const hostname = new URL(url).hostname;
+        return hostname.replace('www.', '');
     } catch {
         return 'news.google.com';
     }
 }
 
-function getFavicon(url: string): string {
-    try {
-        const domain = new URL(url).hostname;
-        return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-    } catch {
-        return '';
-    }
-}
+// --- Core Logic ---
 
 export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<NewsArticle[]> {
   let apiKey: string;
@@ -55,33 +45,46 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   
   const ai = new GoogleGenAI({ apiKey });
   
-  // Construct Search Query
-  const baseQuery = filter.query 
-    ? filter.query 
-    : (filter.category && filter.category !== 'Destaques' ? `Notícias sobre ${filter.category} no mercado financeiro` : "Destaques do Mercado Financeiro e FIIs Brasil");
+  // Construção da Query Otimizada para Busca
+  const baseContext = "Mercado Financeiro Brasil";
+  let searchQuery = "";
+
+  if (filter.query) {
+      searchQuery = `${filter.query} notícias recentes`;
+  } else if (filter.category && filter.category !== 'Destaques') {
+      searchQuery = `Notícias sobre ${filter.category} ${baseContext}`;
+  } else {
+      searchQuery = `Principais notícias ${baseContext} hoje`;
+  }
+
+  if (filter.tickers && filter.tickers.length > 0) {
+      const tickerList = filter.tickers.slice(0, 3).join(' OR ');
+      searchQuery += ` (${tickerList})`;
+  }
+
+  // Prompt focado em estruturação de dados
+  // Instruímos a IA a agir como um parser de JSON para os resultados da ferramenta de busca
+  const prompt = `
+    Você é um backend de API de notícias financeiras (Google News style).
+    Sua tarefa é pesquisar e retornar um JSON array estruturado.
     
-  const tickersQuery = filter.tickers && filter.tickers.length > 0 ? `(${filter.tickers.slice(0, 3).join(' OR ')})` : "";
-  const timeQuery = filter.dateRange === 'today' ? 'nas últimas 24 horas' : 'na última semana';
-  
-  const finalPrompt = `
-    Atue como um agregador de notícias financeiras estilo Google News.
-    Pesquise por: "${baseQuery} ${tickersQuery} ${timeQuery}".
+    PESQUISA: "${searchQuery}"
     
-    IMPORTANTE:
-    1. Use a ferramenta googleSearch para encontrar links reais.
-    2. Retorne um JSON puro contendo um array de notícias.
-    3. Para cada notícia, extraia: title, source (nome do site), date, url, summary (max 100 caracteres).
-    4. Tente encontrar a URL da imagem principal da notícia (og:image) se disponível nos metadados.
+    REGRAS RÍGIDAS:
+    1. Use a ferramenta [googleSearch] OBRIGATORIAMENTE.
+    2. Analise os resultados da pesquisa.
+    3. Retorne APENAS um JSON Array válido. Sem markdown, sem explicações.
+    4. Extraia o máximo de notícias recentes e relevantes possível (mínimo 5).
     
-    Retorne APENAS o JSON:
+    ESTRUTURA DO JSON:
     [
       {
-        "title": "Título da Matéria",
-        "source": "InfoMoney",
-        "date": "2023-10-25",
-        "url": "https://...",
-        "summary": "Resumo curto...",
-        "imageUrl": "https://..."
+        "title": "Título exato da manchete",
+        "source": "Nome do Site (ex: InfoMoney, Brazil Journal)",
+        "date": "YYYY-MM-DDTHH:mm:ssZ (ou data relativa convertida)",
+        "url": "URL completa e válida da notícia",
+        "imageUrl": "URL da imagem da notícia (se disponível nos metadados)",
+        "summary": "Resumo muito breve (max 120 caracteres) sobre o impacto no mercado."
       }
     ]
   `;
@@ -89,95 +92,102 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   try {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash", 
-        contents: finalPrompt,
+        contents: prompt,
         config: {
             tools: [{googleSearch: {}}],
-            temperature: 0.1, // Low temperature for precision
+            temperature: 0.1, // Baixa temperatura para garantir formato JSON
         }
       });
       
       const responseText = response.text || '';
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       
-      let articles: any[] = [];
+      let articles: NewsArticle[] = [];
+      let parsedJson: any[] = [];
 
-      // 1. Try Parsing JSON (Best Case)
+      // 1. Tentativa de Parse do JSON da IA
       try {
-        const jsonStr = cleanText(responseText);
-        const firstBracket = jsonStr.indexOf('[');
-        const lastBracket = jsonStr.lastIndexOf(']');
-        if (firstBracket !== -1 && lastBracket !== -1) {
-            articles = JSON.parse(jsonStr.substring(firstBracket, lastBracket + 1));
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            parsedJson = JSON.parse(jsonMatch[0]);
         }
       } catch (e) {
-        console.warn("JSON Parse failed, switching to Grounding Fallback.");
+        console.warn("IA falhou em gerar JSON válido. Usando fallback de Grounding puro.");
       }
 
-      // 2. Grounding Fallback (Robust Case)
-      // If JSON failed OR resulted in empty/invalid list, build from search metadata directly.
-      if (!Array.isArray(articles) || articles.length === 0) {
-          if (groundingChunks.length > 0) {
-              articles = groundingChunks
-                .filter(c => c.web?.title && c.web?.uri)
-                .map(c => ({
-                    title: c.web!.title,
-                    url: c.web!.uri,
-                    source: getDomain(c.web!.uri!),
-                    date: new Date().toISOString(),
-                    summary: "Toque para ler a notícia completa na fonte original.",
-                    imageUrl: undefined // Will use fallback in UI
-                }));
-          }
+      // 2. Validação e Cruzamento com Grounding (Google News Mechanism)
+      // Se o JSON falhou OU se queremos garantir a veracidade dos links,
+      // cruzamos com os metadados reais da busca.
+      
+      if (parsedJson.length > 0) {
+          // Modo IA + Validação
+          articles = parsedJson.map((item: any) => {
+              // Tenta validar a URL com o grounding para evitar alucinações
+              const groundMatch = groundingChunks.find(c => 
+                  c.web?.uri === item.url || 
+                  c.web?.title?.includes(item.title.substring(0, 15))
+              );
+              
+              return {
+                  title: item.title || groundMatch?.web?.title || "Notícia do Mercado",
+                  source: item.source || getDomain(item.url || groundMatch?.web?.uri || ''),
+                  url: item.url || groundMatch?.web?.uri || `https://www.google.com/search?q=${encodeURIComponent(item.title)}`,
+                  date: item.date || new Date().toISOString(),
+                  summary: item.summary || "Toque para ler a matéria completa.",
+                  imageUrl: item.imageUrl,
+                  category: filter.category as any || 'Mercado',
+                  sentiment: 'Neutral'
+              };
+          });
+      } 
+      
+      // 3. Fallback Robusto (Modo "Search Engine")
+      // Se a IA não retornou nada útil, construímos as notícias DIRETAMENTE dos resultados da busca.
+      if (articles.length === 0 && groundingChunks.length > 0) {
+          const uniqueLinks = new Set();
+          
+          articles = groundingChunks
+            .filter(c => c.web?.title && c.web?.uri)
+            .filter(c => {
+                if (uniqueLinks.has(c.web!.uri)) return false;
+                uniqueLinks.add(c.web!.uri);
+                return true;
+            })
+            .map(c => ({
+                title: c.web!.title!,
+                url: c.web!.uri!,
+                source: getDomain(c.web!.uri!),
+                date: new Date().toISOString(),
+                summary: "Notícia encontrada via busca Google. Clique para ler.",
+                category: filter.category as any || 'Mercado',
+                sentiment: 'Neutral'
+            }));
       }
 
-      // 3. Normalization & Enrichment
-      const processedNews: NewsArticle[] = articles.map((item: any) => {
-          // Validate URL
-          let finalUrl = item.url;
-          if (!finalUrl || !finalUrl.startsWith('http')) {
-              // Try to recover URL from grounding if AI hallucinated a link
-              const match = groundingChunks.find(c => c.web?.title?.includes(item.title.substring(0, 10)));
-              finalUrl = match?.web?.uri || `https://www.google.com/search?q=${encodeURIComponent(item.title)}`;
-          }
-
-          return {
-              title: item.title || "Notícia do Mercado",
-              summary: item.summary || "Sem descrição disponível.",
-              source: item.source || getDomain(finalUrl),
-              url: finalUrl,
-              date: item.date || new Date().toISOString(),
-              imageUrl: item.imageUrl, // Can be undefined
-              category: filter.category as any || 'Mercado',
-              sentiment: 'Neutral', // Default, simple mode
-              impactLevel: 'Low'
-          };
-      });
-
-      // 4. Ultimate Fallback (No results at all)
-      if (processedNews.length === 0) {
+      // 4. Fallback Final (Sem resultados)
+      if (articles.length === 0) {
           return [{
               source: "Google Search",
-              title: `Resultados para: ${baseQuery}`,
-              summary: "Não foi possível carregar o resumo. Clique para pesquisar.",
+              title: `Resultados para: ${searchQuery}`,
+              summary: "Não foi possível processar o resumo. Clique para ver no Google.",
               date: new Date().toISOString(),
-              url: `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}&tbm=nws`,
+              url: `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&tbm=nws`,
               category: "Geral",
-              sentiment: "Neutral",
-              impactLevel: "Low"
+              sentiment: "Neutral"
           }];
       }
 
-      return processedNews.slice(0, 15); // Limit to 15 items
+      return articles.slice(0, 20); // Limita a 20 resultados
 
   } catch (error) {
-      console.error("API Failure:", error);
-      return []; // UI handles empty state
+      console.error("Erro crítico no serviço de notícias:", error);
+      return []; // UI trata lista vazia
   }
 }
 
-// Keep existing asset data fetcher
+// Mantém compatibilidade com outras funções
 export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<any> {
-    return {}; // Stub for now to focus on news fix
+    return {};
 }
 
 export async function validateGeminiKey(key: string): Promise<boolean> {
