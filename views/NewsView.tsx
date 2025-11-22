@@ -46,95 +46,21 @@ const getFallbackImage = (category: string = 'Geral', title: string): string => 
     return images[Math.abs(hash) % images.length];
 };
 
-// --- HOOK DE LÓGICA DE NOTÍCIAS ---
-const useMarketNews = (addToast: (msg: string, type?: any) => void) => {
+const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
     const { t } = useI18n();
-    const { assets, preferences } = usePortfolio();
-    const [news, setNews] = useState<NewsArticle[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    
-    // Filters
-    const [searchQuery, setSearchQuery] = useState('');
-    const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
-    const [sourceFilter, setSourceFilter] = useState('');
-
-    const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
-
-    const fetchNews = useCallback(async (isRefresh = false, query = '', range = 'week', source = '') => {
-        if(!isRefresh) setLoading(true);
-        setError(null);
-        
-        try {
-            const filterKey = `news_cache_v4_${query}_${range}_${source}_${assetTickers.join('-')}`.toLowerCase().replace(/\s+/g, '_');
-            
-            if (!isRefresh) {
-                const cached = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
-                if (cached) {
-                    setNews(cached);
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            const filter: NewsFilter = {
-                query: query,
-                tickers: assetTickers,
-                dateRange: range as any,
-                sources: source
-            };
-
-            const articles = await fetchMarketNews(preferences, filter);
-            
-            if (articles.length > 0) {
-                setNews(articles);
-                CacheManager.set(filterKey, articles);
-            } else if (isRefresh) {
-                setError(t('no_news_found'));
-            }
-        } catch (err: any) {
-            setError(err.message || t('unknown_error'));
-        } finally {
-            setLoading(false);
-        }
-    }, [assetTickers, preferences, t]);
-
-    // Debounced fetcher
-    const debouncedFetch = useCallback(debounce((q, r, s) => fetchNews(true, q, r, s), 800), [fetchNews]);
-
-    // Initial Load
-    useEffect(() => {
-        fetchNews(false, searchQuery, dateRange, sourceFilter);
-    }, []);
-
-    // Handlers
-    const handleRefresh = () => {
-        vibrate();
-        setLoading(true);
-        fetchNews(true, searchQuery, dateRange, sourceFilter);
+    const sentimentMap = {
+        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
+        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400' },
+        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400' },
     };
-
-    const handleSearch = (val: string) => {
-        setSearchQuery(val);
-        setLoading(true);
-        debouncedFetch(val, dateRange, sourceFilter);
-    }
-
-    const handleFilterChange = (range: any, source: string) => {
-        setDateRange(range);
-        setSourceFilter(source);
-        setLoading(true);
-        fetchNews(true, searchQuery, range, source);
-    }
-
-    return {
-        news, loading, error,
-        searchQuery, dateRange, sourceFilter,
-        handleSearch, handleFilterChange, handleRefresh
-    };
+    const sentimentData = sentiment ? sentimentMap[sentiment] : null;
+    if (!sentimentData) return null;
+    return (
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sentimentData.color}`}>
+            {sentimentData.text}
+        </span>
+    );
 };
-
-// --- COMPONENTES VISUAIS ---
 
 const ImpactBadge: React.FC<{ level: string }> = React.memo(({ level }) => {
     const colors = {
@@ -154,14 +80,35 @@ const NewsCard: React.FC<{
   article: NewsArticle;
   isFavorited: boolean;
   onToggleFavorite: () => void;
+  addToast: (message: string, type?: ToastMessage['type']) => void;
   isHero?: boolean;
-}> = React.memo(({ article, isFavorited, onToggleFavorite, isHero = false }) => {
+}> = React.memo(({ article, isFavorited, onToggleFavorite, addToast, isHero = false }) => {
+  const { t } = useI18n();
   const [imageSrc, setImageSrc] = useState(article.imageUrl || getFallbackImage(article.category, article.title));
 
   const handleClick = () => {
       vibrate();
       const url = article.url && article.url.startsWith('http') ? article.url : `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
       window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    vibrate();
+    const shareData = {
+        title: article.title,
+        text: article.summary,
+        url: article.url || window.location.href,
+    };
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+           addToast(t('toast_share_not_supported'), 'error');
+        }
+    } catch (err) {
+       // User cancelled
+    }
   };
 
   return (
@@ -179,16 +126,25 @@ const NewsCard: React.FC<{
             onError={() => setImageSrc(getFallbackImage(article.category, article.title))}
         />
         
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90 transition-opacity group-hover:opacity-100" />
+        {/* Gradient Overlay - Improved readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 transition-opacity group-hover:opacity-100" />
 
         {/* Actions */}
-        <button 
-            onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-            className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition-colors active:scale-90"
-        >
-            <StarIcon filled={isFavorited} className={`w-4 h-4 ${isFavorited ? 'text-yellow-400' : ''}`} />
-        </button>
+        <div className="absolute top-3 right-3 z-20 flex gap-2">
+             <button
+                  onClick={handleShare}
+                  className="p-2 rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition-colors active:scale-90"
+                  aria-label={t('share_news')}
+              >
+                  <ShareIcon className="w-4 h-4" />
+              </button>
+            <button 
+                onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+                className="p-2 rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition-colors active:scale-90"
+            >
+                <StarIcon filled={isFavorited} className={`w-4 h-4 ${isFavorited ? 'text-yellow-400' : ''}`} />
+            </button>
+        </div>
 
         {/* Content */}
         <div className="absolute bottom-0 left-0 right-0 p-5 z-10 flex flex-col justify-end">
@@ -217,6 +173,92 @@ const NewsCard: React.FC<{
   );
 });
 
+// --- HOOK ---
+const useMarketNews = (addToast: (msg: string, type?: any) => void) => {
+    const { t } = useI18n();
+    const { assets, preferences } = usePortfolio();
+    const [news, setNews] = useState<NewsArticle[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    
+    // Filters
+    const [searchQuery, setSearchQuery] = useState('');
+    const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
+    const [sourceFilter, setSourceFilter] = useState('');
+
+    const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
+
+    const fetchNews = useCallback(async (isRefresh = false, query = '', range = 'week', source = '') => {
+        if(!isRefresh) setLoading(true);
+        setError(null);
+        
+        try {
+            const filterKey = `news_cache_v5_${query}_${range}_${source}_${assetTickers.join('-')}`.toLowerCase().replace(/\s+/g, '_');
+            
+            if (!isRefresh) {
+                const cached = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
+                if (cached) {
+                    setNews(cached);
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            const filter: NewsFilter = {
+                query: query,
+                tickers: assetTickers,
+                dateRange: range as any,
+                sources: source
+            };
+
+            const articles = await fetchMarketNews(preferences, filter);
+            
+            // New Behavior: Never error on empty news, as fetchMarketNews now returns fallbacks.
+            // We only set error if something truly catastrophic happens (which shouldn't with the new service).
+            setNews(articles);
+            CacheManager.set(filterKey, articles);
+            
+        } catch (err: any) {
+            console.error(err);
+            // Fallback just in case the service itself crashes
+            setError(t('unknown_error')); 
+        } finally {
+            setLoading(false);
+        }
+    }, [assetTickers, preferences, t]);
+
+    const debouncedFetch = useCallback(debounce((q, r, s) => fetchNews(true, q, r, s), 800), [fetchNews]);
+
+    useEffect(() => {
+        fetchNews(false, searchQuery, dateRange, sourceFilter);
+    }, []);
+
+    const handleRefresh = () => {
+        vibrate();
+        setLoading(true);
+        fetchNews(true, searchQuery, dateRange, sourceFilter);
+    };
+
+    const handleSearch = (val: string) => {
+        setSearchQuery(val);
+        setLoading(true);
+        debouncedFetch(val, dateRange, sourceFilter);
+    }
+
+    const handleFilterChange = (range: any, source: string) => {
+        setDateRange(range);
+        setSourceFilter(source);
+        setLoading(true);
+        fetchNews(true, searchQuery, range, source);
+    }
+
+    return {
+        news, loading, error,
+        searchQuery, dateRange, sourceFilter,
+        handleSearch, handleFilterChange, handleRefresh
+    };
+};
+
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
   const { 
@@ -228,7 +270,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
   
-  // Favorites Logic
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('news-favorites') || '[]')); } catch { return new Set(); }
   });
@@ -245,7 +286,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       vibrate();
   }, []);
 
-  // Memoized Lists
   const displayedNews = useMemo(() => activeTab === 'favorites' ? news.filter(n => favorites.has(n.title)) : news, [news, activeTab, favorites]);
   const heroArticles = useMemo(() => activeTab === 'all' && !searchQuery && !showFilters ? displayedNews.slice(0, 5) : [], [displayedNews, activeTab, searchQuery, showFilters]);
   const listArticles = useMemo(() => activeTab === 'all' && !searchQuery && !showFilters ? displayedNews.slice(5) : displayedNews, [displayedNews, activeTab, searchQuery, showFilters]);
@@ -314,7 +354,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             {heroArticles.length > 0 && (
                 <div className="w-full overflow-x-auto flex snap-x snap-mandatory no-scrollbar gap-4 pb-4">
                     {heroArticles.map((article, idx) => (
-                        <NewsCard key={`hero-${idx}`} article={article} isFavorited={favorites.has(article.title)} onToggleFavorite={() => toggleFavorite(article.title)} isHero />
+                        <NewsCard key={`hero-${idx}`} article={article} isFavorited={favorites.has(article.title)} onToggleFavorite={() => toggleFavorite(article.title)} isHero addToast={addToast} />
                     ))}
                 </div>
             )}
@@ -324,7 +364,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {listArticles.map((article, index) => (
                       <div key={`${article.title}-${index}`} className="animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
-                          <NewsCard article={article} isFavorited={favorites.has(article.title)} onToggleFavorite={() => toggleFavorite(article.title)} />
+                          <NewsCard article={article} isFavorited={favorites.has(article.title)} onToggleFavorite={() => toggleFavorite(article.title)} addToast={addToast} />
                       </div>
                   ))}
               </div>

@@ -56,10 +56,8 @@ export interface NewsFilter {
 // --- JSON Helper ---
 function extractJSON(text: string): any {
     if (!text) throw new Error("Texto vazio");
-    // Remove code blocks logic
     const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    // Try finding the array brackets
     const firstOpen = cleaned.indexOf('[');
     const lastClose = cleaned.lastIndexOf(']');
     
@@ -68,8 +66,8 @@ function extractJSON(text: string): any {
         try {
             return JSON.parse(jsonCandidate);
         } catch (e) {
-            // If strict parse fails, try a loose correction (common trailing comma issue)
             try {
+                // Attempt to fix common trailing comma issues
                 return JSON.parse(jsonCandidate.replace(/,\s*]/g, "]"));
             } catch (e2) {
                 throw new Error("Falha crítica no parsing do JSON");
@@ -90,49 +88,34 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   
   const ai = new GoogleGenAI({ apiKey });
   
-  // Context Optimization
   const contextTickers = filter.tickers && filter.tickers.length > 0 
-    ? `Prioridade máxima para notícias sobre: ${filter.tickers.slice(0, 5).join(', ')}.` 
-    : "Destaques gerais do IFIX e Ibovespa.";
+    ? `Tickers de interesse: ${filter.tickers.slice(0, 5).join(', ')}.` 
+    : "Destaques do IFIX e Ibovespa.";
   
-  const timeMap = {
-      'today': "nas últimas 24 horas",
-      'week': "nos últimos 7 dias",
-      'month': "neste mês"
-  };
-  const timePrompt = timeMap[filter.dateRange || 'week'] || "recentes";
-  const userQuery = filter.query ? `Tópico específico: "${filter.query}".` : "";
-  const sourcePrompt = filter.sources ? `Fontes preferidas: ${filter.sources}.` : "";
+  const timeMap = { 'today': "últimas 24h", 'week': "última semana", 'month': "último mês" };
+  const timePrompt = timeMap[filter.dateRange || 'week'];
+  const userQuery = filter.query ? `Foco no tema: "${filter.query}".` : "";
+  const sourcePrompt = filter.sources ? `Fontes: ${filter.sources}.` : "";
 
   const prompt = `
-    Você é um agregador de notícias financeiras em tempo real.
-    Tarefa: Busque e liste 8 notícias ${timePrompt} sobre o Mercado Financeiro Brasileiro (FIIs e Ações).
+    [SYSTEM INSTRUCTION]
+    Você é uma API de notícias financeiras.
+    OBRIGATÓRIO: Use a ferramenta 'googleSearch' para encontrar notícias reais e recentes.
+    NÃO invente notícias. NÃO use dados antigos do seu conhecimento prévio.
     
-    CONTEXTO:
+    [CONTEXTO]
     ${contextTickers}
     ${userQuery}
     ${sourcePrompt}
+    Período: ${timePrompt}
 
-    REQUISITOS TÉCNICOS (JSON ONLY):
-    1. Retorne APENAS um Array JSON válido.
-    2. Tente encontrar a URL da imagem de capa (og:image) no código da página.
-    3. O link (url) DEVE funcionar.
+    [FORMATO DE SAÍDA]
+    Retorne APENAS um Array JSON.
+    Campos Obrigatórios: source, title, summary, date (YYYY-MM-DD), url, category, sentiment, impactLevel.
+    Tente extrair a 'imageUrl' real se disponível nos metadados.
 
-    SCHEMA:
-    [
-      {
-        "source": "Nome do Veículo (ex: InfoMoney)",
-        "title": "Manchete (Máx 80 caracteres)",
-        "summary": "Resumo direto (Máx 120 caracteres)",
-        "impactAnalysis": "Uma frase curta sobre o impacto (ex: 'Positivo para dividendos' ou 'Risco de vacância')",
-        "date": "YYYY-MM-DD",
-        "sentiment": "Positive" | "Neutral" | "Negative",
-        "category": "Dividendos" | "Macroeconomia" | "Resultados" | "Mercado" | "Imóveis",
-        "impactLevel": "High" | "Medium" | "Low",
-        "url": "https://link-real...",
-        "imageUrl": "https://link-imagem..."
-      }
-    ]
+    Exemplo:
+    [{"source":"InfoMoney","title":"...","summary":"...","url":"https://...","category":"Dividendos","sentiment":"Positive","impactLevel":"High"}]
   `;
 
   try {
@@ -141,8 +124,8 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             model: "gemini-2.5-flash", 
             contents: prompt,
             config: {
-                tools: [{googleSearch: {}}], // Grounding ativado
-                temperature: 0.1, // Frio para precisão
+                tools: [{googleSearch: {}}],
+                temperature: 0.2, // Low temperature for factual consistency
                 maxOutputTokens: 4000, 
             }
           });
@@ -152,68 +135,94 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
           let articles: NewsArticle[] = [];
 
           try {
-            // 1. Tenta extrair o JSON gerado pela IA
             articles = extractJSON(responseText);
           } catch (e) {
-            console.warn("JSON Parsing failed. Switching to Grounding Fallback.");
-            
-            // 2. FALLBACK ROBUSTO: Constrói notícias usando apenas os metadados do Google Search
-            if (groundingChunks.length > 0) {
+            console.warn("JSON Parse failed. Fallback to Grounding Metadata.");
+          }
+
+          // --- HYBRID FALLBACK STRATEGY ---
+          
+          // 1. If JSON failed or empty, construct from Grounding Metadata
+          if (!Array.isArray(articles) || articles.length === 0) {
+             if (groundingChunks.length > 0) {
                 articles = groundingChunks
                     .filter(c => c.web?.title && c.web?.uri)
                     .map(c => ({
                         source: new URL(c.web!.uri!).hostname.replace('www.', '').split('.')[0].toUpperCase(),
                         title: c.web!.title!,
-                        summary: "Notícia encontrada via busca. Clique para ler o conteúdo completo na fonte original.",
+                        summary: "Clique para ler a notícia completa na fonte original.",
                         impactAnalysis: "Conteúdo da Web",
                         date: new Date().toISOString(),
                         sentiment: 'Neutral',
                         category: 'Mercado',
                         impactLevel: 'Medium',
                         url: c.web!.uri!
-                    }));
-            }
+                    })).slice(0, 10);
+             }
           }
 
-          if (!Array.isArray(articles) || articles.length === 0) return [];
-
-          // 3. Pós-Processamento e Validação de Links
+          // 2. Link Validation & Correction
+          // Map AI-generated links to real Google Search links if they look suspicious
           const webSources = groundingChunks
               .map(c => c.web)
               .filter(Boolean)
               .flatMap(w => ({ uri: w?.uri, title: w?.title }));
 
-          return articles.map(article => {
+          const validatedArticles = articles.map(article => {
                 let finalUrl = article.url;
-                
-                // Validação de URL: Se parecer fake, tenta achar no Grounding
-                const isInvalidUrl = !finalUrl || finalUrl.includes('example.com') || !finalUrl.startsWith('http');
-                
-                if (isInvalidUrl && webSources.length > 0) {
+                // If URL is missing or looks fake (example.com), try to find a match in grounding data
+                if (!finalUrl || finalUrl.includes('example.com') || !finalUrl.startsWith('http')) {
+                    // Fuzzy match title
                     const match = webSources.find(src => 
                         src.title && article.title && 
-                        (src.title.includes(article.title.substring(0, 10)) || article.title.includes(src.title.substring(0, 10)))
+                        (src.title.toLowerCase().includes(article.title.toLowerCase().substring(0, 15)))
                     );
-                    finalUrl = match?.uri || webSources[0].uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
+                    finalUrl = match?.uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
                 }
-
+                
                 return {
                   ...article,
                   url: finalUrl,
-                  category: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis"].includes(article.category || '') ? article.category : 'Mercado' as any,
-                  impactLevel: article.impactLevel || 'Medium',
-                  // Validação simples de imagem
-                  imageUrl: article.imageUrl && article.imageUrl.startsWith('http') && !article.imageUrl.includes('favicon') ? article.imageUrl : undefined 
+                  // Sanitize Image URL
+                  imageUrl: article.imageUrl && article.imageUrl.startsWith('http') && !article.imageUrl.includes('favicon') ? article.imageUrl : undefined
                 };
-            }).slice(0, 12); // Limite de segurança
+            }).slice(0, 12);
+
+          // 3. ULTIMATE FALLBACK: If absolutely nothing found (API returned empty JSON and no grounding)
+          // Create a "Search Card" so the user doesn't see an error screen.
+          if (validatedArticles.length === 0) {
+              const searchTerm = filter.query || filter.tickers?.[0] || "Mercado Financeiro";
+              return [{
+                  source: "Google News",
+                  title: `Pesquisar notícias sobre: ${searchTerm}`,
+                  summary: "Não foi possível carregar o resumo automático. Toque para ver os resultados no Google.",
+                  date: new Date().toISOString(),
+                  url: `https://www.google.com/search?q=${encodeURIComponent(searchTerm)}&tbm=nws`,
+                  category: "Mercado",
+                  sentiment: "Neutral",
+                  impactLevel: "Low"
+              }];
+          }
+
+          return validatedArticles;
       });
   } catch (error) {
       console.warn("Erro na API de Notícias:", error);
-      return []; 
+      // Return empty array to let UI handle it, or could return a static error card here too.
+      // Let's return a static card to prevent UI crash.
+      return [{
+          source: "Sistema",
+          title: "Serviço Indisponível Temporariamente",
+          summary: "Verifique sua conexão ou tente novamente mais tarde. Toque para pesquisar manualmente.",
+          date: new Date().toISOString(),
+          url: `https://www.google.com/search?q=${encodeURIComponent(filter.query || "Investimentos")}`,
+          category: "Geral",
+          sentiment: "Neutral",
+          impactLevel: "Low"
+      }]; 
   }
 }
 
-// --- Advanced Asset Data (Mantido igual, apenas re-exportado para garantir compatibilidade) ---
 export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
