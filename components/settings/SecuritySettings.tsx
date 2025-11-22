@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
@@ -10,6 +11,9 @@ import PinLockScreen from '../PinLockScreen';
 
 const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => void; }> = ({ onPinSet, onCancel }) => {
     const [pin, setPin] = useState('');
+    const [step, setStep] = useState<'new' | 'confirm'>('new');
+    const [firstPin, setFirstPin] = useState('');
+    const [error, setError] = useState(false);
     const { t } = useI18n();
 
     const handleDigit = (digit: string) => {
@@ -18,7 +22,29 @@ const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => 
             const newPin = pin + digit;
             setPin(newPin);
             if (newPin.length === 4) {
-                setTimeout(() => onPinSet(newPin), 200);
+                setTimeout(() => {
+                    if (step === 'new') {
+                        setFirstPin(newPin);
+                        setPin('');
+                        setStep('confirm');
+                        vibrate(10);
+                    } else {
+                        // Confirm Step
+                        if (newPin === firstPin) {
+                            onPinSet(newPin);
+                        } else {
+                            vibrate([50, 50, 50]);
+                            setError(true);
+                            // Reset flow after short delay to show error state
+                            setTimeout(() => {
+                                setPin('');
+                                setFirstPin('');
+                                setStep('new');
+                                setError(false);
+                            }, 1000);
+                        }
+                    }
+                }, 200);
             }
         }
     };
@@ -30,13 +56,17 @@ const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => 
 
     return (
         <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-8 animate-fade-in">
-             <div className="mb-8 flex flex-col items-center">
-                 <h2 className="text-xl font-bold text-[var(--text-primary)]">{t('set_pin')}</h2>
-                <p className="text-[var(--text-secondary)] text-sm mt-1">Defina um código de 4 dígitos.</p>
+             <div className="mb-8 flex flex-col items-center text-center">
+                 <h2 className={`text-xl font-bold ${error ? 'text-red-500' : 'text-[var(--text-primary)]'} transition-colors`}>
+                     {error ? t('error') : (step === 'new' ? t('set_pin') : t('confirm_pin'))}
+                 </h2>
+                <p className={`text-[var(--text-secondary)] text-sm mt-1 ${error ? 'text-red-400 font-bold' : ''}`}>
+                    {error ? t('pin_mismatch') : (step === 'new' ? t('create_pin_desc') : t('confirm_pin_desc'))}
+                </p>
             </div>
             <div className="flex space-x-4 mb-8">
                 {[0, 1, 2, 3].map(i => (
-                    <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${pin.length > i ? 'bg-[var(--accent-color)] border-[var(--accent-color)]' : 'border-[var(--text-secondary)]'}`} />
+                    <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${pin.length > i ? (error ? 'bg-red-500 border-red-500' : 'bg-[var(--accent-color)] border-[var(--accent-color)]') : 'border-[var(--text-secondary)]'}`} />
                 ))}
             </div>
              <div className="grid grid-cols-3 gap-6">
@@ -51,7 +81,7 @@ const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => 
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
                 </button>
             </div>
-            <button onClick={onCancel} className="mt-8 text-sm text-[var(--text-secondary)]">{t('cancel')}</button>
+            <button onClick={onCancel} className="mt-8 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">{t('cancel')}</button>
         </div>
     );
 };

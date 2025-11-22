@@ -1,4 +1,5 @@
 
+
 export const ptBR = {
     // Navigation
     nav_portfolio: 'Carteira',
@@ -172,7 +173,11 @@ export const ptBR = {
     privacy_on_start: 'Privacidade ao Iniciar',
     enabled: 'Ativado',
     disabled: 'Desativado',
-    set_pin: 'Definir PIN de 4 dígitos',
+    set_pin: 'Definir PIN',
+    confirm_pin: 'Confirmar PIN',
+    create_pin_desc: 'Crie um código de 4 dígitos.',
+    confirm_pin_desc: 'Digite o código novamente.',
+    pin_mismatch: 'Os códigos não coincidem. Tente novamente.',
     pin_setup_success: 'PIN Configurado!',
     pin_removed: 'PIN Removido',
     wrong_pin: 'PIN inválido. Tente novamente.',
