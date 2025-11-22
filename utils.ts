@@ -1,3 +1,4 @@
+
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import type { Transaction } from './types';
 
@@ -213,3 +214,24 @@ export const getClosestPrice = (history: { date: string; price: number }[], targ
     }
     return closestPrice;
 };
+
+// --- WebAuthn Helpers ---
+export function bufferEncode(value: ArrayBuffer): string {
+    return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(value))))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+}
+
+export function bufferDecode(value: string): ArrayBuffer {
+    const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = base64.length % 4;
+    const padded = pad ? base64.padEnd(base64.length + (4 - pad), '=') : base64;
+    const raw = atob(padded);
+    const buffer = new ArrayBuffer(raw.length);
+    const arr = new Uint8Array(buffer);
+    for (let i = 0; i < raw.length; i++) {
+        arr[i] = raw.charCodeAt(i);
+    }
+    return buffer;
+}

@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
 import type { ToastMessage } from '../../types';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
-import { usePersistentState, vibrate } from '../../utils';
+import { usePersistentState, vibrate, bufferEncode } from '../../utils';
 import PinLockScreen from '../PinLockScreen';
 
 const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => void; }> = ({ onPinSet, onCancel }) => {
@@ -47,7 +48,7 @@ const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => 
                 <div />
                 <button onClick={() => handleDigit('0')} className="w-16 h-16 rounded-full bg-[var(--bg-secondary)] text-2xl font-bold text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-95 border border-[var(--border-color)]">0</button>
                 <button onClick={handleDelete} className="w-16 h-16 rounded-full flex items-center justify-center text-[var(--text-primary)] hover:text-red-400 transition-colors active:scale-95">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
                 </button>
             </div>
             <button onClick={onCancel} className="mt-8 text-sm text-[var(--text-secondary)]">{t('cancel')}</button>
@@ -62,14 +63,43 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
     const [biometricsEnabled, setBiometricsEnabled] = usePersistentState('security-biometrics', false);
     const [showPinModal, setShowPinModal] = useState(false);
 
-    const handleBiometricsToggle = (enabled: boolean) => {
-        // In a real app, you would check for hardware support here
-        if (enabled && !('credentials' in navigator)) {
-            addToast(t('toast_biometric_not_supported'), 'error');
-            return;
+    const handleBiometricsToggle = async (enabled: boolean) => {
+        vibrate();
+        if (enabled) {
+            try {
+                if (!window.PublicKeyCredential || !(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())) {
+                    addToast(t('toast_biometric_not_supported'), 'error');
+                    return;
+                }
+
+                const credential = await navigator.credentials.create({
+                    publicKey: {
+                        challenge: new Uint8Array(16), // In a real app, this should be a random challenge from a server
+                        rp: { name: "Invest Portfolio" },
+                        user: { id: new Uint8Array(16), name: "user@invest.app", displayName: "User" },
+                        pubKeyCredParams: [{ type: "public-key", alg: -7 }], // ES256
+                        authenticatorSelection: {
+                            authenticatorAttachment: "platform",
+                            userVerification: "required",
+                        },
+                        timeout: 60000,
+                    }
+                });
+                
+                if (credential) {
+                    localStorage.setItem('biometric-credential-id', bufferEncode((credential as any).rawId));
+                    setBiometricsEnabled(true);
+                    addToast(t('toast_biometric_enabled'), 'success');
+                }
+            } catch (err) {
+                 console.error("Biometric registration failed:", err);
+                 addToast('Falha ao registrar biometria.', 'error');
+            }
+        } else {
+            localStorage.removeItem('biometric-credential-id');
+            setBiometricsEnabled(false);
+            addToast(t('toast_biometric_disabled'), 'info');
         }
-        setBiometricsEnabled(enabled);
-        addToast(enabled ? t('toast_biometric_enabled') : t('toast_biometric_disabled'), 'info');
     };
 
     const handlePinSet = (pin: string) => {

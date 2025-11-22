@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { vibrate } from '../utils';
+import { vibrate, bufferDecode } from '../utils';
 import FingerprintIcon from './icons/FingerprintIcon';
 
 interface PinLockScreenProps {
@@ -14,6 +14,36 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
     const [error, setError] = useState(false);
     const [isBiometricScanning, setIsBiometricScanning] = useState(false);
 
+    const handleBiometricAuth = async () => {
+        if (!allowBiometrics) return;
+        const credentialId = localStorage.getItem('biometric-credential-id');
+        if (!credentialId) return;
+
+        setIsBiometricScanning(true);
+        try {
+            const credential = await navigator.credentials.get({
+                publicKey: {
+                    challenge: new Uint8Array(16), // Challenge should be random
+                    allowCredentials: [{
+                        type: 'public-key',
+                        id: bufferDecode(credentialId),
+                    }],
+                    userVerification: 'required',
+                }
+            });
+
+            if (credential) {
+                vibrate(20);
+                onUnlock();
+            }
+        } catch (err) {
+            console.error("Biometric auth failed:", err);
+            // Fallback to PIN, no error toast needed
+        } finally {
+            setIsBiometricScanning(false);
+        }
+    };
+
     useEffect(() => {
         // Auto-trigger biometrics on mount if enabled
         if (allowBiometrics) {
@@ -21,16 +51,6 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
         }
     }, [allowBiometrics]);
 
-    const handleBiometricAuth = () => {
-        if (!allowBiometrics) return;
-        setIsBiometricScanning(true);
-        // Simulate scan delay
-        setTimeout(() => {
-            vibrate(20);
-            setIsBiometricScanning(false);
-            onUnlock();
-        }, 800);
-    };
 
     const handleDigit = (digit: string) => {
         vibrate(5);

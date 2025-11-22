@@ -33,6 +33,7 @@ interface PortfolioContextType {
   getAssetByTicker: (ticker: string) => Asset | undefined;
   getAveragePriceForTransaction: (transaction: Transaction) => number;
   setDemoMode: (enabled: boolean) => void;
+  setPrivacyMode: React.Dispatch<React.SetStateAction<boolean>>;
   togglePrivacyMode: () => void;
   resetApp: () => void;
   clearCache: (key?: string) => void;
@@ -373,12 +374,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return Object.entries(incomeMap).map(([month, total]) => ({ month, total }));
   }, [dividends]);
 
-  useEffect(() => {
-    if (preferences.privacyOnStart) {
-      setPrivacyMode(true);
-    }
-  }, [preferences.privacyOnStart]);
-
   const value = useMemo(() => ({
     assets,
     transactions: sourceTransactions,
@@ -405,6 +400,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     getAssetByTicker,
     getAveragePriceForTransaction,
     setDemoMode,
+    setPrivacyMode,
     togglePrivacyMode,
     resetApp,
     clearCache,
@@ -412,7 +408,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
     yieldOnCost, projectedAnnualIncome, monthlyIncome, portfolioEvolution,
     lastSync, isRefreshing, marketDataError, userProfile, refreshMarketData,
-    refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction
+    refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction, setPrivacyMode
   ]);
 
   return (

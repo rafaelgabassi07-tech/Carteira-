@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import BottomNav from './components/BottomNav';
 import PortfolioView from './views/PortfolioView';
 import NewsView from './views/NewsView';
@@ -27,7 +27,7 @@ export type View = 'carteira' | 'transacoes' | 'analise' | 'noticias' | 'setting
 export type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
-  const { assets, preferences, setDemoMode, isDemoMode, marketDataError } = usePortfolio();
+  const { assets, preferences, setDemoMode, isDemoMode, marketDataError, setPrivacyMode } = usePortfolio();
   const { t } = useI18n();
   const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'carteira');
   const [previousView, setPreviousView] = useState<View>('carteira');
@@ -37,6 +37,7 @@ const App: React.FC = () => {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
+  const lastVisibleTimestamp = useRef(Date.now());
 
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
     const newToast: ToastMessage = { id: Date.now(), message, type };
@@ -122,11 +123,35 @@ const App: React.FC = () => {
         }
 
         if (!isInitialized) {
+            if (preferences.privacyOnStart) {
+              setPrivacyMode(true);
+            }
             setActiveView(preferences.startScreen as View || 'carteira');
             setIsInitialized(true);
         }
     }
-  }, [isLocked, preferences.startScreen, isInitialized, preferences.restartTutorial, setDemoMode]);
+  }, [isLocked, preferences.startScreen, isInitialized, preferences.restartTutorial, setDemoMode, preferences.privacyOnStart, setPrivacyMode]);
+  
+  // Re-lock on backgrounding
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') {
+            lastVisibleTimestamp.current = Date.now();
+        }
+        if (document.visibilityState === 'visible' && preferences.appPin) {
+            const timeInBackground = Date.now() - lastVisibleTimestamp.current;
+            // Re-lock if the app was in background for more than 60 seconds
+            if (timeInBackground > 60 * 1000) { 
+                setIsLocked(true);
+            }
+        }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [preferences.appPin]);
 
   const handleTourFinish = () => {
     setDemoMode(false);
