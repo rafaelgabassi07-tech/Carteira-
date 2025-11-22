@@ -96,7 +96,8 @@
       .animate-slide-in-right { animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
       /* Mobile Landscape Overrides */
-      @media (orientation: landscape) and (max-width: 767px) {
+      /* Adicionado 'min-width: 480px' para evitar que o teclado em portrait ative o modo landscape */
+      @media (orientation: landscape) and (max-width: 767px) and (min-width: 480px) {
         .mobile-landscape-layout {
             flex-direction: row !important;
         }

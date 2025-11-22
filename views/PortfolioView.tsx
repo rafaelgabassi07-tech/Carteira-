@@ -1,14 +1,16 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Asset, ToastMessage, SortOption } from '../types';
+import type { Asset, ToastMessage, SortOption, CalendarEvent } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
+import CalendarIcon from '../components/icons/CalendarIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
+import { generateCalendarEvents } from '../services/dynamicDataService';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -27,7 +29,7 @@ const WalletIcon: React.FC<{className?:string}> = ({className}) => (
 // --- Components ---
 
 const PortfolioSkeleton: React.FC = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse">
         {[1, 2, 3, 4, 5, 6].map(i => (
             <div key={i} className="h-20 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]"></div>
         ))}
@@ -44,7 +46,7 @@ const Header: React.FC<{
     const { privacyMode, togglePrivacyMode } = usePortfolio();
 
     return (
-        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300">
+        <header className="py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300 -mx-4 px-4 mb-4">
             <div className="flex flex-col">
                 <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">Invest</h1>
                 <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
@@ -107,7 +109,7 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
+        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500 h-full flex flex-col justify-center">
             {/* Decorative Glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
 
@@ -148,6 +150,67 @@ const PortfolioSummary: React.FC = () => {
         </div>
     );
 };
+
+const DividendCalendar: React.FC = () => {
+    const { t, locale } = useI18n();
+    const { assets } = usePortfolio();
+    
+    const events = useMemo(() => {
+        const allEvents = generateCalendarEvents(assets);
+        // Filter for upcoming and sort
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        const upcoming = allEvents.filter(e => new Date(e.date) >= today);
+        // If no upcoming, show recently passed to avoid empty state
+        return upcoming.length > 0 ? upcoming.slice(0, 5) : allEvents.slice(-3).reverse(); 
+    }, [assets]);
+
+    if (events.length === 0) return (
+        <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl border border-[var(--border-color)] h-full flex flex-col justify-center items-center text-center shadow-sm animate-scale-in min-h-[250px]">
+             <div className="p-3 bg-[var(--bg-primary)] rounded-full mb-3">
+                <CalendarIcon className="w-6 h-6 text-[var(--text-secondary)] opacity-50" />
+             </div>
+             <p className="text-xs font-bold text-[var(--text-secondary)]">{t('no_dividends_scheduled')}</p>
+        </div>
+    );
+
+    return (
+        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] h-full shadow-sm animate-scale-in flex flex-col min-h-[250px]">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-[var(--accent-color)]" /> 
+                    {t('dividend_calendar')}
+                </h3>
+                <span className="text-[10px] font-bold bg-[var(--bg-primary)] px-2 py-1 rounded text-[var(--text-secondary)]">{t('next_payments')}</span>
+            </div>
+            
+            <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar flex-1">
+                {events.map((evt, i) => {
+                    const dateObj = new Date(evt.date);
+                    const day = dateObj.getDate();
+                    const month = dateObj.toLocaleDateString(locale, { month: 'short' }).replace('.','');
+                    
+                    return (
+                        <div key={`${evt.ticker}-${i}`} className="flex items-center p-3 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] hover:border-[var(--accent-color)]/30 transition-colors">
+                            <div className="flex-shrink-0 w-10 h-10 bg-[var(--bg-secondary)] rounded-lg flex flex-col items-center justify-center border border-[var(--border-color)]">
+                                <span className="text-[10px] leading-none text-[var(--text-secondary)] font-bold uppercase">{month}</span>
+                                <span className="text-sm leading-none font-bold text-[var(--text-primary)] mt-0.5">{day}</span>
+                            </div>
+                            <div className="ml-3 flex-1 min-w-0">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-sm text-[var(--text-primary)]">{evt.ticker}</span>
+                                    <span className="text-[10px] font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-2 py-0.5 rounded-full whitespace-nowrap">{evt.eventType}</span>
+                                </div>
+                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">Previsão de pagamento</p>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+    );
+}
 
 // Memoized Asset Item
 const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: () => void, style?: React.CSSProperties, privacyMode: boolean, hideCents: boolean }>(({ asset, totalValue, onClick, style, privacyMode, hideCents }) => {
@@ -293,7 +356,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
 
     return (
         <div 
-            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar"
+            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
             ref={containerRef}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -309,16 +372,21 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-7xl mx-auto px-4">
                 <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
                 
                 {assets.length > 0 ? (
                     <>
-                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
-                            <PortfolioSummary />
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                            <div className="lg:col-span-2 h-full">
+                                <PortfolioSummary />
+                            </div>
+                            <div className="lg:col-span-1 h-full">
+                                <DividendCalendar />
+                            </div>
                         </div>
 
-                        <div className="px-4 mt-8">
+                        <div>
                             <div className="flex space-x-3 mb-5">
                                 <div className="flex-1 relative">
                                     <input 
@@ -367,7 +435,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                             {isRefreshing && processedAssets.length === 0 ? (
                                 <PortfolioSkeleton />
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px]">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
                                     {processedAssets.map((asset, index) => (
                                         <AssetListItem 
                                             key={asset.ticker}

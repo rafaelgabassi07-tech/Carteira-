@@ -1,3 +1,4 @@
+
 export const ptBR = {
     // Navigation
     nav_portfolio: 'Carteira',
@@ -41,6 +42,10 @@ export const ptBR = {
     sort_value_asc: 'Menor Valor',
     sort_ticker_asc: 'Ticker (A-Z)',
     sort_performance_desc: 'Performance',
+    dividend_calendar: 'Agenda de Dividendos',
+    next_payments: 'Próximos Pagamentos',
+    no_dividends_scheduled: 'Nenhum pagamento agendado para breve.',
+    per_share: '/cota',
 
     // Asset Detail View
     asset_details: 'Detalhes do Ativo',
