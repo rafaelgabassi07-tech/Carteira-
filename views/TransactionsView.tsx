@@ -82,7 +82,7 @@ const TransactionModal: React.FC<{
 
     return (
         <Modal title={isEditMode ? t('edit_transaction') : t('add_transaction')} onClose={onClose}>
-            <form onSubmit={handleSubmit} className="space-y-3 pb-24 md:pb-6">
+            <form onSubmit={handleSubmit} className="space-y-3 pb-32 md:pb-6">
                  {/* Compact Type Selector */}
                  <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)] mb-2">
                     <button

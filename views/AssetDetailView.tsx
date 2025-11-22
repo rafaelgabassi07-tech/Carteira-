@@ -100,8 +100,8 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const variationPercent = totalInvested > 0 ? (variation / totalInvested) * 100 : 0;
 
     return (
-        <div className="p-4 pb-20">
-            <div className="max-w-4xl mx-auto">
+        <div className="p-4 pb-20 landscape-pb-6">
+            <div className="max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center">
                         <button 
@@ -162,7 +162,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                              </div>
                              
                              {isRefreshing || !asset ? <IndicatorSkeleton /> : (
-                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                                     <MetricItem label={t('quantity')} value={asset.quantity} className="animate-fade-in-up" style={{animationDelay: '0ms'}}/>
                                     <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} className="animate-fade-in-up" style={{animationDelay: '50ms'}}/>
                                     <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} className="animate-fade-in-up" style={{animationDelay: '100ms'}}/>
@@ -187,7 +187,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                     />
 
                                     {/* Analysis Section Header */}
-                                    <div className="col-span-2 sm:col-span-3 mt-4 mb-1 flex items-center gap-2">
+                                    <div className="col-span-full mt-4 mb-1 flex items-center gap-2">
                                         <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
                                         <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('nav_analysis')} & {t('data')}</span>
                                         <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
@@ -227,20 +227,24 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 )}
                 {activeTab === 'history' && (
                     <div className="space-y-3 animate-fade-in pb-4">
-                        {assetTransactions.length > 0 ? assetTransactions.map((tx, index) => (
-                            <div key={tx.id} className="bg-[var(--bg-secondary)] p-4 rounded-xl text-sm border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${index * 50}ms`}}>
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className={`font-bold text-base mb-0.5 ${tx.type === 'Compra' ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{t(tx.type === 'Compra' ? 'buy' : 'sell')}</p>
-                                        <p className="text-xs text-[var(--text-secondary)] font-medium">{new Date(tx.date).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
+                        {assetTransactions.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {assetTransactions.map((tx, index) => (
+                                    <div key={tx.id} className="bg-[var(--bg-secondary)] p-4 rounded-xl text-sm border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${index * 50}ms`}}>
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className={`font-bold text-base mb-0.5 ${tx.type === 'Compra' ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{t(tx.type === 'Compra' ? 'buy' : 'sell')}</p>
+                                                <p className="text-xs text-[var(--text-secondary)] font-medium">{new Date(tx.date).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-[var(--text-primary)]">{formatCurrency(tx.quantity * tx.price)}</p>
+                                                <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{`${tx.quantity} × ${formatCurrency(tx.price)}`}</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-[var(--text-primary)]">{formatCurrency(tx.quantity * tx.price)}</p>
-                                        <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{`${tx.quantity} × ${formatCurrency(tx.price)}`}</p>
-                                    </div>
-                                </div>
+                                ))}
                             </div>
-                        )) : <p className="text-sm text-center text-[var(--text-secondary)] py-12">{t('no_transactions_for_asset')}</p>}
+                        ) : <p className="text-sm text-center text-[var(--text-secondary)] py-12">{t('no_transactions_for_asset')}</p>}
                     </div>
                 )}
             </div>

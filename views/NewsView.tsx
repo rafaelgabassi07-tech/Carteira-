@@ -111,8 +111,8 @@ const NewsCard: React.FC<{
   };
 
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden border border-[var(--border-color)] shadow-sm hover:border-[var(--accent-color)]/30 transition-colors flex flex-col">
-      <div className="p-4 flex-1">
+    <div className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden border border-[var(--border-color)] shadow-sm hover:border-[var(--accent-color)]/30 transition-colors flex flex-col h-full">
+      <div className="p-4 flex-1 flex flex-col">
         <div className="flex justify-between items-start mb-2">
             <div className="flex gap-2">
                 {article.impactLevel === 'High' && <ImpactBadge level="High" />}
@@ -143,13 +143,13 @@ const NewsCard: React.FC<{
         </p>
         
         {article.summary.length > 100 && (
-             <button onClick={() => setIsExpanded(!isExpanded)} className="text-[10px] font-bold text-[var(--accent-color)] mt-1 hover:underline">
+             <button onClick={() => setIsExpanded(!isExpanded)} className="text-[10px] font-bold text-[var(--accent-color)] mt-1 hover:underline self-start">
                 {isExpanded ? t('read_less') : t('read_more')}
             </button>
         )}
       </div>
       
-      <div className="bg-[var(--bg-tertiary-hover)]/30 px-4 py-2 flex justify-between items-center border-t border-[var(--border-color)]">
+      <div className="bg-[var(--bg-tertiary-hover)]/30 px-4 py-2 flex justify-between items-center border-t border-[var(--border-color)] mt-auto">
           <span className="text-[10px] font-bold text-[var(--text-secondary)]">{article.source} • {article.date}</span>
           {article.url && (
               <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[var(--accent-color)] hover:underline flex items-center gap-1">
@@ -162,7 +162,7 @@ const NewsCard: React.FC<{
 };
 
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] p-4 rounded-xl animate-pulse border border-[var(--border-color)] h-48">
+    <div className="bg-[var(--bg-secondary)] p-4 rounded-xl animate-pulse border border-[var(--border-color)] h-64">
         <div className="flex gap-2 mb-3">
             <div className="h-4 bg-gray-700 rounded w-16"></div>
             <div className="h-4 bg-gray-700 rounded w-20"></div>

@@ -46,7 +46,7 @@ const Header: React.FC<{
     const { privacyMode, togglePrivacyMode } = usePortfolio();
 
     return (
-        <header className="py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300 -mx-4 px-4 mb-4">
+        <header className="py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300 -mx-4 px-4 mb-6">
             <div className="flex flex-col">
                 <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">Invest</h1>
                 <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
@@ -157,12 +157,10 @@ const DividendCalendar: React.FC = () => {
     
     const events = useMemo(() => {
         const allEvents = generateCalendarEvents(assets);
-        // Filter for upcoming and sort
         const today = new Date();
         today.setHours(0,0,0,0);
         
         const upcoming = allEvents.filter(e => new Date(e.date) >= today);
-        // If no upcoming, show recently passed to avoid empty state
         return upcoming.length > 0 ? upcoming.slice(0, 5) : allEvents.slice(-3).reverse(); 
     }, [assets]);
 
@@ -384,11 +382,12 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 
                 {assets.length > 0 ? (
                     <>
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                            <div className="lg:col-span-2 h-full">
+                        {/* Grid Layout for Summary and Calendar */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                            <div className="lg:col-span-8 h-full">
                                 <PortfolioSummary />
                             </div>
-                            <div className="lg:col-span-1 h-full">
+                            <div className="lg:col-span-4 h-full">
                                 <DividendCalendar />
                             </div>
                         </div>

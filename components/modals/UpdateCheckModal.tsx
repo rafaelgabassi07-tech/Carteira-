@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useI18n } from '../../contexts/I18nContext';
@@ -81,9 +82,18 @@ const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     const changelogData = [
         {
-            version: 'changelog_version_title_1_5_0',
+            version: 'changelog_version_title_1_6_0',
             isLatest: true,
             devNote: { title: 'dev_note_title', content: 'dev_note_content' },
+            sections: [
+                { titleKey: 'changelog_news_title_1_6_0', color: 'text-sky-400', icon: <RocketIcon className="w-4 h-4"/>, itemsKey: 'changelog_news_items_1_6_0' },
+                { titleKey: 'changelog_improvements_title_1_6_0', color: 'text-purple-400', icon: <WrenchIcon className="w-4 h-4"/>, itemsKey: 'changelog_improvements_items_1_6_0' },
+                { titleKey: 'changelog_fixes_title_1_6_0', color: 'text-emerald-400', icon: <BugIcon className="w-4 h-4"/>, itemsKey: 'changelog_fixes_items_1_6_0' }
+            ]
+        },
+        {
+            version: 'changelog_version_title_1_5_0',
+            isLatest: false,
             sections: [
                 { titleKey: 'changelog_news_title_1_5_0', color: 'text-sky-400', icon: <RocketIcon className="w-4 h-4"/>, itemsKey: 'changelog_news_items_1_5_0' },
                 { titleKey: 'changelog_improvements_title_1_5_0', color: 'text-purple-400', icon: <WrenchIcon className="w-4 h-4"/>, itemsKey: 'changelog_improvements_items_1_5_0' },
@@ -121,7 +131,7 @@ const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             </div>
                             <div>
                                 <h3 className="font-bold text-lg">{t('you_are_up_to_date')}</h3>
-                                <p className="text-xs text-[var(--text-secondary)]">{t('version')} 1.5.0 • {t('channel_stable')}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">{t('version')} 1.6.0 • {t('channel_stable')}</p>
                             </div>
                         </div>
 

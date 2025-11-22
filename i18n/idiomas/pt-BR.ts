@@ -304,7 +304,16 @@ export const ptBR = {
     channel_stable: 'Canal: Estável',
     latest: 'Atual',
     dev_note_title: 'Nota do Desenvolvedor',
-    dev_note_content: "A integração com a Brapi API para cotações em tempo real torna o app mais rápido e preciso. A IA do Gemini agora foca em análises e notícias, onde ela realmente brilha. Obrigado pelo feedback!",
+    dev_note_content: "Refatoração completa para melhorar a estabilidade e a experiência do usuário. Focamos em adaptar o app para telas grandes (Desktop) e simplificar as operações no Mobile.",
+    
+    changelog_version_title_1_6_0: 'Versão 1.6.0 - Refatoração Visual & IA',
+    changelog_news_title_1_6_0: 'Novidades',
+    changelog_news_items_1_6_0: 'Layout Adaptativo: Split-View nas configurações e Grid na Carteira (Desktop).|Notícias Inteligentes: Categorização, Análise de Impacto e Destaque do Dia.|Notificações Acionáveis: Clique para ir direto ao ativo.',
+    changelog_improvements_title_1_6_0: 'Melhorias',
+    changelog_improvements_items_1_6_0: 'Tela de transações compactada e otimizada para uso com teclado.|Agenda de dividendos agora exibe o valor projetado.|Layout dos detalhes do ativo reestruturado para melhor leitura.',
+    changelog_fixes_title_1_6_0: 'Correções',
+    changelog_fixes_items_1_6_0: 'Correção do botão "Adicionar" oculto pelo teclado.|Ajuste de margens desalinhadas na carteira.|Correção na validação de input de quantidades (permitindo decimais livremente).',
+
     changelog_version_title_1_5_0: 'Versão 1.5.0 - Arquitetura Híbrida',
     changelog_news_title_1_5_0: 'Novidades',
     changelog_news_items_1_5_0: 'Integração com Brapi API para cotações.|Tela de Análise com gráficos aprimorados.|Refatoração da tela de Configurações.',
