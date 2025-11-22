@@ -45,16 +45,30 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   
   const ai = new GoogleGenAI({ apiKey });
   
-  // Construção da Query Otimizada para Busca
-  const baseContext = "Mercado Financeiro Brasil";
+  // --- CONTEXTO ESTRITAMENTE FII ---
+  const fiiContext = "Fundos Imobiliários (FIIs) Brasil IFIX Fiagro";
+  
   let searchQuery = "";
 
   if (filter.query) {
-      searchQuery = `${filter.query} notícias recentes`;
+      // Se o usuário digitou algo, adicionamos o contexto FII para garantir relevância
+      searchQuery = `${filter.query} mercado imobiliário FII`;
   } else if (filter.category && filter.category !== 'Destaques') {
-      searchQuery = `Notícias sobre ${filter.category} ${baseContext}`;
+      // Mapeamento de categorias para termos de busca específicos de FII
+      const catMap: Record<string, string> = {
+          'Dividendos': 'Pagamento dividendos FIIs rendimentos data com',
+          'Papel': 'FIIs de Papel CRI Recebíveis High Yield',
+          'Tijolo': 'FIIs de Tijolo imóveis vacância',
+          'Logística': 'FIIs Galpões Logísticos vacância aluguel',
+          'Shoppings': 'FIIs de Shopping Centers vendas',
+          'Fiagro': 'Fiagros agronegócio calote dividendos',
+          'Lajes': 'FIIs Lajes Corporativas escritórios',
+          'Mercado': 'Boletim Focus IFIX Selic impacto FIIs'
+      };
+      const term = catMap[filter.category] || filter.category;
+      searchQuery = `${term} notícias recentes Brasil`;
   } else {
-      searchQuery = `Principais notícias ${baseContext} hoje`;
+      searchQuery = `Destaques Fundos Imobiliários IFIX hoje`;
   }
 
   if (filter.tickers && filter.tickers.length > 0) {
@@ -62,29 +76,30 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       searchQuery += ` (${tickerList})`;
   }
 
-  // Prompt focado em estruturação de dados
-  // Instruímos a IA a agir como um parser de JSON para os resultados da ferramenta de busca
+  // Prompt Especializado em FIIs
   const prompt = `
-    Você é um backend de API de notícias financeiras (Google News style).
-    Sua tarefa é pesquisar e retornar um JSON array estruturado.
+    Você é um motor de busca especializado EXCLUSIVAMENTE em Fundos de Investimento Imobiliário (FIIs) e Fiagros do Brasil.
     
-    PESQUISA: "${searchQuery}"
+    OBJETIVO: Usar a ferramenta de busca para encontrar as últimas notícias sobre: "${searchQuery}".
     
-    REGRAS RÍGIDAS:
-    1. Use a ferramenta [googleSearch] OBRIGATORIAMENTE.
-    2. Analise os resultados da pesquisa.
-    3. Retorne APENAS um JSON Array válido. Sem markdown, sem explicações.
-    4. Extraia o máximo de notícias recentes e relevantes possível (mínimo 5).
+    REGRAS DE OURO (FILTRO RÍGIDO):
+    1. IGNORAR completamente notícias sobre: Ações (Petrobras, Vale, etc), Criptomoedas, Política genérica ou Tech, A MENOS que afete diretamente o IFIX.
+    2. O foco deve ser: Dividendos, Vacância, Emissões, Relatórios Gerenciais, IFIX, Taxa Selic (impacto nos FIIs).
+    3. Se a busca retornar lixo, FILTRE.
     
-    ESTRUTURA DO JSON:
+    RETORNO:
+    Retorne APENAS um JSON Array válido. Sem markdown.
+    Tente extrair URLs de imagens reais (og:image) dos resultados se possível.
+    
+    ESTRUTURA JSON:
     [
       {
-        "title": "Título exato da manchete",
-        "source": "Nome do Site (ex: InfoMoney, Brazil Journal)",
-        "date": "YYYY-MM-DDTHH:mm:ssZ (ou data relativa convertida)",
-        "url": "URL completa e válida da notícia",
-        "imageUrl": "URL da imagem da notícia (se disponível nos metadados)",
-        "summary": "Resumo muito breve (max 120 caracteres) sobre o impacto no mercado."
+        "title": "Título da manchete (focado em FIIs)",
+        "source": "Fonte (ex: Clube FII, Funds Explorer, InfoMoney)",
+        "date": "YYYY-MM-DDTHH:mm:ssZ",
+        "url": "URL da notícia",
+        "imageUrl": "URL da imagem (opcional)",
+        "summary": "Resumo de 1 linha focado no cotista."
       }
     ]
   `;
@@ -95,7 +110,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         contents: prompt,
         config: {
             tools: [{googleSearch: {}}],
-            temperature: 0.1, // Baixa temperatura para garantir formato JSON
+            temperature: 0.1,
         }
       });
       
@@ -105,50 +120,53 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       let articles: NewsArticle[] = [];
       let parsedJson: any[] = [];
 
-      // 1. Tentativa de Parse do JSON da IA
+      // 1. Parse JSON da IA
       try {
-        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        // Regex mais agressivo para pegar apenas o array JSON, ignorando texto ao redor
+        const jsonMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/);
         if (jsonMatch) {
             parsedJson = JSON.parse(jsonMatch[0]);
         }
       } catch (e) {
-        console.warn("IA falhou em gerar JSON válido. Usando fallback de Grounding puro.");
+        // Falha silenciosa, fallback entra em ação
       }
 
-      // 2. Validação e Cruzamento com Grounding (Google News Mechanism)
-      // Se o JSON falhou OU se queremos garantir a veracidade dos links,
-      // cruzamos com os metadados reais da busca.
-      
+      // 2. Pipeline Híbrido (IA + Grounding Validation)
       if (parsedJson.length > 0) {
-          // Modo IA + Validação
           articles = parsedJson.map((item: any) => {
-              // Tenta validar a URL com o grounding para evitar alucinações
+              // Tenta encontrar o link real nos metadados para garantir que funciona
               const groundMatch = groundingChunks.find(c => 
                   c.web?.uri === item.url || 
-                  c.web?.title?.includes(item.title.substring(0, 15))
+                  (c.web?.title && item.title && c.web.title.includes(item.title.substring(0, 10)))
               );
               
               return {
-                  title: item.title || groundMatch?.web?.title || "Notícia do Mercado",
+                  title: item.title || groundMatch?.web?.title || "Notícia FII",
                   source: item.source || getDomain(item.url || groundMatch?.web?.uri || ''),
-                  url: item.url || groundMatch?.web?.uri || `https://www.google.com/search?q=${encodeURIComponent(item.title)}`,
+                  url: item.url || groundMatch?.web?.uri || `https://www.google.com/search?q=${encodeURIComponent(item.title + ' FII')}`,
                   date: item.date || new Date().toISOString(),
-                  summary: item.summary || "Toque para ler a matéria completa.",
-                  imageUrl: item.imageUrl,
-                  category: filter.category as any || 'Mercado',
+                  summary: item.summary || "Toque para ler detalhes.",
+                  imageUrl: item.imageUrl, // IA tenta extrair, View faz o fallback
+                  category: filter.category as any || 'FIIs',
                   sentiment: 'Neutral'
               };
           });
       } 
       
-      // 3. Fallback Robusto (Modo "Search Engine")
-      // Se a IA não retornou nada útil, construímos as notícias DIRETAMENTE dos resultados da busca.
+      // 3. Fallback de Segurança (Grounding Puro)
+      // Se a IA falhou no JSON, usamos os dados brutos do Google Search, mas filtramos por termos FII
       if (articles.length === 0 && groundingChunks.length > 0) {
           const uniqueLinks = new Set();
+          const keywordsFII = ['fii', 'fundo', 'imobiliário', 'ifix', 'dividendo', 'cota', 'rendimento', 'aluguel', 'cap rate', 'vacância', 'fiagro'];
           
           articles = groundingChunks
             .filter(c => c.web?.title && c.web?.uri)
             .filter(c => {
+                // Filtro simples para garantir relevância FII no fallback
+                const text = (c.web!.title! + c.web!.uri!).toLowerCase();
+                const isRelevant = keywordsFII.some(k => text.includes(k));
+                
+                if (!isRelevant) return false;
                 if (uniqueLinks.has(c.web!.uri)) return false;
                 uniqueLinks.add(c.web!.uri);
                 return true;
@@ -158,34 +176,20 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
                 url: c.web!.uri!,
                 source: getDomain(c.web!.uri!),
                 date: new Date().toISOString(),
-                summary: "Notícia encontrada via busca Google. Clique para ler.",
+                summary: "Notícia do mercado de Fundos Imobiliários.",
                 category: filter.category as any || 'Mercado',
                 sentiment: 'Neutral'
             }));
       }
 
-      // 4. Fallback Final (Sem resultados)
-      if (articles.length === 0) {
-          return [{
-              source: "Google Search",
-              title: `Resultados para: ${searchQuery}`,
-              summary: "Não foi possível processar o resumo. Clique para ver no Google.",
-              date: new Date().toISOString(),
-              url: `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&tbm=nws`,
-              category: "Geral",
-              sentiment: "Neutral"
-          }];
-      }
-
-      return articles.slice(0, 20); // Limita a 20 resultados
+      return articles.slice(0, 20);
 
   } catch (error) {
-      console.error("Erro crítico no serviço de notícias:", error);
-      return []; // UI trata lista vazia
+      console.error("Erro serviço notícias:", error);
+      return [];
   }
 }
 
-// Mantém compatibilidade com outras funções
 export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<any> {
     return {};
 }

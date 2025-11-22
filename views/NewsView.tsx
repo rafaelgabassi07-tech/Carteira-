@@ -5,19 +5,130 @@ import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
 import StarIcon from '../components/icons/StarIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
+import FilterIcon from '../components/icons/FilterIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-// --- Assets & Helpers ---
+const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
+    const { t } = useI18n();
+    const sentimentMap = {
+        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
+        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400' },
+        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400' },
+    };
+    const sentimentData = sentiment ? sentimentMap[sentiment] : null;
+    if (!sentimentData) return null;
+    return (
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sentimentData.color}`}>
+            {sentimentData.text}
+        </span>
+    );
+};
 
+const NewsCard: React.FC<{ 
+  article: NewsArticle;
+  isFavorited: boolean;
+  onToggleFavorite: () => void;
+  addToast: (message: string, type?: ToastMessage['type']) => void;
+}> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
+  const { t } = useI18n();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    vibrate();
+    const shareData = {
+        title: article.title,
+        text: article.summary,
+        url: article.url || window.location.href,
+    };
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+           addToast(t('toast_share_not_supported'), 'error');
+        }
+    } catch (err) {
+       // addToast(t('toast_share_cancelled'), 'info');
+    }
+  };
+
+  const handleFavorite = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      vibrate(20);
+      onToggleFavorite();
+  }
+
+  return (
+    <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col">
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs text-[var(--accent-color)] font-semibold mb-1">{article.source}</p>
+              <h3 className="text-sm font-bold mr-16 leading-tight">{article.title}</h3>
+            </div>
+             <div className="absolute top-2 right-1 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-lg p-0.5">
+               <button
+                  onClick={handleShare}
+                  className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
+                  aria-label={t('share_news')}
+              >
+                  <ShareIcon className="w-4 h-4" />
+              </button>
+              <div className="w-px h-4 bg-[var(--border-color)] mx-0.5"></div>
+              <button
+                  onClick={handleFavorite}
+                  className={`p-2 rounded-full transition-all active:scale-90 ${isFavorited ? 'text-yellow-400 scale-110' : 'text-gray-400 hover:text-yellow-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
+              >
+                  <StarIcon filled={isFavorited} className="w-4 h-4" />
+              </button>
+            </div>
+        </div>
+        
+        <p className={`text-xs text-[var(--text-secondary)] mt-3 transition-[max-height] duration-500 ease-in-out overflow-hidden leading-relaxed ${isExpanded ? 'max-h-96' : 'max-h-14'}`}>
+          {article.summary}
+        </p>
+
+        <div className="flex justify-between items-center mt-auto pt-3 border-t border-[var(--border-color)]">
+          <div className="flex items-center space-x-3">
+            <SentimentBadge sentiment={article.sentiment} />
+             {article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">{t('view_original')}</a> : <span className="text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider opacity-50">{t('view_original')}</span>}
+          </div>
+          <button onClick={() => setIsExpanded(!isExpanded)} className="text-[var(--accent-color)] text-xs font-bold hover:underline">
+                {isExpanded ? t('read_less') : t('read_more')}
+            </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const NewsCardSkeleton: React.FC = () => (
+    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg animate-pulse border border-[var(--border-color)]">
+        <div className="h-3 bg-gray-700 rounded w-1/4 mb-3"></div>
+        <div className="h-4 bg-gray-700 rounded w-full mb-2"></div>
+        <div className="h-4 bg-gray-700 rounded w-3/4 mb-4"></div>
+        <div className="h-3 bg-gray-700 rounded w-5/6 mb-2"></div>
+        <div className="h-3 bg-gray-700 rounded w-4/6"></div>
+        <div className="flex justify-between items-center mt-4">
+            <div className="h-3 bg-gray-700 rounded w-1/5"></div>
+            <div className="h-2 bg-gray-700 rounded w-1/3"></div>
+        </div>
+    </div>
+);
+
+// --- Assets & Helpers for Image Fallback ---
 const getFallbackImage = (title: string) => {
+    // Imagens focadas em Real Estate / Business para FIIs
     const images = [
-        'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1614028674026-a65e31bfd27c?auto=format&fit=crop&w=400&q=80'
+        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80', // Skyscraper
+        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&q=80', // Chart
+        'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=400&q=80', // Building Key
+        'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80', // Financial
+        'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=400&q=80'  // Real Estate Model
     ];
     let hash = 0;
     for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
@@ -48,8 +159,6 @@ const timeAgo = (dateString: string) => {
     if (interval > 1) return Math.floor(interval) + "min";
     return "Agora";
 };
-
-// --- Components ---
 
 const TopicPill: React.FC<{ label: string; isActive: boolean; onClick: () => void }> = ({ label, isActive, onClick }) => (
     <button
@@ -155,8 +264,6 @@ const NewsSkeleton = () => (
     </div>
 );
 
-// --- Main View ---
-
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
   const { preferences, assets } = usePortfolio();
@@ -173,7 +280,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     } catch { return new Set(); }
   });
 
-  const topics = ['Destaques', 'Mercado', 'FIIs', 'Dividendos', 'Macroeconomia', 'Tech', 'Crypto', 'Favoritos'];
+  // CATEGORIAS FOCADAS EM FIIs
+  const topics = ['Destaques', 'Dividendos', 'Papel', 'Logística', 'Shoppings', 'Lajes', 'Fiagro', 'Favoritos'];
   
   // Pull to Refresh
   const touchStartY = useRef(0);
@@ -182,14 +290,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   const fetchNews = useCallback(async (cat: string, query: string, isRefresh = false) => {
     if (cat === 'Favoritos') {
-        // Filter logic handled in render
         setLoading(false);
         return;
     }
 
     if (!isRefresh) setLoading(true);
     
-    const cacheKey = `news_gn_v1_${cat}_${query}`.toLowerCase();
+    const cacheKey = `news_fii_v2_${cat}_${query}`.toLowerCase();
     
     if (!isRefresh) {
         const cached = CacheManager.get<NewsArticle[]>(cacheKey, CACHE_TTL.NEWS);
@@ -200,7 +307,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         }
     }
 
-    const tickers = (cat === 'FIIs' || cat === 'Destaques') ? assets.map(a => a.ticker) : undefined;
+    const tickers = (cat === 'Destaques') ? assets.map(a => a.ticker) : undefined;
     const articles = await fetchMarketNews(preferences, { category: cat, query, tickers, dateRange: 'week' });
     
     if (articles && articles.length > 0) {
@@ -230,9 +337,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     vibrate(10);
     setFavorites(prev => {
         const next = new Set(prev);
-        const key = JSON.stringify(article); // Simple serialization for set storage
-        // Store simpler key or handle object storage differently in real app
-        // For now, storing titles to match existing logic
         if (next.has(article.title)) next.delete(article.title);
         else next.add(article.title);
         return next;
@@ -259,8 +363,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   const displayedNews = useMemo(() => {
       if (category === 'Favoritos') {
-          // In a real app, we'd need to store full article objects, not just titles
-          // For this refactor, we filter the current list or show a message
           return news.filter(n => favorites.has(n.title));
       }
       return news;
@@ -272,11 +374,11 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         <div className="sticky top-0 z-30 bg-[var(--bg-secondary)]/90 backdrop-blur-md border-b border-[var(--border-color)]">
             <div className="max-w-2xl mx-auto px-4 py-2">
                 <div className="flex items-center gap-3 mb-3 mt-2">
-                    <span className="text-xl font-bold tracking-tight"><span className="text-[var(--accent-color)]">G</span>News</span>
+                    <span className="text-xl font-bold tracking-tight"><span className="text-[var(--accent-color)]">FII</span>News</span>
                     <div className="flex-1 relative group">
                         <input 
                             type="text"
-                            placeholder="Pesquisar..."
+                            placeholder="Buscar FIIs..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-full py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
@@ -348,7 +450,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                         ) : (
                             !loading && (
                                 <div className="text-center py-20">
-                                    <p className="text-[var(--text-secondary)] mb-4">Nenhuma notícia encontrada.</p>
+                                    <p className="text-[var(--text-secondary)] mb-4">Nenhuma notícia de FII encontrada.</p>
                                     <button onClick={() => fetchNews(category, searchQuery, true)} className="text-[var(--accent-color)] font-bold text-sm">
                                         Tentar Novamente
                                     </button>
