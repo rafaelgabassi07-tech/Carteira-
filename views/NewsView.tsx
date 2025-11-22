@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -110,7 +109,7 @@ const NewsCard: React.FC<{
         className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden relative border border-[var(--border-color)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-all duration-300 flex flex-row md:flex-col h-full group active:scale-[0.99]"
     >
       {/* Mobile: Image Right (Google News Style) | Desktop: Image Top */}
-      <div className="w-24 h-24 md:w-full md:h-40 flex-shrink-0 order-2 md:order-1 relative overflow-hidden">
+      <div className="w-28 h-28 md:w-full md:h-44 flex-shrink-0 order-2 md:order-1 relative overflow-hidden">
            <img 
                 src={imgSrc} 
                 alt=""
@@ -134,6 +133,7 @@ const NewsCard: React.FC<{
                 {article.title}
             </h3>
             
+            {/* Resumo visível apenas em desktop nos cards menores para economizar espaço mobile */}
             <p className="hidden md:block text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed mb-3">
                 {article.summary}
             </p>
@@ -161,10 +161,10 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
             href={article.url} 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="relative w-full flex-shrink-0 rounded-3xl overflow-hidden shadow-lg cursor-pointer group snap-center"
+            className="relative w-full flex-shrink-0 rounded-3xl overflow-hidden shadow-lg cursor-pointer group snap-center block h-full"
             style={{ scrollSnapAlign: 'center' }}
         >
-            <div className="aspect-[16/9] md:aspect-[21/9] w-full relative">
+            <div className="aspect-[16/10] md:aspect-[21/9] w-full relative">
                 <img 
                     src={imgSrc} 
                     alt={article.title}
@@ -172,8 +172,8 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
                     loading="eager"
                     onError={() => setImgSrc(getFallbackImage(article.title))}
                 />
-                {/* Strong Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-90"></div>
+                {/* Stronger Gradient Overlay for better text readability on mobile */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90"></div>
                 
                 <div className="absolute bottom-0 left-0 p-5 md:p-8 w-full md:w-3/4">
                     <div className="flex items-center gap-3 mb-2">
@@ -188,7 +188,8 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
                         {article.title}
                     </h2>
                     
-                    <p className="text-gray-300 text-xs md:text-sm line-clamp-2 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3 hidden sm:block">
+                    {/* Resumo agora visível em Mobile também, limitado a 3 linhas */}
+                    <p className="text-gray-300 text-xs md:text-sm line-clamp-3 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3">
                         {article.summary}
                     </p>
                 </div>
