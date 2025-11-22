@@ -62,10 +62,19 @@ export const generateCalendarEvents = (assets: Asset[], forceRefresh = false): C
              nextPayment.setDate(15);
              if (nextPayment < new Date()) nextPayment.setMonth(nextPayment.getMonth() + 1);
 
+             const dy = asset.dy || 0;
+             let projectedAmount = 0;
+             // Calculate projected amount based on monthly yield estimate
+             if (dy > 0 && asset.currentPrice > 0) {
+                 const monthlyPerShare = (asset.currentPrice * (dy / 100)) / 12;
+                 projectedAmount = monthlyPerShare * asset.quantity;
+             }
+
             events.push({
                 ticker: asset.ticker,
                 eventType: 'Pagamento',
                 date: nextPayment.toISOString(),
+                projectedAmount: projectedAmount
             });
         });
     }

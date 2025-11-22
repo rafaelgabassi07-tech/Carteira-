@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Asset, ToastMessage, SortOption, CalendarEvent } from '../types';
+import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
@@ -152,8 +152,8 @@ const PortfolioSummary: React.FC = () => {
 };
 
 const DividendCalendar: React.FC = () => {
-    const { t, locale } = useI18n();
-    const { assets } = usePortfolio();
+    const { t, locale, formatCurrency } = useI18n();
+    const { assets, privacyMode } = usePortfolio();
     
     const events = useMemo(() => {
         const allEvents = generateCalendarEvents(assets);
@@ -197,12 +197,19 @@ const DividendCalendar: React.FC = () => {
                                 <span className="text-[10px] leading-none text-[var(--text-secondary)] font-bold uppercase">{month}</span>
                                 <span className="text-sm leading-none font-bold text-[var(--text-primary)] mt-0.5">{day}</span>
                             </div>
-                            <div className="ml-3 flex-1 min-w-0">
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-sm text-[var(--text-primary)]">{evt.ticker}</span>
-                                    <span className="text-[10px] font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-2 py-0.5 rounded-full whitespace-nowrap">{evt.eventType}</span>
+                            <div className="ml-3 flex-1 min-w-0 flex justify-between items-center">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-sm text-[var(--text-primary)]">{evt.ticker}</span>
+                                        <span className="text-[10px] font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-2 py-0.5 rounded-full whitespace-nowrap">{evt.eventType}</span>
+                                    </div>
+                                    <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">Previsão de pagamento</p>
                                 </div>
-                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">Previsão de pagamento</p>
+                                {evt.projectedAmount && evt.projectedAmount > 0 && (
+                                    <div className={`text-right ${privacyMode ? 'blur-sm select-none opacity-50' : ''}`}>
+                                        <p className="text-xs font-bold text-[var(--green-text)]">{formatCurrency(evt.projectedAmount)}</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )

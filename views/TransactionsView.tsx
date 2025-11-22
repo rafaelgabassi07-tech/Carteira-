@@ -112,7 +112,7 @@ const TransactionModal: React.FC<{
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('quantity')}</label>
-                        <input value={quantity} onChange={e => setQuantity(e.target.value)} type="number" inputMode="decimal" step="1" min="0.0001" required className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
+                        <input value={quantity} onChange={e => setQuantity(e.target.value)} type="number" inputMode="decimal" step="any" min="0" required className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
                         {errors.quantity && <p className="text-xs text-red-400 mt-1">{errors.quantity}</p>}
                     </div>
                     <div>
@@ -337,7 +337,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
     };
     
     return (
-        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar" id="transactions-view">
+        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6" id="transactions-view">
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_transactions')}</h1>
                 
@@ -400,7 +400,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                     Object.entries(groupedTransactions).map(([monthYear, txs]) => (
                         <div key={monthYear} className="mb-6 animate-fade-in-up">
                             <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-widest px-1 sticky top-0 z-10 bg-[var(--bg-primary)]/90 backdrop-blur-sm py-2">{monthYear}</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 landscape-grid-cols-2">
                                 {(txs as Transaction[]).map((tx, index) => (
                                     <TransactionItem 
                                         key={tx.id} 

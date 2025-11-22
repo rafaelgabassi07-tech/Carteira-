@@ -1,3 +1,4 @@
+
 export interface Asset {
   ticker: string;
   quantity: number;
@@ -63,6 +64,7 @@ export interface CalendarEvent {
     ticker: string;
     eventType: 'Data Com' | 'Pagamento';
     date: string;
+    projectedAmount?: number;
 }
 
 export interface ToastMessage {
