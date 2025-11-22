@@ -39,15 +39,16 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
 const newsArticleSchema: Schema = {
     type: Type.OBJECT,
     properties: {
-        source: { type: Type.STRING, description: "Nome da fonte (ex: Valor, InfoMoney)." },
-        title: { type: Type.STRING, description: "Manchete original." },
-        summary: { type: Type.STRING, description: "Resumo conciso do fato (max 30 palavras)." },
-        impactAnalysis: { type: Type.STRING, description: "Análise crítica: Por que isso move o preço ou afeta dividendos?" },
-        date: { type: Type.STRING, description: "Data YYYY-MM-DD." },
+        source: { type: Type.STRING, description: "Nome do veículo (ex: Brazil Journal, InfoMoney)." },
+        title: { type: Type.STRING, description: "Manchete exata." },
+        summary: { type: Type.STRING, description: "Resumo do fato em 1 frase." },
+        impactAnalysis: { type: Type.STRING, description: "Breve análise: Como isso afeta o investidor?" },
+        date: { type: Type.STRING, description: "Data ISO YYYY-MM-DD." },
         sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] },
         category: { type: Type.STRING, enum: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"] },
         impactLevel: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
-        imageUrl: { type: Type.STRING, description: "Tente encontrar a URL da imagem de capa da notícia original nos resultados da busca. Se não encontrar, deixe em branco." }
+        imageUrl: { type: Type.STRING, description: "URL da imagem de capa encontrada na busca." },
+        url: { type: Type.STRING, description: "Link direto para a notícia." }
     },
     required: ["source", "title", "summary", "impactAnalysis", "date", "sentiment", "category", "impactLevel"]
 };
@@ -70,66 +71,11 @@ export interface AdvancedAssetData {
     lastDividend?: number;
 }
 
-const advancedAssetDataSchema: Schema = {
-    type: Type.ARRAY,
-    description: "Lista de dados fundamentalistas para ativos financeiros.",
-    items: {
-        type: Type.OBJECT,
-        properties: {
-            ticker: { type: Type.STRING },
-            dy: { type: Type.NUMBER },
-            pvp: { type: Type.NUMBER },
-            sector: { type: Type.STRING },
-            administrator: { type: Type.STRING },
-            vacancyRate: { type: Type.NUMBER },
-            dailyLiquidity: { type: Type.NUMBER },
-            shareholders: { type: Type.NUMBER },
-            nextPaymentDate: { type: Type.STRING },
-            lastDividend: { type: Type.NUMBER }
-        },
-        required: ["ticker", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
-    }
-};
-
-function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?: string }>): string | undefined {
-    if (!articleTitle || typeof articleTitle !== 'string') return undefined;
-    
-    const normalize = (str: any) => {
-        if (typeof str !== 'string') return '';
-        return str.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-    };
-
-    const normalizedArticleTitle = normalize(articleTitle);
-    if (!normalizedArticleTitle) return undefined;
-
-    let bestMatch: { uri: string; score: number } | null = null;
-
-    for (const source of sources) {
-        if (!source || !source.title || !source.uri) continue;
-        const normalizedSourceTitle = normalize(source.title);
-
-        if (!normalizedSourceTitle) continue;
-
-        const articleWords = new Set(normalizedArticleTitle.split(' ').filter((w: string) => w.length > 2));
-        const sourceWords = new Set(normalizedSourceTitle.split(' '));
-        const intersection = new Set([...articleWords].filter(x => sourceWords.has(x)));
-        const union = new Set([...articleWords, ...sourceWords]);
-        
-        const score = union.size === 0 ? 0 : intersection.size / union.size;
-
-        if (!bestMatch || score > bestMatch.score) {
-            bestMatch = { uri: source.uri, score };
-        }
-    }
-
-    return (bestMatch && bestMatch.score > 0.1) ? bestMatch.uri : undefined;
-}
-
 export interface NewsFilter {
-    query?: string;
     tickers?: string[];
     dateRange?: 'today' | 'week' | 'month';
     sources?: string;
+    query?: string;
 }
 
 export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<NewsArticle[]> {
@@ -146,32 +92,43 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   
   let dateConstraint = "";
   switch (filter.dateRange) {
-      case 'today': dateConstraint = "publicadas nas últimas 24 horas"; break;
-      case 'week': dateConstraint = "publicadas na última semana"; break;
-      case 'month': dateConstraint = "publicadas no último mês"; break;
+      case 'today': dateConstraint = "publicadas HOJE"; break;
+      case 'week': dateConstraint = "publicadas nesta semana"; break;
+      case 'month': dateConstraint = "deste mês"; break;
       default: dateConstraint = "recentes";
   }
 
   let sourceConstraint = "";
   if (filter.sources && filter.sources.trim().length > 0) {
-      sourceConstraint = `Priorize fontes: ${filter.sources}.`;
+      sourceConstraint = `Fontes preferenciais: ${filter.sources}.`;
   }
 
-  // Prompt Refinado para Imagens e Links
+  // Prompt Refinado
   const prompt = `
-    Atue como analista financeiro sênior. Busque as 6 notícias mais relevantes do mercado de FIIs (Fundos Imobiliários) e Macroeconomia do Brasil ${dateConstraint}.
+    Você é um API de notícias financeiras. Busque as 6 notícias mais importantes sobre Fundos Imobiliários (FIIs) e Mercado Brasileiro ${dateConstraint}.
     
-    Contexto (Tickers do usuário): ${contextTickers || 'Geral do mercado'}.
-    
+    Foco nos ativos: ${contextTickers || 'Geral do mercado'}.
     ${sourceConstraint}
 
-    INSTRUÇÕES CRÍTICAS:
-    1. Retorne ESTRITAMENTE um JSON Array válido com o schema abaixo. NADA MAIS.
-    2. Para cada notícia, analise o impacto real no bolso do investidor.
-    3. Tente extrair a URL da IMAGEM da notícia (thumbnail) se disponível nos metadados da busca.
+    REGRAS RÍGIDAS DE FORMATAÇÃO:
+    1. Retorne APENAS um JSON Array puro. Não use blocos de código (\`\`\`json).
+    2. Tente extrair o link real (url) e a imagem (imageUrl) dos resultados da busca.
     
-    SCHEMA JSON ESPERADO:
-    ${JSON.stringify(newsListSchema)}
+    SCHEMA JSON:
+    [
+      {
+        "source": "Fonte",
+        "title": "Título",
+        "summary": "Resumo",
+        "impactAnalysis": "Impacto no bolso",
+        "date": "YYYY-MM-DD",
+        "sentiment": "Positive/Neutral/Negative",
+        "category": "Mercado",
+        "impactLevel": "High/Medium/Low",
+        "url": "https://...",
+        "imageUrl": "https://..."
+      }
+    ]
   `;
 
   try {
@@ -181,19 +138,18 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
-                temperature: 0.1, // Reduz alucinações
+                temperature: 0.1, 
             }
           });
           
           const responseText = response.text?.trim() || '';
           if (!responseText) return [];
 
-          // Extração robusta de JSON
-          let jsonText = responseText;
-          const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-          if (jsonMatch && jsonMatch[1]) {
-            jsonText = jsonMatch[1];
-          }
+          // Limpeza agressiva de Markdown e JSON inválido
+          let jsonText = responseText
+            .replace(/^```json\s*/, '') // Remove início de bloco code
+            .replace(/^```\s*/, '') 
+            .replace(/\s*```$/, ''); // Remove fim de bloco code
 
           try {
             let parsedData = JSON.parse(jsonText);
@@ -202,35 +158,39 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             if (Array.isArray(parsedData)) {
                 articles = parsedData;
             } else if (typeof parsedData === 'object' && parsedData !== null) {
-                // Tenta encontrar array dentro do objeto
+                // Fallback: Tenta encontrar array dentro de alguma propriedade
                 const possibleArray = Object.values(parsedData).find(val => Array.isArray(val));
                 if (possibleArray) articles = possibleArray as NewsArticle[];
             }
             
             if (articles.length === 0) return [];
 
+            // Grounding check (Melhoria de Links)
             const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
   
-            return articles
-              .filter(article => article && article.title)
-              .map(article => {
-                  // Tenta encontrar a URL da fonte original
-                  const foundUrl = findBestUrl(article.title, webSources);
+            return articles.map(article => {
+                  // Se a IA não retornou URL, tenta achar no grounding
+                  let finalUrl = article.url;
+                  if (!finalUrl || finalUrl.length < 10) {
+                      const match = webSources.find(src => src?.title && article.title.includes(src.title.substring(0, 10)));
+                      if (match?.uri) finalUrl = match.uri;
+                  }
+
                   return {
                     ...article,
-                    url: foundUrl || article.url, // Prioriza URL encontrada no grounding
+                    url: finalUrl,
                     category: article.category || 'Mercado',
                     impactLevel: article.impactLevel || 'Medium'
                   };
               });
 
           } catch(e) {
-            console.error("Erro ao processar JSON do Gemini:", e);
+            console.error("Falha no parsing JSON da IA:", e);
             return [];
           }
       });
   } catch (error) {
-      console.warn("Falha ao buscar notícias:", error);
+      console.warn("Falha na requisição de notícias:", error);
       return []; 
   }
 }
@@ -249,10 +209,13 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const now = new Date();
     const currentDate = now.toISOString().split('T')[0];
 
-    const prompt = `Data de hoje: ${currentDate}.
-    Busque dados fundamentalistas para: ${tickers.join(', ')}. 
-    Retorne um JSON array válido (sem markdown) com: dy, pvp, sector, administrator, vacancyRate, dailyLiquidity, shareholders, nextPaymentDate (YYYY-MM-DD, pagamento real), lastDividend.
-    Use Tools para buscar dados reais.`;
+    const prompt = `Hoje é ${currentDate}. Busque dados fundamentalistas ATUALIZADOS para: ${tickers.join(', ')}.
+    
+    IMPORTANTE: Busque o "Último Rendimento Anunciado" e a "Data de Pagamento" (Next Payment Date) deste ciclo atual (Mês corrente ou próximo).
+    
+    Retorne JSON Array puro:
+    [{"ticker": "X", "dy": 0, "pvp": 0, "sector": "", "administrator": "", "vacancyRate": 0, "dailyLiquidity": 0, "shareholders": 0, "nextPaymentDate": "YYYY-MM-DD", "lastDividend": 0}]
+    `;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
@@ -264,10 +227,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
             }
         });
         
-        const responseText = response.text || '[]';
-        let jsonText = responseText;
-        const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (jsonMatch && jsonMatch[1]) jsonText = jsonMatch[1];
+        let jsonText = response.text || '[]';
+        jsonText = jsonText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
 
         try {
             const data = JSON.parse(jsonText);
@@ -284,7 +245,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                             vacancyRate: Number(item.vacancyRate),
                             dailyLiquidity: Number(item.dailyLiquidity || 0),
                             shareholders: Number(item.shareholders || 0),
-                            nextPaymentDate: item.nextPaymentDate,
+                            nextPaymentDate: item.nextPaymentDate, // Mantém string ISO
                             lastDividend: Number(item.lastDividend || 0)
                         };
                     }
