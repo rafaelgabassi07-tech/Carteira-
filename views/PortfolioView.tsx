@@ -1,10 +1,10 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
-import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -142,24 +142,6 @@ const PortfolioSummary: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </div>
-    );
-};
-
-const QuickAccess: React.FC<{ setActiveView: (view: View) => void; }> = ({ setActiveView }) => {
-    const { t } = useI18n();
-    return (
-         <div onClick={() => { setActiveView('analise'); vibrate(); }} className="mx-4 mt-4 p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] flex justify-between items-center cursor-pointer hover:bg-[var(--bg-tertiary-hover)] transition-all duration-200 shadow-sm group active:scale-[0.98]">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)] group-hover:scale-110 transition-transform">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                </div>
-                <div>
-                    <p className="text-sm font-bold text-[var(--text-primary)]">{t('portfolio_analysis')}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">{t('quick_access')}</p>
-                </div>
-            </div>
-            <ChevronRightIcon className="w-5 h-5 text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] group-hover:translate-x-1 transition-all" />
         </div>
     );
 };
@@ -327,7 +309,6 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             {assets.length > 0 ? (
                 <>
                     <PortfolioSummary />
-                    <QuickAccess setActiveView={setActiveView} />
 
                     <div className="px-4 mt-8">
                         <div className="flex space-x-3 mb-5">
