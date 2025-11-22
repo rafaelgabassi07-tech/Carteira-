@@ -200,3 +200,4 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
 };
 
 export default AssetDetailView;
+    
