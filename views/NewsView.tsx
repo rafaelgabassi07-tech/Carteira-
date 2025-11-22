@@ -32,12 +32,13 @@ const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sen
 // --- Helpers ---
 const getFavicon = (url: string) => {
     try {
+        if (!url) return '';
         const domain = new URL(url).hostname;
         return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
     } catch { return ''; }
 };
 
-const getFallbackImage = (title: string, category?: string) => {
+const getFallbackImage = (title: string) => {
     const images = [
         'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80', // Building Glass
         'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80', // Chart
@@ -55,13 +56,16 @@ const getFallbackImage = (title: string, category?: string) => {
 };
 
 const timeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (seconds < 3600) return "Recente";
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-    return `${Math.floor(seconds / 86400)}d`;
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return "Recente";
+        const now = new Date();
+        const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+        
+        if (seconds < 3600) return "Recente";
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+        return `${Math.floor(seconds / 86400)}d`;
+    } catch { return "Recente"; }
 };
 
 const NewsCard: React.FC<{ 
@@ -71,7 +75,8 @@ const NewsCard: React.FC<{
   addToast: (message: string, type?: ToastMessage['type']) => void;
 }> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
   const { t } = useI18n();
-  
+  const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
+
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -88,7 +93,7 @@ const NewsCard: React.FC<{
            addToast(t('toast_share_not_supported'), 'error');
         }
     } catch (err) {
-       // addToast(t('toast_share_cancelled'), 'info');
+       // User cancelled
     }
   };
 
@@ -99,36 +104,35 @@ const NewsCard: React.FC<{
       onToggleFavorite();
   }
 
-  const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
-
   return (
     <a 
         href={article.url} 
         target="_blank" 
         rel="noopener noreferrer"
-        className="relative rounded-2xl overflow-hidden block h-64 group shadow-md hover:shadow-xl transition-all duration-300 border border-[var(--border-color)] active:scale-[0.98]"
+        className="relative rounded-2xl overflow-hidden block h-72 group shadow-md hover:shadow-2xl transition-all duration-300 border border-[var(--border-color)] active:scale-[0.98]"
     >
         {/* Background Image */}
         <div className="absolute inset-0 bg-[var(--bg-secondary)]">
             <img 
                 src={imgSrc} 
-                alt=""
+                alt={article.title}
                 loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 onError={() => setImgSrc(getFallbackImage(article.title))}
             />
         </div>
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90 z-10"></div>
+        {/* Gradient Overlay - Stronger at bottom for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 z-10"></div>
 
         {/* Content */}
-        <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
+        <div className="absolute inset-0 p-5 flex flex-col justify-between z-20">
             
             {/* Top Row: Source & Actions */}
             <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
-                    <img src={getFavicon(article.url || '')} className="w-3 h-3 rounded-sm bg-white/20" onError={(e) => e.currentTarget.style.display = 'none'} />
+                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/10 shadow-sm">
+                    <img src={getFavicon(article.url || '')} className="w-3.5 h-3.5 rounded-sm bg-white/20" onError={(e) => e.currentTarget.style.display = 'none'} />
                     <span className="text-[10px] font-bold text-white uppercase tracking-wider max-w-[120px] truncate">{article.source}</span>
                 </div>
                 
@@ -143,21 +147,17 @@ const NewsCard: React.FC<{
             </div>
 
             {/* Bottom Row: Title, Summary, Metadata */}
-            <div>
-                <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
                     <SentimentBadge sentiment={article.sentiment} />
                     <span className="text-[10px] text-gray-300 font-medium">• {timeAgo(article.date)}</span>
                 </div>
 
-                <h3 className="text-base md:text-lg font-extrabold text-white leading-snug mb-1 line-clamp-2 drop-shadow-md">
+                <h3 className="text-lg font-extrabold text-white leading-snug line-clamp-3 drop-shadow-lg tracking-tight">
                     {article.title}
                 </h3>
                 
-                <p className="text-xs text-gray-300 line-clamp-2 leading-relaxed mb-2 opacity-90 font-medium">
-                    {article.summary}
-                </p>
-                
-                <div className="flex items-center text-[var(--accent-color)] text-xs font-bold group-hover:translate-x-1 transition-transform duration-300">
+                <div className="flex items-center text-[var(--accent-color)] text-xs font-bold group-hover:translate-x-1 transition-transform duration-300 mt-1">
                     {t('read_more')} <ChevronRightIcon className="w-4 h-4" />
                 </div>
             </div>
@@ -199,11 +199,11 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
                         <span className="text-gray-400 text-[10px]">• {timeAgo(article.date)}</span>
                     </div>
                     
-                    <h2 className="text-lg md:text-3xl font-extrabold text-white leading-tight line-clamp-2 mb-2 drop-shadow-lg">
+                    <h2 className="text-xl md:text-3xl font-extrabold text-white leading-tight line-clamp-2 mb-2 drop-shadow-lg">
                         {article.title}
                     </h2>
                     
-                    <p className="text-gray-300 text-xs md:text-sm line-clamp-3 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3">
+                    <p className="text-gray-300 text-xs md:text-sm line-clamp-2 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3">
                         {article.summary}
                     </p>
                 </div>
@@ -267,7 +267,7 @@ const NewsCarousel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => {
 };
 
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] p-4 rounded-xl animate-pulse border border-[var(--border-color)] h-64 flex flex-col justify-end">
+    <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl animate-pulse border border-[var(--border-color)] h-72 flex flex-col justify-end">
         <div className="h-4 bg-gray-700/50 rounded w-1/4 mb-4"></div>
         <div className="h-6 bg-gray-700/50 rounded w-full mb-2"></div>
         <div className="h-6 bg-gray-700/50 rounded w-3/4 mb-4"></div>
@@ -565,7 +565,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             </button>
         </div>
 
-        {loading && <div className="space-y-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
         
         {error && (
           <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">

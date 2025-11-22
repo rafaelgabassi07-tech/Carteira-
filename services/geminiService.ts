@@ -23,22 +23,40 @@ export interface NewsFilter {
 
 function getDomain(url: string): string {
     try {
-        const hostname = new URL(url).hostname;
-        return hostname.replace('www.', '');
+        let cleanUrl = url;
+        // Clean Google Redirect URLs
+        if (url.includes('google.com/url?')) {
+            const params = new URL(url).searchParams;
+            cleanUrl = params.get('url') || params.get('q') || url;
+        }
+        
+        const hostname = new URL(cleanUrl).hostname;
+        let domain = hostname.replace('www.', '');
+        
+        // Map some common ugly domains to pretty names
+        if (domain.includes('infomoney')) return 'InfoMoney';
+        if (domain.includes('valor.globo')) return 'Valor Econômico';
+        if (domain.includes('braziljournal')) return 'Brazil Journal';
+        if (domain.includes('suno')) return 'Suno';
+        if (domain.includes('fiis.com.br')) return 'FIIs.com.br';
+        if (domain.includes('moneytimes')) return 'Money Times';
+        if (domain.includes('finance.yahoo')) return 'Yahoo Finance';
+        
+        // Fix for Vertex AI / Google Grounding internal links
+        if (domain.includes('vertexaisearch') || domain.includes('google.com')) return 'Google News';
+        
+        return domain;
     } catch {
         return 'news.google.com';
     }
 }
 
-// Função auxiliar para extrair JSON de texto markdown
 function extractJSON(text: string): any[] | null {
     try {
-        // Tenta encontrar array JSON explícito
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
             return JSON.parse(jsonMatch[0]);
         }
-        // Tenta parsear o texto todo se não achou array
         return JSON.parse(text);
     } catch (e) {
         return null;
@@ -76,28 +94,24 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       searchQuery = `Destaques Mercado FIIs IFIX notícias hoje`;
   }
 
-  // Prompt focado em JSON estruturado para garantir RESUMOS
+  // Prompt Refinado para Títulos e Resumos
   const prompt = `
-    Atue como um analista financeiro especializado em Fundos Imobiliários (FIIs).
+    Você é um agregador de notícias de Fundos Imobiliários (FIIs).
     Pesquise no Google sobre: "${searchQuery}".
     
-    Retorne um JSON Array estrito com as 10 notícias mais relevantes encontradas.
-    Formato do JSON:
+    Retorne um JSON Array com 10 notícias REAIS.
+    NÃO INVENTE notícias. Use os dados do Grounding.
+    
     [
       {
-        "title": "Título da notícia",
-        "source": "Fonte (ex: InfoMoney)",
-        "date": "YYYY-MM-DDTHH:mm:ssZ",
-        "summary": "Resumo curto e direto (máx 2 frases) explicando o impacto para o investidor.",
-        "url": "URL da notícia",
-        "sentiment": "Positive" | "Neutral" | "Negative"
+        "title": "Título exato da matéria",
+        "source": "Nome do Site (ex: InfoMoney)",
+        "date": "YYYY-MM-DD",
+        "summary": "Resumo em 1 frase curta e impactante.",
+        "url": "Link real",
+        "sentiment": "Neutral"
       }
     ]
-
-    REGRAS:
-    1. Priorize FIIs (Fundos Imobiliários) e Fiagros.
-    2. O resumo DEVE existir e ser explicativo.
-    3. Se não encontrar notícias específicas, traga destaques gerais do mercado financeiro (IFIX, Taxa Selic).
   `;
 
   try {
@@ -113,60 +127,79 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const textResponse = response.text || "";
       
-      // Tenta extrair as notícias ricas (com resumo da IA)
       let articles: NewsArticle[] = extractJSON(textResponse) || [];
 
-      // Validação e Correção de Links usando Grounding Metadata (Dados Reais)
-      // A IA pode "alucinar" links ou não saber a URL exata. O Grounding tem a verdade.
-      if (articles.length > 0) {
-          articles = articles.map(article => {
-              // Tenta encontrar um link real nos metadados que corresponda ao título ou fonte
-              const matchedChunk = groundingChunks.find(c => 
-                  c.web?.title?.toLowerCase().includes(article.title.substring(0, 10).toLowerCase()) ||
-                  c.web?.uri === article.url
-              );
-
-              return {
-                  ...article,
-                  // Se achou link real no grounding, usa ele. Se não, mantém o da IA (risco de quebrado, mas tentamos)
-                  url: matchedChunk?.web?.uri || article.url, 
-                  // Garante campos obrigatórios
-                  source: article.source || getDomain(article.url || ''),
-                  date: article.date || new Date().toISOString(),
-                  sentiment: article.sentiment || 'Neutral'
-              };
-          });
-      } 
-      // FALLBACK: Se a IA falhou em gerar JSON (articles vazio), usamos puramente o Grounding
-      else if (groundingChunks.length > 0) {
-          console.warn("JSON parsing failed, falling back to raw Grounding Metadata");
+      // --- PIPELINE DE RECUPERAÇÃO E CORREÇÃO (FAIL-SAFE) ---
+      
+      // 1. Se o JSON veio vazio mas tem chunks, reconstrua a partir dos chunks (Prioridade: Dados Reais)
+      if (articles.length === 0 && groundingChunks.length > 0) {
+          console.log("Usando Fallback de Grounding Chunks");
           const uniqueLinks = new Set();
-          
           articles = groundingChunks
             .filter(c => c.web?.title && c.web?.uri)
             .map(c => {
                 const url = c.web!.uri!;
                 if (uniqueLinks.has(url)) return null;
                 uniqueLinks.add(url);
+                
+                // Clean title (remove site name suffix like " - InfoMoney")
+                let title = c.web!.title!;
+                const separatorIndex = title.lastIndexOf(' - ');
+                if (separatorIndex > 10) title = title.substring(0, separatorIndex);
+
+                // Avoid using URL as title
+                if (title.includes('http') || title.includes('.com')) {
+                    return null; // Skip garbage titles
+                }
 
                 return {
-                    title: c.web!.title!,
+                    title: title,
                     source: getDomain(url),
                     url: url,
                     date: new Date().toISOString(),
-                    summary: "Toque para ler a matéria completa.", // Fallback text
-                    category: (filter.category as any) || 'FIIs',
+                    summary: "Toque para ler a matéria completa na fonte original.",
+                    category: filter.category || 'FIIs',
                     sentiment: 'Neutral' as const,
                 };
             })
             .filter((item): item is NewsArticle => item !== null);
+      }
+      // 2. Se o JSON veio preenchido, valide os links com o Grounding para evitar alucinação
+      else if (articles.length > 0) {
+          articles = articles.map(article => {
+              // Tenta achar o link real que a IA usou
+              const matchedChunk = groundingChunks.find(c => 
+                  c.web?.uri === article.url || 
+                  (c.web?.title && article.title && c.web.title.includes(article.title.substring(0, 15)))
+              );
+
+              const realUrl = matchedChunk?.web?.uri || article.url;
+              const cleanSource = getDomain(realUrl || '');
+              
+              // If IA hallucinated a source/title that is just a domain, clean it
+              if (article.title && (article.title.includes(cleanSource) || article.title.includes('.com'))) {
+                  // Try to recover title from chunk if available
+                  if (matchedChunk?.web?.title) {
+                      article.title = matchedChunk.web.title;
+                  }
+              }
+
+              return {
+                  ...article,
+                  url: realUrl,
+                  source: article.source || cleanSource,
+                  date: article.date || new Date().toISOString(),
+                  sentiment: article.sentiment || 'Neutral',
+                  // Fallback summary if empty
+                  summary: article.summary || "Acesse para ler os detalhes."
+              };
+          });
       }
 
       return articles.slice(0, 15);
 
   } catch (error) {
       console.error("Erro busca notícias:", error);
-      // Se tudo falhar, retorna array vazio para UI tratar
       return [];
   }
 }
