@@ -31,11 +31,11 @@ export const MOCK_CALENDAR_EVENTS: CalendarEvent[] = [];
 
 // --- DEMO MODE DATA ---
 export const DEMO_TRANSACTIONS: Transaction[] = [
-    { id: 'demo1', ticker: 'MXRF11', type: 'Compra', quantity: 100, price: 10.50, date: '2023-01-15', costs: 0, notes: 'Demo' },
-    { id: 'demo2', ticker: 'HGLG11', type: 'Compra', quantity: 10, price: 160.00, date: '2023-02-10', costs: 0, notes: 'Demo' },
-    { id: 'demo3', ticker: 'VISC11', type: 'Compra', quantity: 15, price: 115.00, date: '2023-03-05', costs: 0, notes: 'Demo' },
-    { id: 'demo4', ticker: 'KNRI11', type: 'Compra', quantity: 5, price: 155.00, date: '2023-04-20', costs: 0, notes: 'Demo' },
-    { id: 'demo5', ticker: 'MXRF11', type: 'Compra', quantity: 50, price: 10.80, date: '2023-05-15', costs: 0, notes: 'Demo' },
+    { id: 'demo1', ticker: 'MXRF11', type: 'Compra', quantity: 100, price: 10.50, date: '2023-01-15', costs: 0 },
+    { id: 'demo2', ticker: 'HGLG11', type: 'Compra', quantity: 10, price: 160.00, date: '2023-02-10', costs: 0 },
+    { id: 'demo3', ticker: 'VISC11', type: 'Compra', quantity: 15, price: 115.00, date: '2023-03-05', costs: 0 },
+    { id: 'demo4', ticker: 'KNRI11', type: 'Compra', quantity: 5, price: 155.00, date: '2023-04-20', costs: 0 },
+    { id: 'demo5', ticker: 'MXRF11', type: 'Compra', quantity: 50, price: 10.80, date: '2023-05-15', costs: 0 },
 ];
 
 export const DEMO_DIVIDENDS: Dividend[] = [

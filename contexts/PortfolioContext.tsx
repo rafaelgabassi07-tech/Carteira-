@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
@@ -26,6 +25,7 @@ interface PortfolioContextType {
   updateTransaction: (transaction: Transaction) => void;
   deleteTransaction: (id: string) => void;
   importTransactions: (transactions: Transaction[]) => void;
+  restoreData: (data: { transactions: Transaction[], preferences?: Partial<AppPreferences> }) => void;
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
   updateUserProfile: (profile: Partial<UserProfile>) => void;
   refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
@@ -82,6 +82,13 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const toAdd = newTransactions.filter(t => !txIds.has(t.id));
           return [...prev, ...toAdd];
       });
+  };
+   const restoreData = (data: { transactions: Transaction[], preferences?: Partial<AppPreferences> }) => {
+    setTransactions(data.transactions);
+    if (data.preferences) {
+      // Merge with existing to not lose keys that might not be in the backup
+      setPreferences(currentPrefs => ({ ...currentPrefs, ...data.preferences }));
+    }
   };
   const updatePreferences = (newPrefs: Partial<AppPreferences>) => setPreferences(prev => ({ ...prev, ...newPrefs }));
   const updateUserProfile = (newProfile: Partial<UserProfile>) => setUserProfile(prev => ({ ...prev, ...newProfile }));
@@ -393,6 +400,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     updateTransaction,
     deleteTransaction,
     importTransactions,
+    restoreData,
     updatePreferences,
     updateUserProfile,
     refreshMarketData,
