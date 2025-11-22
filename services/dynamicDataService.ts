@@ -57,7 +57,7 @@ export const generateDividends = (assets: Asset[], forceRefresh = false): Divide
 };
 
 // Generates calendar events
-// Robust logic to handle Timezones and current month payments
+// Robust logic to handle Timezones and current/next month payments
 export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
     const today = new Date();
@@ -75,11 +75,12 @@ export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
                  const pMonth = paymentDate.getMonth();
                  const pYear = paymentDate.getFullYear();
                  
-                 // Logic: Show if it's in the current month OR in the future
-                 const isCurrentMonth = pMonth === currentMonth && pYear === currentYear;
-                 const isFuture = paymentDate >= today;
+                 // Logic: Show if it's in the current month OR next month
+                 // We want to see upcoming payments even if they are next month (e.g. announced on 30th for 5th)
+                 const isRelevantDate = (pYear === currentYear && (pMonth === currentMonth || pMonth === currentMonth + 1)) || 
+                                        (pYear === currentYear + 1 && currentMonth === 11 && pMonth === 0); // Dec -> Jan transition
 
-                 if (!isNaN(paymentDate.getTime()) && (isCurrentMonth || isFuture)) {
+                 if (!isNaN(paymentDate.getTime()) && isRelevantDate) {
                      
                      // Use last dividend amount if available for calculation
                      const amountPerShare = asset.lastDividend || (asset.currentPrice * ((asset.dy || 0) / 100)) / 12;

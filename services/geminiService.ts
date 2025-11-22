@@ -77,11 +77,11 @@ const advancedAssetDataSchema: Schema = {
             pvp: { type: Type.NUMBER, description: "P/VP" },
             sector: { type: Type.STRING, description: "Segmento padronizado." },
             administrator: { type: Type.STRING, description: "Administradora." },
-            vacancyRate: { type: Type.NUMBER, description: "Vacância (%)" },
+            vacancyRate: { type: Type.NUMBER, description: "Vacância Física (%)" },
             dailyLiquidity: { type: Type.NUMBER, description: "Liquidez diária." },
             shareholders: { type: Type.NUMBER, description: "Número de cotistas." },
-            nextPaymentDate: { type: Type.STRING, description: "Data de PAGAMENTO (Pay Date) do provento referente ao mês ATUAL ou PRÓXIMO. Se já foi pago este mês, retorne essa data. Formato YYYY-MM-DD." },
-            lastDividend: { type: Type.NUMBER, description: "Valor do último rendimento pago ou anunciado." }
+            nextPaymentDate: { type: Type.STRING, description: "Data EXATA de PAGAMENTO anunciada (Payment Date) para o mês corrente ou próximo. Formato YYYY-MM-DD. Exemplo: Se o fundo anunciou pagamento para 15/12/2025, retorne '2025-12-15'." },
+            lastDividend: { type: Type.NUMBER, description: "Valor do rendimento (R$/cota) referente a essa data de pagamento." }
         },
         required: ["ticker", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
@@ -256,20 +256,28 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `Busque dados fundamentalistas atualizados para: ${tickers.join(', ')}. 
+    // Get current date context for the AI
+    const now = new Date();
+    const currentMonth = now.toLocaleString('pt-BR', { month: 'long' });
+    const currentYear = now.getFullYear();
+    const currentDate = now.toISOString().split('T')[0];
+
+    const prompt = `Data de hoje: ${currentDate} (${currentMonth}/${currentYear}).
     
-    Para cada ativo, retorne:
+    Busque dados fundamentalistas ATUALIZADOS para: ${tickers.join(', ')}. 
+    
+    Para cada ativo, retorne os dados técnicos e, CRUCIALMENTE, pesquise pelo "Aviso aos Cotistas" ou "Comunicado ao Mercado" mais recente para identificar dividendos.
+    
+    Campos Obrigatórios:
     - dy: Dividend Yield 12M (%)
     - pvp: P/VP
-    - sector: Segmento
+    - sector: Segmento ('Tijolo - Shoppings', 'Papel', etc)
     - administrator: Administradora
     - vacancyRate: Vacância Física (%)
-    - dailyLiquidity: Liquidez Média Diária
-    - shareholders: Nº de Cotistas
-    - nextPaymentDate: A data EXATA de PAGAMENTO (Pay Date) do último rendimento anunciado referente ao mês atual ou próximo. (Ex: se hoje é dia 20 e pagou dia 15, retorne o dia 15). Formato YYYY-MM-DD.
-    - lastDividend: O valor desse rendimento.
-    
-    Use EXATAMENTE as categorias: 'Tijolo - Shoppings', 'Tijolo - Lajes Corporativas', 'Tijolo - Logística', 'Tijolo - Híbrido', 'Papel', 'Fundo de Fundos (FOF)', 'Agro (Fiagro)' ou 'Outros'.`;
+    - dailyLiquidity: Liquidez Diária
+    - shareholders: Nº Cotistas
+    - nextPaymentDate: A data de PAGAMENTO (não a Data Com) do provento referente ao ciclo atual (${currentMonth}). Se já foi pago, retorne essa data passada. Se vai ser pago no futuro (este mês ou próximo), retorne a data futura. Formato YYYY-MM-DD.
+    - lastDividend: O valor anunciado (R$/cota).`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
@@ -279,7 +287,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                 responseMimeType: "application/json",
                 responseSchema: advancedAssetDataSchema,
                 temperature: 0,
-                tools: [{googleSearch: {}}] // Enable search to find latest dividend dates
+                tools: [{googleSearch: {}}] // Essential for real-time dividend dates
             }
         });
         
