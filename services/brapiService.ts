@@ -40,8 +40,9 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     const allQuotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }> = {};
     const failedTickers: string[] = [];
 
-    // Strategy: Try long history first, fallback to shorter if 403/Forbidden (common for new assets or free tier limits)
-    const ranges = ['5y', '3mo', '1mo'];
+    // Strategy: Try long history first, fallback to shorter if 403/Forbidden or 404/Not Found (common for new assets)
+    // Expanded ranges to be more granular to ensure at least some data is returned.
+    const ranges = ['5y', '1y', '6mo', '3mo', '1mo', '5d'];
 
     for (const ticker of tickers) {
         let success = false;
@@ -64,10 +65,10 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                     response = await fetch(url);
                 }
 
-                // Fallback logic for 403 (Forbidden)
-                if (response.status === 403) {
-                    console.warn(`Range ${range} forbidden for ${ticker}, trying shorter range...`);
-                    lastError = new Error(`Acesso negado (403) para histórico de ${range}`);
+                // Fallback logic for 403 (Forbidden), 404 (Not Found), or 400 (Bad Request - sometimes used for invalid ranges)
+                if (response.status === 403 || response.status === 404 || response.status === 400) {
+                    console.warn(`Range ${range} failed (${response.status}) for ${ticker}, trying shorter range...`);
+                    lastError = new Error(`Erro (${response.status}) para histórico de ${range}`);
                     continue; // Try next range
                 }
 
@@ -106,7 +107,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                     throw error; // Re-throw fatal
                 }
                 lastError = error;
-                // Continue to next range loop if possible, otherwise it will exit loop
+                // Continue to next range loop if possible
             }
         }
 
@@ -115,19 +116,17 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             failedTickers.push(ticker);
         }
         
-        // Proactive delay between asset requests
+        // Proactive delay between asset requests to respect API limits
         await delay(300); 
     }
 
     if (failedTickers.length > 0) {
         // Only throw if ALL attempts for a ticker failed. 
-        // If partial success happened (fallback), we don't throw.
         throw new Error(`Falha ao atualizar: ${failedTickers.join(', ')}.`);
     }
 
     return allQuotes;
 }
-
 
 export async function validateBrapiToken(token: string): Promise<boolean> {
     if (!token || token.trim() === '') return false;
