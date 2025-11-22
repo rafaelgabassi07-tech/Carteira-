@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -6,6 +7,8 @@ import StarIcon from '../components/icons/StarIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import FilterIcon from '../components/icons/FilterIcon';
+import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
+import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
@@ -25,99 +28,6 @@ const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sen
             {sentimentData.text}
         </span>
     );
-};
-
-const NewsCard: React.FC<{ 
-  article: NewsArticle;
-  isFavorited: boolean;
-  onToggleFavorite: () => void;
-  addToast: (message: string, type?: ToastMessage['type']) => void;
-}> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
-  const { t } = useI18n();
-  // Removed internal state for expansion to keep UI cleaner/faster like Google News
-  
-  const handleShare = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    vibrate();
-    const shareData = {
-        title: article.title,
-        text: article.summary,
-        url: article.url || window.location.href,
-    };
-    try {
-        if (navigator.share) {
-            await navigator.share(shareData);
-        } else {
-           addToast(t('toast_share_not_supported'), 'error');
-        }
-    } catch (err) {
-       // addToast(t('toast_share_cancelled'), 'info');
-    }
-  };
-
-  const handleFavorite = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-      vibrate(20);
-      onToggleFavorite();
-  }
-
-  const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
-
-  return (
-    <a 
-        href={article.url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden relative border border-[var(--border-color)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-all duration-300 flex flex-col h-full group active:scale-[0.99]"
-    >
-      {/* Desktop: Image Top. Mobile: Image Right (Handled via Grid in parent or flex here if needed, but kept stack for consistency with "Card" request) */}
-      <div className="h-40 overflow-hidden relative">
-           <img 
-                src={imgSrc} 
-                alt=""
-                loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
-                onError={() => setImgSrc(getFallbackImage(article.title))}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)]/80 to-transparent opacity-60"></div>
-            <div className="absolute top-2 right-2 flex gap-1">
-                 <button onClick={handleFavorite} className={`p-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 transition-colors ${isFavorited ? 'text-yellow-400' : 'text-gray-300 hover:text-white'}`}>
-                    <StarIcon filled={isFavorited} className="w-3.5 h-3.5" />
-                </button>
-            </div>
-            <div className="absolute bottom-2 left-2">
-                 <span className="text-[10px] font-bold text-white bg-black/50 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10">
-                    {article.category || 'FIIs'}
-                 </span>
-            </div>
-      </div>
-
-      <div className="p-4 flex-1 flex flex-col">
-        <div className="flex items-center gap-2 mb-2">
-            <img src={getFavicon(article.url || '')} className="w-3.5 h-3.5 rounded-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
-            <span className="text-[10px] font-bold text-[var(--accent-color)] uppercase truncate">{article.source}</span>
-            <span className="text-[10px] text-[var(--text-secondary)]">• {timeAgo(article.date)}</span>
-        </div>
-
-        <h3 className="text-sm font-bold text-[var(--text-primary)] leading-snug line-clamp-3 mb-2 group-hover:text-[var(--accent-color)] transition-colors">
-            {article.title}
-        </h3>
-        
-        <p className="text-xs text-[var(--text-secondary)] line-clamp-3 leading-relaxed mb-3">
-          {article.summary}
-        </p>
-
-        <div className="mt-auto flex justify-between items-center pt-3 border-t border-[var(--border-color)]">
-             <SentimentBadge sentiment={article.sentiment} />
-             <div className="flex items-center gap-3 text-[var(--text-secondary)]">
-                <button onClick={handleShare} className="hover:text-[var(--text-primary)] transition-colors"><ShareIcon className="w-4 h-4" /></button>
-             </div>
-        </div>
-      </div>
-    </a>
-  );
 };
 
 // --- Helpers ---
@@ -155,52 +65,200 @@ const timeAgo = (dateString: string) => {
     return `${Math.floor(seconds / 86400)}d`;
 };
 
+const NewsCard: React.FC<{ 
+  article: NewsArticle;
+  isFavorited: boolean;
+  onToggleFavorite: () => void;
+  addToast: (message: string, type?: ToastMessage['type']) => void;
+}> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
+  const { t } = useI18n();
+  
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    vibrate();
+    const shareData = {
+        title: article.title,
+        text: article.summary,
+        url: article.url || window.location.href,
+    };
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+           addToast(t('toast_share_not_supported'), 'error');
+        }
+    } catch (err) {
+       // addToast(t('toast_share_cancelled'), 'info');
+    }
+  };
+
+  const handleFavorite = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      vibrate(20);
+      onToggleFavorite();
+  }
+
+  const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
+
+  return (
+    <a 
+        href={article.url} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden relative border border-[var(--border-color)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-all duration-300 flex flex-row md:flex-col h-full group active:scale-[0.99]"
+    >
+      {/* Mobile: Image Right (Google News Style) | Desktop: Image Top */}
+      <div className="w-24 h-24 md:w-full md:h-40 flex-shrink-0 order-2 md:order-1 relative overflow-hidden">
+           <img 
+                src={imgSrc} 
+                alt=""
+                loading="lazy"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                onError={() => setImgSrc(getFallbackImage(article.title))}
+            />
+            {/* Overlay only visible on desktop layout */}
+            <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)] via-transparent to-transparent opacity-60"></div>
+      </div>
+
+      <div className="p-3 md:p-4 flex-1 flex flex-col justify-between order-1 md:order-2 min-w-0">
+        <div>
+            <div className="flex items-center gap-2 mb-1.5">
+                <img src={getFavicon(article.url || '')} className="w-3 h-3 rounded-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
+                <span className="text-[10px] font-bold text-[var(--accent-color)] uppercase truncate max-w-[100px]">{article.source}</span>
+                <span className="text-[10px] text-[var(--text-secondary)]">• {timeAgo(article.date)}</span>
+            </div>
+
+            <h3 className="text-sm font-bold text-[var(--text-primary)] leading-snug line-clamp-3 md:line-clamp-2 mb-1 group-hover:text-[var(--accent-color)] transition-colors">
+                {article.title}
+            </h3>
+            
+            <p className="hidden md:block text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed mb-3">
+                {article.summary}
+            </p>
+        </div>
+
+        <div className="flex justify-between items-center mt-2 pt-2 md:border-t md:border-[var(--border-color)]">
+             <SentimentBadge sentiment={article.sentiment} />
+             <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                <button onClick={handleFavorite} className={`hover:text-[var(--text-primary)] transition-colors ${isFavorited ? 'text-yellow-400' : ''}`}><StarIcon filled={isFavorited} className="w-4 h-4" /></button>
+                <button onClick={handleShare} className="hover:text-[var(--text-primary)] transition-colors"><ShareIcon className="w-4 h-4" /></button>
+             </div>
+        </div>
+      </div>
+    </a>
+  );
+};
+
 // --- Components ---
 
-const NewsHero: React.FC<{ article: NewsArticle }> = ({ article }) => {
+const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
     const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
 
     return (
-        <a href={article.url} target="_blank" rel="noopener noreferrer" className="block relative w-full aspect-[16/9] md:aspect-[21/9] rounded-3xl overflow-hidden shadow-2xl mb-8 group cursor-pointer ring-1 ring-white/10 transition-transform duration-500 hover:scale-[1.01]">
-            <img 
-                src={imgSrc} 
-                alt={article.title}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-                loading="eager"
-                onError={() => setImgSrc(getFallbackImage(article.title))}
-            />
-            {/* Strong Gradient Overlay for Text Readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90"></div>
-            
-            <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full md:w-3/4 lg:w-2/3">
-                <div className="flex items-center gap-3 mb-3">
-                    <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-[var(--accent-color)]/20 animate-pulse">DESTAQUE</span>
-                    <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
-                        <img src={getFavicon(article.url || '')} className="w-3.5 h-3.5 rounded-full bg-white/10" onError={(e) => e.currentTarget.style.display = 'none'} />
-                        <span className="text-gray-200 text-xs font-bold uppercase tracking-wider">{article.source}</span>
+        <a 
+            href={article.url} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="relative w-full flex-shrink-0 rounded-3xl overflow-hidden shadow-lg cursor-pointer group snap-center"
+            style={{ scrollSnapAlign: 'center' }}
+        >
+            <div className="aspect-[16/9] md:aspect-[21/9] w-full relative">
+                <img 
+                    src={imgSrc} 
+                    alt={article.title}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    loading="eager"
+                    onError={() => setImgSrc(getFallbackImage(article.title))}
+                />
+                {/* Strong Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-90"></div>
+                
+                <div className="absolute bottom-0 left-0 p-5 md:p-8 w-full md:w-3/4">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-md border border-white/10">
+                            <img src={getFavicon(article.url || '')} className="w-3 h-3 rounded-full bg-white/10" onError={(e) => e.currentTarget.style.display = 'none'} />
+                            <span className="text-gray-200 text-[10px] font-bold uppercase tracking-wider">{article.source}</span>
+                        </div>
+                        <span className="text-gray-400 text-[10px]">• {timeAgo(article.date)}</span>
                     </div>
+                    
+                    <h2 className="text-lg md:text-3xl font-extrabold text-white leading-tight line-clamp-2 mb-2 drop-shadow-lg">
+                        {article.title}
+                    </h2>
+                    
+                    <p className="text-gray-300 text-xs md:text-sm line-clamp-2 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3 hidden sm:block">
+                        {article.summary}
+                    </p>
                 </div>
-                
-                <h2 className="text-xl md:text-3xl lg:text-4xl font-extrabold text-white leading-tight line-clamp-3 mb-3 drop-shadow-lg tracking-tight">
-                    {article.title}
-                </h2>
-                
-                <p className="text-gray-300 text-sm md:text-base line-clamp-3 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3">
-                    {article.summary}
-                </p>
             </div>
         </a>
     );
 };
 
+const NewsCarousel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => {
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollRef.current) {
+            const scrollAmount = scrollRef.current.clientWidth;
+            scrollRef.current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+    };
+
+    if (!articles || articles.length === 0) return null;
+
+    return (
+        <div className="relative group mb-8">
+            {/* Desktop Navigation Buttons (Translucent, Show on Hover) */}
+            <button 
+                onClick={() => scroll('left')}
+                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/30 backdrop-blur-md border border-white/10 text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
+            >
+                <ChevronLeftIcon className="w-6 h-6" />
+            </button>
+            
+            <button 
+                onClick={() => scroll('right')}
+                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/30 backdrop-blur-md border border-white/10 text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
+            >
+                <ChevronRightIcon className="w-6 h-6" />
+            </button>
+
+            {/* Carousel Container */}
+            <div 
+                ref={scrollRef}
+                className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-2"
+            >
+                {articles.map((article, idx) => (
+                    <div key={idx} className="w-full min-w-[90%] md:min-w-[80%] lg:min-w-[70%] snap-center">
+                        <NewsHeroItem article={article} />
+                    </div>
+                ))}
+            </div>
+            
+            {/* Mobile Dots Indicator */}
+            <div className="flex justify-center gap-1.5 mt-2 md:hidden">
+                {articles.map((_, idx) => (
+                    <div key={idx} className="w-1.5 h-1.5 rounded-full bg-[var(--text-secondary)] opacity-30"></div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-color)] animate-pulse h-full flex flex-col">
-        <div className="h-32 bg-[var(--bg-tertiary-hover)] rounded-lg mb-4 w-full"></div>
-        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/4 mb-3"></div>
-        <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-full mb-2"></div>
-        <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-3/4 mb-3"></div>
-        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-full mb-1"></div>
-        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-5/6"></div>
+    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg animate-pulse border border-[var(--border-color)] flex gap-4 h-32">
+        <div className="flex-1 space-y-2">
+            <div className="h-3 bg-gray-700 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-700 rounded w-full"></div>
+            <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+        </div>
+        <div className="w-24 h-24 bg-gray-700 rounded-lg flex-shrink-0"></div>
     </div>
 );
 
@@ -219,7 +277,7 @@ const CategoryPill: React.FC<{ label: string; isActive: boolean; onClick: () => 
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  const { preferences, assets } = usePortfolio();
+  const { assets, preferences } = usePortfolio();
   
   const categories = ['Destaques', 'Rendimentos', 'Papel & CRI', 'Logística', 'Shoppings', 'Fiagro', 'Lajes', 'Geral', 'Favoritos'];
   
@@ -278,7 +336,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     setError(null);
     
     try {
-      const filterKey = `news_v6_${currentQuery}_${currentDateRange}_${currentSource}_${category}`.toLowerCase().replace(/\s+/g, '_');
+      const filterKey = `news_${currentQuery}_${currentDateRange}_${currentSource}_${category}`.toLowerCase().replace(/\s+/g, '_');
       
       if (!isRefresh) {
           const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
@@ -295,7 +353,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           tickers: assetTickers,
           dateRange: currentDateRange,
           sources: currentSource,
-          category: category 
+          category: category
       };
 
       const articles = await fetchMarketNews(preferences, filter);
@@ -313,10 +371,10 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   // Debounced Load
   const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);
 
-  // Reset news when category changes
+  // Reset when category changes
   useEffect(() => {
       setLoading(true);
-      setNews([]);
+      setNews([]); // Clear current list
       loadNews(false, searchQuery, dateRange, sourceFilter);
   }, [category]);
 
@@ -377,6 +435,17 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         : news;
   }, [news, activeTab, favorites]);
 
+  // Split news for Carousel vs List
+  const { heroNews, listNews } = useMemo(() => {
+      if (activeTab === 'favorites' || searchQuery) {
+          return { heroNews: [], listNews: displayedNews };
+      }
+      return {
+          heroNews: displayedNews.slice(0, 5),
+          listNews: displayedNews.slice(5)
+      };
+  }, [displayedNews, activeTab, searchQuery]);
+
   return (
     <div 
         className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6"
@@ -393,7 +462,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       </div>
       
       <div className="w-full max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-md py-2">
           <h1 className="text-2xl font-bold">{t('market_news')}</h1>
           <div className="flex gap-2">
                <button 
@@ -415,7 +484,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         </div>
         
         {/* Categories Scroller */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-2 -mx-4 px-4 snap-x mask-linear-fade">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-4 -mx-4 px-4 snap-x">
             {categories.map(cat => (
                 <CategoryPill 
                     key={cat} 
@@ -467,7 +536,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           />
         </div>
         
-        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
+        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-6 border border-[var(--border-color)] shrink-0">
             <button 
               onClick={() => { setActiveTab('all'); vibrate(); }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
@@ -483,7 +552,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             </button>
         </div>
 
-        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+        {loading && <div className="space-y-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
         
         {error && (
           <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
@@ -497,40 +566,32 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
         {!loading && !error && (
           <div className="flex-1">
-            {displayedNews.length > 0 ? (
-              <>
-                 {/* Hero Section (Only for 'All' tab and no search) */}
-                 {activeTab === 'all' && !searchQuery && displayedNews.length > 0 && (
-                    <div className="mb-8 animate-scale-in">
-                        <NewsHero article={displayedNews[0]} />
-                    </div>
-                 )}
+            {heroNews.length > 0 && <NewsCarousel articles={heroNews} />}
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 landscape-grid-cols-3">
-                    {(activeTab === 'all' && !searchQuery ? displayedNews.slice(1) : displayedNews).map((article, index) => (
-                        <div 
-                            key={`${article.title}-${index}`} 
-                            className="animate-fade-in-up h-full" 
-                            style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                            <NewsCard 
-                                article={article}
-                                isFavorited={favorites.has(article.title)}
-                                onToggleFavorite={() => handleToggleFavorite(article.title)}
-                                addToast={addToast}
-                            />
-                        </div>
-                    ))}
-                 </div>
-                 
-                 {activeTab === 'favorites' && displayedNews.length > 0 && (
-                      <div className="col-span-full text-center pt-8 pb-4">
+            {listNews.length > 0 || heroNews.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 landscape-grid-cols-3">
+                  {listNews.map((article, index) => (
+                  <div 
+                      key={`${article.title}-${index}`} 
+                      className="animate-fade-in-up h-full" 
+                      style={{ animationDelay: `${index * 70}ms` }}
+                  >
+                      <NewsCard 
+                      article={article}
+                      isFavorited={favorites.has(article.title)}
+                      onToggleFavorite={() => handleToggleFavorite(article.title)}
+                      addToast={addToast}
+                      />
+                  </div>
+                  ))}
+                  {activeTab === 'favorites' && (
+                      <div className="col-span-full text-center pt-4 pb-8">
                           <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:underline uppercase tracking-wider">
                               {t('clear_favorites')}
                           </button>
                       </div>
                   )}
-              </>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">
                   {activeTab === 'favorites' ? (
