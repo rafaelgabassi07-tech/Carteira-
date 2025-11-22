@@ -20,6 +20,17 @@ const getFutureDate = (days: number): Date => {
     return date;
 };
 
+// Helper for deterministic IDs based on string content
+const simpleHash = (str: string): number => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+};
+
 // Generates estimated dividend data based on current portfolio YIELD (not random)
 export const generateDividends = (assets: Asset[], forceRefresh = false): Dividend[] => {
     const cacheKey = 'portfolio_dividends_v2';
@@ -46,7 +57,7 @@ export const generateDividends = (assets: Asset[], forceRefresh = false): Divide
 };
 
 // Generates calendar events
-// MODIFIED: Robust logic to handle Timezones and current month payments
+// Robust logic to handle Timezones and current month payments
 export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
     const today = new Date();
@@ -95,10 +106,9 @@ export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
     return events.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 };
 
-// Generates notifications based on real asset data
+// Generates notifications based on real asset data with deterministic IDs
 export const generateNotifications = (assets: Asset[]): Notification[] => {
     const notifications: Notification[] = [];
-    let id = 1;
     
     if (assets.length === 0) return [];
 
@@ -106,13 +116,17 @@ export const generateNotifications = (assets: Asset[]): Notification[] => {
         // 1. Dividend Projections
         if (asset.dy && asset.dy > 0) {
             const dividend = (asset.currentPrice * (asset.dy / 100)) / 12;
-            // Only verify significant amounts
             if (dividend > 0.01) {
+                const title = `Provisão: ${asset.ticker}`;
+                const desc = `Estimativa de R$ ${dividend.toFixed(2)}/cota com base no DY de ${asset.dy.toFixed(1)}%.`;
+                // Create ID based on title and month to avoid duplicates but persist across re-renders
+                const id = simpleHash(title + new Date().getMonth()); 
+                
                 notifications.push({
-                    id: id++,
+                    id: id,
                     type: 'dividend',
-                    title: `Provisão: ${asset.ticker}`,
-                    description: `Estimativa de R$ ${dividend.toFixed(2)}/cota com base no DY de ${asset.dy.toFixed(1)}%.`,
+                    title: title,
+                    description: desc,
                     date: new Date().toISOString(),
                     read: false,
                     relatedTicker: asset.ticker
@@ -125,41 +139,49 @@ export const generateNotifications = (assets: Asset[]): Notification[] => {
         if (asset.currentPrice > 0 && asset.avgPrice > 0) {
             if (asset.currentPrice < asset.avgPrice * 0.95) {
                 const dropPercent = ((asset.avgPrice - asset.currentPrice) / asset.avgPrice) * 100;
+                const title = `Oportunidade: ${asset.ticker}`;
+                const id = simpleHash(title + new Date().getDate()); // Daily alert
+
                 notifications.push({
-                    id: id++,
+                    id: id,
                     type: 'price',
-                    title: `Oportunidade: ${asset.ticker}`,
+                    title: title,
                     description: `Preço atual está ${dropPercent.toFixed(1)}% abaixo do seu preço médio.`,
-                    date: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+                    date: new Date(Date.now() - 3600000).toISOString(),
                     read: false,
                     relatedTicker: asset.ticker
                 });
             }
             
             // 3. Gain Alert (Price Up)
-            // If current price is 10% above average price
             if (asset.currentPrice > asset.avgPrice * 1.10) {
                 const gainPercent = ((asset.currentPrice - asset.avgPrice) / asset.avgPrice) * 100;
+                const title = `Valorização: ${asset.ticker}`;
+                const id = simpleHash(title + new Date().getDate());
+
                 notifications.push({
-                    id: id++,
+                    id: id,
                     type: 'price',
-                    title: `Valorização: ${asset.ticker}`,
+                    title: title,
                     description: `Seu ativo valorizou ${gainPercent.toFixed(1)}% em relação ao custo.`,
-                    date: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+                    date: new Date(Date.now() - 7200000).toISOString(),
                     read: false,
                     relatedTicker: asset.ticker
                 });
             }
         }
 
-        // 4. High P/VP Warning (Paper Funds usually)
+        // 4. High P/VP Warning
         if (asset.pvp && asset.pvp > 1.15) {
+             const title = `Atenção: ${asset.ticker}`;
+             const id = simpleHash(title + asset.pvp.toFixed(1)); // Based on PVP value range
+
              notifications.push({
-                id: id++,
-                type: 'news', // Categorized as news/insight
-                title: `Atenção: ${asset.ticker}`,
+                id: id,
+                type: 'news',
+                title: title,
                 description: `O P/VP está em ${asset.pvp.toFixed(2)}, indicando que o ativo pode estar caro.`,
-                date: new Date(Date.now() - 86400000).toISOString(), // Yesterday
+                date: new Date(Date.now() - 86400000).toISOString(),
                 read: false,
                 relatedTicker: asset.ticker
             });

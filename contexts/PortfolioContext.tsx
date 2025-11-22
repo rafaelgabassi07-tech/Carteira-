@@ -74,34 +74,37 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const sourceMarketData = useMemo(() => isDemoMode ? DEMO_MARKET_DATA : marketData, [isDemoMode, marketData]);
 
   // --- Actions ---
-  const addTransaction = (transaction: Transaction) => setTransactions(prev => [...prev, transaction]);
-  const updateTransaction = (transaction: Transaction) => setTransactions(prev => prev.map(t => t.id === transaction.id ? transaction : t));
-  const deleteTransaction = (id: string) => setTransactions(prev => prev.filter(t => t.id !== id));
-  const importTransactions = (newTransactions: Transaction[]) => {
+  const addTransaction = useCallback((transaction: Transaction) => setTransactions(prev => [...prev, transaction]), [setTransactions]);
+  const updateTransaction = useCallback((transaction: Transaction) => setTransactions(prev => prev.map(t => t.id === transaction.id ? transaction : t)), [setTransactions]);
+  const deleteTransaction = useCallback((id: string) => setTransactions(prev => prev.filter(t => t.id !== id)), [setTransactions]);
+  
+  const importTransactions = useCallback((newTransactions: Transaction[]) => {
       setTransactions(prev => {
           const txIds = new Set(prev.map(t => t.id));
           const toAdd = newTransactions.filter(t => !txIds.has(t.id));
           return [...prev, ...toAdd];
       });
-  };
-   const restoreData = (data: { transactions: Transaction[], preferences?: Partial<AppPreferences> }) => {
+  }, [setTransactions]);
+
+   const restoreData = useCallback((data: { transactions: Transaction[], preferences?: Partial<AppPreferences> }) => {
     setTransactions(data.transactions);
     if (data.preferences) {
-      // Merge with existing to not lose keys that might not be in the backup
       setPreferences(currentPrefs => ({ ...currentPrefs, ...data.preferences }));
     }
-  };
-  const updatePreferences = (newPrefs: Partial<AppPreferences>) => setPreferences(prev => ({ ...prev, ...newPrefs }));
-  const updateUserProfile = (newProfile: Partial<UserProfile>) => setUserProfile(prev => ({ ...prev, ...newProfile }));
-  const togglePrivacyMode = () => setPrivacyMode(prev => !prev);
-  const resetApp = () => { 
-      if(window.confirm("Tem certeza que deseja sair? Todos os seus dados locais (transações, preferências) serão apagados permanentemente. Esta ação não pode ser desfeita.")) {
+  }, [setTransactions, setPreferences]);
+
+  const updatePreferences = useCallback((newPrefs: Partial<AppPreferences>) => setPreferences(prev => ({ ...prev, ...newPrefs })), [setPreferences]);
+  const updateUserProfile = useCallback((newProfile: Partial<UserProfile>) => setUserProfile(prev => ({ ...prev, ...newProfile })), [setUserProfile]);
+  const togglePrivacyMode = useCallback(() => setPrivacyMode(prev => !prev), [setPrivacyMode]);
+  
+  const resetApp = useCallback(() => { 
+      if(window.confirm("Tem certeza que deseja sair? Todos os seus dados locais serão apagados permanentemente.")) {
         localStorage.clear(); 
         window.location.reload(); 
       }
-  };
-  const setDemoMode = (enabled: boolean) => setIsDemoMode(enabled);
-  const clearCache = (key?: string) => {
+  }, []);
+
+  const clearCache = useCallback((key?: string) => {
     if (key === 'all') {
       Object.keys(localStorage).forEach(k => { if(k.startsWith('cache_')) localStorage.removeItem(k); });
       setMarketData({}); setLastSync(null);
@@ -109,7 +112,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       CacheManager.clear(key);
       if (key === 'asset_prices') { setMarketData({}); setLastSync(null); }
     }
-  };
+  }, [setMarketData, setLastSync]);
 
   const refreshMarketData = useCallback(async (force = false, silent = false) => {
     if (isRefreshing) return;
@@ -124,7 +127,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let hasError = false;
     
     try {
-        // Parallel execution to be faster, but handled individually
+        // Parallel execution
         const [brapiResult, geminiResult] = await Promise.allSettled([
             fetchBrapiQuotes(preferences, uniqueTickers),
             fetchAdvancedAssetData(preferences, uniqueTickers)
@@ -149,7 +152,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 });
             } else {
                 console.error("Gemini Error:", geminiResult.reason);
-                // Gemini error is non-critical for prices, so we might not want to show a blocking error
             }
 
             return updated;
@@ -163,7 +165,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
         if (!silent) setIsRefreshing(false);
     }
-  }, [isRefreshing, lastSync, sourceTransactions, preferences]);
+  }, [isRefreshing, lastSync, sourceTransactions, preferences, setMarketData, setLastSync]);
 
   const refreshSingleAsset = useCallback(async (ticker: string) => {
     if (!ticker) return;
@@ -183,7 +185,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setMarketDataError(error.message);
         throw error;
     }
-  }, [preferences]);
+  }, [preferences, setMarketData]);
 
   // --- Derived State Calculations ---
   const assets = useMemo((): Asset[] => {
@@ -192,7 +194,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const metric = portfolioMetrics[ticker];
       const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
       const avgPrice = metric.quantity > 0 ? metric.totalCost / metric.quantity : 0;
-      const currentPrice = liveData.currentPrice || avgPrice; // Fallback to avgPrice if no live data
+      const currentPrice = liveData.currentPrice || avgPrice;
       const totalInvested = metric.quantity * avgPrice;
       const yieldOnCost = totalInvested > 0 && liveData.dy > 0 ? ((currentPrice * (liveData.dy / 100)) / avgPrice) * 100 : 0;
       
@@ -210,8 +212,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         liquidity: liveData.dailyLiquidity,
         shareholders: liveData.shareholders,
         yieldOnCost,
-        nextPaymentDate: liveData.nextPaymentDate, // New Field
-        lastDividend: liveData.lastDividend, // New Field
+        nextPaymentDate: liveData.nextPaymentDate,
+        lastDividend: liveData.lastDividend,
       };
     }).filter(asset => asset.quantity > EPSILON);
   }, [sourceTransactions, sourceMarketData]);
@@ -221,6 +223,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [assets]);
   
   const getAveragePriceForTransaction = useCallback((transaction: Transaction): number => {
+    // Optimized to avoid filtering all transactions if possible, but logic remains strict
     const transactionsBefore = sourceTransactions
         .filter(t => t.ticker === transaction.ticker && new Date(t.date) <= new Date(transaction.date))
         .sort((a, b) => a.date.localeCompare(b.date));
@@ -247,7 +250,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { yieldOnCost: yoc, projectedAnnualIncome: projectedIncome };
   }, [assets]);
   
-  // --- Improved Evolution Calculation ---
+  // --- Evolution Calculation ---
   const { portfolioEvolution, dividends } = useMemo(() => {
     if (sourceTransactions.length === 0 && !isDemoMode) {
         return { portfolioEvolution: {}, dividends: [] };
@@ -270,10 +273,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const firstTxDate = fromISODate(sortedTransactions[0].date);
     const today = new Date();
     
-    // Start from the first day of the month of the first transaction
     let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
     
-    // Running State (State at the end of previous month)
     const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
     let txIndex = 0;
 
@@ -281,7 +282,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
         const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
 
-        // Update state with transactions of this month
         while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
             const tx = sortedTransactions[txIndex];
             if (!portfolioState[tx.ticker]) {
@@ -291,24 +291,21 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (tx.type === 'Compra') {
                 portfolioState[tx.ticker].quantity += tx.quantity;
                 portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
-            } else { // Venda
+            } else {
                 const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
                 if (portfolioState[tx.ticker].quantity > EPSILON) {
-                    // Average price logic for reducing cost
                     const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
                     portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
                     portfolioState[tx.ticker].quantity -= sellQuantity;
                 }
             }
             
-            // Clean up sold positions
             if (portfolioState[tx.ticker].quantity < EPSILON) {
                 delete portfolioState[tx.ticker];
             }
             txIndex++;
         }
 
-        // Calculate Snapshot for this month
         let monthInvestedTotal = 0;
         let monthMarketValueTotal = 0;
         const segmentInvested: Record<string, number> = {};
@@ -319,12 +316,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
             const segment = liveData.sector || 'Outros';
             
-            // Robust Price Finding
             let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
             
-            // Fallbacks if historical price is missing:
-            // 1. Use current price if available
-            // 2. Use average purchase price (assume no gain/loss)
             if (historicalPrice === null) {
                 historicalPrice = liveData.currentPrice || (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
             }
@@ -334,15 +327,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             monthInvestedTotal += holdings.totalCost;
             monthMarketValueTotal += marketValue;
             
-            // Aggregate per segment
             segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
             segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
 
-            // Dividends simulation (only if holdings > 0)
             const dy = liveData.dy || 0;
             if (holdings.quantity > EPSILON && dy > 0 && historicalPrice > 0) {
                 const amountPerShare = (historicalPrice * (dy / 100)) / 12;
-                // Simulate payout in middle of next month
                 const paymentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 15);
                 if (paymentDate <= today) {
                     simulatedDividends.push({
@@ -357,7 +347,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
         
-        // Only add point if there is value
         if (monthInvestedTotal > 0) {
             evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
 
@@ -367,7 +356,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             });
         }
 
-        // Move to next month
         currentDate.setMonth(currentDate.getMonth() + 1);
     }
     
@@ -410,7 +398,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     refreshSingleAsset,
     getAssetByTicker,
     getAveragePriceForTransaction,
-    setDemoMode,
+    setDemoMode: setIsDemoMode,
     setPrivacyMode,
     togglePrivacyMode,
     resetApp,
@@ -418,8 +406,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }), [
     assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
     yieldOnCost, projectedAnnualIncome, monthlyIncome, portfolioEvolution,
-    lastSync, isRefreshing, marketDataError, userProfile, refreshMarketData,
-    refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction, setPrivacyMode
+    lastSync, isRefreshing, marketDataError, userProfile, 
+    addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
+    updatePreferences, updateUserProfile, refreshMarketData, refreshSingleAsset,
+    getAssetByTicker, getAveragePriceForTransaction, setIsDemoMode, setPrivacyMode,
+    togglePrivacyMode, resetApp, clearCache
   ]);
 
   return (
