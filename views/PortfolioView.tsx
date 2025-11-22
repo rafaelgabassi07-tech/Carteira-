@@ -5,9 +5,11 @@ import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
+import CalendarIcon from '../components/icons/CalendarIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
+import { generateCalendarEvents } from '../services/dynamicDataService';
 import { vibrate } from '../utils';
 
 // Icons
@@ -64,13 +66,13 @@ const Header: React.FC<{
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
-                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
+                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
                      {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                 </button>
-                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
+                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
                     <ShareIcon className="w-5 h-5" />
                 </button>
-                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
+                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
                     <BellIcon className="w-5 h-5" />
                 </button>
             </div>
@@ -113,7 +115,7 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
+        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500 h-full">
             {/* Decorative Glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
 
@@ -149,6 +151,76 @@ const PortfolioSummary: React.FC = () => {
                     <Metric label={t('capital_gain')}>
                         <p className={unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}><CountUp end={unrealizedGain} formatter={format} /></p>
                     </Metric>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const DividendCalendar: React.FC = () => {
+    const { t, formatCurrency, locale } = useI18n();
+    const { assets } = usePortfolio();
+
+    const events = useMemo(() => generateCalendarEvents(assets), [assets]);
+
+    if (events.length === 0) {
+         return (
+            <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl shadow-lg border border-[var(--border-color)] animate-scale-in flex flex-col items-center text-center justify-center h-full min-h-[200px]">
+                <div className="w-12 h-12 rounded-full bg-[var(--bg-tertiary-hover)] flex items-center justify-center mb-3 text-[var(--text-secondary)]">
+                    <CalendarIcon className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('dividend_calendar')}</h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-[150px] leading-relaxed">{t('no_dividends_scheduled')}</p>
+            </div>
+         );
+    }
+
+    return (
+        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl shadow-lg border border-[var(--border-color)] animate-scale-in h-full flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5 text-[var(--accent-color)]" />
+                    <h3 className="font-bold text-sm uppercase tracking-wider text-[var(--text-primary)]">{t('dividend_calendar')}</h3>
+                </div>
+                <span className="text-[10px] font-bold bg-[var(--accent-color)]/10 text-[var(--accent-color)] px-2 py-0.5 rounded-full">
+                    {t('next_payments')}
+                </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar max-h-[280px] lg:max-h-none">
+                <div className="space-y-3">
+                    {events.map((event, idx) => {
+                        const dateObj = new Date(event.date);
+                        // Fix timezone offset for display
+                        const userTimezoneOffset = dateObj.getTimezoneOffset() * 60000;
+                        const adjustedDate = new Date(dateObj.getTime() + userTimezoneOffset);
+                        
+                        const day = adjustedDate.getDate();
+                        const month = adjustedDate.toLocaleDateString(locale, { month: 'short' }).toUpperCase().replace('.', '');
+                        const isPaid = event.eventType === 'Pago';
+
+                        return (
+                            <div key={`${event.ticker}-${idx}`} className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${isPaid ? 'bg-[var(--bg-primary)] border-transparent opacity-50' : 'bg-[var(--bg-tertiary-hover)] border-[var(--border-color)]'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className={`flex flex-col items-center justify-center w-10 h-10 rounded-lg ${isPaid ? 'bg-[var(--text-secondary)]/20 text-[var(--text-secondary)]' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-color)]'}`}>
+                                        <span className="text-[9px] font-bold uppercase leading-none">{month}</span>
+                                        <span className="text-sm font-bold leading-none">{day}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block font-bold text-sm">{event.ticker}</span>
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isPaid ? 'bg-gray-500/20 text-gray-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                            {event.eventType}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className={`block font-bold text-sm ${isPaid ? 'text-[var(--text-secondary)]' : 'text-[var(--green-text)]'}`}>
+                                        {event.projectedAmount ? formatCurrency(event.projectedAmount) : '-'}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>
@@ -320,8 +392,13 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 
                 {assets.length > 0 ? (
                     <>
-                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
-                            <PortfolioSummary />
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-7xl mx-auto px-4 mt-6">
+                            <div className="lg:col-span-8">
+                                 <PortfolioSummary />
+                            </div>
+                            <div className="lg:col-span-4">
+                                 <DividendCalendar />
+                            </div>
                         </div>
 
                         <div className="px-4 mt-8">
