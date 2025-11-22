@@ -55,7 +55,7 @@ const newsArticleSchema: Schema = {
         sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] },
         category: { type: Type.STRING, enum: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"], description: "Categoria principal da notícia." },
         impactLevel: { type: Type.STRING, enum: ["High", "Medium", "Low"], description: "Nível de impacto potencial nos preços ou dividendos." },
-        imageUrl: { type: Type.STRING, description: "URL de uma imagem relevante encontrada, ou deixe em branco." }
+        imageUrl: { type: Type.STRING, description: "URL da imagem principal da notícia (thumbnail/og:image) encontrada na busca. Tente ao máximo encontrar uma imagem real." }
     },
     required: ["source", "title", "summary", "impactAnalysis", "date", "sentiment", "category", "impactLevel"]
 };
@@ -156,7 +156,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       sourceConstraint = `Priorize notícias das seguintes fontes: ${filter.sources}.`;
   }
 
-  const jsonInstruction = ` Responda ESTRITAMENTE com um array JSON correspondente ao schema: ${JSON.stringify(newsListSchema)}. Analise cada notícia como um especialista em Fundos Imobiliários, preenchendo o campo 'category' e 'impactLevel' com precisão. Tente extrair uma URL de imagem relevante se disponível.`;
+  const jsonInstruction = ` Responda ESTRITAMENTE com um array JSON correspondente ao schema: ${JSON.stringify(newsListSchema)}. Analise cada notícia como um especialista em Fundos Imobiliários. IMPORTANTE: Tente encontrar a URL da imagem real da notícia (thumbnail) no contexto da busca.`;
   
   let prompt: string;
   if (filter.query && filter.query.trim()) {

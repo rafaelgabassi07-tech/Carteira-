@@ -12,16 +12,61 @@ import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
 // --- Image Helpers ---
-const getFallbackImage = (category?: string) => {
-    const map: Record<string, string> = {
-        'Dividendos': 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=800', // Money/Calculations
-        'Macroeconomia': 'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&q=80&w=800', // Chart/Graph
-        'Resultados': 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=800', // Data analysis
-        'Mercado': 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&q=80&w=800', // Stock market
-        'Imóveis': 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800', // Skyscraper
-        'Geral': 'https://images.unsplash.com/photo-1612178991541-b48cc8e92a4d?auto=format&fit=crop&q=80&w=800', // Coins/Finance
-    };
-    return map[category || 'Geral'] || map['Geral'];
+
+const FALLBACK_IMAGES: Record<string, string[]> = {
+    'Dividendos': [
+        'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=800', // Money/Calculations
+        'https://images.unsplash.com/photo-1628348068343-c6a848d2b6dd?auto=format&fit=crop&q=80&w=800', // Coins stack
+        'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=800', // Money plant
+        'https://images.unsplash.com/photo-1633158829585-23ba8f7c8caf?auto=format&fit=crop&q=80&w=800' // Gold coins
+    ],
+    'Macroeconomia': [
+        'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&q=80&w=800', // Chart/Graph
+        'https://images.unsplash.com/photo-1526304640152-d4619684e484?auto=format&fit=crop&q=80&w=800', // Business chart
+        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800', // Skyscraper bottom view
+        'https://images.unsplash.com/photo-1591696205602-2f950c417cb9?auto=format&fit=crop&q=80&w=800' // Analytics
+    ],
+    'Resultados': [
+        'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=800', // Data analysis
+        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800', // Marketing graph
+        'https://images.unsplash.com/photo-1543286386-713df548e9cc?auto=format&fit=crop&q=80&w=800', // Meeting
+        'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800' // Business people
+    ],
+    'Mercado': [
+        'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&q=80&w=800', // Stock market
+        'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&q=80&w=800', // Candles
+        'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&q=80&w=800', // Bull market concept
+        'https://images.unsplash.com/photo-1535320903710-d9cf113d2054?auto=format&fit=crop&q=80&w=800' // Graph on tablet
+    ],
+    'Imóveis': [
+        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800', // Skyscraper
+        'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=800', // Real estate
+        'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&q=80&w=800', // Modern building
+        'https://images.unsplash.com/photo-1464938050520-ef2270bb8ce8?auto=format&fit=crop&q=80&w=800' // Cityscape
+    ],
+    'Geral': [
+        'https://images.unsplash.com/photo-1612178991541-b48cc8e92a4d?auto=format&fit=crop&q=80&w=800', // Coins/Finance
+        'https://images.unsplash.com/photo-1604594849809-dfedbc827105?auto=format&fit=crop&q=80&w=800', // Bills
+        'https://images.unsplash.com/photo-1621981386829-9b416a95bd3d?auto=format&fit=crop&q=80&w=800', // Crypto/Tech
+        'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=800' // Laptop working
+    ]
+};
+
+// Deterministic Image Selection based on Title Hash
+// Ensures the same news always gets the same image, but different news get different images
+const getFallbackImage = (category?: string, title?: string) => {
+    const cat = category && FALLBACK_IMAGES[category] ? category : 'Geral';
+    const images = FALLBACK_IMAGES[cat];
+    
+    if (!title) return images[0];
+
+    let hash = 0;
+    for (let i = 0; i < title.length; i++) {
+        hash = title.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const index = Math.abs(hash) % images.length;
+    return images[index];
 };
 
 // --- Visual Components ---
@@ -76,17 +121,16 @@ const ImpactBadge: React.FC<{ level?: string; transparent?: boolean }> = ({ leve
 };
 
 const NewsHero: React.FC<{ article: NewsArticle; onClick: () => void }> = ({ article, onClick }) => {
-    const [imgSrc, setImgSrc] = useState<string>(article.imageUrl || getFallbackImage(article.category));
+    const [imgSrc, setImgSrc] = useState<string>(article.imageUrl || getFallbackImage(article.category, article.title));
 
     // Atualiza a imagem se o artigo mudar
     useEffect(() => {
-        setImgSrc(article.imageUrl || getFallbackImage(article.category));
+        setImgSrc(article.imageUrl || getFallbackImage(article.category, article.title));
     }, [article]);
 
     const handleError = () => {
-        // Se a imagem falhar, define o fallback. 
-        // Verifica se já não estamos usando o fallback para evitar loop infinito.
-        const fallback = getFallbackImage(article.category);
+        // Se a imagem falhar, usa o hash determinístico para pegar um fallback
+        const fallback = getFallbackImage(article.category, article.title);
         if (imgSrc !== fallback) {
             setImgSrc(fallback);
         }
@@ -139,14 +183,15 @@ const NewsCard: React.FC<{
   addToast: (message: string, type?: ToastMessage['type']) => void;
 }> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
   const { t } = useI18n();
-  const [imgSrc, setImgSrc] = useState<string>(article.imageUrl || getFallbackImage(article.category));
+  // Deterministic fallback on init
+  const [imgSrc, setImgSrc] = useState<string>(article.imageUrl || getFallbackImage(article.category, article.title));
 
   useEffect(() => {
-      setImgSrc(article.imageUrl || getFallbackImage(article.category));
+      setImgSrc(article.imageUrl || getFallbackImage(article.category, article.title));
   }, [article]);
 
   const handleError = () => {
-      const fallback = getFallbackImage(article.category);
+      const fallback = getFallbackImage(article.category, article.title);
       if (imgSrc !== fallback) {
           setImgSrc(fallback);
       }
