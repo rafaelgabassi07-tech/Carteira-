@@ -27,10 +27,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast }) => {
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const { t } = useI18n();
 
-    const renderScreen = () => {
+    // Ensure that on large screens we default to a content view instead of empty state
+    const activeDesktopScreen = screen === 'main' ? 'appearance' : screen;
+
+    const getScreenComponent = (currentScreen: MenuScreen, isDesktop = false) => {
+        // On desktop, we don't need the 'back' action to navigate, but we pass it for type compatibility.
+        // The PageHeader component handles hiding the back button visually on desktop.
         const onBack = () => setScreen('main');
-        switch (screen) {
-            case 'main': return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
+        
+        switch (currentScreen) {
+            case 'main': return <MainMenu setScreen={setScreen} activeScreen={screen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
             case 'profile': return <UserProfileDetail onBack={onBack} addToast={addToast} />;
             case 'security': return <SecuritySettings onBack={onBack} addToast={addToast} />;
             case 'notifications': return <NotificationSettings onBack={onBack} />;
@@ -40,20 +46,43 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast }) => {
             case 'transactions': return <TransactionSettings onBack={onBack} />;
             case 'apiConnections': return <ApiConnectionSettings onBack={onBack} addToast={addToast} />;
             case 'about': return <AboutApp onBack={onBack} />;
-            default: return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
+            default: return <MainMenu setScreen={setScreen} activeScreen={screen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
         }
     };
     
     const animationClass = screen === 'main' ? 'animate-fade-in' : 'animate-slide-in-right';
 
     return (
-        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar">
-             <div className="max-w-2xl mx-auto">
-                {screen === 'main' && (
-                    <h1 className="text-2xl font-bold mb-4 px-1 animate-fade-in">{t('nav_settings')}</h1>
-                )}
-                <div key={screen} className={animationClass}>
-                    {renderScreen()}
+        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6">
+             <div className="max-w-7xl mx-auto h-full">
+                {/* Header only visible on mobile main screen or if we want a global title */}
+                <h1 className="text-2xl font-bold mb-6 px-1 animate-fade-in lg:mb-8">{t('nav_settings')}</h1>
+                
+                {/* Responsive Grid Layout */}
+                <div className="lg:grid lg:grid-cols-12 lg:gap-8 h-full">
+                    
+                    {/* Sidebar (Menu) - Hidden on mobile if showing detail, Always visible on Desktop */}
+                    <div className={`lg:col-span-4 lg:block ${screen !== 'main' ? 'hidden' : 'block'}`}>
+                        <div className="lg:sticky lg:top-0">
+                            <MainMenu 
+                                setScreen={setScreen} 
+                                activeScreen={activeDesktopScreen} 
+                                onShowUpdateModal={() => setShowUpdateModal(true)} 
+                                addToast={addToast} 
+                            />
+                        </div>
+                    </div>
+
+                    {/* Content Area - Hidden on mobile if showing menu, Always visible on Desktop */}
+                    <div className={`lg:col-span-8 lg:block ${screen === 'main' ? 'hidden' : 'block'}`}>
+                        <div className={`bg-[var(--bg-secondary)]/50 lg:bg-[var(--bg-secondary)] lg:border border-[var(--border-color)] lg:p-8 lg:rounded-3xl lg:shadow-sm h-full ${animationClass} lg:animate-fade-in`}>
+                            {/* On desktop, force render the active component or default. On mobile, render based on screen state */}
+                            {/* We use a key to force re-render animation when switching tabs on desktop */}
+                            <div key={activeDesktopScreen}>
+                                {getScreenComponent(window.innerWidth >= 1024 ? activeDesktopScreen : screen, window.innerWidth >= 1024)}
+                            </div>
+                        </div>
+                    </div>
                 </div>
              </div>
             {showUpdateModal && <UpdateCheckModal onClose={() => setShowUpdateModal(false)} />}

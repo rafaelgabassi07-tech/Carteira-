@@ -19,9 +19,12 @@ export interface NewsArticle {
   source: string;
   title: string;
   summary: string;
+  impactAnalysis?: string; // Por que isso importa?
   date: string;
   url?: string;
   sentiment?: 'Positive' | 'Neutral' | 'Negative';
+  category?: 'Dividendos' | 'Macroeconomia' | 'Resultados' | 'Mercado' | 'Imóveis' | 'Geral';
+  impactLevel?: 'High' | 'Medium' | 'Low';
 }
 
 export interface UserProfile {

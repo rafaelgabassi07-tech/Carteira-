@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Type, Schema } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -48,19 +47,22 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
 const newsArticleSchema: Schema = {
     type: Type.OBJECT,
     properties: {
-        source: { type: Type.STRING, description: "Name of the news source." },
-        title: { type: Type.STRING, description: "The original headline." },
-        summary: { type: Type.STRING, description: "Concise summary in Portuguese (max 30 words)." },
-        date: { type: Type.STRING, description: "Publication date in YYYY-MM-DD format." },
-        sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] }
+        source: { type: Type.STRING, description: "Nome da fonte (ex: Valor, InfoMoney)." },
+        title: { type: Type.STRING, description: "Manchete original." },
+        summary: { type: Type.STRING, description: "Resumo conciso do fato (max 30 palavras)." },
+        impactAnalysis: { type: Type.STRING, description: "Análise crítica em 1 frase: Por que isso importa para o investidor de FIIs?" },
+        date: { type: Type.STRING, description: "Data YYYY-MM-DD." },
+        sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] },
+        category: { type: Type.STRING, enum: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"], description: "Categoria principal da notícia." },
+        impactLevel: { type: Type.STRING, enum: ["High", "Medium", "Low"], description: "Nível de impacto potencial nos preços ou dividendos." }
     },
-    required: ["source", "title", "summary", "date", "sentiment"]
+    required: ["source", "title", "summary", "impactAnalysis", "date", "sentiment", "category", "impactLevel"]
 };
 
 const newsListSchema: Schema = {
     type: Type.ARRAY,
     items: newsArticleSchema,
-    description: "List of financial news articles."
+    description: "Lista de notícias financeiras analisadas."
 };
 
 const advancedAssetDataSchema: Schema = {
@@ -138,7 +140,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   }
   
   const ai = new GoogleGenAI({ apiKey });
-  const contextTickers = filter.tickers?.slice(0, 5).join(', ');
+  const contextTickers = filter.tickers?.slice(0, 8).join(', '); // Increased context
   
   let dateConstraint = "";
   switch (filter.dateRange) {
@@ -153,12 +155,17 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       sourceConstraint = `Priorize notícias das seguintes fontes: ${filter.sources}.`;
   }
 
-  const jsonInstruction = ` Responda estritamente com um array JSON, sem markdown, que corresponda a este schema: ${JSON.stringify(newsListSchema)}.`;
+  const jsonInstruction = ` Responda ESTRITAMENTE com um array JSON correspondente ao schema: ${JSON.stringify(newsListSchema)}. Analise cada notícia como um especialista em Fundos Imobiliários, preenchendo o campo 'category' e 'impactLevel' com precisão.`;
+  
   let prompt: string;
   if (filter.query && filter.query.trim()) {
-      prompt = `Encontre notícias financeiras ${dateConstraint} sobre "${filter.query}". ${sourceConstraint} Foque em FIIs e mercado brasileiro.` + jsonInstruction;
+      prompt = `Encontre notícias financeiras ${dateConstraint} sobre "${filter.query}". ${sourceConstraint} Foque no impacto para investidores de FIIs.` + jsonInstruction;
   } else {
-      prompt = `Encontre as 5 notícias mais importantes sobre o mercado de Fundos Imobiliários (FIIs) do Brasil ${dateConstraint}. Tickers de interesse: ${contextTickers || 'Geral'}. ${sourceConstraint}` + jsonInstruction;
+      // Prompt otimizado para gerar insights mais valiosos
+      prompt = `Atue como um analista sênior de FIIs. Busque as 6 notícias mais críticas do mercado brasileiro de Fundos Imobiliários (FIIs) e Macroeconomia ${dateConstraint}. 
+      Contexto da carteira do usuário (Tickers): ${contextTickers || 'Geral'}.
+      Se houver notícias específicas sobre esses ativos, priorize-as. Caso contrário, foque em notícias macro (Selic, inflação, legislação) que impactam o setor imobiliário.
+      ${sourceConstraint}` + jsonInstruction;
   }
 
   try {
@@ -168,6 +175,8 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
+                // Note: We don't use responseSchema here directly because googleSearch tool output handling with schema can sometimes be tricky in 'generateContent',
+                // manual parsing is more robust when combined with tools.
             }
           });
           
@@ -213,7 +222,6 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
           } catch(e) {
             console.error("Failed to parse JSON response from Gemini:", e);
-            console.log("Raw response text:", responseText);
             return [];
           }
       });

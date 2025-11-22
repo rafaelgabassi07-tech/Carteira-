@@ -15,7 +15,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, helpText, onBack }) => {
         <div className="flex items-center mb-6">
             <button 
                 onClick={onBack} 
-                className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-all duration-200 active:scale-95"
+                className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-all duration-200 active:scale-95 lg:hidden"
                 aria-label="Voltar"
             >
                 <ChevronLeftIcon className="w-6 h-6" />

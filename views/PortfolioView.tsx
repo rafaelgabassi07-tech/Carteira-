@@ -205,7 +205,7 @@ const DividendCalendar: React.FC = () => {
                                     </div>
                                     <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">Previsão de pagamento</p>
                                 </div>
-                                {evt.projectedAmount !== undefined && evt.projectedAmount > 0 && (
+                                {evt.projectedAmount !== undefined && !isNaN(evt.projectedAmount) && evt.projectedAmount > 0 && (
                                     <div className={`text-right flex-shrink-0 pl-2 ${privacyMode ? 'blur-sm select-none opacity-50' : ''}`}>
                                         <p className="text-xs font-bold text-[var(--green-text)] whitespace-nowrap">{formatCurrency(evt.projectedAmount)}</p>
                                     </div>
