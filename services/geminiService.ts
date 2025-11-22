@@ -105,28 +105,34 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
   // Prompt Refinado
   const prompt = `
-    Você é um API de notícias financeiras. Busque as 6 notícias mais importantes sobre Fundos Imobiliários (FIIs) e Mercado Brasileiro ${dateConstraint}.
+    Você é um API de notícias financeiras. Busque as 8 notícias mais importantes sobre Fundos Imobiliários (FIIs) e Mercado Financeiro Brasileiro ${dateConstraint}.
     
     Foco nos ativos: ${contextTickers || 'Geral do mercado'}.
     ${sourceConstraint}
 
-    REGRAS RÍGIDAS DE FORMATAÇÃO:
-    1. Retorne APENAS um JSON Array puro. Não use blocos de código (\`\`\`json).
-    2. Tente extrair o link real (url) e a imagem (imageUrl) dos resultados da busca.
+    REGRAS CRÍTICAS PARA LINKS E IMAGENS:
+    1. Use a ferramenta de busca para encontrar URLs REAIS das notícias.
+    2. Extraia o link direto (href) e a imagem de capa (og:image) de cada resultado.
+    3. Se não encontrar imagem, deixe o campo 'imageUrl' em branco (não invente).
+    4. O campo 'url' DEVE ser um link válido para clicar.
+
+    REGRAS DE FORMATO:
+    - Retorne APENAS um JSON Array puro.
+    - Não use blocos de código markdown (\`\`\`json).
     
     SCHEMA JSON:
     [
       {
-        "source": "Fonte",
-        "title": "Título",
-        "summary": "Resumo",
-        "impactAnalysis": "Impacto no bolso",
+        "source": "Nome da Fonte",
+        "title": "Título da Matéria",
+        "summary": "Resumo curto",
+        "impactAnalysis": "Por que isso mexe com o bolso?",
         "date": "YYYY-MM-DD",
         "sentiment": "Positive/Neutral/Negative",
-        "category": "Mercado",
+        "category": "Dividendos/Macroeconomia/Resultados/Mercado/Imóveis",
         "impactLevel": "High/Medium/Low",
-        "url": "https://...",
-        "imageUrl": "https://..."
+        "url": "https://link-real-da-noticia.com",
+        "imageUrl": "https://link-da-imagem.jpg"
       }
     ]
   `;
@@ -165,20 +171,38 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             
             if (articles.length === 0) return [];
 
-            // Grounding check (Melhoria de Links)
+            // Grounding Check Refinado (Correção de Links)
+            // A API do Gemini retorna 'groundingChunks' que contém os links reais usados para gerar a resposta.
+            // Vamos tentar casar o título da notícia com o título do chunk para garantir o link certo.
             const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
   
             return articles.map(article => {
-                  // Se a IA não retornou URL, tenta achar no grounding
                   let finalUrl = article.url;
-                  if (!finalUrl || finalUrl.length < 10) {
-                      const match = webSources.find(src => src?.title && article.title.includes(src.title.substring(0, 10)));
-                      if (match?.uri) finalUrl = match.uri;
+                  let finalImage = article.imageUrl;
+
+                  // Se a URL parece falsa ou vazia, tenta encontrar no grounding
+                  const isInvalidUrl = !finalUrl || finalUrl.includes('example.com') || finalUrl.length < 10;
+                  
+                  if (isInvalidUrl && webSources.length > 0) {
+                      // Tenta encontrar um source que contenha palavras chave do título
+                      const keywords = article.title.split(' ').filter(w => w.length > 4).slice(0, 3);
+                      const match = webSources.find(src => 
+                          src?.title && keywords.some(k => src.title?.toLowerCase().includes(k.toLowerCase()))
+                      );
+                      
+                      if (match?.uri) {
+                          finalUrl = match.uri;
+                      } else {
+                          // Fallback para o primeiro link relacionado se não houver match preciso
+                          // Melhor um link real do assunto do que nada
+                          finalUrl = webSources[0]?.uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
+                      }
                   }
 
                   return {
                     ...article,
                     url: finalUrl,
+                    imageUrl: finalImage, // Mantém a imagem se a IA achou, senão o front usa fallback
                     category: article.category || 'Mercado',
                     impactLevel: article.impactLevel || 'Medium'
                   };
