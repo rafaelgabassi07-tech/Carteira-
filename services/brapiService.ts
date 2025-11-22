@@ -1,3 +1,4 @@
+
 import type { AppPreferences } from '../types';
 
 interface BrapiHistoricalData {
@@ -47,6 +48,11 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             // Handle invalid token immediately, as it's a fatal error for the entire batch.
             if (response.status === 401) {
                 throw new Error("Token da API Brapi inválido ou expirado. Verifique as configurações.");
+            }
+
+            // Handle Forbidden access (Plan limits or restricted ticker)
+            if (response.status === 403) {
+                throw new Error(`Acesso negado (403). O ativo ${ticker} pode ser restrito no seu plano da Brapi ou o limite histórico foi excedido.`);
             }
 
             // If we are rate-limited, wait and retry once.

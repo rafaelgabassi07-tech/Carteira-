@@ -90,6 +90,8 @@ const advancedAssetDataSchema = {
  * @returns The best-matching URL or undefined.
  */
 function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?: string }>): string | undefined {
+    if (!articleTitle || typeof articleTitle !== 'string') return undefined;
+    
     const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
     const normalizedArticleTitle = normalize(articleTitle);
     if (!normalizedArticleTitle) return undefined;
@@ -172,13 +174,13 @@ export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] =
           const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
 
           if (webSources.length > 0 && Array.isArray(parsedArticles)) {
-              return parsedArticles.map(article => ({
+              return parsedArticles.filter(article => article && article.title).map(article => ({
                   ...article,
                   url: findBestUrl(article.title, webSources),
               }));
           }
 
-          return Array.isArray(parsedArticles) ? parsedArticles : [];
+          return Array.isArray(parsedArticles) ? parsedArticles.filter(a => a && a.title) : [];
       });
   } catch (error) {
       console.warn("News fetch failed:", error);
