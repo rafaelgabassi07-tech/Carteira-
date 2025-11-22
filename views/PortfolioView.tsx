@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
@@ -14,16 +13,16 @@ import { vibrate } from '../utils';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
 );
 const EyeOffIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
 );
 const SortIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
 );
 const WalletIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
 );
 
 // --- Components ---
@@ -280,13 +279,10 @@ interface PortfolioViewProps {
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
     const { t, formatCurrency } = useI18n();
-    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
+    const { assets, privacyMode, preferences, isRefreshing, refreshAllData } = usePortfolio();
     const [searchQuery, setSearchQuery] = useState('');
-    const [isPullRefreshing, setIsPullRefreshing] = useState(false);
     const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
     const [isSortOpen, setIsSortOpen] = useState(false);
-    
-    const isRefreshing = isContextRefreshing || isPullRefreshing;
 
     // Pull to Refresh Logic
     const touchStartY = useRef(0);
@@ -311,24 +307,21 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
 
     const handleTouchEnd = () => {
         if (pullDistance > 60) {
-            handleRefreshPrices();
+            handleGlobalRefresh();
         }
         setPullDistance(0);
         touchStartY.current = 0;
     };
 
-    const handleRefreshPrices = async () => {
-        setIsPullRefreshing(true);
+    const handleGlobalRefresh = async () => {
         vibrate(20);
         addToast(t('toast_updating_prices'));
         try {
-            await refreshMarketData(true);
+            await refreshAllData();
             addToast(t('toast_update_success'), 'success');
         } catch (error: any) {
-            console.error("Error refreshing data:", error);
-            addToast(error.message || t('toast_update_failed'), 'error');
-        } finally {
-            setIsPullRefreshing(false);
+            // Error is handled by the global error handler in App.tsx
+            console.error("Error refreshing all data:", error);
         }
     };
 
@@ -387,7 +380,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             </div>
 
             <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
+                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleGlobalRefresh} isRefreshing={isRefreshing} />
                 
                 {assets.length > 0 ? (
                     <>

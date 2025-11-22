@@ -1,11 +1,16 @@
-import type { Asset, UserProfile, Transaction, Dividend, CalendarEvent, MonthlyIncome } from './types';
+
+import type { Asset, UserProfile, Transaction, Dividend, CalendarEvent, MonthlyIncome, DividendHistoryEvent } from './types';
 
 // --- Cache Time-To-Live (TTLs) em Milissegundos ---
+// Definido para ~100 anos para garantir que os dados nunca expirem sozinhos.
+// A atualização ocorre apenas manualmente pelo usuário.
+const INFINITE_TTL = 100 * 365 * 24 * 60 * 60 * 1000;
+
 export const CACHE_TTL = {
-    PRICES: 15 * 60 * 1000,       // 15 Minutos
-    NEWS: 60 * 60 * 1000,         // 1 Hora
-    DIVIDENDS: 24 * 60 * 60 * 1000, // 24 Horas
-    CALENDAR: 24 * 60 * 60 * 1000,  // 24 Horas
+    PRICES: INFINITE_TTL,
+    NEWS: INFINITE_TTL,
+    DIVIDENDS: INFINITE_TTL,
+    CALENDAR: INFINITE_TTL,
 };
 
 export const MOCK_ASSETS: Omit<Asset, 'quantity' | 'avgPrice' | 'yieldOnCost'>[] = [];
@@ -58,9 +63,24 @@ const generateDemoHistory = (prices: number[]) => {
     });
 };
 
+const DEMO_DIVIDEND_HISTORY_MXRF11: DividendHistoryEvent[] = [
+    { exDate: '2023-01-31', paymentDate: '2023-02-14', value: 0.10 },
+    { exDate: '2023-02-28', paymentDate: '2023-03-14', value: 0.12 },
+    { exDate: '2023-03-31', paymentDate: '2023-04-14', value: 0.12 },
+    { exDate: '2023-04-28', paymentDate: '2023-05-14', value: 0.11 },
+    { exDate: '2023-05-31', paymentDate: '2023-06-14', value: 0.11 },
+];
+
+const DEMO_DIVIDEND_HISTORY_HGLG11: DividendHistoryEvent[] = [
+    { exDate: '2023-02-28', paymentDate: '2023-03-14', value: 1.10 },
+    { exDate: '2023-03-31', paymentDate: '2023-04-14', value: 1.10 },
+    { exDate: '2023-04-28', paymentDate: '2023-05-14', value: 1.10 },
+    { exDate: '2023-05-31', paymentDate: '2023-06-14', value: 1.20 },
+];
+
 export const DEMO_MARKET_DATA = {
-    'MXRF11': { currentPrice: 10.95, dy: 12.5, pvp: 1.05, sector: 'Papel', administrator: 'BTG Pactual', priceHistory: generateDemoHistory([10.2, 10.3, 10.5, 10.4, 10.6, 10.8, 10.95]) },
-    'HGLG11': { currentPrice: 165.50, dy: 8.2, pvp: 1.02, sector: 'Logística', administrator: 'Credit Suisse', priceHistory: generateDemoHistory([158, 160, 162, 161, 163, 164, 165.5]) },
-    'VISC11': { currentPrice: 120.10, dy: 9.1, pvp: 0.98, sector: 'Shoppings', administrator: 'Vinci', priceHistory: generateDemoHistory([112, 115, 118, 117, 119, 120, 120.1]) },
-    'KNRI11': { currentPrice: 158.30, dy: 7.8, pvp: 1.00, sector: 'Híbrido', administrator: 'Kinea', priceHistory: generateDemoHistory([150, 152, 155, 154, 156, 158, 158.3]) },
+    'MXRF11': { currentPrice: 10.95, dy: 12.5, pvp: 1.05, sector: 'Papel', administrator: 'BTG Pactual', priceHistory: generateDemoHistory([10.2, 10.3, 10.5, 10.4, 10.6, 10.8, 10.95]), dividendsHistory: DEMO_DIVIDEND_HISTORY_MXRF11 },
+    'HGLG11': { currentPrice: 165.50, dy: 8.2, pvp: 1.02, sector: 'Logística', administrator: 'Credit Suisse', priceHistory: generateDemoHistory([158, 160, 162, 161, 163, 164, 165.5]), dividendsHistory: DEMO_DIVIDEND_HISTORY_HGLG11 },
+    'VISC11': { currentPrice: 120.10, dy: 9.1, pvp: 0.98, sector: 'Shoppings', administrator: 'Vinci', priceHistory: generateDemoHistory([112, 115, 118, 117, 119, 120, 120.1]), dividendsHistory: [] },
+    'KNRI11': { currentPrice: 158.30, dy: 7.8, pvp: 1.00, sector: 'Híbrido', administrator: 'Kinea', priceHistory: generateDemoHistory([150, 152, 155, 154, 156, 158, 158.3]), dividendsHistory: [] },
 };

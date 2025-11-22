@@ -1,10 +1,17 @@
 
+export interface DividendHistoryEvent {
+  exDate: string;
+  paymentDate: string;
+  value: number;
+}
+
 export interface Asset {
   ticker: string;
   quantity: number;
   avgPrice: number;
   currentPrice: number;
   priceHistory: { date: string, price: number }[];
+  dividendsHistory?: DividendHistoryEvent[];
   dy?: number; // Dividend Yield 12M
   pvp?: number; // Price / Book Value
   segment?: string;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -388,7 +387,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   }
 
   const loadNews = useCallback(async (isRefresh = false, currentQuery: string, currentDateRange: 'today' | 'week' | 'month', currentSource: string) => {
-    if(!isRefresh) setLoading(true);
     setError(null);
     
     try {
@@ -401,9 +399,15 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
               setLoading(false);
               setPullPosition(0);
               return;
+          } else {
+              // Se não tem cache e não for refresh manual, não carrega nada automaticamente.
+              setNews([]);
+              setLoading(false);
+              return;
           }
       }
 
+      setLoading(true);
       const filter: NewsFilter = {
           query: currentQuery,
           tickers: assetTickers,
@@ -452,7 +456,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       loadNews(true, searchQuery, range, sourceFilter);
   };
   
-  const handleRefresh = () => {
+  const handleManualRefresh = () => {
     vibrate();
     setLoading(true);
     loadNews(true, searchQuery, dateRange, sourceFilter);
@@ -477,8 +481,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   
   const handleTouchEnd = () => {
       if(pullPosition > 70) {
-          setLoading(true);
-          loadNews(true, searchQuery, dateRange, sourceFilter);
+          handleManualRefresh();
       } else {
           setPullPosition(0);
       }
@@ -527,14 +530,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                   aria-label="Filtros"
               >
                   <FilterIcon className="w-5 h-5" />
-              </button>
-              <button 
-                  onClick={handleRefresh} 
-                  disabled={loading}
-                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
-                  aria-label={t('refresh_prices')}
-              >
-                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
               </button>
           </div>
         </div>
@@ -659,7 +654,16 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                           <p className="text-sm mt-2 max-w-[250px]">{t('no_favorites_subtitle')}</p>
                       </>
                   ) : (
-                      <p>{t('no_news_found')}</p>
+                      <div className="mt-8">
+                          <p className="font-bold text-lg mb-2">{t('no_news_found')}</p>
+                          <p className="text-sm opacity-75 mb-4">As notícias não carregam automaticamente para economizar seus dados.</p>
+                          <button 
+                            onClick={handleManualRefresh} 
+                            className="px-6 py-3 bg-[var(--accent-color)] text-[var(--accent-color-text)] rounded-xl font-bold shadow-lg"
+                          >
+                              Carregar Notícias
+                          </button>
+                      </div>
                   )}
               </div>
             )}

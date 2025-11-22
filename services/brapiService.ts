@@ -1,5 +1,5 @@
 
-import type { AppPreferences } from '../types';
+import type { AppPreferences, DividendHistoryEvent } from '../types';
 
 interface BrapiHistoricalData {
     date: number; // Unix timestamp
@@ -10,6 +10,13 @@ interface BrapiQuote {
     symbol: string;
     regularMarketPrice: number;
     historicalDataPrice?: BrapiHistoricalData[];
+    dividendData?: {
+        historicalDataPrice?: {
+            date: number; // exDate timestamp
+            paymentDate: number; // paymentDate timestamp
+            dividends: { value: number }[];
+        }[];
+    };
 }
 
 interface BrapiResponse {
@@ -31,26 +38,28 @@ function getBrapiToken(prefs: AppPreferences): string {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }>> {
+export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[], dividendsHistory: DividendHistoryEvent[] }>> {
     if (tickers.length === 0) {
         return {};
     }
 
     const token = getBrapiToken(prefs);
-    const allQuotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[] }> = {};
+    const allQuotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[], dividendsHistory: DividendHistoryEvent[] }> = {};
     const failedTickers: string[] = [];
 
     for (const ticker of tickers) {
         let success = false;
         let historyData: any[] = [];
+        let dividendsHistory: DividendHistoryEvent[] = [];
         let currentPrice = 0;
         const urlBase = `https://brapi.dev/api/quote/${ticker}`;
 
         // Strategy: Try 1y (Premium/Full) -> 5d (Free/Short) -> Current Price (Fallback)
+        // We add dividends=true to all requests to get dividend history
         
         // 1. Try Long Range (1y)
         try {
-            const response = await fetch(`${urlBase}?range=1y&token=${token}`);
+            const response = await fetch(`${urlBase}?range=1y&dividends=true&token=${token}`);
             
             if (response.status === 403 || response.status === 401) {
                 throw new Error("FORBIDDEN_TIER");
@@ -62,6 +71,13 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                 if (result) {
                     currentPrice = result.regularMarketPrice;
                     historyData = result.historicalDataPrice || [];
+                    if (result.dividendData?.historicalDataPrice) {
+                        dividendsHistory = result.dividendData.historicalDataPrice.map((item: any) => ({
+                            exDate: new Date(item.date * 1000).toISOString().split('T')[0],
+                            paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
+                            value: item.dividends?.[0]?.value || 0
+                        })).filter(d => d.value > 0);
+                    }
                     success = true;
                 }
             }
@@ -75,7 +91,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         if (!success) {
              try {
                 await delay(200); // Small delay to be nice to API
-                const response = await fetch(`${urlBase}?range=5d&token=${token}`);
+                const response = await fetch(`${urlBase}?range=5d&dividends=true&token=${token}`);
                 
                 if (response.ok) {
                     const data = await response.json();
@@ -83,6 +99,13 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                      if (result) {
                         currentPrice = result.regularMarketPrice;
                         historyData = result.historicalDataPrice || [];
+                        if (result.dividendData?.historicalDataPrice) {
+                            dividendsHistory = result.dividendData.historicalDataPrice.map((item: any) => ({
+                                exDate: new Date(item.date * 1000).toISOString().split('T')[0],
+                                paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
+                                value: item.dividends?.[0]?.value || 0
+                            })).filter(d => d.value > 0);
+                        }
                         success = true;
                     }
                 }
@@ -116,7 +139,8 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                 priceHistory: historyData.map((item: any) => ({
                     date: new Date(item.date * 1000).toISOString().split('T')[0],
                     price: item.close,
-                })).sort((a: any, b: any) => a.date.localeCompare(b.date))
+                })).sort((a: any, b: any) => a.date.localeCompare(b.date)),
+                dividendsHistory
             };
         } else {
              failedTickers.push(ticker);

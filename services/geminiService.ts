@@ -208,8 +208,87 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<any> {
-    return {};
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { nextPaymentDate?: string; lastDividend?: number }>> {
+    if (tickers.length === 0) {
+        return {};
+    }
+
+    let apiKey: string;
+    try {
+        apiKey = getGeminiApiKey(prefs);
+    } catch (error: any) {
+        console.warn("Advanced asset data fetch skipped:", error.message);
+        return {};
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const tickersString = tickers.join(', ');
+
+    const prompt = `
+      Você é um analista de dados financeiros especializado em Fundos Imobiliários (FIIs) do Brasil.
+      Sua tarefa é buscar as informações de dividendos mais recentes e confirmadas para os seguintes tickers: ${tickersString}.
+      
+      Use a busca do Google para encontrar a "data de pagamento" do próximo dividendo já anunciado e o valor do "último provento pago" por cota.
+      
+      Retorne um único objeto JSON onde cada chave é o ticker em maiúsculas.
+      Para cada ticker, o valor deve ser um objeto com as chaves "nextPaymentDate" e "lastDividend".
+
+      - "nextPaymentDate": Deve ser uma string no formato "YYYY-MM-DD". Se a data de pagamento ainda não foi anunciada, use null.
+      - "lastDividend": Deve ser um número representando o valor do último dividendo pago. Se não encontrar, use null.
+
+      NÃO INVENTE dados. Se não encontrar uma informação, use null. Baseie-se apenas em fontes confiáveis (RI, StatusInvest, FIIs.com.br, etc.).
+
+      Exemplo de formato de resposta para a busca por MXRF11, HGLG11:
+      {
+        "MXRF11": {
+          "nextPaymentDate": "2024-07-15",
+          "lastDividend": 0.10
+        },
+        "HGLG11": {
+          "nextPaymentDate": "2024-07-15",
+          "lastDividend": 1.10
+        },
+        "TICKER_SEM_DADOS": {
+          "nextPaymentDate": null,
+          "lastDividend": 0.95
+        }
+      }
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+                temperature: 0.1,
+            }
+        });
+
+        const textResponse = response.text || "{}";
+        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+
+        if (jsonMatch) {
+            const parsedData = JSON.parse(jsonMatch[0]);
+            const sanitizedData: Record<string, { nextPaymentDate?: string; lastDividend?: number }> = {};
+            for (const ticker of tickers) {
+                const data = parsedData[ticker.toUpperCase()];
+                if (data) {
+                    sanitizedData[ticker.toUpperCase()] = {
+                        nextPaymentDate: typeof data.nextPaymentDate === 'string' && data.nextPaymentDate.match(/^\d{4}-\d{2}-\d{2}$/) ? data.nextPaymentDate : undefined,
+                        lastDividend: typeof data.lastDividend === 'number' ? data.lastDividend : undefined
+                    };
+                }
+            }
+            return sanitizedData;
+        }
+
+        return {};
+
+    } catch (error) {
+        console.error("Erro ao buscar dados avançados de ativos com Gemini:", error);
+        return {};
+    }
 }
 
 export async function validateGeminiKey(key: string): Promise<boolean> {

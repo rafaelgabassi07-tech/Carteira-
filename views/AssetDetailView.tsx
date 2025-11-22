@@ -68,6 +68,13 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
 
     useEffect(() => {
         const initialLoad = async () => {
+             // Se o ativo já tem dados (ex: preço > 0), não atualiza automaticamente.
+             // Só atualiza se for a primeira vez que carrega dados para este ticker.
+             if (asset && asset.currentPrice > 0) {
+                 setIsRefreshing(false);
+                 return;
+             }
+
              setIsRefreshing(true);
              try {
                 await refreshSingleAsset(ticker);
@@ -76,7 +83,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
              }
         };
         initialLoad();
-    }, [ticker, refreshSingleAsset]);
+    }, [ticker, refreshSingleAsset, asset]); // Dependência 'asset' permite revalidar se for null inicialmente
 
     const assetTransactions = useMemo(() => {
         return transactions.filter(tx => tx.ticker === asset?.ticker).sort((a, b) => b.date.localeCompare(a.date));
