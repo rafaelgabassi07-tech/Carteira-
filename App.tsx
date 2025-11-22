@@ -58,7 +58,7 @@ const App: React.FC = () => {
         }
     }
   }, [marketDataError, addToast, t]);
-
+  
   // Theme Management
   useEffect(() => {
     const applyTheme = () => {
@@ -226,6 +226,8 @@ const App: React.FC = () => {
       );
   }
 
+  const isNavVisible = !['assetDetail', 'notificacoes'].includes(activeView);
+
   return (
     <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden">
        {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
@@ -274,7 +276,7 @@ const App: React.FC = () => {
           
           {/* Mobile Bottom Nav Wrapper */}
           <div className="md:hidden">
-             {activeView !== 'assetDetail' && <BottomNav activeView={activeView} setActiveView={navigateTo} />}
+             {isNavVisible && <BottomNav activeView={activeView} setActiveView={navigateTo} />}
           </div>
        </main>
 

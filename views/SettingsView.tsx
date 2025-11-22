@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import type { ToastMessage } from '../types';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -17,7 +18,11 @@ import UpdateCheckModal from '../components/modals/UpdateCheckModal';
 
 export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections';
 
-const SettingsView: React.FC<{ addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ addToast }) => {
+interface SettingsViewProps {
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+}
+
+const SettingsView: React.FC<SettingsViewProps> = ({ addToast }) => {
     const [screen, setScreen] = useState<MenuScreen>('main');
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const { t } = useI18n();

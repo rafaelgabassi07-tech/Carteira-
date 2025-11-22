@@ -110,7 +110,7 @@ const BackupRestore: React.FC<{ onBack: () => void; addToast: (message: string, 
             <div className="space-y-4">
                 <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
                     <p className="font-bold mb-1">{t('backup_export_desc')}</p>
-                    <div className="flex space-x-2 mt-3">
+                    <div className="flex flex-col sm:flex-row gap-2 mt-3">
                          <button onClick={handleExportJson} className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold py-3 rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-colors">
                             <DownloadIcon className="w-4 h-4" />
                             {t('export_data_json')}
