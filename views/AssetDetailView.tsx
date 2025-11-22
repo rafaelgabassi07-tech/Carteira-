@@ -1,10 +1,10 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import PortfolioLineChart from '../components/PortfolioLineChart';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import { vibrate, fromISODate } from '../utils';
+import { vibrate } from '../utils';
 
 interface AssetDetailViewProps {
     ticker: string;
@@ -27,7 +27,7 @@ const IndicatorSkeleton: React.FC = () => (
 
 const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onViewTransactions }) => {
     const { t, formatCurrency, locale } = useI18n();
-    const { getAssetByTicker, transactions, dividends, refreshSingleAsset } = usePortfolio();
+    const { getAssetByTicker, transactions, refreshSingleAsset } = usePortfolio();
     const [activeTab, setActiveTab] = useState('summary');
     const [isRefreshing, setIsRefreshing] = useState(true);
     
@@ -61,27 +61,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const assetTransactions = useMemo(() => {
         return transactions.filter(tx => tx.ticker === asset?.ticker).sort((a, b) => b.date.localeCompare(a.date));
     }, [transactions, asset?.ticker]);
-
-    const assetDividends = useMemo(() => {
-        return dividends.filter(d => d.ticker === ticker).sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
-    }, [dividends, ticker]);
-
-    const priceHistory7d = useMemo(() => {
-        if (!asset || !asset.priceHistory || asset.priceHistory.length === 0) return [];
-        
-        // Get the most recent date from the history
-        const lastDateStr = asset.priceHistory[asset.priceHistory.length - 1].date;
-        const lastDate = fromISODate(lastDateStr);
-
-        // Calculate the date 7 days ago
-        const sevenDaysAgo = new Date(lastDate);
-        sevenDaysAgo.setDate(lastDate.getDate() - 6); // -6 to include the last day, making it a 7 day window
-        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
-        
-        // Filter the history for dates within the last 7 days
-        return asset.priceHistory.filter(p => p.date >= sevenDaysAgoStr);
-    }, [asset]);
-
 
     if (!asset && !isRefreshing) {
         return (
@@ -160,23 +139,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         </div>
                     </div>
 
-                    <div className="bg-[var(--bg-secondary)] p-2 rounded-lg border border-[var(--border-color)]">
-                        <h3 className="text-xs text-[var(--text-secondary)] font-bold mb-1 px-2">{t('price_history_7d')}</h3>
-                        <div className="h-32">
-                           {priceHistory7d.length > 1 ? (
-                               <PortfolioLineChart 
-                                   data={priceHistory7d.map(p => p.price)} 
-                                   isPositive={priceHistory7d[priceHistory7d.length - 1].price >= priceHistory7d[0].price} 
-                                   simpleMode={true} 
-                               />
-                           ) : (
-                               <div className="flex items-center justify-center h-full text-xs text-[var(--text-secondary)]">
-                                   {t('price_history_unavailable')}
-                               </div>
-                           )}
-                        </div>
-                    </div>
-                    
                     <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
                          <h3 className="font-bold text-base mb-4">{t('key_indicators')}</h3>
                          {isRefreshing || !asset ? <IndicatorSkeleton /> : (
@@ -208,32 +170,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                 </div>
                              </div>
                          )}
-                    </div>
-                    
-                    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                        <h3 className="font-bold text-base mb-4">{t('dividends_received')}</h3>
-                        {assetDividends.length > 0 ? (
-                            <div className="space-y-2 text-xs">
-                                <div className="grid grid-cols-4 gap-2 font-bold text-[var(--text-secondary)] px-2">
-                                    <div className="text-left">{t('payment_date')}</div>
-                                    <div className="text-right">{t('value_per_share')}</div>
-                                    <div className="text-right">{t('quantity_at_payment')}</div>
-                                    <div className="text-right">{t('total_received')}</div>
-                                </div>
-                                <div className="max-h-48 overflow-y-auto pr-1 space-y-2">
-                                    {assetDividends.map((div, index) => (
-                                        <div key={index} className="grid grid-cols-4 gap-2 items-center bg-[var(--bg-primary)] p-2 rounded-md border border-[var(--border-color)]">
-                                            <div className="text-left">{new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC', day: '2-digit', month: 'short', year: '2-digit' })}</div>
-                                            <div className="text-right">{formatCurrency(div.amountPerShare)}</div>
-                                            <div className="text-right">{div.quantity.toFixed(2)}</div>
-                                            <div className="text-right font-bold text-sm text-[var(--green-text)]">{formatCurrency(div.amountPerShare * div.quantity)}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-center text-[var(--text-secondary)] py-4">{t('no_dividends_projected')}</p>
-                        )}
                     </div>
 
                     <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3 rounded-lg mt-2 active:scale-95 transition-transform">
