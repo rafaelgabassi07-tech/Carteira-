@@ -12,7 +12,7 @@ import ShieldIcon from '../icons/ShieldIcon';
 import BellIcon from '../icons/BellIcon';
 import DatabaseIcon from '../icons/DatabaseIcon';
 import InfoIcon from '../icons/InfoIcon';
-import ThemeIcon from '../icons/ThemeIcon';
+import PaletteIcon from '../icons/PaletteIcon';
 import SettingsIcon from '../icons/SettingsIcon';
 import TransactionIcon from '../icons/TransactionIcon';
 import UpdateIcon from '../icons/UpdateIcon';
@@ -66,7 +66,7 @@ const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; activeScreen
                 <div>
                     <SectionHeader title={t('app')} />
                     <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] overflow-hidden">
-                        <MenuItem isActive={activeScreen === 'appearance'} icon={<ThemeIcon className="w-5 h-5" />} title={t('appearance')} subtitle={t('accent_color') + ', ' + t('system_theme') + '...'} onClick={() => setScreen('appearance')} />
+                        <MenuItem isActive={activeScreen === 'appearance'} icon={<PaletteIcon className="w-5 h-5" />} title={t('themes')} subtitle={t('themes_subtitle')} onClick={() => setScreen('appearance')} />
                         <MenuItem isActive={activeScreen === 'general'} icon={<SettingsIcon className="w-5 h-5" />} title={t('general')} subtitle={t('start_screen') + ', ' + t('haptic_feedback') + '...'} onClick={() => setScreen('general')} />
                         <MenuItem isActive={activeScreen === 'security'} icon={<ShieldIcon className="w-5 h-5" />} title={t('security')} subtitle={t('app_lock_pin') + ', ' + t('biometric_login') + '...'} onClick={() => setScreen('security')} />
                         <MenuItem isActive={activeScreen === 'notifications'} icon={<BellIcon className="w-5 h-5" />} title={t('notifications')} subtitle={t('price_alerts') + ', ' + t('dividend_announcements') + '...'} onClick={() => setScreen('notifications')} isLast />
@@ -85,7 +85,7 @@ const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; activeScreen
                 <div>
                     <SectionHeader title={t('about_app')} />
                      <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] overflow-hidden">
-                        <MenuItem icon={<UpdateIcon className="w-5 h-5" />} title={t('check_for_update')} subtitle={t('version') + ' 1.5.0'} onClick={onShowUpdateModal} />
+                        <MenuItem icon={<UpdateIcon className="w-5 h-5" />} title={t('check_for_update')} subtitle={t('version') + ' 1.6.0'} onClick={onShowUpdateModal} />
                         <MenuItem isActive={activeScreen === 'about'} icon={<InfoIcon className="w-5 h-5" />} title={t('about_app')} subtitle={t('help_about')} onClick={() => setScreen('about')} isLast />
                     </div>
                 </div>

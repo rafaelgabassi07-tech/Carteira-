@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 const FingerprintIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -13,12 +14,15 @@ const FingerprintIcon: React.FC<{ className?: string }> = ({ className }) => (
     strokeLinejoin="round"
     className={className}
   >
-    <path d="M12 12a3 3 0 0 0-3 3" />
-    <path d="M12 2a10 10 0 0 0-10 10c0 4.4 3.6 8 8 8" />
-    <path d="M22 12c0-4.4-3.6-8-8-8" />
-    <path d="M12 12a3 3 0 0 1 3 3" />
-    <path d="M12 5a7 7 0 0 1 7 7" />
-    <path d="M5 12a7 7 0 0 1 7-7" />
+    <path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 6" />
+    <path d="M5 15a7 7 0 0 1 1-6" />
+    <path d="M9 18a4 4 0 0 1-1-6" />
+    <path d="M12 12v.01" />
+    <path d="M12 15a2 2 0 0 1 2-2" />
+    <path d="M12 18a6 6 0 0 1 6-6" />
+    <path d="M16 12a2 2 0 0 1 1.8 1" />
+    <path d="M19 17a3 3 0 0 0 .9-3" />
+    <path d="M12 22v-1" />
   </svg>
 );
 

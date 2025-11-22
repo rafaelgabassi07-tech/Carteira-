@@ -124,7 +124,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
                         <button 
                             key={num} 
                             onClick={() => handleDigit(String(num))} 
-                            className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-[var(--bg-secondary)] md:bg-[var(--bg-primary)] text-2xl md:text-xl font-bold text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-95 border border-[var(--border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
+                            className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-[var(--bg-secondary)] md:bg-[var(--bg-primary)] text-2xl md:text-xl font-bold text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-95 border border-[var(--border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 flex items-center justify-center"
                         >
                             {num}
                         </button>
@@ -141,7 +141,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
                     
                     <button 
                         onClick={() => handleDigit('0')} 
-                        className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-[var(--bg-secondary)] md:bg-[var(--bg-primary)] text-2xl md:text-xl font-bold text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-95 border border-[var(--border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
+                        className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-[var(--bg-secondary)] md:bg-[var(--bg-primary)] text-2xl md:text-xl font-bold text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-95 border border-[var(--border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 flex items-center justify-center"
                     >
                         0
                     </button>

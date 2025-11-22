@@ -1,16 +1,21 @@
+
 export const ptBR = {
     // Appearance
+    themes: 'Temas',
+    themes_subtitle: 'Cores, estilo e modo escuro.',
     appearance: 'Aparência',
-    visual_style: 'Estilo Visual',
-    style_simple: 'Minimalista',
-    style_premium: 'Premium (Glass)',
-    accent_color: 'Cor de Destaque',
-    system_theme: 'Padrão do Sistema',
+    visual_style: 'Acabamento Visual',
+    visual_style_desc: 'Defina a profundidade e transparência.',
+    style_simple: 'Sólido (Minimalista)',
+    style_premium: 'Glass (Translucido)',
+    accent_color: 'Cor Principal',
+    accent_color_desc: 'A cor que define a identidade do seu app.',
+    system_theme: 'Modo de Cor',
     light_theme: 'Claro',
     dark_theme: 'Escuro',
-    font_size: 'Tamanho da Fonte',
-    font_small: 'Pequena',
-    font_medium: 'Média',
+    font_size: 'Tamanho do Texto',
+    font_small: 'Pequeno',
+    font_medium: 'Padrão',
     font_large: 'Grande',
 
     // General
@@ -176,7 +181,7 @@ export const ptBR = {
     app: 'Aplicativo',
     general: 'Geral',
     security: 'Segurança',
-    data: 'Dados',
+    // data: 'Dados', // Duplicated key removed
     transactions_data: 'Transações',
     api_connections: 'Conexões API',
     api_connections_desc: 'Configure chaves de API para dados em tempo real.',

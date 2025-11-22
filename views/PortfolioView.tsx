@@ -23,7 +23,7 @@ const SortIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
 );
 const WalletIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
 );
 
 // --- Components ---
@@ -55,18 +55,31 @@ const Header: React.FC<{
                 <button 
                     id="refresh-btn" 
                     onClick={() => { onRefresh(); vibrate(); }} 
-                    className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)] ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
+                    className={`w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)] ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
-                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]" aria-label="Toggle Privacy">
+                <button 
+                    id="privacy-toggle" 
+                    onClick={() => { togglePrivacyMode(); vibrate(); }} 
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]" 
+                    aria-label="Toggle Privacy"
+                >
                      {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                 </button>
-                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]">
+                <button 
+                    id="share-btn" 
+                    onClick={() => { onShare(); vibrate(); }} 
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]"
+                >
                     <ShareIcon className="w-5 h-5" />
                 </button>
-                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]">
+                <button 
+                    id="notifications-btn" 
+                    onClick={() => { setActiveView('notificacoes'); vibrate(); }} 
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]"
+                >
                     <BellIcon className="w-5 h-5" />
                 </button>
             </div>
@@ -198,8 +211,8 @@ const DividendCalendar: React.FC = () => {
                     const month = dateObj.toLocaleDateString(locale, { month: 'short' }).replace('.','');
                     
                     return (
-                        <div key={`${evt.ticker}-${i}`} className="flex items-center p-3 bg-[var(--bg-primary)]/50 rounded-2xl border border-[var(--border-color)] hover:border-[var(--accent-color)]/30 transition-colors">
-                            <div className="flex-shrink-0 w-12 h-12 bg-[var(--bg-secondary)] rounded-xl flex flex-col items-center justify-center border border-[var(--border-color)] shadow-sm">
+                        <div key={`${evt.ticker}-${i}`} className="flex items-center p-3 bg-[var(--bg-primary)]/50 rounded-2xl border border-[var(--border-color)] hover:border-[var(--accent-color)]/30 transition-colors group">
+                            <div className="flex-shrink-0 w-12 h-12 bg-[var(--bg-secondary)] rounded-xl flex flex-col items-center justify-center border border-[var(--border-color)] shadow-sm group-hover:border-[var(--accent-color)]/20 transition-colors">
                                 <span className="text-[9px] leading-none text-[var(--text-secondary)] font-bold uppercase mt-0.5">{month}</span>
                                 <span className="text-lg leading-none font-bold text-[var(--text-primary)]">{day}</span>
                             </div>
@@ -243,7 +256,7 @@ const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: ()
             <div className="flex-1">
                 <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-xs text-[var(--accent-color)] border border-[var(--border-color)] shadow-sm">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-xs text-[var(--accent-color)] border border-[var(--border-color)] shadow-sm group-hover:scale-105 transition-transform">
                             {asset.ticker.substring(0, 4)}
                         </div>
                         <div>
@@ -470,10 +483,10 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
-                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
-                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                        <div className="w-32 h-32 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border-2 border-dashed border-[var(--border-color)] shadow-lg">
+                            <WalletIcon className="w-14 h-14 text-[var(--text-secondary)] opacity-50"/>
                         </div>
-                        <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
+                        <h2 className="text-2xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
                         <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
                     </div>
                 )}

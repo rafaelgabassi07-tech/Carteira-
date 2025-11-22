@@ -19,6 +19,7 @@
         --border-color: #27272a;
         --backdrop-blur: 0px;
         --card-shadow: none;
+        --glass-border: 1px solid transparent;
         
         /* Colors */
         --accent-color: #38bdf8;
@@ -37,6 +38,7 @@
       [data-style="simple"] {
           --backdrop-blur: 0px;
           --card-shadow: none;
+          --glass-border: 1px solid var(--border-color);
       }
       [data-style="simple"][data-theme="dark"] {
           --bg-primary: #09090b;
@@ -53,22 +55,24 @@
 
       /* STYLE: PREMIUM (Glassmorphism, Gradients, Depth) */
       [data-style="premium"] {
-          --backdrop-blur: 12px;
-          --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+          --backdrop-blur: 20px;
+          --card-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.3);
       }
       [data-style="premium"][data-theme="dark"] {
-          --bg-primary: #09090b;
-          /* Semi-transparent secondary for glass effect */
-          --bg-secondary: rgba(39, 39, 42, 0.55); 
-          --bg-tertiary-hover: rgba(63, 63, 70, 0.6);
+          --bg-primary: #000000;
+          /* Deep, rich glass dark */
+          --bg-secondary: rgba(20, 20, 23, 0.65); 
+          --bg-tertiary-hover: rgba(255, 255, 255, 0.08);
           --border-color: rgba(255, 255, 255, 0.08);
+          --glass-border: 1px solid rgba(255, 255, 255, 0.08);
       }
       [data-style="premium"][data-theme="light"] {
-          --bg-primary: #f0f4f8;
-          --bg-secondary: rgba(255, 255, 255, 0.65);
-          --bg-tertiary-hover: rgba(255, 255, 255, 0.8);
-          --border-color: rgba(255, 255, 255, 0.4);
-          --card-shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
+          --bg-primary: #f0f2f5;
+          --bg-secondary: rgba(255, 255, 255, 0.75);
+          --bg-tertiary-hover: rgba(255, 255, 255, 0.9);
+          --border-color: rgba(255, 255, 255, 0.5);
+          --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+          --glass-border: 1px solid rgba(255, 255, 255, 0.6);
       }
 
       /* GLOBAL BASE STYLES */
@@ -82,30 +86,44 @@
         -webkit-tap-highlight-color: transparent;
       }
 
-      /* Premium Background Effect (Only visible in Premium Style) */
+      /* Premium Background Effect (Aurora) */
       body[data-style="premium"] {
         background-image: 
-          radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.12), transparent 45%),
-          radial-gradient(circle at 90% 10%, rgba(74, 222, 128, 0.08), transparent 35%),
-          radial-gradient(circle at 0% 20%, rgba(168, 85, 247, 0.05), transparent 40%);
+          radial-gradient(circle at 15% 5%, rgba(var(--accent-rgb, 56, 189, 248), 0.08), transparent 40%),
+          radial-gradient(circle at 85% 15%, rgba(168, 85, 247, 0.06), transparent 35%),
+          radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb, 56, 189, 248), 0.03), transparent 60%);
         background-attachment: fixed;
       }
 
       /* --- UNIVERSAL GLASS COMPONENT CLASSES --- */
       
-      /* The main card class to use instead of static bg-secondary */
+      /* Overwrite Tailwind utility to use CSS vars for true glass effect */
       .bg-\[var\(--bg-secondary\)\] {
           background-color: var(--bg-secondary);
           backdrop-filter: blur(var(--backdrop-blur));
           -webkit-backdrop-filter: blur(var(--backdrop-blur));
           box-shadow: var(--card-shadow);
+          border: var(--glass-border);
+      }
+      
+      /* Add subtle inner highlight for premium feel */
+      [data-style="premium"] .bg-\[var\(--bg-secondary\)\] {
+          box-shadow: 
+            var(--card-shadow), 
+            inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
       }
 
-      /* Specific overrides for Floating Elements in Premium */
-      [data-style="premium"] .glass, 
-      [data-style="premium"] .glass-card {
-          border-top: 1px solid rgba(255,255,255,0.1);
-          border-left: 1px solid rgba(255,255,255,0.05);
+      /* Specific overrides for Floating Elements */
+      .glass, .glass-card {
+          background-color: var(--bg-secondary);
+          backdrop-filter: blur(var(--backdrop-blur));
+          -webkit-backdrop-filter: blur(var(--backdrop-blur));
+          border-bottom: 1px solid var(--border-color);
+      }
+      
+      [data-style="premium"] .glass {
+          background-color: rgba(var(--bg-secondary), 0.8); 
+          border-bottom: 1px solid rgba(255,255,255,0.05);
       }
 
       /* Scrollbar Polish */
