@@ -11,6 +11,115 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
+const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
+    const { t } = useI18n();
+    const sentimentMap = {
+        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
+        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400' },
+        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400' },
+    };
+    const sentimentData = sentiment ? sentimentMap[sentiment] : null;
+    if (!sentimentData) return null;
+    return (
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sentimentData.color}`}>
+            {sentimentData.text}
+        </span>
+    );
+};
+
+const NewsCard: React.FC<{ 
+  article: NewsArticle;
+  isFavorited: boolean;
+  onToggleFavorite: () => void;
+  addToast: (message: string, type?: ToastMessage['type']) => void;
+}> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
+  const { t } = useI18n();
+  // Removed internal state for expansion to keep UI cleaner/faster like Google News
+  
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    vibrate();
+    const shareData = {
+        title: article.title,
+        text: article.summary,
+        url: article.url || window.location.href,
+    };
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+           addToast(t('toast_share_not_supported'), 'error');
+        }
+    } catch (err) {
+       // addToast(t('toast_share_cancelled'), 'info');
+    }
+  };
+
+  const handleFavorite = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      vibrate(20);
+      onToggleFavorite();
+  }
+
+  const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
+
+  return (
+    <a 
+        href={article.url} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden relative border border-[var(--border-color)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-all duration-300 flex flex-col h-full group active:scale-[0.99]"
+    >
+      {/* Desktop: Image Top. Mobile: Image Right (Handled via Grid in parent or flex here if needed, but kept stack for consistency with "Card" request) */}
+      <div className="h-40 overflow-hidden relative">
+           <img 
+                src={imgSrc} 
+                alt=""
+                loading="lazy"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                onError={() => setImgSrc(getFallbackImage(article.title))}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)]/80 to-transparent opacity-60"></div>
+            <div className="absolute top-2 right-2 flex gap-1">
+                 <button onClick={handleFavorite} className={`p-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 transition-colors ${isFavorited ? 'text-yellow-400' : 'text-gray-300 hover:text-white'}`}>
+                    <StarIcon filled={isFavorited} className="w-3.5 h-3.5" />
+                </button>
+            </div>
+            <div className="absolute bottom-2 left-2">
+                 <span className="text-[10px] font-bold text-white bg-black/50 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10">
+                    {article.category || 'FIIs'}
+                 </span>
+            </div>
+      </div>
+
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="flex items-center gap-2 mb-2">
+            <img src={getFavicon(article.url || '')} className="w-3.5 h-3.5 rounded-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
+            <span className="text-[10px] font-bold text-[var(--accent-color)] uppercase truncate">{article.source}</span>
+            <span className="text-[10px] text-[var(--text-secondary)]">• {timeAgo(article.date)}</span>
+        </div>
+
+        <h3 className="text-sm font-bold text-[var(--text-primary)] leading-snug line-clamp-3 mb-2 group-hover:text-[var(--accent-color)] transition-colors">
+            {article.title}
+        </h3>
+        
+        <p className="text-xs text-[var(--text-secondary)] line-clamp-3 leading-relaxed mb-3">
+          {article.summary}
+        </p>
+
+        <div className="mt-auto flex justify-between items-center pt-3 border-t border-[var(--border-color)]">
+             <SentimentBadge sentiment={article.sentiment} />
+             <div className="flex items-center gap-3 text-[var(--text-secondary)]">
+                <button onClick={handleShare} className="hover:text-[var(--text-primary)] transition-colors"><ShareIcon className="w-4 h-4" /></button>
+             </div>
+        </div>
+      </div>
+    </a>
+  );
+};
+
 // --- Helpers ---
 const getFavicon = (url: string) => {
     try {
@@ -52,139 +161,60 @@ const NewsHero: React.FC<{ article: NewsArticle }> = ({ article }) => {
     const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
 
     return (
-        <a href={article.url} target="_blank" rel="noopener noreferrer" className="block relative w-full aspect-[16/9] md:aspect-[21/9] rounded-3xl overflow-hidden shadow-xl mb-8 group cursor-pointer ring-1 ring-white/10">
+        <a href={article.url} target="_blank" rel="noopener noreferrer" className="block relative w-full aspect-[16/9] md:aspect-[21/9] rounded-3xl overflow-hidden shadow-2xl mb-8 group cursor-pointer ring-1 ring-white/10 transition-transform duration-500 hover:scale-[1.01]">
             <img 
                 src={imgSrc} 
                 alt={article.title}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                 loading="eager"
                 onError={() => setImgSrc(getFallbackImage(article.title))}
             />
-            {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-90"></div>
+            {/* Strong Gradient Overlay for Text Readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90"></div>
             
-            <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full md:w-2/3">
+            <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full md:w-3/4 lg:w-2/3">
                 <div className="flex items-center gap-3 mb-3">
-                    <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-[var(--accent-color)]/20">DESTAQUE</span>
-                    <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
-                        <img src={getFavicon(article.url || '')} className="w-3 h-3 rounded-full" onError={(e) => e.currentTarget.style.display = 'none'} />
+                    <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-[var(--accent-color)]/20 animate-pulse">DESTAQUE</span>
+                    <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+                        <img src={getFavicon(article.url || '')} className="w-3.5 h-3.5 rounded-full bg-white/10" onError={(e) => e.currentTarget.style.display = 'none'} />
                         <span className="text-gray-200 text-xs font-bold uppercase tracking-wider">{article.source}</span>
                     </div>
                 </div>
-                <h2 className="text-xl md:text-3xl font-extrabold text-white leading-tight line-clamp-3 mb-2 drop-shadow-md">{article.title}</h2>
-                <p className="text-gray-300 text-sm md:text-base line-clamp-2 opacity-90 font-medium">
-                    Toque para ler a análise completa desta notícia impactante sobre o mercado de FIIs.
+                
+                <h2 className="text-xl md:text-3xl lg:text-4xl font-extrabold text-white leading-tight line-clamp-3 mb-3 drop-shadow-lg tracking-tight">
+                    {article.title}
+                </h2>
+                
+                <p className="text-gray-300 text-sm md:text-base line-clamp-3 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3">
+                    {article.summary}
                 </p>
             </div>
         </a>
     );
 };
 
-// Responsive Card: Row on Mobile (Google News Style), Column on Desktop (Card Style)
-const NewsCard: React.FC<{ 
-  article: NewsArticle;
-  isFavorited: boolean;
-  onToggleFavorite: () => void;
-}> = ({ article, isFavorited, onToggleFavorite }) => {
-  const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
-
-  const handleShare = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    vibrate();
-    if (navigator.share) {
-        try { await navigator.share({ title: article.title, url: article.url }); } catch {}
-    }
-  };
-
-  const handleFavorite = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-      vibrate(20);
-      onToggleFavorite();
-  }
-
-  return (
-    <a 
-        href={article.url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="group relative flex flex-row md:flex-col bg-[var(--bg-secondary)] md:bg-[var(--bg-secondary)]/50 rounded-2xl border border-[var(--border-color)] overflow-hidden hover:bg-[var(--bg-tertiary-hover)] transition-all duration-300 active:scale-[0.98] md:hover:-translate-y-1 md:hover:shadow-lg h-full"
-    >
-        {/* Image Section */}
-        {/* Mobile: Right side, Fixed Size. Desktop: Top side, Aspect Ratio */}
-        <div className="order-2 md:order-1 w-28 h-28 md:w-full md:h-48 flex-shrink-0 bg-gray-800 relative m-3 md:m-0 rounded-xl md:rounded-none overflow-hidden">
-            <img 
-                src={imgSrc} 
-                alt=""
-                loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-90 group-hover:opacity-100"
-                onError={() => setImgSrc(getFallbackImage(article.title))}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 md:opacity-100"></div>
-            
-            {/* Category Badge (Desktop Only) */}
-            <div className="absolute bottom-2 left-2 hidden md:block">
-                 <span className="text-[10px] font-bold text-white bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10">
-                    {article.category || 'FIIs'}
-                 </span>
-            </div>
-        </div>
-
-        {/* Content Section */}
-        <div className="order-1 md:order-2 flex-1 p-4 flex flex-col justify-between min-w-0">
-            <div>
-                <div className="flex items-center gap-2 mb-2">
-                    <img src={getFavicon(article.url || '')} className="w-4 h-4 rounded-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
-                    <span className="text-[10px] font-bold text-[var(--accent-color)] uppercase truncate max-w-[100px]">{article.source}</span>
-                    <span className="text-[10px] text-[var(--text-secondary)]">• {timeAgo(article.date)}</span>
-                </div>
-                
-                <h3 className="text-sm md:text-base font-bold text-[var(--text-primary)] leading-snug line-clamp-3 md:line-clamp-2 mb-1 group-hover:text-[var(--accent-color)] transition-colors">
-                    {article.title}
-                </h3>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 mt-3 md:mt-4">
-                <button onClick={handleFavorite} className={`transition-colors ${isFavorited ? 'text-yellow-400' : 'text-[var(--text-secondary)] hover:text-yellow-400'}`}>
-                    <StarIcon filled={isFavorited} className="w-4 h-4" />
-                </button>
-                <button onClick={handleShare} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                    <ShareIcon className="w-4 h-4" />
-                </button>
-            </div>
-        </div>
-    </a>
-  );
-};
+const NewsCardSkeleton: React.FC = () => (
+    <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-color)] animate-pulse h-full flex flex-col">
+        <div className="h-32 bg-[var(--bg-tertiary-hover)] rounded-lg mb-4 w-full"></div>
+        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/4 mb-3"></div>
+        <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-full mb-2"></div>
+        <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-3/4 mb-3"></div>
+        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-full mb-1"></div>
+        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-5/6"></div>
+    </div>
+);
 
 const CategoryPill: React.FC<{ label: string; isActive: boolean; onClick: () => void }> = ({ label, isActive, onClick }) => (
     <button
         onClick={() => { vibrate(); onClick(); }}
-        className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 snap-start ${
+        className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 snap-start border ${
             isActive 
-                ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-lg shadow-[var(--accent-color)]/20 scale-105' 
-                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'
+                ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/20' 
+                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)]'
         }`}
     >
         {label}
     </button>
-);
-
-const NewsSkeleton = () => (
-    <div className="space-y-4 animate-pulse mt-4">
-        {[1, 2, 3, 4].map(i => (
-            <div key={i} className="flex gap-4 bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-color)]">
-                <div className="flex-1 space-y-3 py-1">
-                    <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/3"></div>
-                    <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-full"></div>
-                    <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-3/4"></div>
-                </div>
-                <div className="w-28 h-28 bg-[var(--bg-tertiary-hover)] rounded-xl"></div>
-            </div>
-        ))}
-    </div>
 );
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
@@ -195,16 +225,27 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   
   const [category, setCategory] = useState('Destaques');
   const [news, setNews] = useState<NewsArticle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
+  const [sourceFilter, setSourceFilter] = useState('');
+
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try {
         const saved = localStorage.getItem('news-favorites');
         return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch { return new Set(); }
   });
+  
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
+  
+  const touchStartY = useRef(0);
+  const [pullPosition, setPullPosition] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
 
@@ -213,172 +254,301 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   }, [favorites]);
 
   const handleToggleFavorite = (articleTitle: string) => {
-    setFavorites(prev => {
-        const next = new Set(prev);
-        if (next.has(articleTitle)) next.delete(articleTitle);
-        else next.add(articleTitle);
-        return next;
+    setFavorites(prevFavorites => {
+      const newFavorites = new Set(prevFavorites);
+      if (newFavorites.has(articleTitle)) {
+        newFavorites.delete(articleTitle);
+      } else {
+        newFavorites.add(articleTitle);
+      }
+      return newFavorites;
     });
   };
 
-  const fetchNews = useCallback(async (cat: string, query: string, isRefresh = false) => {
-    if (cat === 'Favoritos') {
-        setLoading(false);
-        return;
-    }
-
-    if (!isRefresh) setLoading(true);
-    else setIsRefreshing(true);
-    
-    const cacheKey = `fii_news_v5_${cat}_${query}`; // V5 Cache
-    
-    if (!isRefresh) {
-        const cached = CacheManager.get<NewsArticle[]>(cacheKey, CACHE_TTL.NEWS);
-        if (cached) {
-            setNews(cached);
-            setLoading(false);
-            return;
-        }
-    }
-
-    const filter: NewsFilter = {
-        category: cat,
-        query: query,
-        tickers: cat === 'Destaques' ? assetTickers : undefined,
-        dateRange: 'week'
-    };
-
-    try {
-        const articles = await fetchMarketNews(preferences, filter);
-        if (articles && articles.length > 0) {
-            setNews(articles);
-            CacheManager.set(cacheKey, articles);
-        }
-    } catch (e) {
-        console.error(e);
-    } finally {
-        setLoading(false);
-        setIsRefreshing(false);
-    }
-  }, [preferences, assetTickers]);
-
-  // Debounced search
-  useEffect(() => {
-      const timer = setTimeout(() => {
-          fetchNews(category, searchQuery);
-      }, 600);
-      return () => clearTimeout(timer);
-  }, [category, searchQuery, fetchNews]);
-
-  const displayedNews = useMemo(() => {
-      if (category === 'Favoritos') {
-          return news.filter(n => favorites.has(n.title));
+  const clearFavorites = () => {
+      if (window.confirm(t('clear_cache_confirm'))) {
+          setFavorites(new Set());
+          addToast(t('cache_cleared'), 'success');
+          setActiveTab('all');
       }
-      return news;
-  }, [news, category, favorites]);
+  }
 
-  const handleRefresh = () => {
-      vibrate();
-      fetchNews(category, searchQuery, true);
+  const loadNews = useCallback(async (isRefresh = false, currentQuery: string, currentDateRange: 'today' | 'week' | 'month', currentSource: string) => {
+    if(!isRefresh) setLoading(true);
+    setError(null);
+    
+    try {
+      const filterKey = `news_v6_${currentQuery}_${currentDateRange}_${currentSource}_${category}`.toLowerCase().replace(/\s+/g, '_');
+      
+      if (!isRefresh) {
+          const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
+          if (cachedNews) {
+              setNews(cachedNews);
+              setLoading(false);
+              setPullPosition(0);
+              return;
+          }
+      }
+
+      const filter: NewsFilter = {
+          query: currentQuery,
+          tickers: assetTickers,
+          dateRange: currentDateRange,
+          sources: currentSource,
+          category: category 
+      };
+
+      const articles = await fetchMarketNews(preferences, filter);
+      setNews(articles);
+      if(articles.length > 0) CacheManager.set(filterKey, articles);
+
+    } catch (err: any) {
+      setError(err.message || t('unknown_error'));
+    } finally {
+      setLoading(false);
+      setPullPosition(0);
+    }
+  }, [t, assetTickers, addToast, preferences, category]);
+  
+  // Debounced Load
+  const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);
+
+  // Reset news when category changes
+  useEffect(() => {
+      setLoading(true);
+      setNews([]);
+      loadNews(false, searchQuery, dateRange, sourceFilter);
+  }, [category]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(e.target.value);
+      setLoading(true);
+      debouncedLoadNews(e.target.value, dateRange, sourceFilter);
   };
 
+  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSourceFilter(e.target.value);
+      setLoading(true);
+      debouncedLoadNews(searchQuery, dateRange, e.target.value);
+  };
+
+  const handleDateRangeChange = (range: 'today' | 'week' | 'month') => {
+      setDateRange(range);
+      setLoading(true);
+      loadNews(true, searchQuery, range, sourceFilter);
+  };
+  
+  const handleRefresh = () => {
+    vibrate();
+    setLoading(true);
+    loadNews(true, searchQuery, dateRange, sourceFilter);
+  };
+  
+  const handleTouchStart = (e: React.TouchEvent) => {
+      if(containerRef.current && containerRef.current.scrollTop === 0) {
+          touchStartY.current = e.targetTouches[0].clientY;
+      }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+      if(touchStartY.current > 0 && !loading) {
+          const touchY = e.targetTouches[0].clientY;
+          const pullDistance = touchY - touchStartY.current;
+          if(pullDistance > 0) {
+              if (e.cancelable) e.preventDefault();
+              setPullPosition(Math.min(pullDistance, 100));
+          }
+      }
+  };
+  
+  const handleTouchEnd = () => {
+      if(pullPosition > 70) {
+          setLoading(true);
+          loadNews(true, searchQuery, dateRange, sourceFilter);
+      } else {
+          setPullPosition(0);
+      }
+      touchStartY.current = 0;
+  };
+
+  const displayedNews = useMemo(() => {
+      return activeTab === 'favorites' 
+        ? news.filter(n => favorites.has(n.title))
+        : news;
+  }, [news, activeTab, favorites]);
+
   return (
-    <div className="h-full flex flex-col bg-[var(--bg-primary)]">
-        {/* Sticky Glass Header */}
-        <div className="sticky top-0 z-40 bg-[var(--bg-secondary)]/80 backdrop-blur-xl border-b border-[var(--border-color)] transition-all duration-300">
-            <div className="max-w-7xl mx-auto px-4 pt-3 pb-2">
-                <div className="flex justify-between items-center mb-3">
-                    <h1 className="text-xl font-extrabold tracking-tight flex items-center gap-2">
-                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-[var(--accent-color)] to-blue-500">FII</span>News
-                    </h1>
-                    <div className="flex gap-2">
-                        <div className="relative">
-                            <input 
-                                type="text" 
-                                placeholder="Buscar..." 
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-full py-1.5 pl-3 pr-8 text-xs w-32 focus:w-48 transition-all focus:outline-none focus:border-[var(--accent-color)]"
-                            />
-                            <FilterIcon className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
-                        </div>
-                        <button 
-                            onClick={handleRefresh}
-                            className={`p-1.5 rounded-full bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--accent-color)] border border-[var(--border-color)] active:scale-95 transition-all ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`}
-                        >
-                            <RefreshIcon className="w-4 h-4" />
-                        </button>
+    <div 
+        className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6"
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+    >
+      <div 
+        className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
+        style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
+      >
+        <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
+      </div>
+      
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">{t('market_news')}</h1>
+          <div className="flex gap-2">
+               <button 
+                  onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                  className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  aria-label="Filtros"
+              >
+                  <FilterIcon className="w-5 h-5" />
+              </button>
+              <button 
+                  onClick={handleRefresh} 
+                  disabled={loading}
+                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
+                  aria-label={t('refresh_prices')}
+              >
+                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+              </button>
+          </div>
+        </div>
+        
+        {/* Categories Scroller */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-2 -mx-4 px-4 snap-x mask-linear-fade">
+            {categories.map(cat => (
+                <CategoryPill 
+                    key={cat} 
+                    label={cat} 
+                    isActive={category === cat} 
+                    onClick={() => setCategory(cat)} 
+                />
+            ))}
+        </div>
+        
+        {/* Filter Panel */}
+        {showFilters && (
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-4">
+                 <div>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Período</label>
+                    <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)]">
+                      {(['today', 'week', 'month'] as const).map((r) => (
+                          <button
+                              key={r}
+                              onClick={() => handleDateRangeChange(r)}
+                              className={`flex-1 py-1.5 text-xs font-bold rounded transition-all ${dateRange === r ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                          >
+                              {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
+                          </button>
+                      ))}
                     </div>
                 </div>
                 
-                {/* Categories Scroller */}
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 snap-x mask-linear-fade">
-                    {categories.map(cat => (
-                        <CategoryPill 
-                            key={cat} 
-                            label={cat} 
-                            isActive={category === cat} 
-                            onClick={() => setCategory(cat)} 
-                        />
-                    ))}
+                 <div>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Fontes (Opcional)</label>
+                    <input 
+                      type="text"
+                      placeholder="Ex: InfoMoney, Valor, Brazil Journal"
+                      value={sourceFilter}
+                      onChange={handleSourceChange}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors placeholder:text-[var(--text-secondary)]/50"
+                    />
                 </div>
             </div>
+        )}
+
+        <div className="mb-4">
+          <input 
+            type="text"
+            placeholder={t('search_news_placeholder')}
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
+          />
+        </div>
+        
+        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
+            <button 
+              onClick={() => { setActiveTab('all'); vibrate(); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            >
+                {t('news_tab_all')}
+            </button>
+             <button 
+              onClick={() => { setActiveTab('favorites'); vibrate(); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            >
+                {t('news_tab_favorites')}
+                {favorites.size > 0 && <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] px-1.5 py-0.5 rounded-full text-[9px]">{favorites.size}</span>}
+            </button>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-24 md:pb-6">
-            <div className="max-w-7xl mx-auto min-h-[50vh]">
-                {loading ? (
-                    <NewsSkeleton />
-                ) : (
-                    <div className="animate-fade-in">
-                        {displayedNews.length > 0 ? (
-                            <>
-                                {/* Hero Section (Desktop: Big Impact, Mobile: Compact) */}
-                                {category !== 'Favoritos' && !searchQuery && (
-                                    <div className="mb-8">
-                                        <NewsHero article={displayedNews[0]} />
-                                    </div>
-                                )}
-                                
-                                {/* Responsive Grid/List */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {(category !== 'Favoritos' && !searchQuery ? displayedNews.slice(1) : displayedNews).map((article, i) => (
-                                        <div 
-                                            key={`${article.url}-${i}`} 
-                                            className="animate-fade-in-up" 
-                                            style={{ animationDelay: `${i * 50}ms` }}
-                                        >
-                                            <NewsCard 
-                                                article={article} 
-                                                isFavorited={favorites.has(article.title)}
-                                                onToggleFavorite={() => handleToggleFavorite(article.title)}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] opacity-70">
-                                {category === 'Favoritos' ? (
-                                    <>
-                                        <StarIcon className="w-12 h-12 mb-2 opacity-30" />
-                                        <p>Nenhuma notícia favorita.</p>
-                                    </>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <p>Não encontramos notícias para esta busca.</p>
-                                        <button onClick={handleRefresh} className="text-[var(--accent-color)] font-bold text-sm hover:underline">
-                                            Atualizar Agora
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+        
+        {error && (
+          <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
+            <p className="font-bold">{t('error')}</p>
+            <p className="text-sm">{error}</p>
+            <button onClick={() => loadNews(true, searchQuery, dateRange, sourceFilter)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
+              {t('try_again')}
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="flex-1">
+            {displayedNews.length > 0 ? (
+              <>
+                 {/* Hero Section (Only for 'All' tab and no search) */}
+                 {activeTab === 'all' && !searchQuery && displayedNews.length > 0 && (
+                    <div className="mb-8 animate-scale-in">
+                        <NewsHero article={displayedNews[0]} />
                     </div>
-                )}
-            </div>
-        </div>
+                 )}
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 landscape-grid-cols-3">
+                    {(activeTab === 'all' && !searchQuery ? displayedNews.slice(1) : displayedNews).map((article, index) => (
+                        <div 
+                            key={`${article.title}-${index}`} 
+                            className="animate-fade-in-up h-full" 
+                            style={{ animationDelay: `${index * 50}ms` }}
+                        >
+                            <NewsCard 
+                                article={article}
+                                isFavorited={favorites.has(article.title)}
+                                onToggleFavorite={() => handleToggleFavorite(article.title)}
+                                addToast={addToast}
+                            />
+                        </div>
+                    ))}
+                 </div>
+                 
+                 {activeTab === 'favorites' && displayedNews.length > 0 && (
+                      <div className="col-span-full text-center pt-8 pb-4">
+                          <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:underline uppercase tracking-wider">
+                              {t('clear_favorites')}
+                          </button>
+                      </div>
+                  )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">
+                  {activeTab === 'favorites' ? (
+                      <>
+                          <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-[var(--border-color)]">
+                              <StarIcon className="w-8 h-8 text-gray-600" />
+                          </div>
+                          <p className="font-bold text-lg">{t('no_favorites_title')}</p>
+                          <p className="text-sm mt-2 max-w-[250px]">{t('no_favorites_subtitle')}</p>
+                      </>
+                  ) : (
+                      <p>{t('no_news_found')}</p>
+                  )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
