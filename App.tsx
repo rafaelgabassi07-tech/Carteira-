@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import BottomNav from './components/BottomNav';
 import PortfolioView from './views/PortfolioView';
@@ -201,7 +200,7 @@ const App: React.FC = () => {
       case 'settings':
         return <SettingsView addToast={addToast} />;
       case 'notificacoes':
-        return <NotificationsView setActiveView={navigateTo} />;
+        return <NotificationsView setActiveView={navigateTo} onSelectAsset={handleSelectAsset} />;
       case 'assetDetail':
         return <AssetDetailView ticker={selectedTicker!} onBack={handleBack} onViewTransactions={handleViewTransactions} />;
       default:

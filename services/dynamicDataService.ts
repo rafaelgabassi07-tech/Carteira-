@@ -4,13 +4,14 @@ import { NotificationType } from '../types';
 import { CacheManager } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-interface Notification {
+export interface Notification {
     id: number;
     type: NotificationType;
     title: string;
     description: string;
     date: string;
     read: boolean;
+    relatedTicker?: string;
 }
 
 const getFutureDate = (days: number): Date => {
@@ -84,24 +85,73 @@ export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
     return events.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 };
 
-// Generates notifications
+// Generates notifications based on real asset data
 export const generateNotifications = (assets: Asset[]): Notification[] => {
     const notifications: Notification[] = [];
     let id = 1;
     
     if (assets.length === 0) return [];
 
-    // Generate specific notifications only if we have assets
-    assets.slice(0, 2).forEach(asset => {
+    assets.forEach(asset => {
+        // 1. Dividend Projections
         if (asset.dy && asset.dy > 0) {
             const dividend = (asset.currentPrice * (asset.dy / 100)) / 12;
-            notifications.push({
+            // Only verify significant amounts
+            if (dividend > 0.01) {
+                notifications.push({
+                    id: id++,
+                    type: 'dividend',
+                    title: `Provisão: ${asset.ticker}`,
+                    description: `Estimativa de R$ ${dividend.toFixed(2)}/cota com base no DY de ${asset.dy.toFixed(1)}%.`,
+                    date: new Date().toISOString(),
+                    read: false,
+                    relatedTicker: asset.ticker
+                });
+            }
+        }
+
+        // 2. Opportunity Alert (Price Drop)
+        // If current price is 5% below average price
+        if (asset.currentPrice > 0 && asset.avgPrice > 0) {
+            if (asset.currentPrice < asset.avgPrice * 0.95) {
+                const dropPercent = ((asset.avgPrice - asset.currentPrice) / asset.avgPrice) * 100;
+                notifications.push({
+                    id: id++,
+                    type: 'price',
+                    title: `Oportunidade: ${asset.ticker}`,
+                    description: `Preço atual está ${dropPercent.toFixed(1)}% abaixo do seu preço médio.`,
+                    date: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+                    read: false,
+                    relatedTicker: asset.ticker
+                });
+            }
+            
+            // 3. Gain Alert (Price Up)
+            // If current price is 10% above average price
+            if (asset.currentPrice > asset.avgPrice * 1.10) {
+                const gainPercent = ((asset.currentPrice - asset.avgPrice) / asset.avgPrice) * 100;
+                notifications.push({
+                    id: id++,
+                    type: 'price',
+                    title: `Valorização: ${asset.ticker}`,
+                    description: `Seu ativo valorizou ${gainPercent.toFixed(1)}% em relação ao custo.`,
+                    date: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+                    read: false,
+                    relatedTicker: asset.ticker
+                });
+            }
+        }
+
+        // 4. High P/VP Warning (Paper Funds usually)
+        if (asset.pvp && asset.pvp > 1.15) {
+             notifications.push({
                 id: id++,
-                type: 'dividend',
-                title: `Provisão: ${asset.ticker}`,
-                description: `Estimativa de R$ ${dividend.toFixed(2)}/cota com base no DY atual.`,
-                date: new Date().toISOString(),
+                type: 'news', // Categorized as news/insight
+                title: `Atenção: ${asset.ticker}`,
+                description: `O P/VP está em ${asset.pvp.toFixed(2)}, indicando que o ativo pode estar caro.`,
+                date: new Date(Date.now() - 86400000).toISOString(), // Yesterday
                 read: false,
+                relatedTicker: asset.ticker
             });
         }
     });

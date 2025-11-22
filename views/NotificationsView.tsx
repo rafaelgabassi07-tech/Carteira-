@@ -5,17 +5,11 @@ import type { NotificationType } from '../types';
 import { usePersistentState, vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import { generateNotifications } from '../services/dynamicDataService';
+import { generateNotifications, Notification } from '../services/dynamicDataService';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
-
-interface Notification {
-    id: number;
-    type: NotificationType;
-    title: string;
-    description: string;
-    date: string; // ISO String date
-    read: boolean;
-}
+import SettingsIcon from '../components/icons/SettingsIcon';
+import TrashIcon from '../components/icons/TrashIcon';
+import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 
 const NotificationIcon: React.FC<{ type: string }> = ({ type }) => {
     switch (type) {
@@ -30,10 +24,12 @@ const NotificationIcon: React.FC<{ type: string }> = ({ type }) => {
     }
 };
 
-const NotificationsView: React.FC<{ setActiveView: (view: View) => void; }> = ({ setActiveView }) => {
+const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelectAsset: (ticker: string) => void; }> = ({ setActiveView, onSelectAsset }) => {
     const { t } = useI18n();
     const { assets } = usePortfolio();
     
+    // Only generate initial notifications if the list is empty (first load behavior)
+    // In a real app, this would come from a backend/websocket
     const initialNotifications = useMemo(() => generateNotifications(assets), [assets]);
     
     const [notifications, setNotifications] = usePersistentState<Notification[]>('app-notifications', initialNotifications);
@@ -47,6 +43,23 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; }> = ({
         );
     };
 
+    const deleteNotification = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        vibrate(10);
+        setNotifications(notifications.filter(n => n.id !== id));
+    };
+
+    const handleNotificationClick = (notification: Notification) => {
+        if (!notification.read) {
+            toggleRead(notification.id);
+        }
+        
+        if (notification.relatedTicker) {
+            vibrate();
+            onSelectAsset(notification.relatedTicker);
+        }
+    };
+
     const markAllAsRead = () => {
         vibrate();
         setNotifications(notifications.map(n => ({ ...n, read: true })));
@@ -54,7 +67,16 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; }> = ({
 
     const clearAll = () => {
         vibrate();
-        setNotifications([]);
+        if (window.confirm(t('clear_all') + '?')) {
+            setNotifications([]);
+        }
+    };
+
+    const goToSettings = () => {
+        vibrate();
+        setActiveView('settings');
+        // Assuming 'settings' view defaults to main, user navigates to notifications manually 
+        // or we could pass a param to open notifications section directly if supported
     };
 
     const groupedNotifications = useMemo(() => {
@@ -114,9 +136,18 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; }> = ({
                     </button>
                     <h1 className="text-2xl font-bold">{t('notifications')}</h1>
                  </div>
-                 <div className="space-x-4">
-                    {notifications.length > 0 && (
-                        <button onClick={markAllAsRead} className="text-xs bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold px-3 py-1.5 rounded-lg">{t('mark_all_as_read')}</button>
+                 <div className="flex space-x-2">
+                    <button 
+                        onClick={goToSettings} 
+                        className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors"
+                        aria-label="Configurações"
+                    >
+                        <SettingsIcon className="w-5 h-5" />
+                    </button>
+                    {notifications.some(n => !n.read) && (
+                        <button onClick={markAllAsRead} className="text-xs bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold px-3 py-1.5 rounded-lg flex items-center whitespace-nowrap">
+                            Lidas
+                        </button>
                     )}
                  </div>
             </div>
@@ -135,7 +166,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; }> = ({
             </div>
 
             {Object.values(groupedNotifications).some((g: Notification[]) => g.length > 0) ? (
-                <div className="space-y-6 pb-20 overflow-y-auto">
+                <div className="space-y-6 pb-24 md:pb-6 overflow-y-auto custom-scrollbar landscape-pb-6">
                     {(Object.keys(groupedNotifications) as Array<keyof typeof groupedNotifications>).map(groupKey => 
                         groupedNotifications[groupKey].length > 0 && (
                             <div key={groupKey}>
@@ -144,18 +175,31 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; }> = ({
                                     {groupedNotifications[groupKey].map((notification, index) => (
                                         <div 
                                             key={notification.id} 
-                                            onClick={() => toggleRead(notification.id)}
-                                            className={`relative overflow-hidden bg-[var(--bg-secondary)] p-4 rounded-xl flex items-start space-x-4 cursor-pointer transition-all border border-[var(--border-color)] active:scale-[0.98] animate-fade-in-up ${notification.read ? 'opacity-60 grayscale-[0.5]' : 'shadow-sm border-[var(--accent-color)]/30'}`}
+                                            onClick={() => handleNotificationClick(notification)}
+                                            className={`relative overflow-hidden bg-[var(--bg-secondary)] p-4 rounded-xl flex items-start space-x-4 cursor-pointer transition-all border border-[var(--border-color)] active:scale-[0.98] animate-fade-in-up group hover:border-[var(--accent-color)]/30 ${notification.read ? 'opacity-60' : 'shadow-sm border-l-4 border-l-[var(--accent-color)]'}`}
                                             style={{ animationDelay: `${index * 50}ms` }}
                                         >
                                             <NotificationIcon type={notification.type} />
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start">
                                                     <p className={`text-sm font-bold truncate ${notification.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{notification.title}</p>
-                                                    {!notification.read && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)] mt-1.5 ml-2 flex-shrink-0"></div>}
+                                                    {/* Delete Button (Visible on hover or touch actions in future) */}
+                                                    <button 
+                                                        onClick={(e) => deleteNotification(e, notification.id)}
+                                                        className="text-gray-400 hover:text-red-500 p-1 -mr-2 -mt-2 rounded-full hover:bg-[var(--bg-primary)] transition-colors z-10"
+                                                    >
+                                                        <TrashIcon className="w-4 h-4" />
+                                                    </button>
                                                 </div>
                                                 <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">{notification.description}</p>
-                                                <p className="text-[10px] text-[var(--text-secondary)] mt-2 opacity-70">{new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                                <div className="flex justify-between items-center mt-2">
+                                                    <p className="text-[10px] text-[var(--text-secondary)] opacity-70">{new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                                    {notification.relatedTicker && (
+                                                        <div className="flex items-center text-[var(--accent-color)] text-[10px] font-bold gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            VER ATIVO <ChevronRightIcon className="w-3 h-3" />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -163,17 +207,21 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; }> = ({
                             </div>
                         )
                     )}
-                     <div className="text-center mt-8">
-                        <button onClick={clearAll} className="text-xs text-red-400 font-bold hover:underline py-2">{t('clear_all')}</button>
+                     <div className="text-center mt-8 mb-4">
+                        <button onClick={clearAll} className="text-xs text-red-400 font-bold hover:underline py-2 px-4 rounded-lg hover:bg-red-500/10 transition-colors">{t('clear_all')}</button>
                      </div>
                 </div>
             ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-center text-[var(--text-secondary)] pb-20 animate-fade-in">
-                  <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 opacity-50">
-                      <div className="text-2xl">zzz</div>
+                  <div className="w-20 h-20 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 opacity-50 border border-[var(--border-color)]">
+                      <div className="text-3xl">💤</div>
                   </div>
-                  <p className="font-bold">{t('no_notifications_title')}</p>
-                  <p className="text-xs mt-1 max-w-[200px]">{t('no_notifications_subtitle')}</p>
+                  <p className="font-bold text-lg">{t('no_notifications_title')}</p>
+                  <p className="text-xs mt-2 max-w-[220px] leading-relaxed">{t('no_notifications_subtitle')}</p>
+                  
+                  <button onClick={goToSettings} className="mt-6 text-xs font-bold text-[var(--accent-color)] hover:underline">
+                      Gerenciar Preferências
+                  </button>
                 </div>
             )}
         </div>
