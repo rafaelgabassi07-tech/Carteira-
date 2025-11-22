@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
-import { fetchMarketNews } from '../services/geminiService';
+import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
 import StarIcon from '../components/icons/StarIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
+import FilterIcon from '../components/icons/FilterIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
@@ -125,13 +127,20 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
+  const [sourceFilter, setSourceFilter] = useState('');
+
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try {
         const saved = localStorage.getItem('news-favorites');
         return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch { return new Set(); }
   });
-  const [searchQuery, setSearchQuery] = useState('');
+  
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
   
   const touchStartY = useRef(0);
@@ -157,21 +166,22 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   };
 
   const clearFavorites = () => {
-      if (window.confirm(t('clear_cache_confirm'))) { // Reusing a generic confirm or could add a specific one
+      if (window.confirm(t('clear_cache_confirm'))) {
           setFavorites(new Set());
           addToast(t('cache_cleared'), 'success');
           setActiveTab('all');
       }
   }
 
-  const loadNews = useCallback(async (isRefresh = false, query: string) => {
+  const loadNews = useCallback(async (isRefresh = false, currentQuery: string, currentDateRange: 'today' | 'week' | 'month', currentSource: string) => {
     if(!isRefresh) setLoading(true);
     setError(null);
     
     try {
-      const cacheKey = `news_feed_${query.trim().toLowerCase().replace(/\s+/g, '_') || 'general'}`;
+      const filterKey = `news_${currentQuery}_${currentDateRange}_${currentSource}`.toLowerCase().replace(/\s+/g, '_');
+      
       if (!isRefresh) {
-          const cachedNews = CacheManager.get<NewsArticle[]>(cacheKey, CACHE_TTL.NEWS);
+          const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
           if (cachedNews) {
               setNews(cachedNews);
               setLoading(false);
@@ -180,9 +190,16 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           }
       }
 
-      const articles = await fetchMarketNews(preferences, assetTickers, query);
+      const filter: NewsFilter = {
+          query: currentQuery,
+          tickers: assetTickers,
+          dateRange: currentDateRange,
+          sources: currentSource
+      };
+
+      const articles = await fetchMarketNews(preferences, filter);
       setNews(articles);
-      if(articles.length > 0) CacheManager.set(cacheKey, articles);
+      if(articles.length > 0) CacheManager.set(filterKey, articles);
 
     } catch (err: any) {
       setError(err.message || t('unknown_error'));
@@ -192,19 +209,31 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     }
   }, [t, assetTickers, addToast, preferences]);
   
-  const debouncedLoadNews = useCallback(debounce((q: string) => loadNews(true, q), 600), [loadNews]);
+  // Create a debounced version of the load function for text inputs
+  const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setSearchQuery(e.target.value);
       setLoading(true);
-      setError(null);
-      debouncedLoadNews(e.target.value);
+      debouncedLoadNews(e.target.value, dateRange, sourceFilter);
+  };
+
+  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSourceFilter(e.target.value);
+      setLoading(true);
+      debouncedLoadNews(searchQuery, dateRange, e.target.value);
+  };
+
+  const handleDateRangeChange = (range: 'today' | 'week' | 'month') => {
+      setDateRange(range);
+      setLoading(true);
+      loadNews(true, searchQuery, range, sourceFilter);
   };
   
   const handleRefresh = () => {
     vibrate();
     setLoading(true);
-    loadNews(true, searchQuery);
+    loadNews(true, searchQuery, dateRange, sourceFilter);
   };
   
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -227,7 +256,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const handleTouchEnd = () => {
       if(pullPosition > 70) {
           setLoading(true);
-          loadNews(true, searchQuery);
+          loadNews(true, searchQuery, dateRange, sourceFilter);
       } else {
           setPullPosition(0);
       }
@@ -235,7 +264,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   };
 
   useEffect(() => {
-    loadNews(false, ''); // Initial load
+    loadNews(false, '', 'week', ''); // Initial load
   }, [loadNews]);
 
   const displayedNews = useMemo(() => {
@@ -261,23 +290,63 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">{t('market_news')}</h1>
-        <button 
-            onClick={handleRefresh} 
-            disabled={loading}
-            className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50"
-            aria-label={t('refresh_prices')}
-        >
-            <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
-        </button>
+        <div className="flex gap-2">
+             <button 
+                onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                aria-label="Filtros"
+            >
+                <FilterIcon className="w-5 h-5" />
+            </button>
+            <button 
+                onClick={handleRefresh} 
+                disabled={loading}
+                className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
+                aria-label={t('refresh_prices')}
+            >
+                <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+            </button>
+        </div>
       </div>
       
+      {/* Filter Panel */}
+      {showFilters && (
+          <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-4">
+               <div>
+                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Período</label>
+                  <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)]">
+                    {(['today', 'week', 'month'] as const).map((r) => (
+                        <button
+                            key={r}
+                            onClick={() => handleDateRangeChange(r)}
+                            className={`flex-1 py-1.5 text-xs font-bold rounded transition-all ${dateRange === r ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        >
+                            {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
+                        </button>
+                    ))}
+                  </div>
+              </div>
+              
+               <div>
+                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Fontes (Opcional)</label>
+                  <input 
+                    type="text"
+                    placeholder="Ex: InfoMoney, Valor, Brazil Journal"
+                    value={sourceFilter}
+                    onChange={handleSourceChange}
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors placeholder:text-[var(--text-secondary)]/50"
+                  />
+              </div>
+          </div>
+      )}
+
       <div className="mb-4">
         <input 
           type="text"
           placeholder={t('search_news_placeholder')}
           value={searchQuery}
           onChange={handleSearchChange}
-          className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors"
+          className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
         />
       </div>
       
@@ -303,7 +372,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
           <p className="font-bold">{t('error')}</p>
           <p className="text-sm">{error}</p>
-          <button onClick={() => loadNews(true, searchQuery)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
+          <button onClick={() => loadNews(true, searchQuery, dateRange, sourceFilter)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
             {t('try_again')}
           </button>
         </div>

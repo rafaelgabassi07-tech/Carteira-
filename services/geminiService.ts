@@ -119,7 +119,14 @@ function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?
     return (bestMatch && bestMatch.score > 0) ? bestMatch.uri : undefined;
 }
 
-export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] = [], searchQuery: string = ''): Promise<NewsArticle[]> {
+export interface NewsFilter {
+    query?: string;
+    tickers?: string[];
+    dateRange?: 'today' | 'week' | 'month';
+    sources?: string; // Comma separated string
+}
+
+export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<NewsArticle[]> {
   let apiKey: string;
   try {
     apiKey = getGeminiApiKey(prefs);
@@ -129,13 +136,26 @@ export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] =
   }
   
   const ai = new GoogleGenAI({ apiKey });
-  const contextTickers = tickers.slice(0, 5).join(', ');
+  const contextTickers = filter.tickers?.slice(0, 5).join(', ');
   
+  let dateConstraint = "";
+  switch (filter.dateRange) {
+      case 'today': dateConstraint = "publicadas nas últimas 24 horas"; break;
+      case 'week': dateConstraint = "publicadas na última semana"; break;
+      case 'month': dateConstraint = "publicadas no último mês"; break;
+      default: dateConstraint = "recentes";
+  }
+
+  let sourceConstraint = "";
+  if (filter.sources && filter.sources.trim().length > 0) {
+      sourceConstraint = `Priorize notícias das seguintes fontes: ${filter.sources}.`;
+  }
+
   let prompt: string;
-  if (searchQuery.trim()) {
-      prompt = `Encontre notícias financeiras sobre "${searchQuery}" publicadas na semana atual. Foque em FIIs.`;
+  if (filter.query && filter.query.trim()) {
+      prompt = `Encontre notícias financeiras ${dateConstraint} sobre "${filter.query}". ${sourceConstraint} Foque em FIIs e mercado brasileiro.`;
   } else {
-      prompt = `Encontre as 5 notícias mais importantes sobre o mercado de Fundos Imobiliários (FIIs) do Brasil publicadas recentemente. Tickers de interesse: ${contextTickers || 'Geral'}.`;
+      prompt = `Encontre as 5 notícias mais importantes sobre o mercado de Fundos Imobiliários (FIIs) do Brasil ${dateConstraint}. Tickers de interesse: ${contextTickers || 'Geral'}. ${sourceConstraint}`;
   }
 
   try {
