@@ -109,7 +109,7 @@ const NewsCard: React.FC<{
         href={article.url} 
         target="_blank" 
         rel="noopener noreferrer"
-        className="relative rounded-2xl overflow-hidden block h-72 group shadow-md hover:shadow-2xl transition-all duration-300 border border-[var(--border-color)] active:scale-[0.98]"
+        className="relative rounded-2xl overflow-hidden block h-72 group shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-[var(--border-color)] active:scale-[0.98]"
     >
         {/* Background Image */}
         <div className="absolute inset-0 bg-[var(--bg-secondary)]">
@@ -176,36 +176,61 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
             href={article.url} 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="relative w-full flex-shrink-0 rounded-3xl overflow-hidden shadow-lg cursor-pointer group snap-center block h-full border border-[var(--border-color)]"
-            style={{ scrollSnapAlign: 'center' }}
+            className="group relative w-full h-full block rounded-3xl overflow-hidden shadow-lg border border-[var(--border-color)] cursor-pointer snap-center"
         >
-            <div className="aspect-[16/10] md:aspect-[21/9] w-full relative">
+            {/* Image Container */}
+            <div className="absolute inset-0 bg-[var(--bg-secondary)]">
                 <img 
                     src={imgSrc} 
                     alt={article.title}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
                     loading="eager"
                     onError={() => setImgSrc(getFallbackImage(article.title))}
                 />
-                {/* Stronger Gradient Overlay for better text readability on mobile */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 z-10"></div>
+            </div>
+
+            {/* Enhanced Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-[#020617]/70 to-transparent opacity-95 z-10"></div>
+            
+            {/* Top Gradient for Badge Visibility */}
+            <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black/60 to-transparent z-10"></div>
+
+            {/* Content Container */}
+            <div className="absolute inset-0 p-6 flex flex-col justify-between z-20">
                 
-                <div className="absolute bottom-0 left-0 p-5 md:p-8 w-full md:w-3/4 z-20">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-md border border-white/10">
-                            <img src={getFavicon(article.url || '')} className="w-3 h-3 rounded-full bg-white/10" onError={(e) => e.currentTarget.style.display = 'none'} />
-                            <span className="text-gray-200 text-[10px] font-bold uppercase tracking-wider">{article.source}</span>
+                {/* Header Badge */}
+                <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/10 shadow-sm">
+                        <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+                             <img src={getFavicon(article.url || '')} className="w-4 h-4" onError={(e) => e.currentTarget.style.display = 'none'} />
                         </div>
-                        <span className="text-gray-400 text-[10px]">• {timeAgo(article.date)}</span>
+                        <span className="text-white text-[10px] font-extrabold uppercase tracking-widest text-shadow-sm">{article.source}</span>
                     </div>
-                    
-                    <h2 className="text-xl md:text-3xl font-extrabold text-white leading-tight line-clamp-2 mb-2 drop-shadow-lg">
+                </div>
+
+                {/* Main Text */}
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-gray-300">
+                        <span className="text-[10px] font-bold bg-white/10 px-2 py-0.5 rounded text-gray-200">{timeAgo(article.date)}</span>
+                        <div className="h-1 w-1 rounded-full bg-gray-500"></div>
+                        <SentimentBadge sentiment={article.sentiment} />
+                    </div>
+
+                    <h2 className="text-xl md:text-3xl font-black text-white leading-[1.1] tracking-tight line-clamp-3 drop-shadow-md group-hover:text-[var(--accent-color)] transition-colors duration-300">
                         {article.title}
                     </h2>
                     
-                    <p className="text-gray-300 text-xs md:text-sm line-clamp-2 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3">
+                    <p className="text-gray-300 text-xs md:text-sm line-clamp-2 font-medium leading-relaxed max-w-[90%] opacity-90">
                         {article.summary}
                     </p>
+
+                    {/* Read Button */}
+                    <div className="mt-2 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-[var(--accent-color)] flex items-center justify-center text-[var(--accent-color-text)] shadow-lg shadow-[var(--accent-color)]/30 group-hover:scale-110 transition-transform duration-300">
+                            <ChevronRightIcon className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-[var(--accent-color)] opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">Ler matéria</span>
+                    </div>
                 </div>
             </div>
         </a>
@@ -214,6 +239,16 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
 
 const NewsCarousel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    const handleScroll = () => {
+        if (scrollRef.current) {
+            const scrollLeft = scrollRef.current.scrollLeft;
+            const width = scrollRef.current.clientWidth;
+            const newIndex = Math.round(scrollLeft / width);
+            setActiveIndex(newIndex);
+        }
+    };
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
@@ -228,38 +263,46 @@ const NewsCarousel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => {
     if (!articles || articles.length === 0) return null;
 
     return (
-        <div className="relative group mb-8">
-            {/* Desktop Navigation Buttons (Translucent, Show on Hover) */}
-            <button 
-                onClick={() => scroll('left')}
-                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 bg-black/30 backdrop-blur-md border border-white/10 text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
-            >
-                <ChevronLeftIcon className="w-6 h-6" />
-            </button>
+        <div className="relative mb-8">
+            {/* Desktop Navigation Buttons */}
+            <div className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-30 -ml-4">
+                 <button 
+                    onClick={() => scroll('left')}
+                    className="w-12 h-12 bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-color)] text-[var(--text-primary)] rounded-full flex items-center justify-center shadow-2xl hover:bg-[var(--bg-secondary)] hover:scale-110 transition-all duration-300 disabled:opacity-50"
+                >
+                    <ChevronLeftIcon className="w-6 h-6" />
+                </button>
+            </div>
             
-            <button 
-                onClick={() => scroll('right')}
-                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 bg-black/30 backdrop-blur-md border border-white/10 text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
-            >
-                <ChevronRightIcon className="w-6 h-6" />
-            </button>
+            <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-30 -mr-4">
+                <button 
+                    onClick={() => scroll('right')}
+                    className="w-12 h-12 bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-color)] text-[var(--text-primary)] rounded-full flex items-center justify-center shadow-2xl hover:bg-[var(--bg-secondary)] hover:scale-110 transition-all duration-300"
+                >
+                    <ChevronRightIcon className="w-6 h-6" />
+                </button>
+            </div>
 
             {/* Carousel Container */}
             <div 
                 ref={scrollRef}
-                className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-2"
+                onScroll={handleScroll}
+                className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-4 px-1"
             >
                 {articles.map((article, idx) => (
-                    <div key={idx} className="w-full min-w-[90%] md:min-w-[80%] lg:min-w-[70%] snap-center">
+                    <div key={idx} className="w-[90%] md:w-[80%] lg:w-[70%] flex-shrink-0 snap-center h-[380px] md:h-[450px]">
                         <NewsHeroItem article={article} />
                     </div>
                 ))}
             </div>
             
-            {/* Mobile Dots Indicator */}
-            <div className="flex justify-center gap-1.5 mt-2 md:hidden">
+            {/* Indicators */}
+            <div className="flex justify-center gap-2 mt-1">
                 {articles.map((_, idx) => (
-                    <div key={idx} className="w-1.5 h-1.5 rounded-full bg-[var(--text-secondary)] opacity-30"></div>
+                    <div 
+                        key={idx} 
+                        className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeIndex ? 'w-6 bg-[var(--accent-color)]' : 'w-1.5 bg-[var(--border-color)]'}`}
+                    ></div>
                 ))}
             </div>
         </div>

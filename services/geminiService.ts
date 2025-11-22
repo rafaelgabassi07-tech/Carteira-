@@ -74,11 +74,16 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   
   const ai = new GoogleGenAI({ apiKey });
   
+  let timeTerm = "recentes";
+  if (filter.dateRange === 'today') timeTerm = "hoje";
+  else if (filter.dateRange === 'week') timeTerm = "desta semana";
+  else if (filter.dateRange === 'month') timeTerm = "deste mês";
+  
   let searchQuery = "";
   const baseTerm = "Fundos Imobiliários FIIs Brasil notícias";
 
   if (filter.query) {
-      searchQuery = `${filter.query} ${baseTerm}`;
+      searchQuery = `${filter.query} ${baseTerm} ${timeTerm}`;
   } else if (filter.category && filter.category !== 'Destaques') {
       const catMap: Record<string, string> = {
           'Rendimentos': 'FIIs dividendos anúncios rendimentos',
@@ -89,17 +94,16 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
           'Lajes': 'FIIs Lajes Corporativas escritórios',
           'Geral': 'Mercado FIIs IFIX hoje'
       };
-      searchQuery = `${catMap[filter.category] || filter.category} notícias recentes`;
+      searchQuery = `${catMap[filter.category] || filter.category} notícias ${timeTerm}`;
   } else {
-      searchQuery = `Destaques Mercado FIIs IFIX notícias hoje`;
+      searchQuery = `Destaques Mercado FIIs IFIX notícias ${timeTerm}`;
   }
 
-  // Prompt Refinado para Títulos e Resumos
   const prompt = `
     Você é um agregador de notícias de Fundos Imobiliários (FIIs).
     Pesquise no Google sobre: "${searchQuery}".
     
-    Retorne um JSON Array com 10 notícias REAIS.
+    Retorne um JSON Array com 10 notícias REAIS e RECENTES (${timeTerm}).
     NÃO INVENTE notícias. Use os dados do Grounding.
     
     [
