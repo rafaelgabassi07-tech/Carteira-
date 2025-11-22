@@ -1,7 +1,7 @@
 
 import type { Asset, Dividend, CalendarEvent } from '../types';
 import { NotificationType } from '../types';
-import { CacheManager } from '../utils';
+import { CacheManager, fromISODate } from '../utils';
 import { CACHE_TTL } from '../constants';
 
 export interface Notification {
@@ -46,41 +46,44 @@ export const generateDividends = (assets: Asset[], forceRefresh = false): Divide
 };
 
 // Generates calendar events
-// MODIFIED: Only shows CONFIRMED payments based on real market data
+// MODIFIED: Robust logic to handle Timezones and current month payments
 export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
     
     // Only generate if we have assets
     if (assets.length > 0) {
         assets.forEach(asset => {
              // STRICT CHECK: Only process if a confirmed date exists
              if (asset.nextPaymentDate) {
-                 const paymentDate = new Date(asset.nextPaymentDate);
-                 paymentDate.setHours(0,0,0,0);
+                 // Use fromISODate to set time to 12:00 PM to avoid timezone rollover issues
+                 const paymentDate = fromISODate(asset.nextPaymentDate);
+                 const pMonth = paymentDate.getMonth();
+                 const pYear = paymentDate.getFullYear();
                  
                  // Logic: Show if it's in the current month OR in the future
-                 // This allows showing "Paid" events for recent days in current month
-                 // or "Future" events for later.
-                 const isSameMonth = paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === today.getFullYear();
+                 const isCurrentMonth = pMonth === currentMonth && pYear === currentYear;
                  const isFuture = paymentDate >= today;
 
-                 if (!isNaN(paymentDate.getTime()) && (isSameMonth || isFuture)) {
+                 if (!isNaN(paymentDate.getTime()) && (isCurrentMonth || isFuture)) {
                      
                      // Use last dividend amount if available for calculation
-                     // If lastDividend is missing but we have a date, we try to estimate with DY, 
-                     // but ideally we want the real amount.
                      const amountPerShare = asset.lastDividend || (asset.currentPrice * ((asset.dy || 0) / 100)) / 12;
                      const amount = amountPerShare * asset.quantity;
                      
-                     const isPaid = paymentDate < today;
+                     // Check if "Paid" (Past date) or "Scheduled" (Today or Future)
+                     // We reset paymentDate to midnight for accurate day comparison
+                     const compareDate = new Date(paymentDate);
+                     compareDate.setHours(0,0,0,0);
+                     const isPaid = compareDate < today;
 
                      events.push({
                         ticker: asset.ticker,
                         eventType: isPaid ? 'Pago' : 'Confirmado',
-                        date: paymentDate.toISOString(),
+                        date: asset.nextPaymentDate, // Keep ISO string for display consistency
                         projectedAmount: amount
                     });
                  }

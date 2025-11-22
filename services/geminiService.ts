@@ -80,8 +80,8 @@ const advancedAssetDataSchema: Schema = {
             vacancyRate: { type: Type.NUMBER, description: "Vacância (%)" },
             dailyLiquidity: { type: Type.NUMBER, description: "Liquidez diária." },
             shareholders: { type: Type.NUMBER, description: "Número de cotistas." },
-            nextPaymentDate: { type: Type.STRING, description: "Próxima data de pagamento de proventos confirmada (YYYY-MM-DD) ou null se não houver." },
-            lastDividend: { type: Type.NUMBER, description: "Valor do último rendimento pago/anunciado." }
+            nextPaymentDate: { type: Type.STRING, description: "Data de PAGAMENTO (Pay Date) do provento referente ao mês ATUAL ou PRÓXIMO. Se já foi pago este mês, retorne essa data. Formato YYYY-MM-DD." },
+            lastDividend: { type: Type.NUMBER, description: "Valor do último rendimento pago ou anunciado." }
         },
         required: ["ticker", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
@@ -256,7 +256,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `Busque dados fundamentalistas do StatusInvest para: ${tickers.join(', ')}. 
+    const prompt = `Busque dados fundamentalistas atualizados para: ${tickers.join(', ')}. 
     
     Para cada ativo, retorne:
     - dy: Dividend Yield 12M (%)
@@ -266,8 +266,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     - vacancyRate: Vacância Física (%)
     - dailyLiquidity: Liquidez Média Diária
     - shareholders: Nº de Cotistas
-    - nextPaymentDate: A data de pagamento (Pay Date) do provento mais recente anunciado (do mês atual ou próximo). Formato YYYY-MM-DD.
-    - lastDividend: O valor desse provento anunciado.
+    - nextPaymentDate: A data EXATA de PAGAMENTO (Pay Date) do último rendimento anunciado referente ao mês atual ou próximo. (Ex: se hoje é dia 20 e pagou dia 15, retorne o dia 15). Formato YYYY-MM-DD.
+    - lastDividend: O valor desse rendimento.
     
     Use EXATAMENTE as categorias: 'Tijolo - Shoppings', 'Tijolo - Lajes Corporativas', 'Tijolo - Logística', 'Tijolo - Híbrido', 'Papel', 'Fundo de Fundos (FOF)', 'Agro (Fiagro)' ou 'Outros'.`;
 
