@@ -55,6 +55,30 @@ export interface NewsFilter {
     query?: string;
 }
 
+// Função Helper Robusta para Extração de JSON
+function extractJSON(text: string): any {
+    if (!text) throw new Error("Texto vazio");
+
+    // 1. Tenta parsing direto (caso ideal)
+    try { return JSON.parse(text); } catch (e) {}
+
+    // 2. Tenta extrair de bloco de código markdown ```json ... ``` ou ``` ... ```
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch) {
+        try { return JSON.parse(codeBlockMatch[1]); } catch (e) {}
+    }
+
+    // 3. Tenta encontrar limites de array [...]
+    const firstOpen = text.indexOf('[');
+    const lastClose = text.lastIndexOf(']');
+    if (firstOpen !== -1 && lastClose > firstOpen) {
+        const candidate = text.substring(firstOpen, lastClose + 1);
+        try { return JSON.parse(candidate); } catch (e) {}
+    }
+
+    throw new Error("Não foi possível extrair JSON válido da resposta.");
+}
+
 export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<NewsArticle[]> {
   let apiKey: string;
   try {
@@ -88,21 +112,18 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     ${userQuery}
     ${sourcePrompt}
 
-    OBJETIVO:
-    Retorne um JSON Array estritamente válido.
-    
-    PARA CADA NOTÍCIA:
-    1. Encontre o LINK REAL (url) funcional.
-    2. Tente extrair a URL da IMAGEM de capa (thumbnail/og:image). Se não achar, deixe em branco.
-    3. Analise o IMPACTO para o investidor (positivo/negativo/neutro e porquê).
+    REGRAS CRÍTICAS:
+    1. Retorne APENAS um JSON Array. Sem markdown, sem explicações antes ou depois.
+    2. Encontre o LINK REAL (url) funcional.
+    3. Tente extrair a URL da IMAGEM de capa (thumbnail/og:image). Se não achar, deixe em branco.
 
     FORMATO JSON (Array):
     [
       {
         "source": "Nome da Fonte",
-        "title": "Manchete Curta e Chamativa",
-        "summary": "Resumo em 1 frase direta.",
-        "impactAnalysis": "Ex: 'Alta na Selic prejudica FIIs de tijolo'.",
+        "title": "Manchete Curta",
+        "summary": "Resumo em 1 frase.",
+        "impactAnalysis": "Impacto no investidor.",
         "date": "YYYY-MM-DD",
         "sentiment": "Positive" | "Neutral" | "Negative",
         "category": "Dividendos" | "Macroeconomia" | "Resultados" | "Mercado" | "Imóveis",
@@ -121,69 +142,82 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             config: {
                 tools: [{googleSearch: {}}],
                 temperature: 0.3, // Baixa temperatura para respostas mais objetivas e rápidas
-                maxOutputTokens: 2000, // Limita o tamanho para garantir velocidade
+                maxOutputTokens: 2500, 
             }
           });
           
-          const responseText = response.text?.trim() || '';
-          if (!responseText) return [];
-
-          // Limpeza robusta de JSON (remove blocos de código e texto extra)
-          const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-          const jsonText = jsonMatch ? jsonMatch[0] : responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+          const responseText = response.text || '';
+          let articles: NewsArticle[] = [];
 
           try {
-            let articles: NewsArticle[] = JSON.parse(jsonText);
-            if (!Array.isArray(articles)) return [];
-
-            // GROUNDING & LINK RECOVERY (A Mágica da Correção)
-            // O Gemini retorna 'groundingChunks' com os links reais que ele usou para pesquisar.
-            // Vamos usar isso para corrigir links quebrados ou alucinações.
-            const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-                ?.map(c => c.web)
-                .filter(Boolean)
-                .flatMap(w => ({ uri: w?.uri, title: w?.title })) || [];
-  
-            return articles.map(article => {
-                  let finalUrl = article.url;
-                  
-                  // Validação de URL: Se for curta demais, 'example', ou vazia, buscamos no Grounding
-                  const isSuspiciousUrl = !finalUrl || finalUrl.length < 12 || finalUrl.includes('example') || finalUrl.includes('google.com/search');
-                  
-                  if (isSuspiciousUrl && webSources.length > 0) {
-                      // Tenta encontrar um link que tenha palavras do título da notícia
-                      const titleWords = article.title.toLowerCase().split(' ').filter(w => w.length > 4);
-                      
-                      const match = webSources.find(src => 
-                          src.title && titleWords.some(word => src.title?.toLowerCase().includes(word))
-                      );
-                      
-                      if (match?.uri) {
-                          finalUrl = match.uri;
-                      } else {
-                          // Fallback para o primeiro link de fonte confiável encontrado
-                          finalUrl = webSources[0].uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
-                      }
-                  }
-
-                  // Garante categorias válidas para o sistema de ícones/cores
-                  const validCategories = ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"];
-                  const category = validCategories.includes(article.category || '') ? article.category : 'Mercado';
-
-                  return {
-                    ...article,
-                    url: finalUrl,
-                    category: category as any,
-                    impactLevel: article.impactLevel || 'Medium',
-                    // Se a imagem vier vazia ou quebrada, o front-end usará o fallback determinístico
-                    imageUrl: article.imageUrl && article.imageUrl.startsWith('http') ? article.imageUrl : undefined 
-                  };
-              });
-
-          } catch(e) {
-            console.error("Erro ao processar JSON de notícias:", e);
-            return [];
+            articles = extractJSON(responseText);
+          } catch (e) {
+            console.warn("Falha no parsing do JSON da IA. Tentando fallback via Grounding...", e);
+            
+            // FALLBACK DE EMERGÊNCIA: Usar metadados da pesquisa (Grounding) se o JSON falhar
+            // Isso garante que SEMPRE teremos notícias se a busca encontrou algo
+            const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+            if (groundingChunks && groundingChunks.length > 0) {
+                articles = groundingChunks
+                    .filter(c => c.web?.title && c.web?.uri)
+                    .map((c, idx) => ({
+                        source: new URL(c.web!.uri!).hostname.replace('www.', ''),
+                        title: c.web!.title!,
+                        summary: "Notícia encontrada via busca rápida.",
+                        impactAnalysis: "Clique para ler a matéria completa.",
+                        date: new Date().toISOString(),
+                        sentiment: 'Neutral',
+                        category: 'Mercado',
+                        impactLevel: 'Medium',
+                        url: c.web!.uri!
+                    }))
+                    .slice(0, 6); // Limita a 6 itens
+            }
           }
+
+          if (!Array.isArray(articles) || articles.length === 0) return [];
+
+          // GROUNDING & LINK RECOVERY (A Mágica da Correção)
+          const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+              ?.map(c => c.web)
+              .filter(Boolean)
+              .flatMap(w => ({ uri: w?.uri, title: w?.title })) || [];
+
+          return articles.map(article => {
+                let finalUrl = article.url;
+                
+                // Validação de URL: Se for curta demais, 'example', ou vazia, buscamos no Grounding
+                const isSuspiciousUrl = !finalUrl || finalUrl.length < 12 || finalUrl.includes('example') || finalUrl.includes('google.com/search');
+                
+                if (isSuspiciousUrl && webSources.length > 0) {
+                    // Tenta encontrar um link que tenha palavras do título da notícia
+                    const titleWords = article.title.toLowerCase().split(' ').filter(w => w.length > 4);
+                    
+                    const match = webSources.find(src => 
+                        src.title && titleWords.some(word => src.title?.toLowerCase().includes(word))
+                    );
+                    
+                    if (match?.uri) {
+                        finalUrl = match.uri;
+                    } else {
+                        // Fallback para o primeiro link de fonte confiável encontrado
+                        finalUrl = webSources[0].uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
+                    }
+                }
+
+                // Garante categorias válidas
+                const validCategories = ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"];
+                const category = validCategories.includes(article.category || '') ? article.category : 'Mercado';
+
+                return {
+                  ...article,
+                  url: finalUrl,
+                  category: category as any,
+                  impactLevel: article.impactLevel || 'Medium',
+                  // Se a imagem vier vazia ou quebrada, o front-end usará o fallback determinístico
+                  imageUrl: article.imageUrl && article.imageUrl.startsWith('http') ? article.imageUrl : undefined 
+                };
+            });
       });
   } catch (error) {
       console.warn("Erro na API de Notícias:", error);
@@ -225,11 +259,10 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
             }
         });
         
-        let jsonText = response.text || '[]';
-        jsonText = jsonText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-
+        const jsonText = response.text || '[]';
+        
         try {
-            const data = JSON.parse(jsonText);
+            const data = extractJSON(jsonText); // Usando a função helper robusta
             const result: Record<string, AdvancedAssetData> = {};
 
             if (Array.isArray(data)) {
