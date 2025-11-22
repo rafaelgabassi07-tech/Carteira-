@@ -3,22 +3,16 @@ import { GoogleGenAI, Type, Schema } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
 function getGeminiApiKey(prefs: AppPreferences): string {
-    // Priority 1: User-provided key from settings
     if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
         return prefs.geminiApiKey;
     }
-    
-    // Priority 2: Environment variable (Vite's way)
     const envApiKey = (import.meta as any).env.VITE_API_KEY;
     if (envApiKey && envApiKey.trim() !== '') {
         return envApiKey;
     }
-
     throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada.");
 }
 
-
-// --- API Call Resiliency ---
 async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> {
   let attempt = 0;
   while (attempt < maxRetries) {
@@ -42,20 +36,18 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 3, initialDe
   throw new Error("Serviço de IA indisponível no momento.");
 }
 
-// --- SCHEMAS (Structured Outputs) ---
-
 const newsArticleSchema: Schema = {
     type: Type.OBJECT,
     properties: {
         source: { type: Type.STRING, description: "Nome da fonte (ex: Valor, InfoMoney)." },
         title: { type: Type.STRING, description: "Manchete original." },
         summary: { type: Type.STRING, description: "Resumo conciso do fato (max 30 palavras)." },
-        impactAnalysis: { type: Type.STRING, description: "Análise crítica em 1 frase: Por que isso importa para o investidor de FIIs?" },
+        impactAnalysis: { type: Type.STRING, description: "Análise crítica: Por que isso move o preço ou afeta dividendos?" },
         date: { type: Type.STRING, description: "Data YYYY-MM-DD." },
         sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] },
-        category: { type: Type.STRING, enum: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"], description: "Categoria principal da notícia." },
-        impactLevel: { type: Type.STRING, enum: ["High", "Medium", "Low"], description: "Nível de impacto potencial nos preços ou dividendos." },
-        imageUrl: { type: Type.STRING, description: "URL da imagem principal da notícia (thumbnail/og:image) encontrada na busca. Tente ao máximo encontrar uma imagem real." }
+        category: { type: Type.STRING, enum: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"] },
+        impactLevel: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
+        imageUrl: { type: Type.STRING, description: "Tente encontrar a URL da imagem de capa da notícia original nos resultados da busca. Se não encontrar, deixe em branco." }
     },
     required: ["source", "title", "summary", "impactAnalysis", "date", "sentiment", "category", "impactLevel"]
 };
@@ -63,8 +55,20 @@ const newsArticleSchema: Schema = {
 const newsListSchema: Schema = {
     type: Type.ARRAY,
     items: newsArticleSchema,
-    description: "Lista de notícias financeiras analisadas."
 };
+
+// ... (AdvancedAssetData types remain the same) ...
+export interface AdvancedAssetData {
+    dy: number;
+    pvp: number;
+    sector: string;
+    administrator: string;
+    vacancyRate: number;
+    dailyLiquidity: number;
+    shareholders: number;
+    nextPaymentDate?: string;
+    lastDividend?: number;
+}
 
 const advancedAssetDataSchema: Schema = {
     type: Type.ARRAY,
@@ -72,26 +76,21 @@ const advancedAssetDataSchema: Schema = {
     items: {
         type: Type.OBJECT,
         properties: {
-            ticker: { type: Type.STRING, description: "Símbolo do ativo (ticker)." },
-            dy: { type: Type.NUMBER, description: "Dividend Yield 12M (%)" },
-            pvp: { type: Type.NUMBER, description: "P/VP" },
-            sector: { type: Type.STRING, description: "Segmento padronizado." },
-            administrator: { type: Type.STRING, description: "Administradora." },
-            vacancyRate: { type: Type.NUMBER, description: "Vacância Física (%)" },
-            dailyLiquidity: { type: Type.NUMBER, description: "Liquidez diária." },
-            shareholders: { type: Type.NUMBER, description: "Número de cotistas." },
-            nextPaymentDate: { type: Type.STRING, description: "Data EXATA de PAGAMENTO anunciada (Payment Date) para o mês corrente ou próximo. Formato YYYY-MM-DD. Exemplo: Se o fundo anunciou pagamento para 15/12/2025, retorne '2025-12-15'." },
-            lastDividend: { type: Type.NUMBER, description: "Valor do rendimento (R$/cota) referente a essa data de pagamento." }
+            ticker: { type: Type.STRING },
+            dy: { type: Type.NUMBER },
+            pvp: { type: Type.NUMBER },
+            sector: { type: Type.STRING },
+            administrator: { type: Type.STRING },
+            vacancyRate: { type: Type.NUMBER },
+            dailyLiquidity: { type: Type.NUMBER },
+            shareholders: { type: Type.NUMBER },
+            nextPaymentDate: { type: Type.STRING },
+            lastDividend: { type: Type.NUMBER }
         },
         required: ["ticker", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
 };
 
-// --- SERVICES ---
-
-/**
- * Finds the most likely URL for a summarized article by comparing its title to the titles of grounded search results.
- */
 function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?: string }>): string | undefined {
     if (!articleTitle || typeof articleTitle !== 'string') return undefined;
     
@@ -130,7 +129,7 @@ export interface NewsFilter {
     query?: string;
     tickers?: string[];
     dateRange?: 'today' | 'week' | 'month';
-    sources?: string; // Comma separated string
+    sources?: string;
 }
 
 export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<NewsArticle[]> {
@@ -143,7 +142,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   }
   
   const ai = new GoogleGenAI({ apiKey });
-  const contextTickers = filter.tickers?.slice(0, 8).join(', '); // Increased context
+  const contextTickers = filter.tickers?.slice(0, 8).join(', ');
   
   let dateConstraint = "";
   switch (filter.dateRange) {
@@ -155,21 +154,25 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
   let sourceConstraint = "";
   if (filter.sources && filter.sources.trim().length > 0) {
-      sourceConstraint = `Priorize notícias das seguintes fontes: ${filter.sources}.`;
+      sourceConstraint = `Priorize fontes: ${filter.sources}.`;
   }
 
-  const jsonInstruction = ` Responda ESTRITAMENTE com um array JSON correspondente ao schema: ${JSON.stringify(newsListSchema)}. Analise cada notícia como um especialista em Fundos Imobiliários. IMPORTANTE: Tente encontrar a URL da imagem real da notícia (thumbnail/og:image) no contexto da busca.`;
-  
-  let prompt: string;
-  if (filter.query && filter.query.trim()) {
-      prompt = `Encontre notícias financeiras ${dateConstraint} sobre "${filter.query}". ${sourceConstraint} Foque no impacto para investidores de FIIs.` + jsonInstruction;
-  } else {
-      // Prompt otimizado para gerar insights mais valiosos
-      prompt = `Atue como um analista sênior de FIIs. Busque as 6 notícias mais críticas do mercado brasileiro de Fundos Imobiliários (FIIs) e Macroeconomia ${dateConstraint}. 
-      Contexto da carteira do usuário (Tickers): ${contextTickers || 'Geral'}.
-      Se houver notícias específicas sobre esses ativos, priorize-as. Caso contrário, foque em notícias macro (Selic, inflação, legislação) que impactam o setor imobiliário.
-      ${sourceConstraint}` + jsonInstruction;
-  }
+  // Prompt Refinado para Imagens e Links
+  const prompt = `
+    Atue como analista financeiro sênior. Busque as 6 notícias mais relevantes do mercado de FIIs (Fundos Imobiliários) e Macroeconomia do Brasil ${dateConstraint}.
+    
+    Contexto (Tickers do usuário): ${contextTickers || 'Geral do mercado'}.
+    
+    ${sourceConstraint}
+
+    INSTRUÇÕES CRÍTICAS:
+    1. Retorne ESTRITAMENTE um JSON Array válido com o schema abaixo. NADA MAIS.
+    2. Para cada notícia, analise o impacto real no bolso do investidor.
+    3. Tente extrair a URL da IMAGEM da notícia (thumbnail) se disponível nos metadados da busca.
+    
+    SCHEMA JSON ESPERADO:
+    ${JSON.stringify(newsListSchema)}
+  `;
 
   try {
       return await withRetry(async () => {
@@ -178,15 +181,14 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
+                temperature: 0.1, // Reduz alucinações
             }
           });
           
           const responseText = response.text?.trim() || '';
-          if (!responseText) {
-              console.warn("Gemini returned an empty response for news.");
-              return [];
-          }
+          if (!responseText) return [];
 
+          // Extração robusta de JSON
           let jsonText = responseText;
           const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
           if (jsonMatch && jsonMatch[1]) {
@@ -199,49 +201,38 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
             if (Array.isArray(parsedData)) {
                 articles = parsedData;
-            } 
-            else if (typeof parsedData === 'object' && parsedData !== null) {
-                const arrayKey = Object.keys(parsedData).find(key => Array.isArray((parsedData as any)[key]));
-                if (arrayKey) {
-                    articles = (parsedData as any)[arrayKey];
-                }
+            } else if (typeof parsedData === 'object' && parsedData !== null) {
+                // Tenta encontrar array dentro do objeto
+                const possibleArray = Object.values(parsedData).find(val => Array.isArray(val));
+                if (possibleArray) articles = possibleArray as NewsArticle[];
             }
             
-            if (articles.length === 0) {
-                 console.warn("Could not find a valid news array in the Gemini response.", parsedData);
-                 return [];
-            }
+            if (articles.length === 0) return [];
 
             const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
   
             return articles
-              .filter(article => article && typeof article.title === 'string' && article.title.trim() !== '')
-              .map(article => ({
-                ...article,
-                url: findBestUrl(article.title, webSources),
-            }));
+              .filter(article => article && article.title)
+              .map(article => {
+                  // Tenta encontrar a URL da fonte original
+                  const foundUrl = findBestUrl(article.title, webSources);
+                  return {
+                    ...article,
+                    url: foundUrl || article.url, // Prioriza URL encontrada no grounding
+                    category: article.category || 'Mercado',
+                    impactLevel: article.impactLevel || 'Medium'
+                  };
+              });
 
           } catch(e) {
-            console.error("Failed to parse JSON response from Gemini:", e);
+            console.error("Erro ao processar JSON do Gemini:", e);
             return [];
           }
       });
   } catch (error) {
-      console.warn("News fetch failed:", error);
+      console.warn("Falha ao buscar notícias:", error);
       return []; 
   }
-}
-
-export interface AdvancedAssetData {
-    dy: number;
-    pvp: number;
-    sector: string;
-    administrator: string;
-    vacancyRate: number;
-    dailyLiquidity: number;
-    shareholders: number;
-    nextPaymentDate?: string;
-    lastDividend?: number;
 }
 
 export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
@@ -255,77 +246,54 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    
-    // Get current date context for the AI
     const now = new Date();
-    const currentMonth = now.toLocaleString('pt-BR', { month: 'long' });
-    const currentYear = now.getFullYear();
     const currentDate = now.toISOString().split('T')[0];
 
-    // Include structure in prompt since we removed responseSchema config to allow Tools
-    const prompt = `Data de hoje: ${currentDate} (${currentMonth}/${currentYear}).
-    
-    Busque dados fundamentalistas ATUALIZADOS para: ${tickers.join(', ')}. 
-    
-    Para cada ativo, retorne os dados técnicos e, CRUCIALMENTE, pesquise pelo "Aviso aos Cotistas" ou "Comunicado ao Mercado" mais recente para identificar dividendos.
-    
-    Retorne APENAS um JSON array válido seguindo este formato, sem markdown adicional:
-    ${JSON.stringify(advancedAssetDataSchema)}
-
-    Campos Obrigatórios:
-    - dy: Dividend Yield 12M (%)
-    - pvp: P/VP
-    - sector: Segmento ('Tijolo - Shoppings', 'Papel', etc)
-    - administrator: Administradora
-    - vacancyRate: Vacância Física (%)
-    - dailyLiquidity: Liquidez Diária
-    - shareholders: Nº Cotistas
-    - nextPaymentDate: A data de PAGAMENTO (não a Data Com) do provento referente ao ciclo atual (${currentMonth}). Se já foi pago, retorne essa data passada. Se vai ser pago no futuro (este mês ou próximo), retorne a data futura. Formato YYYY-MM-DD.
-    - lastDividend: O valor anunciado (R$/cota).`;
+    const prompt = `Data de hoje: ${currentDate}.
+    Busque dados fundamentalistas para: ${tickers.join(', ')}. 
+    Retorne um JSON array válido (sem markdown) com: dy, pvp, sector, administrator, vacancyRate, dailyLiquidity, shareholders, nextPaymentDate (YYYY-MM-DD, pagamento real), lastDividend.
+    Use Tools para buscar dados reais.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
-                // Conflict fix: Cannot use responseMimeType with tools in standard config
-                // responseMimeType: "application/json", 
-                // responseSchema: advancedAssetDataSchema,
                 temperature: 0,
                 tools: [{googleSearch: {}}] 
             }
         });
         
-        // Robust JSON Parsing from potential Markdown block
         const responseText = response.text || '[]';
         let jsonText = responseText;
         const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (jsonMatch && jsonMatch[1]) {
-            jsonText = jsonMatch[1];
-        }
+        if (jsonMatch && jsonMatch[1]) jsonText = jsonMatch[1];
 
-        const data = JSON.parse(jsonText);
-        const result: Record<string, AdvancedAssetData> = {};
+        try {
+            const data = JSON.parse(jsonText);
+            const result: Record<string, AdvancedAssetData> = {};
 
-        if (Array.isArray(data)) {
-            data.forEach((item: any) => {
-                if (item.ticker) {
-                    result[item.ticker.toUpperCase()] = {
-                        dy: Number(item.dy || 0),
-                        pvp: Number(item.pvp || 1),
-                        sector: item.sector || 'Outros',
-                        administrator: item.administrator || 'N/A',
-                        vacancyRate: Number(item.vacancyRate),
-                        dailyLiquidity: Number(item.dailyLiquidity || 0),
-                        shareholders: Number(item.shareholders || 0),
-                        nextPaymentDate: item.nextPaymentDate || undefined,
-                        lastDividend: Number(item.lastDividend || 0)
-                    };
-                }
-            });
+            if (Array.isArray(data)) {
+                data.forEach((item: any) => {
+                    if (item.ticker) {
+                        result[item.ticker.toUpperCase()] = {
+                            dy: Number(item.dy || 0),
+                            pvp: Number(item.pvp || 1),
+                            sector: item.sector || 'Outros',
+                            administrator: item.administrator || 'N/A',
+                            vacancyRate: Number(item.vacancyRate),
+                            dailyLiquidity: Number(item.dailyLiquidity || 0),
+                            shareholders: Number(item.shareholders || 0),
+                            nextPaymentDate: item.nextPaymentDate,
+                            lastDividend: Number(item.lastDividend || 0)
+                        };
+                    }
+                });
+            }
+            return result;
+        } catch (e) {
+            return {};
         }
-        
-        return result;
     });
 }
 
@@ -339,7 +307,6 @@ export async function validateGeminiKey(key: string): Promise<boolean> {
         });
         return true;
     } catch (error) {
-        console.error("Gemini key validation failed:", error);
         return false;
     }
 }

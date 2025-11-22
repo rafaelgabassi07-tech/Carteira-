@@ -41,7 +41,7 @@ const FALLBACK_IMAGES: Record<string, string[]> = {
 
 const getFallbackImage = (category: string = 'Geral', title: string): string => {
     const cat = FALLBACK_IMAGES[category] ? category : 'Geral';
-    const images = FALLBACK_IMAGES[cat];
+    const images = FALLBACK_IMAGES[cat] || FALLBACK_IMAGES['Geral'];
     
     // Hash determinístico do título para escolher sempre a mesma imagem para a mesma notícia
     let hash = 0;
@@ -108,9 +108,9 @@ const NewsHero: React.FC<{ article: NewsArticle; onClick: () => void }> = ({ art
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                         {article.source} • {new Date(article.date).toLocaleDateString()}
                     </span>
-                    <span className="text-white text-xs font-bold group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                        Ler destaque <ShareIcon className="w-3 h-3" />
-                    </span>
+                    <button className="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-lg transition-all border border-white/20 flex items-center gap-2">
+                        Ler notícia <ShareIcon className="w-3 h-3" />
+                    </button>
                 </div>
             </div>
         </div>
@@ -197,10 +197,9 @@ const NewsCard: React.FC<{
                 <span className="text-[9px] text-[var(--text-secondary)]">{new Date(article.date).toLocaleDateString()}</span>
             </div>
             <button 
-                onClick={handleShare}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-colors"
+                className="text-[10px] font-bold bg-[var(--bg-tertiary-hover)] hover:bg-[var(--accent-color)] hover:text-white text-[var(--text-secondary)] px-2 py-1 rounded transition-colors flex items-center gap-1"
             >
-                <ShareIcon className="w-4 h-4" />
+                Ler mais <ShareIcon className="w-3 h-3" />
             </button>
         </div>
       </div>
