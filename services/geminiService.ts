@@ -262,12 +262,16 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const currentYear = now.getFullYear();
     const currentDate = now.toISOString().split('T')[0];
 
+    // Include structure in prompt since we removed responseSchema config to allow Tools
     const prompt = `Data de hoje: ${currentDate} (${currentMonth}/${currentYear}).
     
     Busque dados fundamentalistas ATUALIZADOS para: ${tickers.join(', ')}. 
     
     Para cada ativo, retorne os dados técnicos e, CRUCIALMENTE, pesquise pelo "Aviso aos Cotistas" ou "Comunicado ao Mercado" mais recente para identificar dividendos.
     
+    Retorne APENAS um JSON array válido seguindo este formato, sem markdown adicional:
+    ${JSON.stringify(advancedAssetDataSchema)}
+
     Campos Obrigatórios:
     - dy: Dividend Yield 12M (%)
     - pvp: P/VP
@@ -284,14 +288,23 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
-                responseSchema: advancedAssetDataSchema,
+                // Conflict fix: Cannot use responseMimeType with tools in standard config
+                // responseMimeType: "application/json", 
+                // responseSchema: advancedAssetDataSchema,
                 temperature: 0,
-                tools: [{googleSearch: {}}] // Essential for real-time dividend dates
+                tools: [{googleSearch: {}}] 
             }
         });
         
-        const data = JSON.parse(response.text || '[]');
+        // Robust JSON Parsing from potential Markdown block
+        const responseText = response.text || '[]';
+        let jsonText = responseText;
+        const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+            jsonText = jsonMatch[1];
+        }
+
+        const data = JSON.parse(jsonText);
         const result: Record<string, AdvancedAssetData> = {};
 
         if (Array.isArray(data)) {
