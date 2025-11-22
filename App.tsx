@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import BottomNav from './components/BottomNav';
 import PortfolioView from './views/PortfolioView';
@@ -277,7 +278,7 @@ const App: React.FC = () => {
        
        <aside className={`hidden md:flex flex-col w-64 xl:w-72 flex-shrink-0 z-20 mobile-landscape-sidebar transition-all duration-300
             ${isPremium 
-                ? 'bg-[var(--bg-secondary)] backdrop-blur-2xl border border-white/10 shadow-2xl rounded-3xl m-4 h-[calc(100vh-2rem)]' 
+                ? 'bg-[var(--bg-secondary)] rounded-3xl m-4 h-[calc(100vh-2rem)]' 
                 : 'bg-[var(--bg-secondary)] border-r border-[var(--border-color)] h-screen'}`
        }>
           <div className={`p-6 flex items-center gap-3 sidebar-title mb-2 ${isPremium ? '' : 'pt-8'}`}>

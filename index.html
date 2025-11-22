@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
   <head>
@@ -23,6 +24,7 @@
         --backdrop-blur: 0px;
         --card-shadow: none;
         --glass-border: 1px solid transparent;
+        --glass-highlight: none;
         
         /* Colors */
         --accent-color: #38bdf8;
@@ -42,6 +44,7 @@
           --backdrop-blur: 0px;
           --card-shadow: none;
           --glass-border: 1px solid var(--border-color);
+          --glass-highlight: none;
       }
       [data-style="simple"][data-theme="dark"] {
           --bg-primary-rgb: 9, 9, 11;
@@ -64,19 +67,24 @@
           --text-secondary: #64748b;
       }
 
-      /* STYLE: PREMIUM */
+      /* STYLE: PREMIUM (Glassmorphism Enhanced) */
       [data-style="premium"] {
           --backdrop-blur: 40px;
-          --card-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5);
       }
       [data-style="premium"][data-theme="dark"] {
           --bg-primary-rgb: 5, 5, 5;
           --bg-secondary-rgb: 20, 20, 25;
           --bg-primary: #050505;
-          --bg-secondary: rgba(20, 20, 25, 0.60); 
+          /* More transparent for depth */
+          --bg-secondary: rgba(20, 20, 25, 0.50); 
           --bg-tertiary-hover: rgba(255, 255, 255, 0.08);
           --border-color: rgba(255, 255, 255, 0.08);
+          /* Thinner, subtle border */
           --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+          /* Top inner shine simulating light hitting the glass edge */
+          --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+          /* Softer, deeper shadow */
+          --card-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.7);
           --text-primary: #ffffff;
           --text-secondary: #a1a1aa;
       }
@@ -84,11 +92,12 @@
           --bg-primary-rgb: 240, 244, 248;
           --bg-secondary-rgb: 255, 255, 255;
           --bg-primary: #f0f4f8;
-          --bg-secondary: rgba(255, 255, 255, 0.65);
+          --bg-secondary: rgba(255, 255, 255, 0.60);
           --bg-tertiary-hover: rgba(255, 255, 255, 0.85);
           --border-color: rgba(0, 0, 0, 0.06); 
-          --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
-          --glass-border: 1px solid rgba(255, 255, 255, 0.5);
+          --glass-border: 1px solid rgba(255, 255, 255, 0.6);
+          --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
+          --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
           --text-primary: #1e293b; 
           --text-secondary: #475569; 
       }
@@ -116,16 +125,16 @@
 
       /* --- UNIVERSAL GLASS COMPONENT CLASSES --- */
       
-      /* Overwrite Tailwind utility to use CSS vars for true glass effect */
+      /* 
+         Overwrite Tailwind utility to use CSS vars for true glass effect 
+         Now includes --glass-highlight for that "expensive 3D glass" look
+      */
       .bg-\[var\(--bg-secondary\)\] {
           background-color: var(--bg-secondary);
           backdrop-filter: blur(var(--backdrop-blur));
           -webkit-backdrop-filter: blur(var(--backdrop-blur));
-          box-shadow: var(--card-shadow);
           border: var(--glass-border);
-          box-shadow: 
-            var(--card-shadow), 
-            inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+          box-shadow: var(--card-shadow), var(--glass-highlight);
       }
       
       /* Specific overrides for Floating Elements */
@@ -134,12 +143,13 @@
           backdrop-filter: blur(var(--backdrop-blur));
           -webkit-backdrop-filter: blur(var(--backdrop-blur));
           border-bottom: 1px solid var(--border-color);
+          box-shadow: var(--glass-highlight);
       }
       
       [data-style="premium"] .glass {
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          /* Fix: Use RGB var for opacity, not nested rgba */
-          background-color: rgba(var(--bg-secondary-rgb), 0.85);
+          border: var(--glass-border); /* Full border in premium */
+          background-color: rgba(var(--bg-secondary-rgb), 0.75); /* Slightly more opaque for headers */
+          box-shadow: var(--card-shadow), var(--glass-highlight);
       }
 
       /* Scrollbar Polish */
