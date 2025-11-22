@@ -229,12 +229,12 @@ const App: React.FC = () => {
   const isNavVisible = !['assetDetail', 'notificacoes'].includes(activeView);
 
   return (
-    <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden">
+    <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout">
        {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
        
-       {/* Desktop Sidebar */}
-       <aside className="hidden md:flex flex-col w-64 xl:w-72 h-screen border-r border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0 z-20">
-          <div className="p-6 flex items-center gap-3">
+       {/* Sidebar for Desktop & Mobile Landscape */}
+       <aside className="hidden md:flex flex-col w-64 xl:w-72 h-screen border-r border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0 z-20 mobile-landscape-sidebar">
+          <div className="p-6 flex items-center gap-3 sidebar-title">
              <div className="w-8 h-8 rounded-lg bg-[var(--accent-color)] flex items-center justify-center text-[var(--bg-primary)]">
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
              </div>
@@ -275,7 +275,7 @@ const App: React.FC = () => {
           </div>
           
           {/* Mobile Bottom Nav Wrapper */}
-          <div className="md:hidden">
+          <div className="md:hidden mobile-landscape-bottom-nav">
              {isNavVisible && <BottomNav activeView={activeView} setActiveView={navigateTo} />}
           </div>
        </main>

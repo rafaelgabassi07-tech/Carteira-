@@ -94,6 +94,41 @@
       .animate-wipe-in { animation: wipe-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .animate-subtle-fade-in { animation: subtle-fade-in 0.3s ease-out forwards; }
       .animate-slide-in-right { animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+      /* Mobile Landscape Overrides */
+      @media (orientation: landscape) and (max-width: 767px) {
+        .mobile-landscape-layout {
+            flex-direction: row !important;
+        }
+        .mobile-landscape-sidebar {
+            display: flex !important;
+            width: 12rem !important;
+        }
+        .mobile-landscape-sidebar .sidebar-title {
+            padding: 1rem !important;
+        }
+        .mobile-landscape-sidebar .sidebar-title h1 {
+            font-size: 1.125rem !important;
+        }
+        .mobile-landscape-sidebar .sidebar-title p {
+            display: none;
+        }
+        .mobile-landscape-bottom-nav {
+            display: none !important;
+        }
+        .landscape-grid-cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+        .landscape-grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+        .landscape-pb-6 {
+            padding-bottom: 1.5rem !important;
+        }
+        .landscape-fab {
+            bottom: 1.5rem !important;
+        }
+      }
     </style>
   <script type="importmap">
 {
