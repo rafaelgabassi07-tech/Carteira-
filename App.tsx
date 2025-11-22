@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import BottomNav from './components/BottomNav';
 import PortfolioView from './views/PortfolioView';
 import NewsView from './views/NewsView';
-import SettingsView from './views/SettingsView';
+import SettingsView, { type MenuScreen } from './views/SettingsView';
 import TransactionsView from './views/TransactionsView';
 import NotificationsView from './views/NotificationsView';
 import AnalysisView from './views/AnalysisView';
@@ -34,6 +35,7 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [transactionFilter, setTransactionFilter] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [settingsStartScreen, setSettingsStartScreen] = useState<MenuScreen>('main');
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
@@ -160,7 +162,14 @@ const App: React.FC = () => {
 
   const navigateTo = (view: View) => {
     setPreviousView(activeView);
+    // Reset settings screen to main when navigating normally
+    if (view === 'settings') setSettingsStartScreen('main');
     setActiveView(view);
+  };
+
+  const navigateToSettings = (screen: MenuScreen) => {
+      setSettingsStartScreen(screen);
+      setActiveView('settings');
   };
 
   const handleSelectAsset = (ticker: string) => {
@@ -198,9 +207,9 @@ const App: React.FC = () => {
       case 'noticias':
         return <NewsView addToast={addToast} />;
       case 'settings':
-        return <SettingsView addToast={addToast} />;
+        return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'notificacoes':
-        return <NotificationsView setActiveView={navigateTo} onSelectAsset={handleSelectAsset} />;
+        return <NotificationsView setActiveView={navigateTo} onSelectAsset={handleSelectAsset} onOpenSettings={navigateToSettings} />;
       case 'assetDetail':
         return <AssetDetailView ticker={selectedTicker!} onBack={handleBack} onViewTransactions={handleViewTransactions} />;
       default:

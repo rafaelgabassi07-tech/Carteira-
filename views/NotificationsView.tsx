@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import type { View, } from '../App';
 import type { NotificationType } from '../types';
+import type { MenuScreen } from './SettingsView';
 import { usePersistentState, vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -24,7 +25,7 @@ const NotificationIcon: React.FC<{ type: string }> = ({ type }) => {
     }
 };
 
-const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelectAsset: (ticker: string) => void; }> = ({ setActiveView, onSelectAsset }) => {
+const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelectAsset: (ticker: string) => void; onOpenSettings: (screen: MenuScreen) => void; }> = ({ setActiveView, onSelectAsset, onOpenSettings }) => {
     const { t } = useI18n();
     const { assets } = usePortfolio();
     
@@ -74,9 +75,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
 
     const goToSettings = () => {
         vibrate();
-        setActiveView('settings');
-        // Assuming 'settings' view defaults to main, user navigates to notifications manually 
-        // or we could pass a param to open notifications section directly if supported
+        onOpenSettings('notifications');
     };
 
     const groupedNotifications = useMemo(() => {

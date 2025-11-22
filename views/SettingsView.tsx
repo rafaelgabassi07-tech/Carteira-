@@ -20,10 +20,11 @@ export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'ba
 
 interface SettingsViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
+    initialScreen?: MenuScreen;
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ addToast }) => {
-    const [screen, setScreen] = useState<MenuScreen>('main');
+const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = 'main' }) => {
+    const [screen, setScreen] = useState<MenuScreen>(initialScreen);
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const { t } = useI18n();
 
