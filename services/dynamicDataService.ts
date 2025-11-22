@@ -21,7 +21,7 @@ const getFutureDate = (days: number): Date => {
 
 // Generates estimated dividend data based on current portfolio YIELD (not random)
 export const generateDividends = (assets: Asset[], forceRefresh = false): Dividend[] => {
-    const cacheKey = 'portfolio_dividends';
+    const cacheKey = 'portfolio_dividends_v2';
     
     if (!forceRefresh) {
         const cached = CacheManager.get<Dividend[]>(cacheKey, CACHE_TTL.DIVIDENDS);
@@ -45,26 +45,27 @@ export const generateDividends = (assets: Asset[], forceRefresh = false): Divide
 };
 
 // Generates calendar events
-export const generateCalendarEvents = (assets: Asset[], forceRefresh = false): CalendarEvent[] => {
-    const cacheKey = 'portfolio_calendar';
-
-    if (!forceRefresh) {
-        const cached = CacheManager.get<CalendarEvent[]>(cacheKey, CACHE_TTL.CALENDAR);
-        if (cached) return cached;
-    }
-
+// Cache removed to ensure reactivity when portfolio changes
+export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
+    
     // Only generate if we have assets
     if (assets.length > 0) {
         assets.forEach(asset => {
              // Prediction logic: usually FIIs pay on 15th
              const nextPayment = new Date();
              nextPayment.setDate(15);
-             if (nextPayment < new Date()) nextPayment.setMonth(nextPayment.getMonth() + 1);
+             
+             // If today is past the 15th, assume next month
+             if (new Date().getDate() > 15) {
+                 nextPayment.setMonth(nextPayment.getMonth() + 1);
+             }
 
              const dy = asset.dy || 0;
              let projectedAmount = 0;
+             
              // Calculate projected amount based on monthly yield estimate
+             // Formula: (Current Price * (DY Annual / 100)) / 12 * Quantity
              if (dy > 0 && asset.currentPrice > 0) {
                  const monthlyPerShare = (asset.currentPrice * (dy / 100)) / 12;
                  projectedAmount = monthlyPerShare * asset.quantity;
@@ -79,9 +80,8 @@ export const generateCalendarEvents = (assets: Asset[], forceRefresh = false): C
         });
     }
     
-    const sortedEvents = events.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    CacheManager.set(cacheKey, sortedEvents);
-    return sortedEvents;
+    // Sort by date
+    return events.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 };
 
 // Generates notifications

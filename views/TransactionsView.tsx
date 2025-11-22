@@ -82,41 +82,47 @@ const TransactionModal: React.FC<{
 
     return (
         <Modal title={isEditMode ? t('edit_transaction') : t('add_transaction')} onClose={onClose}>
-            <form onSubmit={handleSubmit} className="space-y-5 pb-4">
-                 <div>
-                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2 block">{t('type')}</label>
-                    <div className="flex space-x-3">
-                        <div className="relative flex-1">
-                            <input type="radio" id="type-buy" checked={type === 'Compra'} onChange={() => setType('Compra')} className="peer hidden" />
-                            <label htmlFor="type-buy" onClick={() => vibrate(5)} className="block text-center py-3 rounded-xl border-2 border-[var(--border-color)] cursor-pointer peer-checked:bg-green-500/10 peer-checked:text-green-500 peer-checked:border-green-500 transition-all font-bold hover:bg-[var(--bg-tertiary-hover)]">{t('buy')}</label>
-                        </div>
-                        <div className="relative flex-1">
-                            <input type="radio" id="type-sell" checked={type === 'Venda'} onChange={() => setType('Venda')} className="peer hidden" />
-                            <label htmlFor="type-sell" onClick={() => vibrate(5)} className="block text-center py-3 rounded-xl border-2 border-[var(--border-color)] cursor-pointer peer-checked:bg-red-500/10 peer-checked:text-red-500 peer-checked:border-red-500 transition-all font-bold hover:bg-[var(--bg-tertiary-hover)]">{t('sell')}</label>
-                        </div>
-                    </div>
+            <form onSubmit={handleSubmit} className="space-y-3 pb-24 md:pb-6">
+                 {/* Compact Type Selector */}
+                 <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)] mb-2">
+                    <button
+                        type="button"
+                        onClick={() => { setType('Compra'); vibrate(); }}
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${type === 'Compra' ? 'bg-green-500 text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                    >
+                        {t('buy')}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { setType('Venda'); vibrate(); }}
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${type === 'Venda' ? 'bg-red-500 text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                    >
+                        {t('sell')}
+                    </button>
                 </div>
+
                 <div>
-                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('ticker')}</label>
+                    <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-0.5 block">{t('ticker')}</label>
                     <input 
                         value={ticker}
                         onChange={(e) => setTicker(e.target.value)}
                         onBlur={handleTickerBlur}
                         autoFocus 
-                        className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.ticker ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
+                        className={`w-full bg-[var(--bg-primary)] border rounded-lg p-2 text-base font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.ticker ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
                         autoCapitalize="characters" 
                         placeholder="MXRF11" 
                     />
-                    {errors.ticker && <p className="text-xs text-red-400 mt-1">{errors.ticker}</p>}
+                    {errors.ticker && <p className="text-[10px] text-red-400 mt-0.5">{errors.ticker}</p>}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('quantity')}</label>
-                        <input value={quantity} onChange={e => setQuantity(e.target.value)} type="number" inputMode="decimal" step="any" min="0" required className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
-                        {errors.quantity && <p className="text-xs text-red-400 mt-1">{errors.quantity}</p>}
+                        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-0.5 block">{t('quantity')}</label>
+                        <input value={quantity} onChange={e => setQuantity(e.target.value)} type="number" inputMode="decimal" step="any" min="0" required className={`w-full bg-[var(--bg-primary)] border rounded-lg p-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
+                        {errors.quantity && <p className="text-[10px] text-red-400 mt-0.5">{errors.quantity}</p>}
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('price_per_share')}</label>
+                        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-0.5 block">{t('price_per_share')}</label>
                         <input 
                             value={price}
                             onChange={(e) => setPrice(e.target.value)}
@@ -125,36 +131,36 @@ const TransactionModal: React.FC<{
                             step="0.01" 
                             min="0.01" 
                             required 
-                            className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.price ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
+                            className={`w-full bg-[var(--bg-primary)] border rounded-lg p-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.price ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
                         />
-                        {errors.price && <p className="text-xs text-red-400 mt-1">{errors.price}</p>}
+                        {errors.price && <p className="text-[10px] text-red-400 mt-0.5">{errors.price}</p>}
                     </div>
                 </div>
-                 <div className="grid grid-cols-2 gap-4">
+                 <div className="grid grid-cols-2 gap-3">
                      <div>
-                        <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('date')}</label>
-                        <input value={date} onChange={e => setDate(e.target.value)} type="date" required className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.date ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
-                        {errors.date && <p className="text-xs text-red-400 mt-1">{errors.date}</p>}
+                        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-0.5 block">{t('date')}</label>
+                        <input value={date} onChange={e => setDate(e.target.value)} type="date" required className={`w-full bg-[var(--bg-primary)] border rounded-lg p-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.date ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
+                        {errors.date && <p className="text-[10px] text-red-400 mt-0.5">{errors.date}</p>}
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('costs_fees')}</label>
-                        <input value={costs} onChange={e => setCosts(e.target.value)} type="number" inputMode="decimal" step="0.01" min="0" className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.costs ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
-                        {errors.costs && <p className="text-xs text-red-400 mt-1">{errors.costs}</p>}
+                        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-0.5 block">{t('costs_fees')}</label>
+                        <input value={costs} onChange={e => setCosts(e.target.value)} type="number" inputMode="decimal" step="0.01" min="0" className={`w-full bg-[var(--bg-primary)] border rounded-lg p-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.costs ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
+                        {errors.costs && <p className="text-[10px] text-red-400 mt-0.5">{errors.costs}</p>}
                     </div>
                  </div>
 
-                <div className="border-t border-[var(--border-color)] my-4 pt-4">
-                    <div className="flex justify-between items-center bg-[var(--bg-primary)] p-3 rounded-lg">
-                        <span className="text-sm font-bold text-[var(--text-secondary)]">Total da Operação:</span>
-                        <span className="text-xl font-bold text-[var(--accent-color)] tracking-tight">{formatCurrency(totalValue)}</span>
+                <div className="border-t border-[var(--border-color)] my-2 pt-3">
+                    <div className="flex justify-between items-center bg-[var(--bg-primary)] p-2.5 rounded-lg">
+                        <span className="text-xs font-bold text-[var(--text-secondary)]">Total:</span>
+                        <span className="text-lg font-bold text-[var(--accent-color)] tracking-tight">{formatCurrency(totalValue)}</span>
                     </div>
                 </div>
 
-                <div className="flex space-x-3">
+                <div className="flex space-x-3 pt-1">
                   {isEditMode && onDelete && (
-                      <button type="button" onClick={() => { vibrate(); onDelete(transaction!.id); }} className="w-1/3 bg-red-500/10 text-red-500 border border-red-500/30 font-bold py-3.5 rounded-xl hover:bg-red-500 hover:text-white transition-colors active:scale-95">{t('delete')}</button>
+                      <button type="button" onClick={() => { vibrate(); onDelete(transaction!.id); }} className="w-1/3 bg-red-500/10 text-red-500 border border-red-500/30 font-bold py-3 rounded-lg hover:bg-red-500 hover:text-white transition-colors active:scale-95 text-sm">{t('delete')}</button>
                   )}
-                  <button type="submit" className="flex-1 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3.5 rounded-xl shadow-lg shadow-[var(--accent-color)]/20 hover:shadow-[var(--accent-color)]/40 transition-all active:scale-95">{isEditMode ? t('save') : t('add')}</button>
+                  <button type="submit" className="flex-1 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3 rounded-lg shadow-lg shadow-[var(--accent-color)]/20 hover:shadow-[var(--accent-color)]/40 transition-all active:scale-95 text-sm">{isEditMode ? t('save') : t('add')}</button>
                 </div>
             </form>
         </Modal>
