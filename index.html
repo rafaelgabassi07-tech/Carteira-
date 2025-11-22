@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
   <head>
@@ -9,40 +10,68 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
-        /* Premium Fintech Dark Theme (Zinc based) */
-        --bg-primary: #09090b;   /* Zinc 950 */
-        --bg-secondary: #18181b; /* Zinc 900 */
-        --bg-tertiary-hover: #27272a; /* Zinc 800 */
-        --text-primary: #fafafa; /* Zinc 50 */
-        --text-secondary: #a1a1aa; /* Zinc 400 */
-        --border-color: #27272a; /* Zinc 800 */
+        /* Default Variables (will be overridden by styles) */
+        --bg-primary: #09090b;
+        --bg-secondary: #18181b;
+        --bg-tertiary-hover: #27272a;
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --border-color: #27272a;
+        --backdrop-blur: 0px;
+        --card-shadow: none;
         
-        /* Vibrancy & Finance Colors */
-        --accent-color: #38bdf8; /* Sky 400 */
+        /* Colors */
+        --accent-color: #38bdf8;
         --accent-color-text: #09090b; 
-        --green-text: #4ade80; /* Green 400 */
-        --red-text: #f87171; /* Red 400 */
+        --green-text: #4ade80;
+        --red-text: #f87171;
         
         /* Safe Area Insets */
         --safe-top: env(safe-area-inset-top);
         --safe-bottom: env(safe-area-inset-bottom);
       }
 
-      [data-theme="light"] {
-        /* Clean Fintech Light Theme */
-        --bg-primary: #f8fafc;   /* Slate 50 */
-        --bg-secondary: #ffffff; /* White */
-        --bg-tertiary-hover: #f1f5f9; /* Slate 100 */
-        --text-primary: #0f172a; /* Slate 900 */
-        --text-secondary: #64748b; /* Slate 500 */
-        --border-color: #e2e8f0; /* Slate 200 */
-        
-        --accent-color: #0ea5e9; /* Sky 500 */
-        --accent-color-text: #ffffff;
-        --green-text: #16a34a; /* Green 600 */
-        --red-text: #dc2626; /* Red 600 */
+      /* --- VISUAL STYLES --- */
+
+      /* STYLE: SIMPLE (Minimalist, Solid Colors) */
+      [data-style="simple"] {
+          --backdrop-blur: 0px;
+          --card-shadow: none;
+      }
+      [data-style="simple"][data-theme="dark"] {
+          --bg-primary: #09090b;
+          --bg-secondary: #18181b;
+          --bg-tertiary-hover: #27272a;
+          --border-color: #27272a;
+      }
+      [data-style="simple"][data-theme="light"] {
+          --bg-primary: #f8fafc;
+          --bg-secondary: #ffffff;
+          --bg-tertiary-hover: #f1f5f9;
+          --border-color: #e2e8f0;
       }
 
+      /* STYLE: PREMIUM (Glassmorphism, Gradients, Depth) */
+      [data-style="premium"] {
+          --backdrop-blur: 12px;
+          --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+      }
+      [data-style="premium"][data-theme="dark"] {
+          --bg-primary: #09090b;
+          /* Semi-transparent secondary for glass effect */
+          --bg-secondary: rgba(39, 39, 42, 0.55); 
+          --bg-tertiary-hover: rgba(63, 63, 70, 0.6);
+          --border-color: rgba(255, 255, 255, 0.08);
+      }
+      [data-style="premium"][data-theme="light"] {
+          --bg-primary: #f0f4f8;
+          --bg-secondary: rgba(255, 255, 255, 0.65);
+          --bg-tertiary-hover: rgba(255, 255, 255, 0.8);
+          --border-color: rgba(255, 255, 255, 0.4);
+          --card-shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
+      }
+
+      /* GLOBAL BASE STYLES */
       body {
         background-color: var(--bg-primary);
         color: var(--text-primary);
@@ -51,51 +80,47 @@
         padding-top: var(--safe-top);
         padding-bottom: var(--safe-bottom);
         -webkit-tap-highlight-color: transparent;
-        /* Subtle Aurora Background for Depth */
+      }
+
+      /* Premium Background Effect (Only visible in Premium Style) */
+      body[data-style="premium"] {
         background-image: 
-          radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.08), transparent 40%),
-          radial-gradient(circle at 90% 10%, rgba(74, 222, 128, 0.05), transparent 30%);
+          radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.12), transparent 45%),
+          radial-gradient(circle at 90% 10%, rgba(74, 222, 128, 0.08), transparent 35%),
+          radial-gradient(circle at 0% 20%, rgba(168, 85, 247, 0.05), transparent 40%);
         background-attachment: fixed;
       }
 
-      /* Refined Global Scrollbar */
+      /* --- UNIVERSAL GLASS COMPONENT CLASSES --- */
+      
+      /* The main card class to use instead of static bg-secondary */
+      .bg-\[var\(--bg-secondary\)\] {
+          background-color: var(--bg-secondary);
+          backdrop-filter: blur(var(--backdrop-blur));
+          -webkit-backdrop-filter: blur(var(--backdrop-blur));
+          box-shadow: var(--card-shadow);
+      }
+
+      /* Specific overrides for Floating Elements in Premium */
+      [data-style="premium"] .glass, 
+      [data-style="premium"] .glass-card {
+          border-top: 1px solid rgba(255,255,255,0.1);
+          border-left: 1px solid rgba(255,255,255,0.05);
+      }
+
+      /* Scrollbar Polish */
       ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
       }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
+      ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb {
         background: var(--border-color); 
         border-radius: 99px;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: var(--text-secondary); 
-      }
+      ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
 
-      /* Utility Classes for Animations */
-      .glass {
-        background: rgba(24, 24, 27, 0.7); /* Zinc 900 with opacity */
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      }
-      [data-theme="light"] .glass {
-        background: rgba(255, 255, 255, 0.8);
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-      }
-
-      .glass-card {
-        background: rgba(39, 39, 42, 0.4);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-      [data-theme="light"] .glass-card {
-        background: rgba(255, 255, 255, 0.6);
-        border: 1px solid rgba(0, 0, 0, 0.05);
-      }
-
+      /* Animations */
       @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
       @keyframes fade-in-up { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes scale-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
@@ -113,39 +138,16 @@
       .animate-slide-in-right { animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
       /* Mobile Landscape Overrides */
-      /* Adicionado 'min-width: 480px' para evitar que o teclado em portrait ative o modo landscape */
       @media (orientation: landscape) and (max-width: 767px) and (min-width: 480px) {
-        .mobile-landscape-layout {
-            flex-direction: row !important;
-        }
-        .mobile-landscape-sidebar {
-            display: flex !important;
-            width: 12rem !important;
-        }
-        .mobile-landscape-sidebar .sidebar-title {
-            padding: 1rem !important;
-        }
-        .mobile-landscape-sidebar .sidebar-title h1 {
-            font-size: 1.125rem !important;
-        }
-        .mobile-landscape-sidebar .sidebar-title p {
-            display: none;
-        }
-        .mobile-landscape-bottom-nav {
-            display: none !important;
-        }
-        .landscape-grid-cols-2 {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        }
-        .landscape-grid-cols-3 {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        }
-        .landscape-pb-6 {
-            padding-bottom: 1.5rem !important;
-        }
-        .landscape-fab {
-            bottom: 1.5rem !important;
-        }
+        .mobile-landscape-layout { flex-direction: row !important; }
+        .mobile-landscape-sidebar { display: flex !important; width: 12rem !important; }
+        .mobile-landscape-sidebar .sidebar-title { padding: 1rem !important; }
+        .mobile-landscape-sidebar .sidebar-title h1 { font-size: 1.125rem !important; }
+        .mobile-landscape-sidebar .sidebar-title p { display: none; }
+        .mobile-landscape-bottom-nav { display: none !important; }
+        .landscape-grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .landscape-pb-6 { padding-bottom: 1.5rem !important; }
+        .landscape-fab { bottom: 1.5rem !important; }
       }
     </style>
   <script type="importmap">

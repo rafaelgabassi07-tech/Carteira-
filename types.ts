@@ -89,6 +89,7 @@ export interface AppPreferences {
   // Appearance
   accentColor: AppColor;
   systemTheme: 'system' | 'light' | 'dark';
+  visualStyle: 'simple' | 'premium'; // New Visual Style Preference
   fontSize: 'small' | 'medium' | 'large';
   compactMode: boolean;
   showCurrencySymbol: boolean;

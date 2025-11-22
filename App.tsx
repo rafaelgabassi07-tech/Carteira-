@@ -60,8 +60,9 @@ const App: React.FC = () => {
     }
   }, [marketDataError, addToast, t]);
   
-  // Theme Management
+  // Theme & Visual Style Management
   useEffect(() => {
+    // Apply Theme (Light/Dark)
     const applyTheme = () => {
         let themeToApply = preferences.systemTheme;
         if (preferences.systemTheme === 'system') {
@@ -71,13 +72,17 @@ const App: React.FC = () => {
     };
     applyTheme();
     
+    // Apply Visual Style (Simple/Premium)
+    // Default to 'premium' if not set (for existing users migrating)
+    document.documentElement.dataset.style = preferences.visualStyle || 'premium';
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
         if (preferences.systemTheme === 'system') applyTheme();
     };
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [preferences.systemTheme]);
+  }, [preferences.systemTheme, preferences.visualStyle]);
   
   // Font Size Management
   useEffect(() => {
@@ -235,13 +240,21 @@ const App: React.FC = () => {
   }
 
   const isNavVisible = !['assetDetail', 'notificacoes'].includes(activeView);
+  const isPremium = preferences.visualStyle === 'premium';
 
   return (
     <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout selection:bg-[var(--accent-color)] selection:text-[var(--accent-color-text)]">
        {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
        
-       {/* Sidebar for Desktop & Mobile Landscape */}
-       <aside className="hidden md:flex flex-col w-64 xl:w-72 h-screen bg-[var(--bg-secondary)]/50 backdrop-blur-xl border-r border-[var(--border-color)] flex-shrink-0 z-20 mobile-landscape-sidebar shadow-2xl shadow-black/10">
+       {/* Sidebar for Desktop & Mobile Landscape 
+           In Premium mode: 'border-none' and generic 'bg-[var(--bg-secondary)]' which becomes glass via CSS 
+           In Simple mode: 'border-r' and solid color
+       */}
+       <aside className={`hidden md:flex flex-col w-64 xl:w-72 h-screen flex-shrink-0 z-20 mobile-landscape-sidebar transition-all duration-300
+            ${isPremium 
+                ? 'bg-[var(--bg-secondary)] backdrop-blur-xl border-none shadow-none mr-4 rounded-r-3xl my-4 ml-4 h-[calc(100vh-2rem)]' 
+                : 'bg-[var(--bg-secondary)] border-r border-[var(--border-color)]'}`
+       }>
           <div className="p-6 flex items-center gap-3 sidebar-title mb-2">
              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent-color)] to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
@@ -272,7 +285,7 @@ const App: React.FC = () => {
              ))}
           </nav>
 
-          <div className="p-4 border-t border-[var(--border-color)]">
+          <div className={`p-4 ${isPremium ? '' : 'border-t border-[var(--border-color)]'}`}>
               <div className="bg-[var(--bg-tertiary-hover)]/50 rounded-xl p-3 flex items-center gap-3 backdrop-blur-md border border-[var(--border-color)]/50">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                   <span className="text-xs font-semibold text-[var(--text-secondary)]">Mercado Aberto</span>

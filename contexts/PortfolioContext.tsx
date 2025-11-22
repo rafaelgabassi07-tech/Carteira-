@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
@@ -43,7 +44,7 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(undefin
 
 // --- Constants ---
 const DEFAULT_PREFERENCES: AppPreferences = {
-    accentColor: 'blue', systemTheme: 'system', fontSize: 'medium', compactMode: false,
+    accentColor: 'blue', systemTheme: 'system', visualStyle: 'premium', fontSize: 'medium', compactMode: false,
     showCurrencySymbol: true, reduceMotion: false, animationSpeed: 'normal',
     startScreen: 'carteira', hapticFeedback: true, vibrationIntensity: 'medium',
     hideCents: false, restartTutorial: false, privacyOnStart: false, appPin: null,
