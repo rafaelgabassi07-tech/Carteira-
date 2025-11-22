@@ -9,8 +9,8 @@ import { vibrate } from '../utils';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import type { ToastMessage } from '../types';
 
-const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number }> = ({ title, children, action, delay = 0 }) => (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mb-4 border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
+const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number; className?: string }> = ({ title, children, action, delay = 0, className = '' }) => (
+    <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up ${className}`} style={{ animationDelay: `${delay}ms` }}>
         <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-lg text-[var(--text-primary)]">{title}</h3>
             {action}
@@ -99,7 +99,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
     };
     
     return (
-        <div className="p-4 pb-24">
+        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">{t('nav_analysis')}</h1>
                  <button 
@@ -111,8 +111,10 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
                     <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
                 </button>
             </div>
-            <div className="max-w-2xl mx-auto">
-                <PatrimonyEvolutionCard />
+            <div className="max-w-full mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="lg:col-span-2">
+                    <PatrimonyEvolutionCard />
+                </div>
                 <IncomeCard />
                 <DiversificationCard />
             </div>

@@ -186,7 +186,7 @@ const TransactionItem = React.memo<{
     }
 
     return (
-        <div onClick={() => { onEdit(transaction); vibrate(); }} style={style} className="bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] animate-fade-in-up relative group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm mb-2">
+        <div onClick={() => { onEdit(transaction); vibrate(); }} style={style} className="bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] animate-fade-in-up relative group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full">
             <div className="flex items-center justify-between pr-10">
                 <div className="flex items-center space-x-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm ${isBuy ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
@@ -337,12 +337,12 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
     };
     
     return (
-        <div className="p-4 pb-24" id="transactions-view">
+        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar" id="transactions-view">
             <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_transactions')}</h1>
             
             <div className="mb-4 space-y-3">
                 <input 
-                    type="text"
+                    type="text" 
                     placeholder={t('search_by_ticker_placeholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -398,8 +398,8 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
             {Object.keys(groupedTransactions).length > 0 ? (
                 Object.entries(groupedTransactions).map(([monthYear, txs]) => (
                     <div key={monthYear} className="mb-6 animate-fade-in-up">
-                        <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-widest px-1 sticky top-14 z-10 bg-[var(--bg-primary)]/90 backdrop-blur-sm py-2">{monthYear}</h2>
-                        <div className="space-y-3">
+                        <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-widest px-1 sticky top-0 z-10 bg-[var(--bg-primary)]/90 backdrop-blur-sm py-2">{monthYear}</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {(txs as Transaction[]).map((tx, index) => (
                                 <TransactionItem 
                                     key={tx.id} 

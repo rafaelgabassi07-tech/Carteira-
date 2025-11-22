@@ -15,6 +15,13 @@ import type { ToastMessage } from './types';
 import { usePortfolio } from './contexts/PortfolioContext';
 import { useI18n } from './contexts/I18nContext';
 
+// Icons for Sidebar
+import WalletIcon from './components/icons/WalletIcon';
+import TransactionIcon from './components/icons/TransactionIcon';
+import NewsIcon from './components/icons/NewsIcon';
+import AnalysisIcon from './components/icons/AnalysisIcon';
+import SettingsIcon from './components/icons/SettingsIcon';
+
 export type View = 'carteira' | 'transacoes' | 'analise' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail';
 export type Theme = 'dark' | 'light';
 
@@ -41,11 +48,10 @@ const App: React.FC = () => {
   // Global handler for background data sync errors
   useEffect(() => {
     if (marketDataError) {
-        // More intelligent toast display: if the message is already user-friendly, show it directly.
         const isCompleteMessage = marketDataError.includes("Falha ao atualizar:") || marketDataError.includes("Token da API");
         if (isCompleteMessage) {
             addToast(marketDataError, 'error');
-        } else if (!marketDataError.includes("Chave de API")) { // Avoid redundant Gemini key message
+        } else if (!marketDataError.includes("Chave de API")) {
             addToast(`${t('toast_update_failed')}: ${marketDataError}`, 'error');
         }
     }
@@ -80,7 +86,6 @@ const App: React.FC = () => {
   }, [preferences.fontSize]);
 
   useEffect(() => {
-    // Apply Accent Color
     const colors: Record<string, string> = {
         blue: '#38bdf8',
         green: '#4ade80',
@@ -107,12 +112,11 @@ const App: React.FC = () => {
   }, [preferences.accentColor, preferences.systemTheme]); 
 
   useEffect(() => {
-    // Show tour only if unlocked and first visit
     if (!isLocked) {
         const hasVisited = localStorage.getItem('hasVisited');
         
         if (!hasVisited || preferences.restartTutorial) {
-            setDemoMode(true); // Enable Demo Data
+            setDemoMode(true);
             setShowTour(true);
         }
 
@@ -124,7 +128,7 @@ const App: React.FC = () => {
   }, [isLocked, preferences.startScreen, isInitialized, preferences.restartTutorial, setDemoMode]);
 
   const handleTourFinish = () => {
-    setDemoMode(false); // Clear Demo Data (Back to zero/user data)
+    setDemoMode(false);
     setShowTour(false);
     localStorage.setItem('hasVisited', 'true');
   };
@@ -142,6 +146,11 @@ const App: React.FC = () => {
   const handleBack = () => {
     setSelectedTicker(null);
     setActiveView(previousView);
+  };
+
+  const handleViewTransactions = (ticker: string) => {
+    setTransactionFilter(ticker);
+    navigateTo('transacoes');
   };
 
   const renderView = () => {
@@ -178,11 +187,6 @@ const App: React.FC = () => {
         />;
     }
   };
-  
-  const handleViewTransactions = (ticker: string) => {
-    setTransactionFilter(ticker);
-    navigateTo('transacoes');
-  };
 
   // Pin Lock / Biometric Check
   if (isLocked && preferences.appPin) {
@@ -197,17 +201,61 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300">
+    <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden">
        {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
-      <div className="max-w-md mx-auto pb-20 overflow-x-hidden min-h-screen">
-        <ErrorBoundary>
-            <div className="view-container">
-                {renderView()}
-            </div>
-        </ErrorBoundary>
-      </div>
-      {activeView !== 'assetDetail' && <BottomNav activeView={activeView} setActiveView={navigateTo} />}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+       
+       {/* Desktop Sidebar */}
+       <aside className="hidden md:flex flex-col w-64 h-screen border-r border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0 z-20">
+          <div className="p-6 flex items-center gap-3">
+             <div className="w-8 h-8 rounded-lg bg-[var(--accent-color)] flex items-center justify-center text-[var(--bg-primary)]">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+             </div>
+             <div>
+                 <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">Invest</h1>
+                 <p className="text-[10px] text-[var(--text-secondary)] font-medium tracking-wider">PORTFOLIO</p>
+             </div>
+          </div>
+          
+          <nav className="flex-1 px-4 space-y-1 overflow-y-auto py-4">
+             {[
+                 { id: 'carteira', label: t('nav_portfolio'), icon: <WalletIcon /> },
+                 { id: 'transacoes', label: t('nav_transactions'), icon: <TransactionIcon /> },
+                 { id: 'analise', label: t('nav_analysis'), icon: <AnalysisIcon /> },
+                 { id: 'noticias', label: t('nav_news'), icon: <NewsIcon /> },
+                 { id: 'settings', label: t('nav_settings'), icon: <SettingsIcon /> },
+             ].map(item => (
+                 <button
+                    key={item.id}
+                    onClick={() => { navigateTo(item.id as View); }}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 w-full text-left text-sm font-bold ${activeView === item.id ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)]'}`}
+                 >
+                    {React.cloneElement(item.icon as React.ReactElement, { className: "w-5 h-5" })}
+                    <span>{item.label}</span>
+                 </button>
+             ))}
+          </nav>
+       </aside>
+
+       {/* Main Content */}
+       <main className="flex-1 h-screen relative flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-hidden bg-[var(--bg-primary)] relative">
+              {/* We use a container with max width but it needs to be inside the scrollable areas of views */}
+              <div className="w-full h-full">
+                 <ErrorBoundary>
+                    <div className="view-container h-full">
+                        {renderView()}
+                    </div>
+                 </ErrorBoundary>
+              </div>
+          </div>
+          
+          {/* Mobile Bottom Nav Wrapper */}
+          <div className="md:hidden">
+             {activeView !== 'assetDetail' && <BottomNav activeView={activeView} setActiveView={navigateTo} />}
+          </div>
+       </main>
+
+       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };

@@ -40,13 +40,15 @@ const SettingsView: React.FC<{ addToast: (message: string, type?: ToastMessage['
     };
 
     return (
-        <div className="p-4 pb-24">
-             {screen === 'main' && (
-                <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_settings')}</h1>
-            )}
-            <div key={screen} className="animate-fade-in">
-                {renderScreen()}
-            </div>
+        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar">
+             <div className="max-w-2xl mx-auto">
+                {screen === 'main' && (
+                    <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_settings')}</h1>
+                )}
+                <div key={screen} className="animate-fade-in">
+                    {renderScreen()}
+                </div>
+             </div>
             {showUpdateModal && <UpdateCheckModal onClose={() => setShowUpdateModal(false)} />}
         </div>
     );

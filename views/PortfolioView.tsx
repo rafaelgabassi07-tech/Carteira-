@@ -27,8 +27,8 @@ const WalletIcon: React.FC<{className?:string}> = ({className}) => (
 // --- Components ---
 
 const PortfolioSkeleton: React.FC = () => (
-    <div className="space-y-3 animate-pulse px-4">
-        {[1, 2, 3].map(i => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 animate-pulse px-4">
+        {[1, 2, 3, 4, 5, 6].map(i => (
             <div key={i} className="h-20 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]"></div>
         ))}
     </div>
@@ -140,21 +140,23 @@ const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: ()
     }
 
     return (
-        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] mb-3 shadow-sm">
-            <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center space-x-3">
-                    <div className="w-11 h-11 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-sm text-[var(--accent-color)] border border-[var(--border-color)] shadow-inner">
-                        {asset.ticker.substring(0, 4)}
+        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm h-full flex flex-col justify-between">
+            <div>
+                <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-11 h-11 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-sm text-[var(--accent-color)] border border-[var(--border-color)] shadow-inner">
+                            {asset.ticker.substring(0, 4)}
+                        </div>
+                        <div>
+                             <span className="font-bold text-base block leading-tight text-[var(--text-primary)]">{asset.ticker}</span>
+                             <span className="text-xs text-[var(--text-secondary)]">{t('shares', {count: asset.quantity})}</span>
+                        </div>
                     </div>
-                    <div>
-                         <span className="font-bold text-base block leading-tight text-[var(--text-primary)]">{asset.ticker}</span>
-                         <span className="text-xs text-[var(--text-secondary)]">{t('shares', {count: asset.quantity})}</span>
-                    </div>
-                </div>
-                <div className={`text-right transition-all duration-300 ${privacyMode ? 'blur-sm select-none opacity-60' : ''}`}>
-                    <p className="font-bold text-base">{format(currentValue)}</p>
-                    <div className={`text-xs font-bold flex items-center justify-end gap-1 ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                        {variation >= 0 ? '+' : ''}{format(variation)}
+                    <div className={`text-right transition-all duration-300 ${privacyMode ? 'blur-sm select-none opacity-60' : ''}`}>
+                        <p className="font-bold text-base">{format(currentValue)}</p>
+                        <div className={`text-xs font-bold flex items-center justify-end gap-1 ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                            {variation >= 0 ? '+' : ''}{format(variation)}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -267,7 +269,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
 
     return (
         <div 
-            className="pb-24 h-full overflow-y-auto overscroll-contain no-scrollbar"
+            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar"
             ref={containerRef}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -283,86 +285,90 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 </div>
             </div>
 
-            <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
-            
-            {assets.length > 0 ? (
-                <>
-                    <PortfolioSummary />
-
-                    <div className="px-4 mt-8">
-                        <div className="flex space-x-3 mb-5">
-                            <div className="flex-1 relative">
-                                <input 
-                                    type="text" 
-                                    placeholder={t('search_asset_placeholder')} 
-                                    value={searchQuery} 
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
-                                    autoCapitalize="characters"
-                                />
-                            </div>
-                            <div className="relative">
-                                <button 
-                                    id="sort-btn"
-                                    onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
-                                    className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
-                                >
-                                    <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
-                                </button>
-                                {isSortOpen && (
-                                    <>
-                                        <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
-                                        <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
-                                            <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
-                                            {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
-                                                <button 
-                                                    key={option}
-                                                    onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }}
-                                                    className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}
-                                                >
-                                                    {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
-                                                    {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+            <div className="max-w-7xl mx-auto">
+                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
+                
+                {assets.length > 0 ? (
+                    <>
+                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
+                            <PortfolioSummary />
                         </div>
 
-                         <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2">
-                             {t('my_assets')} 
-                             <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
-                         </h3>
-                         
-                        {isRefreshing && processedAssets.length === 0 ? (
-                            <PortfolioSkeleton />
-                        ) : (
-                            <div className="space-y-3 min-h-[200px]">
-                                {processedAssets.map((asset, index) => (
-                                    <AssetListItem 
-                                        key={asset.ticker}
-                                        asset={asset} 
-                                        totalValue={totalPortfolioValue}
-                                        onClick={() => onSelectAsset(asset.ticker)} 
-                                        style={{ animationDelay: `${index * 50}ms` }}
-                                        privacyMode={privacyMode}
-                                        hideCents={preferences.hideCents}
+                        <div className="px-4 mt-8">
+                            <div className="flex space-x-3 mb-5">
+                                <div className="flex-1 relative">
+                                    <input 
+                                        type="text" 
+                                        placeholder={t('search_asset_placeholder')} 
+                                        value={searchQuery} 
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
+                                        autoCapitalize="characters"
                                     />
-                                ))}
+                                </div>
+                                <div className="relative">
+                                    <button 
+                                        id="sort-btn"
+                                        onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
+                                        className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
+                                    >
+                                        <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
+                                    </button>
+                                    {isSortOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
+                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
+                                                <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
+                                                {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
+                                                    <button 
+                                                        key={option}
+                                                        onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }}
+                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}
+                                                    >
+                                                        {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
+                                                        {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                        )}
+
+                             <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2">
+                                 {t('my_assets')} 
+                                 <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
+                             </h3>
+                             
+                            {isRefreshing && processedAssets.length === 0 ? (
+                                <PortfolioSkeleton />
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[200px]">
+                                    {processedAssets.map((asset, index) => (
+                                        <AssetListItem 
+                                            key={asset.ticker}
+                                            asset={asset} 
+                                            totalValue={totalPortfolioValue}
+                                            onClick={() => onSelectAsset(asset.ticker)} 
+                                            style={{ animationDelay: `${index * 50}ms` }}
+                                            privacyMode={privacyMode}
+                                            hideCents={preferences.hideCents}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
+                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
+                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                        </div>
+                        <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
+                        <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
                     </div>
-                </>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
-                    <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
-                        <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
-                    <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };

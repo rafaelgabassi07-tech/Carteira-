@@ -60,8 +60,8 @@ const NewsCard: React.FC<{
   }
 
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm">
-      <div className="p-4">
+    <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col">
+      <div className="p-4 flex-1 flex flex-col">
         <div className="flex justify-between items-start">
             <div>
               <p className="text-xs text-[var(--accent-color)] font-semibold mb-1">{article.source}</p>
@@ -90,7 +90,7 @@ const NewsCard: React.FC<{
           {article.summary}
         </p>
 
-        <div className="flex justify-between items-center mt-3 pt-2 border-t border-[var(--border-color)]">
+        <div className="flex justify-between items-center mt-auto pt-3 border-t border-[var(--border-color)]">
           <div className="flex items-center space-x-3">
             <SentimentBadge sentiment={article.sentiment} />
              {article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">{t('view_original')}</a> : <span className="text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider opacity-50">{t('view_original')}</span>}
@@ -246,7 +246,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   return (
     <div 
-        className="p-4 h-full pb-24 flex flex-col"
+        className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar"
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -297,7 +297,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           </button>
       </div>
 
-      {loading && <div className="space-y-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+      {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
       
       {error && (
         <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
@@ -310,13 +310,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       )}
 
       {!loading && !error && (
-        <div className="space-y-4 flex-1 overflow-y-auto no-scrollbar">
+        <div className="flex-1">
           {displayedNews.length > 0 ? (
-            <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {displayedNews.map((article, index) => (
                 <div 
                     key={`${article.title}-${index}`} 
-                    className="animate-fade-in-up" 
+                    className="animate-fade-in-up h-full" 
                     style={{ animationDelay: `${index * 70}ms` }}
                 >
                     <NewsCard 
@@ -328,13 +328,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                 </div>
                 ))}
                 {activeTab === 'favorites' && (
-                    <div className="text-center pt-4 pb-8">
+                    <div className="col-span-full text-center pt-4 pb-8">
                         <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:underline uppercase tracking-wider">
                             {t('clear_favorites')}
                         </button>
                     </div>
                 )}
-            </>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">
                 {activeTab === 'favorites' ? (
