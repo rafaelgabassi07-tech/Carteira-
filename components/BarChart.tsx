@@ -1,5 +1,4 @@
 
-
 import React, { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import type { MonthlyIncome } from '../types';
@@ -47,7 +46,7 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
     }, [effectiveMaxValue]);
 
 
-    const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+    const handleMouseMove = (event: { clientX: number, clientY: number }) => {
         if (!svgRef.current || data.length === 0) return;
         const rect = svgRef.current.getBoundingClientRect();
         const x = event.clientX - rect.left; 
@@ -91,8 +90,16 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                 viewBox={`0 0 ${width} ${height}`} 
                 preserveAspectRatio="none"
                 onMouseMove={handleMouseMove} 
-                onMouseLeave={() => setTooltip(null)} 
-                className="w-full h-full cursor-crosshair touch-none"
+                onMouseLeave={() => setTooltip(null)}
+                onTouchStart={(e) => {
+                    const touch = e.touches[0];
+                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+                }}
+                onTouchMove={(e) => {
+                    const touch = e.touches[0];
+                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+                }}
+                className="w-full h-full cursor-crosshair"
                 shapeRendering="geometricPrecision"
             >
                 {/* Grid Lines & Y Axis Labels */}

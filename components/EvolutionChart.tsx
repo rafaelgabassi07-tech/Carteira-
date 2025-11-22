@@ -68,7 +68,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
     }, [data, chartWidth]);
 
 
-    const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+    const handleMouseMove = (event: { clientX: number, clientY: number }) => {
         if (!svgRef.current || data.length === 0 || barSlotWidth === 0) return;
         const rect = svgRef.current.getBoundingClientRect();
         const x = event.clientX - rect.left; 
@@ -100,7 +100,15 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                 viewBox={`0 0 ${width} ${height}`} 
                 onMouseMove={handleMouseMove} 
                 onMouseLeave={() => setTooltip(null)} 
-                className="w-full h-full cursor-crosshair touch-none"
+                onTouchStart={(e) => {
+                    const touch = e.touches[0];
+                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+                }}
+                onTouchMove={(e) => {
+                    const touch = e.touches[0];
+                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+                }}
+                className="w-full h-full cursor-crosshair"
             >
                 {yTicks.map((tick, i) => {
                     const y = height - padding.bottom - (tick / maxValue) * chartHeight;
