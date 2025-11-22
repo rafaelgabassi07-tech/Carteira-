@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint } from '../types';
+import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics, getClosestPrice } from '../utils';
@@ -218,7 +217,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // --- Derived State Calculations ---
   const assets = useMemo((): Asset[] => {
     const portfolioMetrics = calculatePortfolioMetrics(sourceTransactions);
-    // FIX: Explicitly type the 'ticker' variable as a string to prevent type inference issues.
     return Object.keys(portfolioMetrics).map((ticker: string) => {
       const metric = portfolioMetrics[ticker];
       const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
@@ -280,27 +278,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { yieldOnCost: yoc, projectedAnnualIncome: projectedIncome };
   }, [assets]);
   
-  // --- Evolution & Real Dividend Calculation ---
-  const { portfolioEvolution, dividends } = useMemo(() => {
-    if (sourceTransactions.length === 0 && !isDemoMode) {
-        return { portfolioEvolution: {}, dividends: [] };
-    }
-    if (isDemoMode) {
-         const demoEv = { 
-            all_types: Array.from({length: 6}, (_, i) => ({ 
-                month: `Mês ${'i+1'}`, 
-                invested: 1000 + i * 500, 
-                marketValue: 1100 + i * 600 
-            }))
-         };
-        return { portfolioEvolution: demoEv, dividends: DEMO_DIVIDENDS };
-    }
-
-    const evolution: SegmentEvolutionData = { all_types: [] };
+  const dividends = useMemo((): Dividend[] => {
     const realDividends: Dividend[] = [];
     const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
     
-    // --- Real Dividend Calculation ---
     const getQuantityOnDate = (ticker: string, targetDate: string) => {
         let quantity = 0;
         for (const tx of sortedTransactions) {
@@ -308,21 +289,21 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 if (tx.type === 'Compra') quantity += tx.quantity;
                 else quantity -= tx.quantity;
             } else if (tx.date > targetDate) {
-                break; // Optimization for sorted transactions
+                break; // Optimization
             }
         }
         return quantity > EPSILON ? quantity : 0;
     };
-    
-    const uniqueTickersInPortfolio = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
-    uniqueTickersInPortfolio.forEach(ticker => {
-        const assetMarketData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
-        if (assetMarketData.dividendsHistory && Array.isArray(assetMarketData.dividendsHistory)) {
-            assetMarketData.dividendsHistory.forEach((divEvent: any) => {
-                const quantityOnExDate = getQuantityOnDate(ticker, divEvent.exDate);
+
+    let hasHistoricalData = false;
+    assets.forEach(asset => {
+        if (asset.dividendsHistory && asset.dividendsHistory.length > 0) {
+            hasHistoricalData = true;
+            asset.dividendsHistory.forEach((divEvent: DividendHistoryEvent) => {
+                const quantityOnExDate = getQuantityOnDate(asset.ticker, divEvent.exDate);
                 if (quantityOnExDate > 0) {
                     realDividends.push({
-                        ticker,
+                        ticker: asset.ticker,
                         amountPerShare: divEvent.value,
                         quantity: quantityOnExDate,
                         paymentDate: divEvent.paymentDate,
@@ -332,84 +313,131 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
     });
 
-
-    // --- Portfolio Evolution Calculation (existing logic) ---
-    if (sortedTransactions.length === 0) {
-        return { portfolioEvolution: {}, dividends: realDividends };
-    }
-    const firstTxDate = fromISODate(sortedTransactions[0].date);
-    const today = new Date();
-    let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
-    
-    const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
-    let txIndex = 0;
-
-    while (currentDate <= today) {
-        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
-
-        while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
-            const tx = sortedTransactions[txIndex];
-            if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
-            
-            if (tx.type === 'Compra') {
-                portfolioState[tx.ticker].quantity += tx.quantity;
-                portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
-            } else {
-                const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
-                if (portfolioState[tx.ticker].quantity > EPSILON) {
-                    const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
-                    portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
-                    portfolioState[tx.ticker].quantity -= sellQuantity;
-                }
-            }
-            if (portfolioState[tx.ticker].quantity < EPSILON) delete portfolioState[tx.ticker];
-            txIndex++;
-        }
-
-        let monthInvestedTotal = 0;
-        let monthMarketValueTotal = 0;
-        const segmentInvested: Record<string, number> = {};
-        const segmentMarketValue: Record<string, number> = {};
-
-        Object.keys(portfolioState).forEach(ticker => {
-            const holdings = portfolioState[ticker];
-            const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
-            const segment = liveData.sector || 'Outros';
-            let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
-            if (historicalPrice === null) historicalPrice = liveData.currentPrice || (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
-            
-            const marketValue = holdings.quantity * historicalPrice;
-            monthInvestedTotal += holdings.totalCost;
-            monthMarketValueTotal += marketValue;
-            segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
-            segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
-        });
-
-        const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
+    // Fallback to projection if no historical data is available
+    if (!hasHistoricalData && !isDemoMode) {
+      const today = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const dateStr = date.toISOString().split('T')[0];
         
-        if (monthInvestedTotal > 0) {
-            evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
-            Object.keys(segmentInvested).forEach(segment => {
-                if (!evolution[segment]) evolution[segment] = [];
-                evolution[segment].push({ month: monthLabel, invested: segmentInvested[segment], marketValue: segmentMarketValue[segment] });
-            });
-        }
-        currentDate.setMonth(currentDate.getMonth() + 1);
+        assets.forEach(asset => {
+          if ((asset.dy || 0) > 0) {
+            const quantityOnDate = getQuantityOnDate(asset.ticker, dateStr);
+            if (quantityOnDate > 0) {
+              const monthlyDividend = (asset.currentPrice * (asset.dy! / 100)) / 12;
+              const paymentDate = new Date(date.getFullYear(), date.getMonth() + 1, 15);
+              realDividends.push({
+                ticker: asset.ticker,
+                amountPerShare: monthlyDividend,
+                quantity: quantityOnDate,
+                paymentDate: paymentDate.toISOString().split('T')[0],
+              });
+            }
+          }
+        });
+      }
     }
-    
-    return { portfolioEvolution: evolution, dividends: realDividends };
-}, [sourceTransactions, sourceMarketData, isDemoMode]);
+
+    if (isDemoMode) return DEMO_DIVIDENDS;
+
+    return realDividends;
+}, [assets, sourceTransactions, isDemoMode]);
+
 
   const monthlyIncome = useMemo((): MonthlyIncome[] => {
       const incomeMap: Record<string, number> = {};
-      dividends.forEach(div => {
+      const sortedDividends = dividends.sort((a,b) => a.paymentDate.localeCompare(b.paymentDate));
+
+      sortedDividends.forEach(div => {
           const date = fromISODate(div.paymentDate);
           const monthKey = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' }).replace('. de ', '/');
           incomeMap[monthKey] = (incomeMap[monthKey] || 0) + (div.amountPerShare * div.quantity);
       });
-      return Object.entries(incomeMap).map(([month, total]) => ({ month, total }));
+      
+      const allMonths = Array.from(new Set(Object.keys(incomeMap)));
+      if (allMonths.length > 0) {
+        // Create a date object from monthKey for proper sorting
+        const dateSortedMonths = allMonths.sort((a, b) => {
+            const [m1, y1] = a.split('/');
+            const [m2, y2] = b.split('/');
+            const dateA = new Date(`01/${m1}/20${y1}`);
+            const dateB = new Date(`01/${m2}/20${y2}`);
+            return dateA.getTime() - dateB.getTime();
+        });
+        return dateSortedMonths.slice(-12).map(month => ({ month, total: incomeMap[month] }));
+      }
+      return [];
   }, [dividends]);
+
+  const portfolioEvolution = useMemo(() => {
+      if (sourceTransactions.length === 0) return { all_types: [] };
+      
+      const evolution: SegmentEvolutionData = { all_types: [] };
+      const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
+      const firstTxDate = fromISODate(sortedTransactions[0].date);
+      const today = new Date();
+      let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+      
+      const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
+      let txIndex = 0;
+
+      while (currentDate <= today) {
+          const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+          const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
+
+          while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
+              const tx = sortedTransactions[txIndex];
+              if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
+              
+              if (tx.type === 'Compra') {
+                  portfolioState[tx.ticker].quantity += tx.quantity;
+                  portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
+              } else {
+                  const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
+                  if (portfolioState[tx.ticker].quantity > EPSILON) {
+                      const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
+                      portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
+                      portfolioState[tx.ticker].quantity -= sellQuantity;
+                  }
+              }
+              if (portfolioState[tx.ticker].quantity < EPSILON) delete portfolioState[tx.ticker];
+              txIndex++;
+          }
+
+          let monthInvestedTotal = 0;
+          let monthMarketValueTotal = 0;
+          const segmentInvested: Record<string, number> = {};
+          const segmentMarketValue: Record<string, number> = {};
+
+          Object.keys(portfolioState).forEach(ticker => {
+              const holdings = portfolioState[ticker];
+              const asset = assets.find(a => a.ticker === ticker);
+              const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
+              const segment = asset?.segment || 'Outros';
+              let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+              if (historicalPrice === null) historicalPrice = asset?.currentPrice || (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
+              
+              const marketValue = holdings.quantity * historicalPrice;
+              monthInvestedTotal += holdings.totalCost;
+              monthMarketValueTotal += marketValue;
+              segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
+              segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
+          });
+
+          const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
+          
+          if (monthInvestedTotal > 0 || monthMarketValueTotal > 0) {
+              evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
+              Object.keys(segmentInvested).forEach(segment => {
+                  if (!evolution[segment]) evolution[segment] = [];
+                  evolution[segment].push({ month: monthLabel, invested: segmentInvested[segment], marketValue: segmentMarketValue[segment] });
+              });
+          }
+          currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+      return evolution;
+  }, [sourceTransactions, assets, sourceMarketData]);
+
 
   const value = useMemo(() => ({
     assets,
