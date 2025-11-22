@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Transaction, TransactionType, ToastMessage } from '../types';
 import FloatingActionButton from '../components/FloatingActionButton';
@@ -27,11 +28,12 @@ const TransactionModal: React.FC<{
 
     const validate = (tx: Partial<Transaction>): boolean => {
         const newErrors: Record<string, string> = {};
-        if (!tx.ticker) newErrors.ticker = t('validation_ticker_required');
-        if (!tx.quantity || tx.quantity <= 0) newErrors.quantity = t('validation_quantity_positive');
-        if (!tx.price || tx.price <= 0) newErrors.price = t('validation_price_positive');
+        if (!tx.ticker || tx.ticker.length < 4) newErrors.ticker = t('validation_ticker_required');
+        if (!tx.quantity || isNaN(tx.quantity) || tx.quantity <= 0) newErrors.quantity = t('validation_quantity_positive');
+        if (!tx.price || isNaN(tx.price) || tx.price <= 0) newErrors.price = t('validation_price_positive');
         if (tx.costs && tx.costs < 0) newErrors.costs = t('validation_costs_positive');
         if (!tx.date) newErrors.date = t('validation_date_required');
+        
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -51,13 +53,18 @@ const TransactionModal: React.FC<{
         e.preventDefault();
         vibrate();
         const formData = new FormData(e.target as HTMLFormElement);
+        
+        const rawQuantity = parseFloat(formData.get('quantity') as string);
+        const rawPrice = parseFloat(formData.get('price') as string);
+        const rawCosts = parseFloat(formData.get('costs') as string);
+
         const newTxData: Partial<Transaction> = {
             ticker: (formData.get('ticker') as string).toUpperCase().trim(),
             type: formData.get('type') as TransactionType,
-            quantity: parseFloat(formData.get('quantity') as string),
-            price: parseFloat(formData.get('price') as string),
+            quantity: isNaN(rawQuantity) ? 0 : rawQuantity,
+            price: isNaN(rawPrice) ? 0 : rawPrice,
             date: formData.get('date') as string,
-            costs: parseFloat(formData.get('costs') as string) || 0,
+            costs: isNaN(rawCosts) ? 0 : rawCosts,
             notes: formData.get('notes') as string,
         };
 
@@ -107,7 +114,7 @@ const TransactionModal: React.FC<{
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('quantity')}</label>
-                        <input name="quantity" type="number" inputMode="decimal" step="1" min="0" required defaultValue={transaction?.quantity} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all" />
+                        <input name="quantity" type="number" inputMode="decimal" step="1" min="0.0001" required defaultValue={transaction?.quantity} className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
                         {errors.quantity && <p className="text-xs text-red-400 mt-1">{errors.quantity}</p>}
                     </div>
                     <div>
@@ -121,7 +128,7 @@ const TransactionModal: React.FC<{
                             required 
                             value={price}
                             onChange={(e) => setPrice(e.target.value)}
-                            className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all" 
+                            className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.price ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
                         />
                         {errors.price && <p className="text-xs text-red-400 mt-1">{errors.price}</p>}
                     </div>
@@ -129,12 +136,12 @@ const TransactionModal: React.FC<{
                  <div className="grid grid-cols-2 gap-4">
                      <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('date')}</label>
-                        <input name="date" type="date" required defaultValue={transaction?.date || todayISODate} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all" />
+                        <input name="date" type="date" required defaultValue={transaction?.date || todayISODate} className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.date ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
                         {errors.date && <p className="text-xs text-red-400 mt-1">{errors.date}</p>}
                     </div>
                     <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('costs_fees')}</label>
-                        <input name="costs" type="number" inputMode="decimal" step="0.01" min="0" defaultValue={transaction?.costs || ''} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all" />
+                        <input name="costs" type="number" inputMode="decimal" step="0.01" min="0" defaultValue={transaction?.costs || ''} className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.costs ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
                         {errors.costs && <p className="text-xs text-red-400 mt-1">{errors.costs}</p>}
                     </div>
                  </div>
@@ -261,13 +268,23 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         if (dateRange !== 'all') {
             limitDate = new Date();
             limitDate.setDate(now.getDate() - parseInt(dateRange));
+            // Normalize to midnight to avoid time discrepancies
+            limitDate.setHours(0,0,0,0);
         }
 
-        return transactions.filter(t => 
-            (filter === 'todos' || t.type === filter) &&
-            (t.ticker.toLowerCase().includes(searchQuery.toLowerCase())) &&
-            (!limitDate || new Date(t.date) >= limitDate)
-        );
+        return transactions.filter(t => {
+            const matchesType = filter === 'todos' || t.type === filter;
+            const matchesTicker = t.ticker.toLowerCase().includes(searchQuery.toLowerCase());
+            
+            let matchesDate = true;
+            if (limitDate) {
+                const txDate = new Date(t.date);
+                txDate.setHours(0,0,0,0); // Normalize comparison
+                matchesDate = txDate >= limitDate;
+            }
+            
+            return matchesType && matchesTicker && matchesDate;
+        });
     }, [filter, transactions, searchQuery, dateRange]);
 
     const summary = useMemo(() => {

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import type { PortfolioEvolutionPoint } from '../types';
@@ -16,26 +17,40 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
     useLayoutEffect(() => {
         const container = containerRef.current;
         if (!container) return;
-        const observer = new ResizeObserver(entries => {
-            const entry = entries[0];
-            if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
-                setDimensions(entry.contentRect);
-            }
+        
+        const updateDimensions = () => {
+             if (container) {
+                 const { width, height } = container.getBoundingClientRect();
+                 // Ensure we don't set 0 dimensions which causes NaN issues
+                 if (width > 0 && height > 0) {
+                     setDimensions({ width, height });
+                 }
+             }
+        };
+
+        const observer = new ResizeObserver(() => {
+             requestAnimationFrame(updateDimensions);
         });
+        
         observer.observe(container);
+        // Initial call
+        updateDimensions();
+
         return () => observer.disconnect();
     }, []);
     
     const { width, height } = dimensions;
     const padding = { top: 20, right: 10, bottom: 25, left: 35 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
+    const chartWidth = Math.max(0, width - padding.left - padding.right);
+    const chartHeight = Math.max(0, height - padding.top - padding.bottom);
+    
+    // Prevent division by zero if data is empty
     const barSlotWidth = data.length > 0 ? chartWidth / data.length : 0;
-    const barWidth = barSlotWidth * 0.7;
+    const barWidth = Math.max(1, barSlotWidth * 0.7);
 
     const maxValue = useMemo(() => {
-        const max = Math.max(...data.map(d => d.marketValue), 0);
-        return max === 0 ? 1 : max * 1.1; // Add 10% headroom
+        const max = Math.max(...data.map(d => Math.max(d.marketValue, d.invested)), 0);
+        return max === 0 ? 1 : max * 1.1; // Add 10% headroom and prevent 0
     }, [data]);
 
     const yTicks = useMemo(() => {
@@ -45,7 +60,8 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
     }, [maxValue]);
     
     const xLabels = useMemo(() => {
-        const maxLabels = Math.floor(chartWidth / 50);
+        if (data.length === 0) return [];
+        const maxLabels = Math.max(1, Math.floor(chartWidth / 50));
         if(data.length <= maxLabels) return data.map((d, i) => ({ label: d.month, index: i }));
         const step = Math.ceil(data.length / maxLabels);
         return data.filter((_, i) => i % step === 0).map((d, i) => ({ label: d.month, index: i * step }));
@@ -53,7 +69,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
 
 
     const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
-        if (!svgRef.current || data.length === 0) return;
+        if (!svgRef.current || data.length === 0 || barSlotWidth === 0) return;
         const rect = svgRef.current.getBoundingClientRect();
         const x = event.clientX - rect.left; 
         
@@ -69,8 +85,12 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
         }
     };
     
-    if (dimensions.width <= 0 || data.length === 0) {
-        return <div ref={containerRef} className="w-full h-full" />;
+    if (data.length === 0) {
+        return (
+            <div ref={containerRef} className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-xs">
+                <p>Sem dados de evolução.</p>
+            </div>
+        );
     }
 
     return (
@@ -103,32 +123,34 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                 {data.map((d, i) => {
                     const barHeight = Math.max(0, (d.marketValue / maxValue) * chartHeight);
                     const investedHeight = Math.max(0, (d.invested / maxValue) * chartHeight);
+                    // Safe coordinate calculation
                     const x = padding.left + i * barSlotWidth + (barSlotWidth - barWidth) / 2;
                     const y = height - padding.bottom - barHeight;
+                    const yInvested = height - padding.bottom - investedHeight;
 
                     return (
                         <g key={d.month}>
+                             <rect
+                                x={x}
+                                y={yInvested}
+                                width={barWidth}
+                                height={investedHeight}
+                                fill="var(--text-secondary)"
+                                opacity={0.3}
+                                rx="2"
+                                 className="animate-grow-up"
+                                 style={{ transformOrigin: `bottom`, animationDelay: `${i*30}ms` }}
+                            />
                             <rect
                                 x={x}
                                 y={y}
                                 width={barWidth}
                                 height={barHeight}
                                 fill="var(--accent-color)"
-                                opacity={0.6}
+                                opacity={0.7}
                                 rx="2"
                                 className="animate-grow-up"
                                 style={{ transformOrigin: `bottom`, animationDelay: `${i*30}ms` }}
-                            />
-                             <rect
-                                x={x}
-                                y={height - padding.bottom - investedHeight}
-                                width={barWidth}
-                                height={investedHeight}
-                                fill="var(--accent-color)"
-                                opacity={1}
-                                rx="2"
-                                 className="animate-grow-up"
-                                 style={{ transformOrigin: `bottom`, animationDelay: `${i*30}ms` }}
                             />
                         </g>
                     );
@@ -145,22 +167,23 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                     }}
                 >
                     <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-color)]" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--text-secondary)] opacity-50" />
                         <span className="text-[var(--text-secondary)]">{t('invested_amount')}:</span>
                         <span className="font-bold text-sm ml-auto">{formatCurrency(tooltip.point.invested)}</span>
                     </div>
                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-color)] opacity-60" />
-                        <span className="text-[var(--text-secondary)]">{t('capital_gain')}:</span>
-                        <span className={`font-bold text-sm ml-auto ${tooltip.point.marketValue - tooltip.point.invested >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                            {formatCurrency(tooltip.point.marketValue - tooltip.point.invested)}
-                        </span>
+                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-color)]" />
+                        <span className="text-[var(--text-secondary)]">{t('patrimony')}:</span>
+                        <span className="font-bold text-sm ml-auto">{formatCurrency(tooltip.point.marketValue)}</span>
                     </div>
+                    
                      <div className="border-t border-[var(--border-color)] my-1"></div>
                     <div className="flex items-center gap-2 mt-1">
                         <div className="w-2.5 h-2.5" />
-                        <span className="text-[var(--text-secondary)] font-bold">{t('patrimony')}:</span>
-                        <span className="font-bold text-sm ml-auto">{formatCurrency(tooltip.point.marketValue)}</span>
+                        <span className="text-[var(--text-secondary)]">{t('result')}:</span>
+                        <span className={`font-bold text-sm ml-auto ${tooltip.point.marketValue - tooltip.point.invested >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                            {formatCurrency(tooltip.point.marketValue - tooltip.point.invested)}
+                        </span>
                     </div>
                 </div>
             )}

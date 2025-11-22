@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
@@ -110,29 +111,46 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     if (!silent) setIsRefreshing(true);
     setMarketDataError(null);
+    
+    let hasError = false;
+    
     try {
-        const priceData = await fetchBrapiQuotes(preferences, uniqueTickers);
+        // Parallel execution to be faster, but handled individually
+        const [brapiResult, geminiResult] = await Promise.allSettled([
+            fetchBrapiQuotes(preferences, uniqueTickers),
+            fetchAdvancedAssetData(preferences, uniqueTickers)
+        ]);
+
         setMarketData(prev => {
             const updated = { ...prev };
-            Object.keys(priceData).forEach(ticker => {
-                updated[ticker] = { ...(updated[ticker] || {}), ...priceData[ticker] };
-            });
+            
+            if (brapiResult.status === 'fulfilled') {
+                Object.keys(brapiResult.value).forEach(ticker => {
+                    updated[ticker] = { ...(updated[ticker] || {}), ...brapiResult.value[ticker] };
+                });
+            } else {
+                console.error("Brapi Error:", brapiResult.reason);
+                hasError = true;
+                setMarketDataError(brapiResult.reason?.message || "Erro ao buscar cotações.");
+            }
+
+            if (geminiResult.status === 'fulfilled') {
+                 Object.keys(geminiResult.value).forEach(ticker => {
+                    updated[ticker] = { ...(updated[ticker] || {}), ...geminiResult.value[ticker] };
+                });
+            } else {
+                console.error("Gemini Error:", geminiResult.reason);
+                // Gemini error is non-critical for prices, so we might not want to show a blocking error
+            }
+
             return updated;
         });
 
-        const advancedData = await fetchAdvancedAssetData(preferences, uniqueTickers);
-        setMarketData(prev => {
-            const updated = { ...prev };
-            Object.keys(advancedData).forEach(ticker => {
-                updated[ticker] = { ...(prev[ticker] || {}), ...advancedData[ticker] };
-            });
-            return updated;
-        });
+        if (!hasError) setLastSync(Date.now());
 
-        setLastSync(Date.now());
     } catch (error: any) {
-        console.error("Market data refresh failed:", error);
-        setMarketDataError(error.message || "Unknown error fetching market data");
+        console.error("Market data refresh critical failure:", error);
+        setMarketDataError(error.message);
     } finally {
         if (!silent) setIsRefreshing(false);
     }
@@ -165,7 +183,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const metric = portfolioMetrics[ticker];
       const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
       const avgPrice = metric.quantity > 0 ? metric.totalCost / metric.quantity : 0;
-      const currentPrice = liveData.currentPrice || 0;
+      const currentPrice = liveData.currentPrice || avgPrice; // Fallback to avgPrice if no live data
       const totalInvested = metric.quantity * avgPrice;
       const yieldOnCost = totalInvested > 0 && liveData.dy > 0 ? ((currentPrice * (liveData.dy / 100)) / avgPrice) * 100 : 0;
       
@@ -184,7 +202,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         shareholders: liveData.shareholders,
         yieldOnCost,
       };
-    }).filter(asset => asset.quantity > EPSILON); // Filter out assets that have been sold off
+    }).filter(asset => asset.quantity > EPSILON);
   }, [sourceTransactions, sourceMarketData]);
 
   const getAssetByTicker = useCallback((ticker: string): Asset | undefined => {
@@ -218,55 +236,68 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { yieldOnCost: yoc, projectedAnnualIncome: projectedIncome };
   }, [assets]);
   
+  // --- Improved Evolution Calculation ---
   const { portfolioEvolution, dividends } = useMemo(() => {
-    if (sourceTransactions.length === 0) {
+    if (sourceTransactions.length === 0 && !isDemoMode) {
         return { portfolioEvolution: {}, dividends: [] };
     }
     if (isDemoMode) {
-        // This part is complex to simulate, return empty for demo or a simplified version
-        return { portfolioEvolution: {}, dividends: DEMO_DIVIDENDS };
+         const demoEv = { 
+            all_types: Array.from({length: 6}, (_, i) => ({ 
+                month: `Mês ${i+1}`, 
+                invested: 1000 + i * 500, 
+                marketValue: 1100 + i * 600 
+            }))
+         };
+        return { portfolioEvolution: demoEv, dividends: DEMO_DIVIDENDS };
     }
 
     const evolution: SegmentEvolutionData = { all_types: [] };
     const simulatedDividends: Dividend[] = [];
     const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
+    
     const firstTxDate = fromISODate(sortedTransactions[0].date);
     const today = new Date();
     
+    // Start from the first day of the month of the first transaction
     let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
-    let txIndex = 0;
+    
+    // Running State (State at the end of previous month)
     const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
+    let txIndex = 0;
 
     while (currentDate <= today) {
         const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
         const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
 
-        // Process transactions for the current month
+        // Update state with transactions of this month
         while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
             const tx = sortedTransactions[txIndex];
             if (!portfolioState[tx.ticker]) {
                 portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
             }
+            
             if (tx.type === 'Compra') {
                 portfolioState[tx.ticker].quantity += tx.quantity;
                 portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
             } else { // Venda
                 const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
                 if (portfolioState[tx.ticker].quantity > EPSILON) {
+                    // Average price logic for reducing cost
                     const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
                     portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
                     portfolioState[tx.ticker].quantity -= sellQuantity;
                 }
             }
+            
+            // Clean up sold positions
             if (portfolioState[tx.ticker].quantity < EPSILON) {
                 delete portfolioState[tx.ticker];
             }
             txIndex++;
         }
 
-        // --- At the end of the month, calculate metrics and dividends ---
-        
-        // 1. Calculate Portfolio Evolution
+        // Calculate Snapshot for this month
         let monthInvestedTotal = 0;
         let monthMarketValueTotal = 0;
         const segmentInvested: Record<string, number> = {};
@@ -276,20 +307,31 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const holdings = portfolioState[ticker];
             const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
             const segment = liveData.sector || 'Outros';
+            
+            // Robust Price Finding
+            let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+            
+            // Fallbacks if historical price is missing:
+            // 1. Use current price if available
+            // 2. Use average purchase price (assume no gain/loss)
+            if (historicalPrice === null) {
+                historicalPrice = liveData.currentPrice || (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
+            }
 
-            const historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
-            const marketValue = historicalPrice !== null ? holdings.quantity * historicalPrice : holdings.totalCost;
+            const marketValue = holdings.quantity * historicalPrice;
 
             monthInvestedTotal += holdings.totalCost;
             monthMarketValueTotal += marketValue;
+            
+            // Aggregate per segment
             segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
             segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
 
-            // 2. Simulate Dividends
+            // Dividends simulation (only if holdings > 0)
             const dy = liveData.dy || 0;
-            const currentPrice = liveData.currentPrice || 0;
-            if (holdings.quantity > EPSILON && dy > 0 && currentPrice > 0) {
-                const amountPerShare = (currentPrice * (dy / 100)) / 12;
+            if (holdings.quantity > EPSILON && dy > 0 && historicalPrice > 0) {
+                const amountPerShare = (historicalPrice * (dy / 100)) / 12;
+                // Simulate payout in middle of next month
                 const paymentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 15);
                 if (paymentDate <= today) {
                     simulatedDividends.push({
@@ -304,13 +346,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
         
-        evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
+        // Only add point if there is value
+        if (monthInvestedTotal > 0) {
+            evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
 
-        Object.keys(segmentInvested).forEach(segment => {
-            if (!evolution[segment]) evolution[segment] = [];
-            evolution[segment].push({ month: monthLabel, invested: segmentInvested[segment], marketValue: segmentMarketValue[segment] });
-        });
+            Object.keys(segmentInvested).forEach(segment => {
+                if (!evolution[segment]) evolution[segment] = [];
+                evolution[segment].push({ month: monthLabel, invested: segmentInvested[segment], marketValue: segmentMarketValue[segment] });
+            });
+        }
 
+        // Move to next month
         currentDate.setMonth(currentDate.getMonth() + 1);
     }
     
