@@ -288,139 +288,141 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
       </div>
       
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">{t('market_news')}</h1>
-        <div className="flex gap-2">
-             <button 
-                onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
-                className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
-                aria-label="Filtros"
-            >
-                <FilterIcon className="w-5 h-5" />
-            </button>
-            <button 
-                onClick={handleRefresh} 
-                disabled={loading}
-                className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
-                aria-label={t('refresh_prices')}
-            >
-                <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
-            </button>
-        </div>
-      </div>
-      
-      {/* Filter Panel */}
-      {showFilters && (
-          <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-4">
-               <div>
-                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Período</label>
-                  <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)]">
-                    {(['today', 'week', 'month'] as const).map((r) => (
-                        <button
-                            key={r}
-                            onClick={() => handleDateRangeChange(r)}
-                            className={`flex-1 py-1.5 text-xs font-bold rounded transition-all ${dateRange === r ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                        >
-                            {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
-                        </button>
-                    ))}
-                  </div>
-              </div>
-              
-               <div>
-                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Fontes (Opcional)</label>
-                  <input 
-                    type="text"
-                    placeholder="Ex: InfoMoney, Valor, Brazil Journal"
-                    value={sourceFilter}
-                    onChange={handleSourceChange}
-                    className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors placeholder:text-[var(--text-secondary)]/50"
-                  />
-              </div>
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">{t('market_news')}</h1>
+          <div className="flex gap-2">
+               <button 
+                  onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                  className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  aria-label="Filtros"
+              >
+                  <FilterIcon className="w-5 h-5" />
+              </button>
+              <button 
+                  onClick={handleRefresh} 
+                  disabled={loading}
+                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
+                  aria-label={t('refresh_prices')}
+              >
+                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+              </button>
           </div>
-      )}
-
-      <div className="mb-4">
-        <input 
-          type="text"
-          placeholder={t('search_news_placeholder')}
-          value={searchQuery}
-          onChange={handleSearchChange}
-          className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
-        />
-      </div>
-      
-      <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
-          <button 
-            onClick={() => { setActiveTab('all'); vibrate(); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-          >
-              {t('news_tab_all')}
-          </button>
-           <button 
-            onClick={() => { setActiveTab('favorites'); vibrate(); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-          >
-              {t('news_tab_favorites')}
-              {favorites.size > 0 && <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] px-1.5 py-0.5 rounded-full text-[9px]">{favorites.size}</span>}
-          </button>
-      </div>
-
-      {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
-      
-      {error && (
-        <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
-          <p className="font-bold">{t('error')}</p>
-          <p className="text-sm">{error}</p>
-          <button onClick={() => loadNews(true, searchQuery, dateRange, sourceFilter)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
-            {t('try_again')}
-          </button>
         </div>
-      )}
-
-      {!loading && !error && (
-        <div className="flex-1">
-          {displayedNews.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayedNews.map((article, index) => (
-                <div 
-                    key={`${article.title}-${index}`} 
-                    className="animate-fade-in-up h-full" 
-                    style={{ animationDelay: `${index * 70}ms` }}
-                >
-                    <NewsCard 
-                    article={article}
-                    isFavorited={favorites.has(article.title)}
-                    onToggleFavorite={() => handleToggleFavorite(article.title)}
-                    addToast={addToast}
+        
+        {/* Filter Panel */}
+        {showFilters && (
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-4">
+                 <div>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Período</label>
+                    <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)]">
+                      {(['today', 'week', 'month'] as const).map((r) => (
+                          <button
+                              key={r}
+                              onClick={() => handleDateRangeChange(r)}
+                              className={`flex-1 py-1.5 text-xs font-bold rounded transition-all ${dateRange === r ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                          >
+                              {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
+                          </button>
+                      ))}
+                    </div>
+                </div>
+                
+                 <div>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Fontes (Opcional)</label>
+                    <input 
+                      type="text"
+                      placeholder="Ex: InfoMoney, Valor, Brazil Journal"
+                      value={sourceFilter}
+                      onChange={handleSourceChange}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors placeholder:text-[var(--text-secondary)]/50"
                     />
                 </div>
-                ))}
-                {activeTab === 'favorites' && (
-                    <div className="col-span-full text-center pt-4 pb-8">
-                        <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:underline uppercase tracking-wider">
-                            {t('clear_favorites')}
-                        </button>
-                    </div>
-                )}
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">
-                {activeTab === 'favorites' ? (
-                    <>
-                        <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-[var(--border-color)]">
-                            <StarIcon className="w-8 h-8 text-gray-600" />
-                        </div>
-                        <p className="font-bold text-lg">{t('no_favorites_title')}</p>
-                        <p className="text-sm mt-2 max-w-[250px]">{t('no_favorites_subtitle')}</p>
-                    </>
-                ) : (
-                    <p>{t('no_news_found')}</p>
-                )}
-            </div>
-          )}
+        )}
+
+        <div className="mb-4">
+          <input 
+            type="text"
+            placeholder={t('search_news_placeholder')}
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
+          />
         </div>
-      )}
+        
+        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
+            <button 
+              onClick={() => { setActiveTab('all'); vibrate(); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            >
+                {t('news_tab_all')}
+            </button>
+             <button 
+              onClick={() => { setActiveTab('favorites'); vibrate(); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            >
+                {t('news_tab_favorites')}
+                {favorites.size > 0 && <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] px-1.5 py-0.5 rounded-full text-[9px]">{favorites.size}</span>}
+            </button>
+        </div>
+
+        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+        
+        {error && (
+          <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
+            <p className="font-bold">{t('error')}</p>
+            <p className="text-sm">{error}</p>
+            <button onClick={() => loadNews(true, searchQuery, dateRange, sourceFilter)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
+              {t('try_again')}
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="flex-1">
+            {displayedNews.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {displayedNews.map((article, index) => (
+                  <div 
+                      key={`${article.title}-${index}`} 
+                      className="animate-fade-in-up h-full" 
+                      style={{ animationDelay: `${index * 70}ms` }}
+                  >
+                      <NewsCard 
+                      article={article}
+                      isFavorited={favorites.has(article.title)}
+                      onToggleFavorite={() => handleToggleFavorite(article.title)}
+                      addToast={addToast}
+                      />
+                  </div>
+                  ))}
+                  {activeTab === 'favorites' && (
+                      <div className="col-span-full text-center pt-4 pb-8">
+                          <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:underline uppercase tracking-wider">
+                              {t('clear_favorites')}
+                          </button>
+                      </div>
+                  )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">
+                  {activeTab === 'favorites' ? (
+                      <>
+                          <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-[var(--border-color)]">
+                              <StarIcon className="w-8 h-8 text-gray-600" />
+                          </div>
+                          <p className="font-bold text-lg">{t('no_favorites_title')}</p>
+                          <p className="text-sm mt-2 max-w-[250px]">{t('no_favorites_subtitle')}</p>
+                      </>
+                  ) : (
+                      <p>{t('no_news_found')}</p>
+                  )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

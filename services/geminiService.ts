@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type, Schema } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -108,15 +109,16 @@ function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?
         const articleWords = new Set(normalizedArticleTitle.split(' ').filter((w: string) => w.length > 2));
         const sourceWords = new Set(normalizedSourceTitle.split(' '));
         const intersection = new Set([...articleWords].filter(x => sourceWords.has(x)));
+        const union = new Set([...articleWords, ...sourceWords]);
         
-        const score = intersection.size;
+        const score = union.size === 0 ? 0 : intersection.size / union.size;
 
         if (!bestMatch || score > bestMatch.score) {
             bestMatch = { uri: source.uri, score };
         }
     }
 
-    return (bestMatch && bestMatch.score > 0) ? bestMatch.uri : undefined;
+    return (bestMatch && bestMatch.score > 0.1) ? bestMatch.uri : undefined;
 }
 
 export interface NewsFilter {
@@ -151,11 +153,12 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       sourceConstraint = `Priorize notícias das seguintes fontes: ${filter.sources}.`;
   }
 
+  const jsonInstruction = ` Responda estritamente com um array JSON, sem markdown, que corresponda a este schema: ${JSON.stringify(newsListSchema)}.`;
   let prompt: string;
   if (filter.query && filter.query.trim()) {
-      prompt = `Encontre notícias financeiras ${dateConstraint} sobre "${filter.query}". ${sourceConstraint} Foque em FIIs e mercado brasileiro.`;
+      prompt = `Encontre notícias financeiras ${dateConstraint} sobre "${filter.query}". ${sourceConstraint} Foque em FIIs e mercado brasileiro.` + jsonInstruction;
   } else {
-      prompt = `Encontre as 5 notícias mais importantes sobre o mercado de Fundos Imobiliários (FIIs) do Brasil ${dateConstraint}. Tickers de interesse: ${contextTickers || 'Geral'}. ${sourceConstraint}`;
+      prompt = `Encontre as 5 notícias mais importantes sobre o mercado de Fundos Imobiliários (FIIs) do Brasil ${dateConstraint}. Tickers de interesse: ${contextTickers || 'Geral'}. ${sourceConstraint}` + jsonInstruction;
   }
 
   try {
@@ -165,25 +168,54 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
-                responseMimeType: "application/json",
-                responseSchema: newsListSchema,
             }
           });
           
-          // With responseSchema, response.text is guaranteed to be valid JSON conforming to the schema
-          const parsedArticles: NewsArticle[] = JSON.parse(response.text || '[]');
-          const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
-
-          if (Array.isArray(parsedArticles)) {
-              return parsedArticles
-                .filter(article => article && typeof article.title === 'string' && article.title.trim() !== '')
-                .map(article => ({
-                  ...article,
-                  url: findBestUrl(article.title, webSources),
-              }));
+          const responseText = response.text?.trim() || '';
+          if (!responseText) {
+              console.warn("Gemini returned an empty response for news.");
+              return [];
           }
 
-          return [];
+          let jsonText = responseText;
+          const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (jsonMatch && jsonMatch[1]) {
+            jsonText = jsonMatch[1];
+          }
+
+          try {
+            let parsedData = JSON.parse(jsonText);
+            let articles: NewsArticle[] = [];
+
+            if (Array.isArray(parsedData)) {
+                articles = parsedData;
+            } 
+            else if (typeof parsedData === 'object' && parsedData !== null) {
+                const arrayKey = Object.keys(parsedData).find(key => Array.isArray((parsedData as any)[key]));
+                if (arrayKey) {
+                    articles = (parsedData as any)[arrayKey];
+                }
+            }
+            
+            if (articles.length === 0) {
+                 console.warn("Could not find a valid news array in the Gemini response.", parsedData);
+                 return [];
+            }
+
+            const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
+  
+            return articles
+              .filter(article => article && typeof article.title === 'string' && article.title.trim() !== '')
+              .map(article => ({
+                ...article,
+                url: findBestUrl(article.title, webSources),
+            }));
+
+          } catch(e) {
+            console.error("Failed to parse JSON response from Gemini:", e);
+            console.log("Raw response text:", responseText);
+            return [];
+          }
       });
   } catch (error) {
       console.warn("News fetch failed:", error);

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -10,7 +11,7 @@ import RefreshIcon from '../components/icons/RefreshIcon';
 import type { ToastMessage } from '../types';
 
 const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number; className?: string }> = ({ title, children, action, delay = 0, className = '' }) => (
-    <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up ${className}`} style={{ animationDelay: `${delay}ms` }}>
+    <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${className}`} style={{ animationDelay: `${delay}ms` }}>
         <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-lg text-[var(--text-primary)]">{title}</h3>
             {action}
@@ -100,23 +101,25 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
     
     return (
         <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">{t('nav_analysis')}</h1>
-                 <button 
-                    onClick={handleRefresh} 
-                    disabled={isRefreshing}
-                    className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50"
-                    aria-label={t('refresh_prices')}
-                >
-                    <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
-                </button>
-            </div>
-            <div className="max-w-full mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="lg:col-span-2">
-                    <PatrimonyEvolutionCard />
+            <div className="max-w-7xl mx-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-2xl font-bold">{t('nav_analysis')}</h1>
+                    <button 
+                        onClick={handleRefresh} 
+                        disabled={isRefreshing}
+                        className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50"
+                        aria-label={t('refresh_prices')}
+                    >
+                        <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+                    </button>
                 </div>
-                <IncomeCard />
-                <DiversificationCard />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="lg:col-span-2">
+                        <PatrimonyEvolutionCard />
+                    </div>
+                    <IncomeCard />
+                    <DiversificationCard />
+                </div>
             </div>
         </div>
     );

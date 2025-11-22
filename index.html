@@ -84,12 +84,16 @@
       @keyframes scale-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
       @keyframes grow-up { from { transform: scaleY(0); } to { transform: scaleY(1); } }
       @keyframes wipe-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+      @keyframes subtle-fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes slide-in-right { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
       
       .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
       .animate-fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .animate-scale-in { animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .animate-grow-up { animation: grow-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; transform-origin: bottom; }
       .animate-wipe-in { animation: wipe-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-subtle-fade-in { animation: subtle-fade-in 0.3s ease-out forwards; }
+      .animate-slide-in-right { animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
   <script type="importmap">
 {

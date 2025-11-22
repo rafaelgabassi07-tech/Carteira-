@@ -43,6 +43,7 @@ export interface Transaction {
     price: number;
     date: string;
     costs?: number;
+    // FIX: Add optional 'notes' property to Transaction interface
     notes?: string;
 }
 

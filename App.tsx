@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import BottomNav from './components/BottomNav';
 import PortfolioView from './views/PortfolioView';
@@ -205,7 +206,7 @@ const App: React.FC = () => {
        {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
        
        {/* Desktop Sidebar */}
-       <aside className="hidden md:flex flex-col w-64 h-screen border-r border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0 z-20">
+       <aside className="hidden md:flex flex-col w-64 xl:w-72 h-screen border-r border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0 z-20">
           <div className="p-6 flex items-center gap-3">
              <div className="w-8 h-8 rounded-lg bg-[var(--accent-color)] flex items-center justify-center text-[var(--bg-primary)]">
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
@@ -239,14 +240,11 @@ const App: React.FC = () => {
        {/* Main Content */}
        <main className="flex-1 h-screen relative flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-hidden bg-[var(--bg-primary)] relative">
-              {/* We use a container with max width but it needs to be inside the scrollable areas of views */}
-              <div className="w-full h-full">
-                 <ErrorBoundary>
-                    <div className="view-container h-full">
-                        {renderView()}
-                    </div>
-                 </ErrorBoundary>
+            <ErrorBoundary>
+              <div className="view-container h-full animate-subtle-fade-in" key={activeView}>
+                {renderView()}
               </div>
+            </ErrorBoundary>
           </div>
           
           {/* Mobile Bottom Nav Wrapper */}

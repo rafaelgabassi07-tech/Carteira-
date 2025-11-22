@@ -27,7 +27,7 @@ const WalletIcon: React.FC<{className?:string}> = ({className}) => (
 // --- Components ---
 
 const PortfolioSkeleton: React.FC = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 animate-pulse px-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
         {[1, 2, 3, 4, 5, 6].map(i => (
             <div key={i} className="h-20 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]"></div>
         ))}
@@ -343,7 +343,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                             {isRefreshing && processedAssets.length === 0 ? (
                                 <PortfolioSkeleton />
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[200px]">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px]">
                                     {processedAssets.map((asset, index) => (
                                         <AssetListItem 
                                             key={asset.ticker}
