@@ -16,14 +16,14 @@ import { CACHE_TTL } from '../constants';
 const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
     const { t } = useI18n();
     const sentimentMap = {
-        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
-        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400' },
-        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400' },
+        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-300 border-gray-500/30' },
+        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400 border-red-500/30' },
     };
     const sentimentData = sentiment ? sentimentMap[sentiment] : null;
     if (!sentimentData) return null;
     return (
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sentimentData.color}`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border backdrop-blur-md ${sentimentData.color}`}>
             {sentimentData.text}
         </span>
     );
@@ -106,47 +106,62 @@ const NewsCard: React.FC<{
         href={article.url} 
         target="_blank" 
         rel="noopener noreferrer"
-        className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden relative border border-[var(--border-color)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-all duration-300 flex flex-row md:flex-col h-full group active:scale-[0.99]"
+        className="relative rounded-2xl overflow-hidden block h-64 group shadow-md hover:shadow-xl transition-all duration-300 border border-[var(--border-color)] active:scale-[0.98]"
     >
-      {/* Mobile: Image Right (Google News Style) | Desktop: Image Top */}
-      <div className="w-28 h-28 md:w-full md:h-44 flex-shrink-0 order-2 md:order-1 relative overflow-hidden">
-           <img 
+        {/* Background Image */}
+        <div className="absolute inset-0 bg-[var(--bg-secondary)]">
+            <img 
                 src={imgSrc} 
                 alt=""
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 onError={() => setImgSrc(getFallbackImage(article.title))}
             />
-            {/* Overlay only visible on desktop layout */}
-            <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)] via-transparent to-transparent opacity-60"></div>
-      </div>
+        </div>
 
-      <div className="p-3 md:p-4 flex-1 flex flex-col justify-between order-1 md:order-2 min-w-0">
-        <div>
-            <div className="flex items-center gap-2 mb-1.5">
-                <img src={getFavicon(article.url || '')} className="w-3 h-3 rounded-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
-                <span className="text-[10px] font-bold text-[var(--accent-color)] uppercase truncate max-w-[100px]">{article.source}</span>
-                <span className="text-[10px] text-[var(--text-secondary)]">• {timeAgo(article.date)}</span>
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90 z-10"></div>
+
+        {/* Content */}
+        <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
+            
+            {/* Top Row: Source & Actions */}
+            <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+                    <img src={getFavicon(article.url || '')} className="w-3 h-3 rounded-sm bg-white/20" onError={(e) => e.currentTarget.style.display = 'none'} />
+                    <span className="text-[10px] font-bold text-white uppercase tracking-wider max-w-[120px] truncate">{article.source}</span>
+                </div>
+                
+                <div className="flex gap-2">
+                    <button onClick={handleFavorite} className={`p-2 rounded-full backdrop-blur-md transition-all ${isFavorited ? 'bg-yellow-500/20 text-yellow-400' : 'bg-black/30 text-white/70 hover:bg-black/50 hover:text-white'}`}>
+                        <StarIcon filled={isFavorited} className="w-4 h-4" />
+                    </button>
+                    <button onClick={handleShare} className="p-2 rounded-full bg-black/30 backdrop-blur-md text-white/70 hover:bg-black/50 hover:text-white transition-all">
+                        <ShareIcon className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
 
-            <h3 className="text-sm font-bold text-[var(--text-primary)] leading-snug line-clamp-3 md:line-clamp-2 mb-1 group-hover:text-[var(--accent-color)] transition-colors">
-                {article.title}
-            </h3>
-            
-            {/* Resumo visível apenas em desktop nos cards menores para economizar espaço mobile */}
-            <p className="hidden md:block text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed mb-3">
-                {article.summary}
-            </p>
-        </div>
+            {/* Bottom Row: Title, Summary, Metadata */}
+            <div>
+                <div className="flex items-center gap-2 mb-2">
+                    <SentimentBadge sentiment={article.sentiment} />
+                    <span className="text-[10px] text-gray-300 font-medium">• {timeAgo(article.date)}</span>
+                </div>
 
-        <div className="flex justify-between items-center mt-2 pt-2 md:border-t md:border-[var(--border-color)]">
-             <SentimentBadge sentiment={article.sentiment} />
-             <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                <button onClick={handleFavorite} className={`hover:text-[var(--text-primary)] transition-colors ${isFavorited ? 'text-yellow-400' : ''}`}><StarIcon filled={isFavorited} className="w-4 h-4" /></button>
-                <button onClick={handleShare} className="hover:text-[var(--text-primary)] transition-colors"><ShareIcon className="w-4 h-4" /></button>
-             </div>
+                <h3 className="text-base md:text-lg font-extrabold text-white leading-snug mb-1 line-clamp-2 drop-shadow-md">
+                    {article.title}
+                </h3>
+                
+                <p className="text-xs text-gray-300 line-clamp-2 leading-relaxed mb-2 opacity-90 font-medium">
+                    {article.summary}
+                </p>
+                
+                <div className="flex items-center text-[var(--accent-color)] text-xs font-bold group-hover:translate-x-1 transition-transform duration-300">
+                    {t('read_more')} <ChevronRightIcon className="w-4 h-4" />
+                </div>
+            </div>
         </div>
-      </div>
     </a>
   );
 };
@@ -161,7 +176,7 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
             href={article.url} 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="relative w-full flex-shrink-0 rounded-3xl overflow-hidden shadow-lg cursor-pointer group snap-center block h-full"
+            className="relative w-full flex-shrink-0 rounded-3xl overflow-hidden shadow-lg cursor-pointer group snap-center block h-full border border-[var(--border-color)]"
             style={{ scrollSnapAlign: 'center' }}
         >
             <div className="aspect-[16/10] md:aspect-[21/9] w-full relative">
@@ -173,9 +188,9 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
                     onError={() => setImgSrc(getFallbackImage(article.title))}
                 />
                 {/* Stronger Gradient Overlay for better text readability on mobile */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 z-10"></div>
                 
-                <div className="absolute bottom-0 left-0 p-5 md:p-8 w-full md:w-3/4">
+                <div className="absolute bottom-0 left-0 p-5 md:p-8 w-full md:w-3/4 z-20">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-md border border-white/10">
                             <img src={getFavicon(article.url || '')} className="w-3 h-3 rounded-full bg-white/10" onError={(e) => e.currentTarget.style.display = 'none'} />
@@ -188,7 +203,6 @@ const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
                         {article.title}
                     </h2>
                     
-                    {/* Resumo agora visível em Mobile também, limitado a 3 linhas */}
                     <p className="text-gray-300 text-xs md:text-sm line-clamp-3 font-medium leading-relaxed drop-shadow-md border-l-2 border-[var(--accent-color)] pl-3">
                         {article.summary}
                     </p>
@@ -218,14 +232,14 @@ const NewsCarousel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => {
             {/* Desktop Navigation Buttons (Translucent, Show on Hover) */}
             <button 
                 onClick={() => scroll('left')}
-                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/30 backdrop-blur-md border border-white/10 text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
+                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 bg-black/30 backdrop-blur-md border border-white/10 text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
             >
                 <ChevronLeftIcon className="w-6 h-6" />
             </button>
             
             <button 
                 onClick={() => scroll('right')}
-                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/30 backdrop-blur-md border border-white/10 text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
+                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 bg-black/30 backdrop-blur-md border border-white/10 text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
             >
                 <ChevronRightIcon className="w-6 h-6" />
             </button>
@@ -253,13 +267,11 @@ const NewsCarousel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => {
 };
 
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg animate-pulse border border-[var(--border-color)] flex gap-4 h-32">
-        <div className="flex-1 space-y-2">
-            <div className="h-3 bg-gray-700 rounded w-1/4"></div>
-            <div className="h-4 bg-gray-700 rounded w-full"></div>
-            <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-        </div>
-        <div className="w-24 h-24 bg-gray-700 rounded-lg flex-shrink-0"></div>
+    <div className="bg-[var(--bg-secondary)] p-4 rounded-xl animate-pulse border border-[var(--border-color)] h-64 flex flex-col justify-end">
+        <div className="h-4 bg-gray-700/50 rounded w-1/4 mb-4"></div>
+        <div className="h-6 bg-gray-700/50 rounded w-full mb-2"></div>
+        <div className="h-6 bg-gray-700/50 rounded w-3/4 mb-4"></div>
+        <div className="h-3 bg-gray-700/50 rounded w-full"></div>
     </div>
 );
 
