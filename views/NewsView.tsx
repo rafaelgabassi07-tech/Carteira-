@@ -76,19 +76,34 @@ const ImpactBadge: React.FC<{ level?: string; transparent?: boolean }> = ({ leve
 };
 
 const NewsHero: React.FC<{ article: NewsArticle; onClick: () => void }> = ({ article, onClick }) => {
-    const bgImage = article.imageUrl || getFallbackImage(article.category);
+    const [imgSrc, setImgSrc] = useState<string>(article.imageUrl || getFallbackImage(article.category));
+
+    // Atualiza a imagem se o artigo mudar
+    useEffect(() => {
+        setImgSrc(article.imageUrl || getFallbackImage(article.category));
+    }, [article]);
+
+    const handleError = () => {
+        // Se a imagem falhar, define o fallback. 
+        // Verifica se já não estamos usando o fallback para evitar loop infinito.
+        const fallback = getFallbackImage(article.category);
+        if (imgSrc !== fallback) {
+            setImgSrc(fallback);
+        }
+    };
 
     return (
         <div onClick={onClick} className="mb-6 relative h-72 sm:h-80 group cursor-pointer rounded-2xl overflow-hidden shadow-lg border border-[var(--border-color)] active:scale-[0.99] transition-transform">
             {/* Background Image */}
             <img 
-                src={bgImage} 
+                src={imgSrc} 
+                onError={handleError}
                 alt="News Background" 
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
             
-            {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent z-10"></div>
+            {/* Gradient Overlay - Stronger at bottom for readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-10"></div>
             
             {/* Content */}
             <div className="relative z-20 p-6 flex flex-col h-full justify-end">
@@ -124,7 +139,18 @@ const NewsCard: React.FC<{
   addToast: (message: string, type?: ToastMessage['type']) => void;
 }> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
   const { t } = useI18n();
-  const bgImage = article.imageUrl || getFallbackImage(article.category);
+  const [imgSrc, setImgSrc] = useState<string>(article.imageUrl || getFallbackImage(article.category));
+
+  useEffect(() => {
+      setImgSrc(article.imageUrl || getFallbackImage(article.category));
+  }, [article]);
+
+  const handleError = () => {
+      const fallback = getFallbackImage(article.category);
+      if (imgSrc !== fallback) {
+          setImgSrc(fallback);
+      }
+  };
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -148,7 +174,12 @@ const NewsCard: React.FC<{
     <div onClick={handleOpen} className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden border border-[var(--border-color)] shadow-sm hover:border-[var(--accent-color)]/40 transition-all flex flex-col h-full cursor-pointer group">
       {/* Card Image Header */}
       <div className="h-32 relative overflow-hidden">
-          <img src={bgImage} alt="News" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-90 group-hover:opacity-100" />
+          <img 
+            src={imgSrc} 
+            onError={handleError}
+            alt="News" 
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-90 group-hover:opacity-100" 
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)] to-transparent opacity-90"></div>
           
           <div className="absolute top-2 right-2 flex gap-1 z-10">

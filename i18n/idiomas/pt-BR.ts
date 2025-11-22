@@ -57,7 +57,8 @@ export const ptBR = {
     daily_liquidity: 'Liquidez Diária',
     shareholders: 'Nº de Cotistas',
     no_transactions_for_asset: 'Nenhuma transação para este ativo.',
-    dividends_received: 'Dividendos Recebidos',
+    dividends_received: 'Proventos',
+    total_dividends_received: 'Total Recebido',
     payment_date: 'Data Pag.',
     value_per_share: 'Valor/Cota',
     quantity_at_payment: 'Cotas',
@@ -122,7 +123,7 @@ export const ptBR = {
     confirm_delete_transaction: 'Tem certeza que deseja excluir esta transação?',
 
     // News View
-    market_news: 'Noticias',
+    market_news: 'Notícias',
     search_news_placeholder: 'Buscar notícias...',
     news_tab_all: 'Mercado',
     news_tab_favorites: 'Salvos',

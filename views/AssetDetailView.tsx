@@ -88,6 +88,10 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
     }, [dividends, ticker]);
 
+    const totalDividendsReceived = useMemo(() => {
+        return assetDividends.reduce((acc, div) => acc + (div.quantity * div.amountPerShare), 0);
+    }, [assetDividends]);
+
     if (!asset && !isRefreshing) {
         return (
             <div className="p-4">
@@ -260,7 +264,14 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     </div>
                 )}
                 {activeTab === 'dividends' && (
-                    <div className="space-y-3 animate-fade-in pb-4">
+                    <div className="space-y-4 animate-fade-in pb-4">
+                        {assetDividends.length > 0 && (
+                            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] shadow-sm flex justify-between items-center">
+                                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('total_dividends_received')}</span>
+                                <span className="text-xl font-bold text-[var(--green-text)]">{formatCurrency(totalDividendsReceived)}</span>
+                            </div>
+                        )}
+
                         {assetDividends.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {assetDividends.map((div, index) => (
