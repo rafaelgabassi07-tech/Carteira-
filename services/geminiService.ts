@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -92,7 +91,12 @@ const advancedAssetDataSchema = {
 function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?: string }>): string | undefined {
     if (!articleTitle || typeof articleTitle !== 'string') return undefined;
     
-    const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    // Robust normalization that handles non-string inputs gracefully to prevent crashes
+    const normalize = (str: any) => {
+        if (typeof str !== 'string') return '';
+        return str.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    };
+
     const normalizedArticleTitle = normalize(articleTitle);
     if (!normalizedArticleTitle) return undefined;
 
@@ -101,6 +105,8 @@ function findBestUrl(articleTitle: string, sources: Array<{ title?: string; uri?
     for (const source of sources) {
         if (!source || !source.title || !source.uri) continue;
         const normalizedSourceTitle = normalize(source.title);
+
+        if (!normalizedSourceTitle) continue;
 
         const articleWords = new Set(normalizedArticleTitle.split(' ').filter(w => w.length > 2));
         const sourceWords = new Set(normalizedSourceTitle.split(' '));
@@ -173,14 +179,17 @@ export async function fetchMarketNews(prefs: AppPreferences, tickers: string[] =
 
           const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map(c => c.web).filter(Boolean) || [];
 
-          if (webSources.length > 0 && Array.isArray(parsedArticles)) {
-              return parsedArticles.filter(article => article && article.title).map(article => ({
+          if (Array.isArray(parsedArticles)) {
+              // Enhanced filtering to ensure title exists and is a string
+              return parsedArticles
+                .filter(article => article && typeof article.title === 'string' && article.title.trim() !== '')
+                .map(article => ({
                   ...article,
                   url: findBestUrl(article.title, webSources),
               }));
           }
 
-          return Array.isArray(parsedArticles) ? parsedArticles.filter(a => a && a.title) : [];
+          return [];
       });
   } catch (error) {
       console.warn("News fetch failed:", error);
