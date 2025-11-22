@@ -11,446 +11,330 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-// --- IMAGENS DE FALLBACK (Expandido e Otimizado) ---
+// --- CONFIGURAÇÃO DE IMAGENS ---
 const FALLBACK_IMAGES: Record<string, string[]> = {
     Dividendos: [
-        'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=800&q=80',
         'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1633158829585-23ba8f7c8caf?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1565514020176-dbf2277479a2?auto=format&fit=crop&w=800&q=80'
     ],
     Macroeconomia: [
         'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1526304640152-d4619684e484?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=800&q=80'
     ],
     Imóveis: [
         'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1448630360428-65456885c650?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=800&q=80'
     ],
     Mercado: [
-        'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=800&q=80'
     ],
     Geral: [
-        'https://images.unsplash.com/photo-1593672715438-d88a350374ee?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?auto=format&fit=crop&w=800&q=80'
     ]
 };
 
 const getFallbackImage = (category: string = 'Geral', title: string): string => {
     const cat = FALLBACK_IMAGES[category] ? category : 'Geral';
     const images = FALLBACK_IMAGES[cat] || FALLBACK_IMAGES['Geral'];
-    // Hash determinístico
     let hash = 0;
     for (let i = 0; i < title.length; i++) {
         hash = ((hash << 5) - hash) + title.charCodeAt(i);
         hash |= 0; 
     }
-    const index = Math.abs(hash) % images.length;
-    return images[index];
+    return images[Math.abs(hash) % images.length];
 };
 
-const ImpactBadge: React.FC<{ level: string }> = ({ level }) => {
-    const colors = {
-        High: 'bg-red-500 text-white shadow-lg shadow-red-500/30',
-        Medium: 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/30',
-        Low: 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-    };
-    const labels = { High: 'Alta Relevância', Medium: 'Médio Impacto', Low: 'Informativo' };
+// --- HOOK DE LÓGICA DE NOTÍCIAS ---
+const useMarketNews = (addToast: (msg: string, type?: any) => void) => {
+    const { t } = useI18n();
+    const { assets, preferences } = usePortfolio();
+    const [news, setNews] = useState<NewsArticle[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     
+    // Filters
+    const [searchQuery, setSearchQuery] = useState('');
+    const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
+    const [sourceFilter, setSourceFilter] = useState('');
+
+    const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
+
+    const fetchNews = useCallback(async (isRefresh = false, query = '', range = 'week', source = '') => {
+        if(!isRefresh) setLoading(true);
+        setError(null);
+        
+        try {
+            const filterKey = `news_cache_v4_${query}_${range}_${source}_${assetTickers.join('-')}`.toLowerCase().replace(/\s+/g, '_');
+            
+            if (!isRefresh) {
+                const cached = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
+                if (cached) {
+                    setNews(cached);
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            const filter: NewsFilter = {
+                query: query,
+                tickers: assetTickers,
+                dateRange: range as any,
+                sources: source
+            };
+
+            const articles = await fetchMarketNews(preferences, filter);
+            
+            if (articles.length > 0) {
+                setNews(articles);
+                CacheManager.set(filterKey, articles);
+            } else if (isRefresh) {
+                setError(t('no_news_found'));
+            }
+        } catch (err: any) {
+            setError(err.message || t('unknown_error'));
+        } finally {
+            setLoading(false);
+        }
+    }, [assetTickers, preferences, t]);
+
+    // Debounced fetcher
+    const debouncedFetch = useCallback(debounce((q, r, s) => fetchNews(true, q, r, s), 800), [fetchNews]);
+
+    // Initial Load
+    useEffect(() => {
+        fetchNews(false, searchQuery, dateRange, sourceFilter);
+    }, []);
+
+    // Handlers
+    const handleRefresh = () => {
+        vibrate();
+        setLoading(true);
+        fetchNews(true, searchQuery, dateRange, sourceFilter);
+    };
+
+    const handleSearch = (val: string) => {
+        setSearchQuery(val);
+        setLoading(true);
+        debouncedFetch(val, dateRange, sourceFilter);
+    }
+
+    const handleFilterChange = (range: any, source: string) => {
+        setDateRange(range);
+        setSourceFilter(source);
+        setLoading(true);
+        fetchNews(true, searchQuery, range, source);
+    }
+
+    return {
+        news, loading, error,
+        searchQuery, dateRange, sourceFilter,
+        handleSearch, handleFilterChange, handleRefresh
+    };
+};
+
+// --- COMPONENTES VISUAIS ---
+
+const ImpactBadge: React.FC<{ level: string }> = React.memo(({ level }) => {
+    const colors = {
+        High: 'bg-red-500 text-white shadow-red-500/30',
+        Medium: 'bg-amber-500 text-black shadow-amber-500/30',
+        Low: 'bg-blue-500 text-white shadow-blue-500/30'
+    };
+    const labels = { High: 'Alta Relevância', Medium: 'Médio Impacto', Low: 'Info' };
     return (
-        <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${colors[level as keyof typeof colors] || colors.Low}`}>
-            {labels[level as keyof typeof labels] || 'Info'}
+        <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider shadow-lg ${colors[level as keyof typeof colors] || colors.Low}`}>
+            {labels[level as keyof typeof labels] || 'Geral'}
         </span>
     );
-};
+});
 
-// --- COMPONENTE CARROSSEL (Novo Hero) ---
-const NewsCarousel: React.FC<{ 
-    articles: NewsArticle[]; 
-    onArticleClick: (article: NewsArticle) => void; 
-}> = ({ articles, onArticleClick }) => {
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const [currentIndex, setCurrentIndex] = useState(0);
-
-    const handleScroll = () => {
-        if (scrollRef.current) {
-            const width = scrollRef.current.offsetWidth;
-            const scrollLeft = scrollRef.current.scrollLeft;
-            const index = Math.round(scrollLeft / width);
-            setCurrentIndex(index);
-        }
-    };
-
-    if (articles.length === 0) return null;
-
-    return (
-        <div className="relative w-full mb-8 group animate-fade-in">
-            {/* Scroll Container */}
-            <div 
-                ref={scrollRef}
-                onScroll={handleScroll}
-                className="w-full overflow-x-auto flex snap-x snap-mandatory no-scrollbar rounded-3xl shadow-2xl border border-[var(--border-color)]"
-            >
-                {articles.map((article, idx) => {
-                    const [imageSrc, setImageSrc] = useState(article.imageUrl || getFallbackImage(article.category, article.title));
-                    
-                    const handleError = () => {
-                        setImageSrc(getFallbackImage(article.category, article.title));
-                    };
-
-                    return (
-                        <div 
-                            key={`${article.title}-hero-${idx}`} 
-                            onClick={() => onArticleClick(article)}
-                            className="w-full flex-shrink-0 snap-center relative h-72 md:h-80 cursor-pointer overflow-hidden"
-                        >
-                            <img 
-                                src={imageSrc} 
-                                alt={article.title}
-                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                onError={handleError}
-                                loading={idx === 0 ? "eager" : "lazy"}
-                            />
-                            {/* Immersive Gradient Overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-95" />
-                            
-                            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 flex flex-col justify-end">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest shadow-lg">
-                                        {article.category || 'Destaque'}
-                                    </span>
-                                    {article.impactLevel && <ImpactBadge level={article.impactLevel} />}
-                                </div>
-                                
-                                <h2 className="text-xl md:text-3xl font-bold text-white leading-tight mb-2 line-clamp-2 drop-shadow-md">
-                                    {article.title}
-                                </h2>
-                                
-                                <p className="text-gray-200 text-xs md:text-sm line-clamp-2 mb-4 max-w-3xl font-medium drop-shadow-sm opacity-90">
-                                    {article.summary}
-                                </p>
-
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                                    <span>{article.source}</span>
-                                    <span>•</span>
-                                    <span>{new Date(article.date).toLocaleDateString()}</span>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Indicators */}
-            <div className="absolute bottom-4 right-6 flex gap-1.5 z-10">
-                {articles.map((_, idx) => (
-                    <div 
-                        key={idx} 
-                        className={`h-1.5 rounded-full transition-all duration-300 shadow-sm ${currentIndex === idx ? 'w-6 bg-[var(--accent-color)]' : 'w-1.5 bg-white/30'}`}
-                    />
-                ))}
-            </div>
-        </div>
-    );
-};
-
-// --- COMPONENTE CARD PADRONIZADO (Novo Design) ---
-const ImmersiveNewsCard: React.FC<{ 
+const NewsCard: React.FC<{ 
   article: NewsArticle;
   isFavorited: boolean;
   onToggleFavorite: () => void;
-  onClick: () => void;
-}> = ({ article, isFavorited, onToggleFavorite, onClick }) => {
+  isHero?: boolean;
+}> = React.memo(({ article, isFavorited, onToggleFavorite, isHero = false }) => {
   const [imageSrc, setImageSrc] = useState(article.imageUrl || getFallbackImage(article.category, article.title));
 
-  const handleError = () => {
-      setImageSrc(getFallbackImage(article.category, article.title));
+  const handleClick = () => {
+      vibrate();
+      const url = article.url && article.url.startsWith('http') ? article.url : `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div 
-        onClick={onClick} 
-        className="relative h-64 w-full rounded-2xl overflow-hidden cursor-pointer group shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-[var(--border-color)] bg-[var(--bg-secondary)]"
+        onClick={handleClick}
+        className={`relative overflow-hidden rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] cursor-pointer group hover:shadow-2xl transition-all duration-300 ${isHero ? 'h-72 md:h-80 w-full flex-shrink-0 snap-center' : 'h-64 w-full hover:-translate-y-1'}`}
     >
-        {/* Full Background Image */}
+        {/* Image Layer */}
         <img 
             src={imageSrc} 
             alt={article.title}
-            loading="lazy"
+            loading={isHero ? "eager" : "lazy"}
             decoding="async"
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-            onError={handleError}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            onError={() => setImageSrc(getFallbackImage(article.category, article.title))}
         />
         
-        {/* Standard Gradient Overlay (Escuro em baixo, transparente em cima) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90 transition-opacity group-hover:opacity-100" />
 
-        {/* Top Actions */}
-        <div className="absolute top-3 right-3 z-20 flex gap-2">
-             <button 
-                onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-                className="p-2 rounded-full bg-black/30 backdrop-blur-md text-white hover:bg-white/20 transition-colors border border-white/10"
-            >
-                <StarIcon filled={isFavorited} className={`w-4 h-4 ${isFavorited ? 'text-yellow-400' : ''}`} />
-            </button>
-        </div>
+        {/* Actions */}
+        <button 
+            onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+            className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition-colors active:scale-90"
+        >
+            <StarIcon filled={isFavorited} className={`w-4 h-4 ${isFavorited ? 'text-yellow-400' : ''}`} />
+        </button>
 
-        {/* Content (Bottom) */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 z-10 flex flex-col justify-end h-full">
-            <div className="mt-auto">
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[9px] font-bold uppercase tracking-wider bg-white/20 text-white backdrop-blur-sm px-2 py-0.5 rounded border border-white/10">
-                        {article.category || 'Geral'}
-                    </span>
-                    <span className="text-[9px] font-bold text-[var(--accent-color)] uppercase tracking-wider drop-shadow-sm">
-                        {article.source}
-                    </span>
-                </div>
+        {/* Content */}
+        <div className="absolute bottom-0 left-0 right-0 p-5 z-10 flex flex-col justify-end">
+            <div className="flex items-center gap-2 mb-2">
+                <span className="text-[9px] font-bold uppercase tracking-wider bg-white/20 text-white backdrop-blur-sm px-2 py-0.5 rounded border border-white/10">
+                    {article.category || 'Mercado'}
+                </span>
+                {article.impactLevel && <ImpactBadge level={article.impactLevel} />}
+            </div>
 
-                <h3 className="text-sm md:text-base font-bold text-white leading-snug mb-1 line-clamp-3 drop-shadow-md group-hover:text-[var(--accent-color)] transition-colors">
-                    {article.title}
-                </h3>
-                
-                <p className="text-[10px] text-gray-300 line-clamp-2 leading-relaxed font-medium opacity-90">
-                    {article.summary}
-                </p>
+            <h3 className={`font-bold text-white leading-tight mb-1 drop-shadow-md ${isHero ? 'text-xl md:text-3xl line-clamp-2' : 'text-sm md:text-base line-clamp-3'}`}>
+                {article.title}
+            </h3>
+            
+            <p className="text-[10px] md:text-xs text-gray-300 line-clamp-2 leading-relaxed font-medium opacity-90 max-w-3xl">
+                {article.summary}
+            </p>
+            
+            <div className="flex items-center gap-2 mt-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                <span className="text-[var(--accent-color)]">{article.source}</span>
+                <span>•</span>
+                <span>{new Date(article.date).toLocaleDateString()}</span>
             </div>
         </div>
     </div>
   );
-};
-
-const NewsCardSkeleton: React.FC = () => (
-    <div className="h-64 bg-[var(--bg-secondary)] rounded-2xl animate-pulse border border-[var(--border-color)] relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-tertiary-hover)] to-transparent opacity-50"></div>
-        <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
-            <div className="h-4 bg-[var(--bg-tertiary-hover)] rounded w-1/3"></div>
-            <div className="h-5 bg-[var(--bg-tertiary-hover)] rounded w-full"></div>
-            <div className="h-5 bg-[var(--bg-tertiary-hover)] rounded w-2/3"></div>
-            <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-5/6"></div>
-        </div>
-    </div>
-);
+});
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  const { assets, preferences } = usePortfolio();
-  const [news, setNews] = useState<NewsArticle[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Filters
+  const { 
+      news, loading, error, 
+      searchQuery, dateRange, sourceFilter,
+      handleSearch, handleFilterChange, handleRefresh 
+  } = useMarketNews(addToast);
+
   const [showFilters, setShowFilters] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
-  const [sourceFilter, setSourceFilter] = useState('');
-
-  const [favorites, setFavorites] = useState<Set<string>>(() => {
-    try {
-        const saved = localStorage.getItem('news-favorites');
-        return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch { return new Set(); }
-  });
-  
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
-  const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
-
-  useEffect(() => {
-    localStorage.setItem('news-favorites', JSON.stringify(Array.from(favorites)));
-  }, [favorites]);
-
-  const handleToggleFavorite = (articleTitle: string) => {
-    setFavorites(prevFavorites => {
-      const newFavorites = new Set(prevFavorites);
-      if (newFavorites.has(articleTitle)) {
-        newFavorites.delete(articleTitle);
-      } else {
-        newFavorites.add(articleTitle);
-      }
-      return newFavorites;
-    });
-  };
-
-  const handleArticleClick = (article: NewsArticle) => {
-      vibrate();
-      if (article.url && article.url.startsWith('http')) {
-          window.open(article.url, '_blank', 'noopener,noreferrer');
-      } else {
-          // Fallback seguro
-          window.open(`https://www.google.com/search?q=${encodeURIComponent(article.title)}`, '_blank');
-      }
-  };
-
-  const loadNews = useCallback(async (isRefresh = false, currentQuery: string, currentDateRange: 'today' | 'week' | 'month', currentSource: string) => {
-    if(!isRefresh) setLoading(true);
-    setError(null);
-    
-    try {
-      const filterKey = `news_v3_${currentQuery}_${currentDateRange}_${currentSource}_${assetTickers.join('-')}`.toLowerCase().replace(/\s+/g, '_');
-      
-      // Use cache unless forced refresh
-      if (!isRefresh) {
-          const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS); // Using 1h TTL
-          if (cachedNews) {
-              setNews(cachedNews);
-              setLoading(false);
-              return;
-          }
-      }
-
-      const filter: NewsFilter = {
-          query: currentQuery,
-          tickers: assetTickers,
-          dateRange: currentDateRange,
-          sources: currentSource
-      };
-
-      const articles = await fetchMarketNews(preferences, filter);
-      
-      if (articles.length > 0) {
-          setNews(articles);
-          CacheManager.set(filterKey, articles);
-      } else {
-          // Only set error if it was a forced refresh and we got nothing, otherwise keep old data or show empty
-          if(isRefresh) setError(t('no_news_found'));
-      }
-
-    } catch (err: any) {
-      setError(err.message || t('unknown_error'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t, assetTickers, preferences]);
   
-  const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);
+  // Favorites Logic
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('news-favorites') || '[]')); } catch { return new Set(); }
+  });
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchQuery(e.target.value);
-      setLoading(true);
-      debouncedLoadNews(e.target.value, dateRange, sourceFilter);
-  };
+  useEffect(() => { localStorage.setItem('news-favorites', JSON.stringify(Array.from(favorites))); }, [favorites]);
 
-  const handleRefresh = () => {
-    vibrate();
-    setLoading(true);
-    loadNews(true, searchQuery, dateRange, sourceFilter);
-  };
+  const toggleFavorite = useCallback((title: string) => {
+      setFavorites(prev => {
+          const next = new Set(prev);
+          if (next.has(title)) next.delete(title);
+          else next.add(title);
+          return next;
+      });
+      vibrate();
+  }, []);
 
-  // Initial Load
-  useEffect(() => {
-    loadNews(false, '', 'week', ''); 
-  }, [loadNews]);
-
-  const displayedNews = useMemo(() => {
-      return activeTab === 'favorites' 
-        ? news.filter(n => favorites.has(n.title))
-        : news;
-  }, [news, activeTab, favorites]);
-
-  const carouselArticles = useMemo(() => {
-      if (activeTab === 'favorites' || searchQuery || showFilters) return []; 
-      return displayedNews.slice(0, 5);
-  }, [displayedNews, activeTab, searchQuery, showFilters]);
-
-  const gridArticles = useMemo(() => {
-      if (activeTab === 'favorites' || searchQuery || showFilters) return displayedNews;
-      return displayedNews.slice(5); 
-  }, [displayedNews, activeTab, searchQuery, showFilters]);
+  // Memoized Lists
+  const displayedNews = useMemo(() => activeTab === 'favorites' ? news.filter(n => favorites.has(n.title)) : news, [news, activeTab, favorites]);
+  const heroArticles = useMemo(() => activeTab === 'all' && !searchQuery && !showFilters ? displayedNews.slice(0, 5) : [], [displayedNews, activeTab, searchQuery, showFilters]);
+  const listArticles = useMemo(() => activeTab === 'all' && !searchQuery && !showFilters ? displayedNews.slice(5) : displayedNews, [displayedNews, activeTab, searchQuery, showFilters]);
 
   return (
     <div className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6">
       <div className="w-full max-w-7xl mx-auto">
+        {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold">{t('market_news')}</h1>
           <div className="flex gap-2">
-               <button 
-                  onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
-                  className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
-              >
+               <button onClick={() => { setShowFilters(!showFilters); vibrate(); }} className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)]'}`}>
                   <FilterIcon className="w-5 h-5" />
               </button>
-              <button 
-                  onClick={handleRefresh} 
-                  disabled={loading}
-                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
-              >
+              <button onClick={handleRefresh} disabled={loading} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]">
                   <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
               </button>
           </div>
         </div>
         
-        {/* Search & Filters UI */}
-        <div className="mb-4 space-y-4">
-             {showFilters && (
-                 <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] animate-fade-in-up">
-                     <div className="flex gap-2 overflow-x-auto">
-                        {(['today', 'week', 'month'] as const).map((r) => (
-                            <button key={r} onClick={() => { setDateRange(r); setLoading(true); loadNews(true, searchQuery, r, sourceFilter); }} className={`px-4 py-1 text-xs font-bold rounded-lg ${dateRange === r ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'bg-[var(--bg-primary)]'}`}>
-                                {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
-                            </button>
-                        ))}
-                     </div>
+        {/* Filters UI */}
+        {showFilters && (
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-3">
+                 <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)]">
+                    {(['today', 'week', 'month'] as const).map((r) => (
+                        <button key={r} onClick={() => handleFilterChange(r, sourceFilter)} className={`flex-1 py-1.5 text-xs font-bold rounded transition-all ${dateRange === r ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>
+                            {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
+                        </button>
+                    ))}
                  </div>
-             )}
-             
-             <input 
-                type="text" 
-                placeholder={t('search_news_placeholder')} 
-                value={searchQuery} 
-                onChange={handleSearchChange} 
-                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 text-sm focus:border-[var(--accent-color)] outline-none shadow-inner transition-colors"
-            />
+                 <input type="text" placeholder="Fonte (ex: InfoMoney)" value={sourceFilter} onChange={(e) => handleFilterChange(dateRange, e.target.value)} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:border-[var(--accent-color)] outline-none" />
+            </div>
+        )}
 
+        {/* Search & Tabs */}
+        <div className="space-y-4 mb-6">
+            <input type="text" placeholder={t('search_news_placeholder')} value={searchQuery} onChange={(e) => handleSearch(e.target.value)} className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:border-[var(--accent-color)] outline-none shadow-sm" />
+            
             <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)]">
-                <button onClick={() => { setActiveTab('all'); vibrate(); }} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t('news_tab_all')}</button>
-                <button onClick={() => { setActiveTab('favorites'); vibrate(); }} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t('news_tab_favorites')} {favorites.size > 0 && `(${favorites.size})`}</button>
+                <button onClick={() => { setActiveTab('all'); vibrate(); }} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>{t('news_tab_all')}</button>
+                <button onClick={() => { setActiveTab('favorites'); vibrate(); }} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>{t('news_tab_favorites')} {favorites.size > 0 && `(${favorites.size})`}</button>
             </div>
         </div>
 
-        {loading ? (
-            <div className="space-y-4">
-                <div className="h-72 bg-[var(--bg-secondary)] rounded-3xl animate-pulse border border-[var(--border-color)]"></div>
+        {/* Content Area */}
+        {loading && (
+            <div className="space-y-4 animate-pulse">
+                <div className="h-72 bg-[var(--bg-secondary)] rounded-3xl border border-[var(--border-color)]"></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[1,2,3,4].map(i => <NewsCardSkeleton key={i}/>)}
+                    {[1,2,3,4].map(i => <div key={i} className="h-64 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)]"></div>)}
                 </div>
             </div>
-        ) : error ? (
-             <div className="text-center py-10 text-red-400 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]">
-                 <p className="font-bold mb-2">Ops!</p>
-                 <p className="text-sm">{error}</p>
-                 <button onClick={handleRefresh} className="mt-4 text-[var(--accent-color)] font-bold text-sm hover:underline">Tentar Novamente</button>
-             </div>
-        ) : (
-            <div className="animate-fade-in">
-                {/* Hero Carousel */}
-                {!searchQuery && !showFilters && activeTab === 'all' && (
-                    <NewsCarousel articles={carouselArticles} onArticleClick={handleArticleClick} />
-                )}
+        )}
+        
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-6 rounded-xl text-center">
+            <p className="font-bold mb-2">Ops!</p>
+            <p className="text-sm mb-4">{error}</p>
+            <button onClick={handleRefresh} className="bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold py-2 px-6 rounded-lg text-xs uppercase tracking-wide transition-colors">{t('try_again')}</button>
+          </div>
+        )}
 
-                {/* Grid */}
-                {gridArticles.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {gridArticles.map((article, index) => (
-                            <div key={`${article.title}-${index}`} className="animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
-                                <ImmersiveNewsCard 
-                                    article={article}
-                                    isFavorited={favorites.has(article.title)}
-                                    onToggleFavorite={() => handleToggleFavorite(article.title)}
-                                    onClick={() => handleArticleClick(article)}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-20 text-[var(--text-secondary)]">
-                        <p>{activeTab === 'favorites' ? t('no_favorites_subtitle') : t('no_news_found')}</p>
-                    </div>
-                )}
-            </div>
+        {!loading && !error && (
+          <div className="animate-fade-in space-y-8">
+            {/* Carousel (Hero) */}
+            {heroArticles.length > 0 && (
+                <div className="w-full overflow-x-auto flex snap-x snap-mandatory no-scrollbar gap-4 pb-4">
+                    {heroArticles.map((article, idx) => (
+                        <NewsCard key={`hero-${idx}`} article={article} isFavorited={favorites.has(article.title)} onToggleFavorite={() => toggleFavorite(article.title)} isHero />
+                    ))}
+                </div>
+            )}
+
+            {/* Grid */}
+            {listArticles.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {listArticles.map((article, index) => (
+                      <div key={`${article.title}-${index}`} className="animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
+                          <NewsCard article={article} isFavorited={favorites.has(article.title)} onToggleFavorite={() => toggleFavorite(article.title)} />
+                      </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 text-[var(--text-secondary)]">
+                  <StarIcon className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  <p>{activeTab === 'favorites' ? t('no_favorites_subtitle') : t('no_news_found')}</p>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

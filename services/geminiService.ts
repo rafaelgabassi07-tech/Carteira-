@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Schema } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
 function getGeminiApiKey(prefs: AppPreferences): string {
@@ -25,10 +25,8 @@ async function withRetry<T>(apiCall: () => Promise<T>, maxRetries = 2, initialDe
 
       if ((isServerError || isOverloaded) && attempt < maxRetries) {
         const delay = initialDelay * Math.pow(2, attempt - 1);
-        console.warn(`AI API busy. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
-        console.error("AI API Critical Failure:", error);
         throw error; 
       }
     }
@@ -55,28 +53,30 @@ export interface NewsFilter {
     query?: string;
 }
 
-// Função Helper Robusta para Extração de JSON
+// --- JSON Helper ---
 function extractJSON(text: string): any {
     if (!text) throw new Error("Texto vazio");
-
-    // 1. Tenta parsing direto (caso ideal)
-    try { return JSON.parse(text); } catch (e) {}
-
-    // 2. Tenta extrair de bloco de código markdown ```json ... ``` ou ``` ... ```
-    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (codeBlockMatch) {
-        try { return JSON.parse(codeBlockMatch[1]); } catch (e) {}
-    }
-
-    // 3. Tenta encontrar limites de array [...]
-    const firstOpen = text.indexOf('[');
-    const lastClose = text.lastIndexOf(']');
+    // Remove code blocks logic
+    const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    // Try finding the array brackets
+    const firstOpen = cleaned.indexOf('[');
+    const lastClose = cleaned.lastIndexOf(']');
+    
     if (firstOpen !== -1 && lastClose > firstOpen) {
-        const candidate = text.substring(firstOpen, lastClose + 1);
-        try { return JSON.parse(candidate); } catch (e) {}
+        const jsonCandidate = cleaned.substring(firstOpen, lastClose + 1);
+        try {
+            return JSON.parse(jsonCandidate);
+        } catch (e) {
+            // If strict parse fails, try a loose correction (common trailing comma issue)
+            try {
+                return JSON.parse(jsonCandidate.replace(/,\s*]/g, "]"));
+            } catch (e2) {
+                throw new Error("Falha crítica no parsing do JSON");
+            }
+        }
     }
-
-    throw new Error("Não foi possível extrair JSON válido da resposta.");
+    throw new Error("Estrutura JSON não encontrada");
 }
 
 export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<NewsArticle[]> {
@@ -84,52 +84,53 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   try {
     apiKey = getGeminiApiKey(prefs);
   } catch (error: any) {
-    console.warn("Skipping news fetch (No API Key):", error.message);
+    console.warn("News fetch skipped:", error.message);
     return [];
   }
   
   const ai = new GoogleGenAI({ apiKey });
   
-  // Otimização: Limitar contexto para os 5 principais ativos para não poluir o prompt
-  const contextTickers = filter.tickers?.slice(0, 5).join(', ');
+  // Context Optimization
+  const contextTickers = filter.tickers && filter.tickers.length > 0 
+    ? `Prioridade máxima para notícias sobre: ${filter.tickers.slice(0, 5).join(', ')}.` 
+    : "Destaques gerais do IFIX e Ibovespa.";
   
-  let timePrompt = "";
-  switch (filter.dateRange) {
-      case 'today': timePrompt = "nas últimas 24 horas"; break;
-      case 'week': timePrompt = "nos últimos 7 dias"; break;
-      case 'month': timePrompt = "neste mês"; break;
-      default: timePrompt = "recente";
-  }
+  const timeMap = {
+      'today': "nas últimas 24 horas",
+      'week': "nos últimos 7 dias",
+      'month': "neste mês"
+  };
+  const timePrompt = timeMap[filter.dateRange || 'week'] || "recentes";
+  const userQuery = filter.query ? `Tópico específico: "${filter.query}".` : "";
+  const sourcePrompt = filter.sources ? `Fontes preferidas: ${filter.sources}.` : "";
 
-  const userQuery = filter.query ? `Assunto específico: "${filter.query}".` : "";
-  const sourcePrompt = filter.sources ? `Fontes prioritárias: ${filter.sources}.` : "";
-
-  // Prompt OTIMIZADO para velocidade e estrutura
   const prompt = `
-    Atue como um analista financeiro sênior. Busque as 6 notícias mais impactantes sobre o Mercado Financeiro Brasileiro e Fundos Imobiliários (FIIs) ${timePrompt}.
+    Você é um agregador de notícias financeiras em tempo real.
+    Tarefa: Busque e liste 8 notícias ${timePrompt} sobre o Mercado Financeiro Brasileiro (FIIs e Ações).
     
-    FOCO: ${contextTickers ? `Prioridade total para notícias sobre: ${contextTickers}.` : "Destaques do IFIX e Ibovespa."}
+    CONTEXTO:
+    ${contextTickers}
     ${userQuery}
     ${sourcePrompt}
 
-    REGRAS CRÍTICAS:
-    1. Retorne APENAS um JSON Array. Sem markdown, sem explicações antes ou depois.
-    2. Encontre o LINK REAL (url) funcional.
-    3. Tente extrair a URL da IMAGEM de capa (thumbnail/og:image). Se não achar, deixe em branco.
+    REQUISITOS TÉCNICOS (JSON ONLY):
+    1. Retorne APENAS um Array JSON válido.
+    2. Tente encontrar a URL da imagem de capa (og:image) no código da página.
+    3. O link (url) DEVE funcionar.
 
-    FORMATO JSON (Array):
+    SCHEMA:
     [
       {
-        "source": "Nome da Fonte",
-        "title": "Manchete Curta",
-        "summary": "Resumo em 1 frase.",
-        "impactAnalysis": "Impacto no investidor.",
+        "source": "Nome do Veículo (ex: InfoMoney)",
+        "title": "Manchete (Máx 80 caracteres)",
+        "summary": "Resumo direto (Máx 120 caracteres)",
+        "impactAnalysis": "Uma frase curta sobre o impacto (ex: 'Positivo para dividendos' ou 'Risco de vacância')",
         "date": "YYYY-MM-DD",
         "sentiment": "Positive" | "Neutral" | "Negative",
         "category": "Dividendos" | "Macroeconomia" | "Resultados" | "Mercado" | "Imóveis",
         "impactLevel": "High" | "Medium" | "Low",
-        "url": "https://...",
-        "imageUrl": "https://..."
+        "url": "https://link-real...",
+        "imageUrl": "https://link-imagem..."
       }
     ]
   `;
@@ -137,87 +138,74 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   try {
       return await withRetry(async () => {
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash", // Modelo mais rápido e eficiente
+            model: "gemini-2.5-flash", 
             contents: prompt,
             config: {
-                tools: [{googleSearch: {}}],
-                temperature: 0.3, // Baixa temperatura para respostas mais objetivas e rápidas
-                maxOutputTokens: 2500, 
+                tools: [{googleSearch: {}}], // Grounding ativado
+                temperature: 0.1, // Frio para precisão
+                maxOutputTokens: 4000, 
             }
           });
           
           const responseText = response.text || '';
+          const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
           let articles: NewsArticle[] = [];
 
           try {
+            // 1. Tenta extrair o JSON gerado pela IA
             articles = extractJSON(responseText);
           } catch (e) {
-            console.warn("Falha no parsing do JSON da IA. Tentando fallback via Grounding...", e);
+            console.warn("JSON Parsing failed. Switching to Grounding Fallback.");
             
-            // FALLBACK DE EMERGÊNCIA: Usar metadados da pesquisa (Grounding) se o JSON falhar
-            // Isso garante que SEMPRE teremos notícias se a busca encontrou algo
-            const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-            if (groundingChunks && groundingChunks.length > 0) {
+            // 2. FALLBACK ROBUSTO: Constrói notícias usando apenas os metadados do Google Search
+            if (groundingChunks.length > 0) {
                 articles = groundingChunks
                     .filter(c => c.web?.title && c.web?.uri)
-                    .map((c, idx) => ({
-                        source: new URL(c.web!.uri!).hostname.replace('www.', ''),
+                    .map(c => ({
+                        source: new URL(c.web!.uri!).hostname.replace('www.', '').split('.')[0].toUpperCase(),
                         title: c.web!.title!,
-                        summary: "Notícia encontrada via busca rápida.",
-                        impactAnalysis: "Clique para ler a matéria completa.",
+                        summary: "Notícia encontrada via busca. Clique para ler o conteúdo completo na fonte original.",
+                        impactAnalysis: "Conteúdo da Web",
                         date: new Date().toISOString(),
                         sentiment: 'Neutral',
                         category: 'Mercado',
                         impactLevel: 'Medium',
                         url: c.web!.uri!
-                    }))
-                    .slice(0, 6); // Limita a 6 itens
+                    }));
             }
           }
 
           if (!Array.isArray(articles) || articles.length === 0) return [];
 
-          // GROUNDING & LINK RECOVERY (A Mágica da Correção)
-          const webSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-              ?.map(c => c.web)
+          // 3. Pós-Processamento e Validação de Links
+          const webSources = groundingChunks
+              .map(c => c.web)
               .filter(Boolean)
-              .flatMap(w => ({ uri: w?.uri, title: w?.title })) || [];
+              .flatMap(w => ({ uri: w?.uri, title: w?.title }));
 
           return articles.map(article => {
                 let finalUrl = article.url;
                 
-                // Validação de URL: Se for curta demais, 'example', ou vazia, buscamos no Grounding
-                const isSuspiciousUrl = !finalUrl || finalUrl.length < 12 || finalUrl.includes('example') || finalUrl.includes('google.com/search');
+                // Validação de URL: Se parecer fake, tenta achar no Grounding
+                const isInvalidUrl = !finalUrl || finalUrl.includes('example.com') || !finalUrl.startsWith('http');
                 
-                if (isSuspiciousUrl && webSources.length > 0) {
-                    // Tenta encontrar um link que tenha palavras do título da notícia
-                    const titleWords = article.title.toLowerCase().split(' ').filter(w => w.length > 4);
-                    
+                if (isInvalidUrl && webSources.length > 0) {
                     const match = webSources.find(src => 
-                        src.title && titleWords.some(word => src.title?.toLowerCase().includes(word))
+                        src.title && article.title && 
+                        (src.title.includes(article.title.substring(0, 10)) || article.title.includes(src.title.substring(0, 10)))
                     );
-                    
-                    if (match?.uri) {
-                        finalUrl = match.uri;
-                    } else {
-                        // Fallback para o primeiro link de fonte confiável encontrado
-                        finalUrl = webSources[0].uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
-                    }
+                    finalUrl = match?.uri || webSources[0].uri || `https://www.google.com/search?q=${encodeURIComponent(article.title)}`;
                 }
-
-                // Garante categorias válidas
-                const validCategories = ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"];
-                const category = validCategories.includes(article.category || '') ? article.category : 'Mercado';
 
                 return {
                   ...article,
                   url: finalUrl,
-                  category: category as any,
+                  category: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis"].includes(article.category || '') ? article.category : 'Mercado' as any,
                   impactLevel: article.impactLevel || 'Medium',
-                  // Se a imagem vier vazia ou quebrada, o front-end usará o fallback determinístico
-                  imageUrl: article.imageUrl && article.imageUrl.startsWith('http') ? article.imageUrl : undefined 
+                  // Validação simples de imagem
+                  imageUrl: article.imageUrl && article.imageUrl.startsWith('http') && !article.imageUrl.includes('favicon') ? article.imageUrl : undefined 
                 };
-            });
+            }).slice(0, 12); // Limite de segurança
       });
   } catch (error) {
       console.warn("Erro na API de Notícias:", error);
@@ -225,46 +213,30 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   }
 }
 
+// --- Advanced Asset Data (Mantido igual, apenas re-exportado para garantir compatibilidade) ---
 export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
     if (tickers.length === 0) return {};
     
     let apiKey: string;
-    try {
-        apiKey = getGeminiApiKey(prefs);
-    } catch (error) {
-        return {};
-    }
+    try { apiKey = getGeminiApiKey(prefs); } catch (error) { return {}; }
 
     const ai = new GoogleGenAI({ apiKey });
-    const now = new Date();
-    const currentDate = now.toISOString().split('T')[0];
+    const now = new Date().toISOString().split('T')[0];
 
-    const prompt = `Hoje é ${currentDate}. Aja como um terminal financeiro. Retorne dados fundamentalistas REAIS e ATUALIZADOS para: ${tickers.join(', ')}.
-    
-    CRÍTICO:
-    1. Busque "Aviso aos Cotistas" ou "Fato Relevante" deste mês ou mês passado para achar a Data de Pagamento.
-    2. Se já pagou este mês, retorne essa data. Se anunciou para o próximo, retorne a próxima.
-    
-    Retorne JSON Array puro:
-    [{"ticker": "X", "dy": 0, "pvp": 0, "sector": "", "administrator": "", "vacancyRate": 0, "dailyLiquidity": 0, "shareholders": 0, "nextPaymentDate": "YYYY-MM-DD", "lastDividend": 0}]
-    `;
+    const prompt = `Data: ${now}. Aja como API financeira. JSON para: ${tickers.join(', ')}.
+    Busque "Aviso aos Cotistas" recente.
+    JSON: [{"ticker": "X", "dy": 0, "pvp": 0, "sector": "", "administrator": "", "vacancyRate": 0, "dailyLiquidity": 0, "shareholders": 0, "nextPaymentDate": "YYYY-MM-DD", "lastDividend": 0}]`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
-            config: {
-                temperature: 0,
-                tools: [{googleSearch: {}}] 
-            }
+            config: { temperature: 0, tools: [{googleSearch: {}}] }
         });
         
-        const jsonText = response.text || '[]';
-        
         try {
-            const data = extractJSON(jsonText); // Usando a função helper robusta
+            const data = extractJSON(response.text || '[]');
             const result: Record<string, AdvancedAssetData> = {};
-
             if (Array.isArray(data)) {
                 data.forEach((item: any) => {
                     if (item.ticker) {
@@ -283,9 +255,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                 });
             }
             return result;
-        } catch (e) {
-            return {};
-        }
+        } catch (e) { return {}; }
     });
 }
 
