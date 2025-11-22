@@ -46,7 +46,7 @@ const Header: React.FC<{
     const { privacyMode, togglePrivacyMode } = usePortfolio();
 
     return (
-        <header className="py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300 -mx-4 px-4 mb-6">
+        <header className="py-4 flex justify-between items-center sticky top-0 z-30 glass shadow-sm transition-all duration-300 -mx-4 px-4 mb-6 md:rounded-b-2xl md:mx-0 md:mb-8 md:px-6">
             <div className="flex flex-col">
                 <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">Invest</h1>
                 <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
@@ -55,18 +55,18 @@ const Header: React.FC<{
                 <button 
                     id="refresh-btn" 
                     onClick={() => { onRefresh(); vibrate(); }} 
-                    className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
+                    className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)] ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
-                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
+                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]" aria-label="Toggle Privacy">
                      {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                 </button>
-                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
+                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]">
                     <ShareIcon className="w-5 h-5" />
                 </button>
-                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
+                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95 border border-[var(--border-color)]">
                     <BellIcon className="w-5 h-5" />
                 </button>
             </div>
@@ -76,7 +76,7 @@ const Header: React.FC<{
 
 const Metric: React.FC<{ label: string; children: React.ReactNode; }> = ({ label, children }) => (
     <div>
-        <h3 className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-0.5">{label}</h3>
+        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</h3>
         <div className="font-semibold text-lg">{children}</div>
     </div>
 );
@@ -109,41 +109,49 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500 h-full flex flex-col justify-center">
-            {/* Decorative Glow */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
+        <div id="portfolio-summary" className="relative overflow-hidden bg-zinc-900 p-6 rounded-3xl shadow-2xl border border-white/5 animate-scale-in group hover:shadow-[var(--accent-color)]/5 transition-all duration-500 h-full flex flex-col justify-center">
+            {/* Premium Mesh Gradient Background */}
+            <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[var(--accent-color)] opacity-[0.07] blur-[80px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/3"></div>
+            <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-purple-500 opacity-[0.05] blur-[60px] rounded-full pointer-events-none -translate-x-1/3 translate-y-1/3"></div>
 
             <div className="relative z-10">
-                <div className="flex justify-between items-start mb-1">
-                     <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('my_portfolio')}</h2>
-                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] border border-[var(--border-color)]">{today}</span>
+                <div className="flex justify-between items-start mb-2">
+                     <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)] shadow-[0_0_8px_var(--accent-color)]"></div>
+                        {t('my_portfolio')}
+                     </h2>
+                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-zinc-400 border border-white/5 backdrop-blur-sm">{today}</span>
                 </div>
                 
-                <div className={`mt-2 mb-1 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
-                    <p className="text-4xl font-bold tracking-tight mb-1 text-[var(--text-primary)]">
+                <div className={`mt-3 mb-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                    <p className="text-4xl font-bold tracking-tight mb-1 text-white drop-shadow-sm">
                         <CountUp end={summary.currentValue} formatter={format} />
                     </p>
-                    <p className={`text-sm font-semibold flex items-center gap-1 ${unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                        {unrealizedGain >= 0 ? '▲' : '▼'}
-                        <CountUp end={Math.abs(unrealizedGain)} formatter={format} /> 
-                        <span className="opacity-80">({unrealizedGainPercent.toFixed(2)}%)</span>
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 ${unrealizedGain >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                            {unrealizedGain >= 0 ? '▲' : '▼'}
+                            <CountUp end={Math.abs(unrealizedGainPercent)} decimals={2} suffix="%" />
+                        </span>
+                        <span className={`text-sm font-medium ${unrealizedGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {unrealizedGain >= 0 ? '+' : ''}<CountUp end={unrealizedGain} formatter={format} /> 
+                        </span>
+                    </div>
                 </div>
 
-                <div className="border-t border-[var(--border-color)]/50 my-5"></div>
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-6"></div>
 
-                <div className={`grid grid-cols-2 gap-y-5 gap-x-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                <div className={`grid grid-cols-2 gap-y-6 gap-x-4 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
                     <Metric label={t('total_invested')}>
-                        <p className="text-[var(--text-primary)]"><CountUp end={summary.totalInvested} formatter={format} /></p>
+                        <p className="text-zinc-100"><CountUp end={summary.totalInvested} formatter={format} /></p>
                     </Metric>
                     <Metric label={t('yield_on_cost')}>
                         <p className="text-[var(--accent-color)]"><CountUp end={yieldOnCost} decimals={2} />%</p>
                     </Metric>
                     <Metric label={t('projected_annual_income')}>
-                        <p className="text-[var(--text-primary)]"><CountUp end={projectedAnnualIncome} formatter={format} /></p>
+                        <p className="text-zinc-100"><CountUp end={projectedAnnualIncome} formatter={format} /></p>
                     </Metric>
                     <Metric label={t('capital_gain')}>
-                        <p className={unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}><CountUp end={unrealizedGain} formatter={format} /></p>
+                        <p className={unrealizedGain >= 0 ? 'text-emerald-400' : 'text-red-400'}><CountUp end={unrealizedGain} formatter={format} /></p>
                     </Metric>
                 </div>
             </div>
@@ -165,8 +173,8 @@ const DividendCalendar: React.FC = () => {
     }, [assets]);
 
     if (events.length === 0) return (
-        <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl border border-[var(--border-color)] h-full flex flex-col justify-center items-center text-center shadow-sm animate-scale-in min-h-[250px]">
-             <div className="p-3 bg-[var(--bg-primary)] rounded-full mb-3">
+        <div className="bg-[var(--bg-secondary)] p-6 rounded-3xl border border-[var(--border-color)] h-full flex flex-col justify-center items-center text-center shadow-sm animate-scale-in min-h-[250px]">
+             <div className="p-4 bg-[var(--bg-primary)] rounded-full mb-4 shadow-inner">
                 <CalendarIcon className="w-6 h-6 text-[var(--text-secondary)] opacity-50" />
              </div>
              <p className="text-xs font-bold text-[var(--text-secondary)]">{t('no_dividends_scheduled')}</p>
@@ -174,13 +182,13 @@ const DividendCalendar: React.FC = () => {
     );
 
     return (
-        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] h-full shadow-sm animate-scale-in flex flex-col min-h-[250px]">
-            <div className="flex justify-between items-center mb-4">
+        <div className="bg-[var(--bg-secondary)] p-5 rounded-3xl border border-[var(--border-color)] h-full shadow-sm animate-scale-in flex flex-col min-h-[250px]">
+            <div className="flex justify-between items-center mb-5">
                 <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-[var(--accent-color)]" /> 
                     {t('dividend_calendar')}
                 </h3>
-                <span className="text-[10px] font-bold bg-[var(--bg-primary)] px-2 py-1 rounded text-[var(--text-secondary)]">{t('next_payments')}</span>
+                <span className="text-[10px] font-bold bg-[var(--accent-color)]/10 text-[var(--accent-color)] px-2 py-1 rounded-full border border-[var(--accent-color)]/20">{t('next_payments')}</span>
             </div>
             
             <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar flex-1">
@@ -190,18 +198,17 @@ const DividendCalendar: React.FC = () => {
                     const month = dateObj.toLocaleDateString(locale, { month: 'short' }).replace('.','');
                     
                     return (
-                        <div key={`${evt.ticker}-${i}`} className="flex items-center p-3 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] hover:border-[var(--accent-color)]/30 transition-colors">
-                            <div className="flex-shrink-0 w-10 h-10 bg-[var(--bg-secondary)] rounded-lg flex flex-col items-center justify-center border border-[var(--border-color)]">
-                                <span className="text-[10px] leading-none text-[var(--text-secondary)] font-bold uppercase">{month}</span>
-                                <span className="text-sm leading-none font-bold text-[var(--text-primary)] mt-0.5">{day}</span>
+                        <div key={`${evt.ticker}-${i}`} className="flex items-center p-3 bg-[var(--bg-primary)]/50 rounded-2xl border border-[var(--border-color)] hover:border-[var(--accent-color)]/30 transition-colors">
+                            <div className="flex-shrink-0 w-12 h-12 bg-[var(--bg-secondary)] rounded-xl flex flex-col items-center justify-center border border-[var(--border-color)] shadow-sm">
+                                <span className="text-[9px] leading-none text-[var(--text-secondary)] font-bold uppercase mt-0.5">{month}</span>
+                                <span className="text-lg leading-none font-bold text-[var(--text-primary)]">{day}</span>
                             </div>
                             <div className="ml-3 flex-1 min-w-0 flex justify-between items-center">
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="font-bold text-sm text-[var(--text-primary)]">{evt.ticker}</span>
-                                        <span className="text-[10px] font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-2 py-0.5 rounded-full whitespace-nowrap">{evt.eventType}</span>
                                     </div>
-                                    <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">Previsão de pagamento</p>
+                                    <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">Previsão</p>
                                 </div>
                                 {evt.projectedAmount !== undefined && !isNaN(evt.projectedAmount) && evt.projectedAmount > 0 && (
                                     <div className={`text-right flex-shrink-0 pl-2 ${privacyMode ? 'blur-sm select-none opacity-50' : ''}`}>
@@ -232,16 +239,16 @@ const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: ()
     }
 
     return (
-        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm flex flex-col">
-            <div>
-                <div className="flex justify-between items-center mb-2">
+        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 animate-fade-in-up group active:scale-[0.98] flex flex-col h-full">
+            <div className="flex-1">
+                <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-sm text-[var(--accent-color)] border border-[var(--border-color)] shadow-inner">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-xs text-[var(--accent-color)] border border-[var(--border-color)] shadow-sm">
                             {asset.ticker.substring(0, 4)}
                         </div>
                         <div>
                              <span className="font-bold text-base block leading-tight text-[var(--text-primary)]">{asset.ticker}</span>
-                             <span className="text-xs text-[var(--text-secondary)]">{t('shares', {count: asset.quantity})}</span>
+                             <span className="text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded border border-[var(--border-color)]">{t('shares', {count: asset.quantity})}</span>
                         </div>
                     </div>
                     <div className={`text-right transition-all duration-300 ${privacyMode ? 'blur-sm select-none opacity-60' : ''}`}>
@@ -252,11 +259,15 @@ const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: ()
                     </div>
                 </div>
             </div>
-            <div className="mt-3 flex items-center gap-2">
-                 <div className="flex-1 bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden">
+            
+            <div className="mt-auto">
+                <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase">Alocação</span>
+                    <span className="text-[10px] font-bold text-[var(--text-primary)]">{allocation.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden border border-[var(--border-color)]">
                      <div className="bg-[var(--accent-color)] h-full rounded-full transition-all duration-1000" style={{ width: `${allocation}%` }}></div>
                 </div>
-                <span className="text-[10px] font-semibold text-[var(--text-secondary)] w-10 text-right">{allocation.toFixed(1)}%</span>
             </div>
         </div>
     );
@@ -369,15 +380,15 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
         >
             {/* Refresh Spinner */}
             <div 
-                className="fixed top-16 left-0 right-0 flex justify-center pointer-events-none z-20 transition-transform duration-200"
+                className="fixed top-20 left-0 right-0 flex justify-center pointer-events-none z-20 transition-transform duration-200"
                 style={{ transform: `translateY(${pullDistance > 0 ? pullDistance : (isRefreshing ? 60 : -50)}px)`, opacity: Math.min(pullDistance / 40, 1) }}
             >
-                <div className="bg-[var(--bg-secondary)] p-2 rounded-full shadow-lg border border-[var(--border-color)]">
+                <div className="bg-[var(--bg-secondary)] p-2.5 rounded-full shadow-xl border border-[var(--border-color)]">
                     <RefreshIcon className={`w-5 h-5 text-[var(--accent-color)] ${isRefreshing ? 'animate-spin' : ''}`} />
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4">
+            <div className="max-w-7xl mx-auto px-4 md:px-6">
                 <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
                 
                 {assets.length > 0 ? (
@@ -393,14 +404,14 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                         </div>
 
                         <div>
-                            <div className="flex space-x-3 mb-5">
-                                <div className="flex-1 relative">
+                            <div className="flex space-x-3 mb-6">
+                                <div className="flex-1 relative group">
                                     <input 
                                         type="text" 
                                         placeholder={t('search_asset_placeholder')} 
                                         value={searchQuery} 
                                         onChange={e => setSearchQuery(e.target.value)}
-                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
+                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-4 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] transition-all shadow-sm group-hover:border-[var(--border-color)]/80"
                                         autoCapitalize="characters"
                                     />
                                 </div>
@@ -408,20 +419,20 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                                     <button 
                                         id="sort-btn"
                                         onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
-                                        className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
+                                        className={`h-full px-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-1 ring-[var(--accent-color)] border-[var(--accent-color)]' : ''}`}
                                     >
                                         <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
                                     </button>
                                     {isSortOpen && (
                                         <>
                                             <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
-                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
+                                            <div className="absolute right-0 mt-2 w-56 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
                                                 <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
                                                 {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
                                                     <button 
                                                         key={option}
                                                         onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }}
-                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}
+                                                        className={`w-full text-left px-4 py-3.5 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}
                                                     >
                                                         {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
                                                         {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
@@ -433,9 +444,9 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                                 </div>
                             </div>
 
-                             <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2">
+                             <h3 className="font-bold text-lg mb-4 px-1 flex items-center gap-2 text-[var(--text-primary)]">
                                  {t('my_assets')} 
-                                 <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
+                                 <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2.5 py-0.5 rounded-full text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
                              </h3>
                              
                             {isRefreshing && processedAssets.length === 0 ? (

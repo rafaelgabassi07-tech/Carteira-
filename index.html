@@ -4,22 +4,22 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/5556/5556468.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#020617" />
+    <meta name="theme-color" content="#09090b" />
     <title>Invest Portfolio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
-        /* Deep Fintech Dark Theme */
-        --bg-primary: #020617;   /* Slate 950 */
-        --bg-secondary: #1e293b; /* Slate 800 */
-        --bg-tertiary-hover: #334155; /* Slate 700 */
-        --text-primary: #f8fafc; /* Slate 50 */
-        --text-secondary: #94a3b8; /* Slate 400 */
-        --border-color: #334155; /* Slate 700 */
+        /* Premium Fintech Dark Theme (Zinc based) */
+        --bg-primary: #09090b;   /* Zinc 950 */
+        --bg-secondary: #18181b; /* Zinc 900 */
+        --bg-tertiary-hover: #27272a; /* Zinc 800 */
+        --text-primary: #fafafa; /* Zinc 50 */
+        --text-secondary: #a1a1aa; /* Zinc 400 */
+        --border-color: #27272a; /* Zinc 800 */
         
         /* Vibrancy & Finance Colors */
         --accent-color: #38bdf8; /* Sky 400 */
-        --accent-color-text: #020617; 
+        --accent-color-text: #09090b; 
         --green-text: #4ade80; /* Green 400 */
         --red-text: #f87171; /* Red 400 */
         
@@ -32,12 +32,12 @@
         /* Clean Fintech Light Theme */
         --bg-primary: #f8fafc;   /* Slate 50 */
         --bg-secondary: #ffffff; /* White */
-        --bg-tertiary-hover: #e2e8f0; /* Slate 200 */
+        --bg-tertiary-hover: #f1f5f9; /* Slate 100 */
         --text-primary: #0f172a; /* Slate 900 */
         --text-secondary: #64748b; /* Slate 500 */
-        --border-color: #cbd5e1; /* Slate 300 */
+        --border-color: #e2e8f0; /* Slate 200 */
         
-        --accent-color: #0284c7; /* Sky 600 */
+        --accent-color: #0ea5e9; /* Sky 500 */
         --accent-color-text: #ffffff;
         --green-text: #16a34a; /* Green 600 */
         --red-text: #dc2626; /* Red 600 */
@@ -51,19 +51,24 @@
         padding-top: var(--safe-top);
         padding-bottom: var(--safe-bottom);
         -webkit-tap-highlight-color: transparent;
+        /* Subtle Aurora Background for Depth */
+        background-image: 
+          radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.08), transparent 40%),
+          radial-gradient(circle at 90% 10%, rgba(74, 222, 128, 0.05), transparent 30%);
+        background-attachment: fixed;
       }
 
       /* Refined Global Scrollbar */
       ::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
         background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
         background: var(--border-color); 
-        border-radius: 4px;
+        border-radius: 99px;
       }
       ::-webkit-scrollbar-thumb:hover {
         background: var(--text-secondary); 
@@ -71,12 +76,24 @@
 
       /* Utility Classes for Animations */
       .glass {
-        background: rgba(30, 41, 59, 0.7);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        background: rgba(24, 24, 27, 0.7); /* Zinc 900 with opacity */
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
       [data-theme="light"] .glass {
         background: rgba(255, 255, 255, 0.8);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .glass-card {
+        background: rgba(39, 39, 42, 0.4);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      [data-theme="light"] .glass-card {
+        background: rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(0, 0, 0, 0.05);
       }
 
       @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }

@@ -237,22 +237,22 @@ const App: React.FC = () => {
   const isNavVisible = !['assetDetail', 'notificacoes'].includes(activeView);
 
   return (
-    <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout">
+    <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout selection:bg-[var(--accent-color)] selection:text-[var(--accent-color-text)]">
        {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
        
        {/* Sidebar for Desktop & Mobile Landscape */}
-       <aside className="hidden md:flex flex-col w-64 xl:w-72 h-screen border-r border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0 z-20 mobile-landscape-sidebar">
-          <div className="p-6 flex items-center gap-3 sidebar-title">
-             <div className="w-8 h-8 rounded-lg bg-[var(--accent-color)] flex items-center justify-center text-[var(--bg-primary)]">
+       <aside className="hidden md:flex flex-col w-64 xl:w-72 h-screen bg-[var(--bg-secondary)]/50 backdrop-blur-xl border-r border-[var(--border-color)] flex-shrink-0 z-20 mobile-landscape-sidebar shadow-2xl shadow-black/10">
+          <div className="p-6 flex items-center gap-3 sidebar-title mb-2">
+             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent-color)] to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
              </div>
              <div>
-                 <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">Invest</h1>
-                 <p className="text-[10px] text-[var(--text-secondary)] font-medium tracking-wider">PORTFOLIO</p>
+                 <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-primary)]">Invest</h1>
+                 <p className="text-[10px] text-[var(--text-secondary)] font-bold tracking-[0.2em] uppercase">Portfolio</p>
              </div>
           </div>
           
-          <nav className="flex-1 px-4 space-y-1 overflow-y-auto py-4">
+          <nav className="flex-1 px-4 space-y-2 overflow-y-auto py-2">
              {[
                  { id: 'carteira', label: t('nav_portfolio'), icon: <WalletIcon /> },
                  { id: 'transacoes', label: t('nav_transactions'), icon: <TransactionIcon /> },
@@ -263,13 +263,21 @@ const App: React.FC = () => {
                  <button
                     key={item.id}
                     onClick={() => { navigateTo(item.id as View); }}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 w-full text-left text-sm font-bold ${activeView === item.id ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)]'}`}
+                    className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 w-full text-left text-sm font-bold group ${activeView === item.id ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)]'}`}
                  >
-                    {React.cloneElement(item.icon as React.ReactElement, { className: "w-5 h-5" })}
+                    {React.cloneElement(item.icon as React.ReactElement, { className: `w-5 h-5 transition-transform duration-300 ${activeView === item.id ? 'scale-110' : 'group-hover:scale-110'}` })}
                     <span>{item.label}</span>
+                    {activeView === item.id && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[var(--accent-color)] shadow-[0_0_8px_var(--accent-color)]"></div>}
                  </button>
              ))}
           </nav>
+
+          <div className="p-4 border-t border-[var(--border-color)]">
+              <div className="bg-[var(--bg-tertiary-hover)]/50 rounded-xl p-3 flex items-center gap-3 backdrop-blur-md border border-[var(--border-color)]/50">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <span className="text-xs font-semibold text-[var(--text-secondary)]">Mercado Aberto</span>
+              </div>
+          </div>
        </aside>
 
        {/* Main Content */}
