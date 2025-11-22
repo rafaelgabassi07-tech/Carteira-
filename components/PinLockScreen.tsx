@@ -133,7 +133,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
                     {allowBiometrics ? (
                         <button onClick={handleBiometricAuth} className={`w-16 h-16 md:w-14 md:h-14 rounded-full flex items-center justify-center text-[var(--accent-color)] hover:bg-[var(--bg-tertiary-hover)] transition-all active:scale-95 relative focus:outline-none ${isBiometricScanning ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}>
                             {isBiometricScanning && <div className="absolute inset-0 rounded-full animate-ping bg-[var(--accent-color)]/20"></div>}
-                            <FingerprintIcon className="w-8 h-8 md:w-6 md:h-6" />
+                            <FingerprintIcon className="w-8 h-8" />
                         </button>
                     ) : (
                         <div />

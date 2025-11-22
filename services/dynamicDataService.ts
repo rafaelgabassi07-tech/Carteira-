@@ -51,34 +51,40 @@ export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const currentMonth = today.getMonth();
     
     // Only generate if we have assets
     if (assets.length > 0) {
         assets.forEach(asset => {
              // STRICT CHECK: Only process if a confirmed date exists
              if (asset.nextPaymentDate) {
-                 const realDate = new Date(asset.nextPaymentDate);
-                 realDate.setHours(0,0,0,0);
+                 const paymentDate = new Date(asset.nextPaymentDate);
+                 paymentDate.setHours(0,0,0,0);
                  
-                 // Ensure date is valid and usually we show future or very recent past (e.g. today)
-                 // We allow today so the user knows they are getting paid today
-                 if (!isNaN(realDate.getTime()) && realDate >= today) {
+                 // Logic: Show if it's in the current month OR in the future
+                 // This allows showing "Paid" events for recent days in current month
+                 // or "Future" events for later.
+                 const isSameMonth = paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === today.getFullYear();
+                 const isFuture = paymentDate >= today;
+
+                 if (!isNaN(paymentDate.getTime()) && (isSameMonth || isFuture)) {
                      
                      // Use last dividend amount if available for calculation
                      // If lastDividend is missing but we have a date, we try to estimate with DY, 
                      // but ideally we want the real amount.
                      const amountPerShare = asset.lastDividend || (asset.currentPrice * ((asset.dy || 0) / 100)) / 12;
                      const amount = amountPerShare * asset.quantity;
+                     
+                     const isPaid = paymentDate < today;
 
                      events.push({
                         ticker: asset.ticker,
-                        eventType: 'Confirmado',
-                        date: realDate.toISOString(),
+                        eventType: isPaid ? 'Pago' : 'Confirmado',
+                        date: paymentDate.toISOString(),
                         projectedAmount: amount
                     });
                  }
              }
-             // PREDICTION LOGIC REMOVED per user request
         });
     }
     

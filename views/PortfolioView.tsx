@@ -118,23 +118,24 @@ const DividendCalendar: React.FC<{ assets: Asset[] }> = ({ assets }) => {
                     const date = new Date(event.date);
                     const day = date.getDate();
                     const month = date.toLocaleDateString(locale, { month: 'short' }).toUpperCase().replace('.', '');
+                    const isPaid = event.eventType === 'Pago';
                     
                     return (
-                        <div key={`${event.ticker}-${idx}`} className="flex items-center justify-between p-2.5 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)]">
+                        <div key={`${event.ticker}-${idx}`} className={`flex items-center justify-between p-2.5 rounded-xl border border-[var(--border-color)] transition-colors ${isPaid ? 'bg-[var(--bg-tertiary-hover)]/50 opacity-70' : 'bg-[var(--bg-primary)]'}`}>
                             <div className="flex items-center gap-3">
-                                <div className="bg-[var(--bg-secondary)] rounded-lg p-1.5 text-center min-w-[3rem] border border-[var(--border-color)]">
+                                <div className={`rounded-lg p-1.5 text-center min-w-[3rem] border border-[var(--border-color)] ${isPaid ? 'bg-[var(--bg-primary)]' : 'bg-[var(--bg-secondary)]'}`}>
                                     <span className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase">{month}</span>
-                                    <span className="block text-lg font-bold leading-none text-[var(--text-primary)]">{day}</span>
+                                    <span className={`block text-lg font-bold leading-none ${isPaid ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{day}</span>
                                 </div>
                                 <div>
-                                    <span className="block font-bold text-sm text-[var(--text-primary)]">{event.ticker}</span>
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${event.eventType === 'Confirmado' ? 'text-[var(--green-text)]' : 'text-[var(--text-secondary)]'}`}>
-                                        {event.eventType === 'Confirmado' ? 'Confirmado' : t('forecast')}
+                                    <span className={`block font-bold text-sm ${isPaid ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--text-primary)]'}`}>{event.ticker}</span>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isPaid ? 'text-[var(--text-secondary)]' : 'text-[var(--green-text)]'}`}>
+                                        {isPaid ? 'Pago' : 'Agendado'}
                                     </span>
                                 </div>
                             </div>
                             <div className={`text-right ${privacyMode ? 'blur-sm select-none opacity-50' : ''}`}>
-                                <span className="block font-bold text-[var(--green-text)] text-sm">
+                                <span className={`block font-bold text-sm ${isPaid ? 'text-[var(--text-secondary)]' : 'text-[var(--green-text)]'}`}>
                                     {event.projectedAmount ? formatCurrency(event.projectedAmount) : '-'}
                                 </span>
                             </div>
@@ -144,7 +145,7 @@ const DividendCalendar: React.FC<{ assets: Asset[] }> = ({ assets }) => {
                     <div className="flex flex-col items-center justify-center h-full py-4 opacity-50">
                         <CalendarIcon className="w-8 h-8 mb-2 text-[var(--text-secondary)]" />
                         <p className="text-xs text-center text-[var(--text-secondary)] max-w-[150px]">
-                            Nenhum dividendo anunciado oficialmente para os próximos dias.
+                            Nenhum dividendo anunciado oficialmente para este mês.
                         </p>
                     </div>
                 )}
@@ -467,8 +468,8 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
-                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
-                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                        <div className="w-24 h-24 md:w-32 md:h-32 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg flex flex-col items-center justify-center">
+                            <WalletIcon className="w-10 h-10 md:w-14 md:h-14 text-[var(--text-secondary)] opacity-50"/>
                         </div>
                         <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
                         <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>

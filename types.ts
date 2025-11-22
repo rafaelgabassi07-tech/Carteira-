@@ -68,7 +68,7 @@ export interface MonthlyIncome {
 
 export interface CalendarEvent {
     ticker: string;
-    eventType: 'Confirmado' | 'Previsão';
+    eventType: 'Confirmado' | 'Previsão' | 'Pago';
     date: string;
     projectedAmount?: number;
 }

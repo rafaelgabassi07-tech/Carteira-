@@ -158,7 +158,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       sourceConstraint = `Priorize notícias das seguintes fontes: ${filter.sources}.`;
   }
 
-  const jsonInstruction = ` Responda ESTRITAMENTE com um array JSON correspondente ao schema: ${JSON.stringify(newsListSchema)}. Analise cada notícia como um especialista em Fundos Imobiliários. IMPORTANTE: Tente encontrar a URL da imagem real da notícia (thumbnail) no contexto da busca.`;
+  const jsonInstruction = ` Responda ESTRITAMENTE com um array JSON correspondente ao schema: ${JSON.stringify(newsListSchema)}. Analise cada notícia como um especialista em Fundos Imobiliários. IMPORTANTE: Tente encontrar a URL da imagem real da notícia (thumbnail/og:image) no contexto da busca.`;
   
   let prompt: string;
   if (filter.query && filter.query.trim()) {
@@ -258,7 +258,16 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     
     const prompt = `Busque dados fundamentalistas do StatusInvest para: ${tickers.join(', ')}. 
     
-    Para cada ativo, busque também a próxima data de pagamento de proventos (Data Pagamento) CONFIRMADA e o valor do último dividendo. Se não houver data futura confirmada, retorne null para a data.
+    Para cada ativo, retorne:
+    - dy: Dividend Yield 12M (%)
+    - pvp: P/VP
+    - sector: Segmento
+    - administrator: Administradora
+    - vacancyRate: Vacância Física (%)
+    - dailyLiquidity: Liquidez Média Diária
+    - shareholders: Nº de Cotistas
+    - nextPaymentDate: A data de pagamento (Pay Date) do provento mais recente anunciado (do mês atual ou próximo). Formato YYYY-MM-DD.
+    - lastDividend: O valor desse provento anunciado.
     
     Use EXATAMENTE as categorias: 'Tijolo - Shoppings', 'Tijolo - Lajes Corporativas', 'Tijolo - Logística', 'Tijolo - Híbrido', 'Papel', 'Fundo de Fundos (FOF)', 'Agro (Fiagro)' ou 'Outros'.`;
 
