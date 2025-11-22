@@ -82,6 +82,8 @@ const NewsHero: React.FC<{ article: NewsArticle; onClick: () => void }> = ({ art
                 <img 
                     src={imageSrc}
                     alt={article.title}
+                    loading="eager"
+                    decoding="async"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90"
                     onError={() => setImgError(true)}
                 />
@@ -158,6 +160,8 @@ const NewsCard: React.FC<{
           <img 
             src={imageSrc} 
             alt={article.title}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             onError={() => setImgError(true)}
           />
