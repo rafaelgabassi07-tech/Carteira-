@@ -79,7 +79,9 @@ const advancedAssetDataSchema: Schema = {
             administrator: { type: Type.STRING, description: "Administradora." },
             vacancyRate: { type: Type.NUMBER, description: "Vacância (%)" },
             dailyLiquidity: { type: Type.NUMBER, description: "Liquidez diária." },
-            shareholders: { type: Type.NUMBER, description: "Número de cotistas." }
+            shareholders: { type: Type.NUMBER, description: "Número de cotistas." },
+            nextPaymentDate: { type: Type.STRING, description: "Próxima data de pagamento de proventos confirmada (YYYY-MM-DD) ou null se não houver." },
+            lastDividend: { type: Type.NUMBER, description: "Valor do último rendimento pago/anunciado." }
         },
         required: ["ticker", "dy", "pvp", "sector", "administrator", "vacancyRate", "dailyLiquidity", "shareholders"]
     }
@@ -238,6 +240,8 @@ export interface AdvancedAssetData {
     vacancyRate: number;
     dailyLiquidity: number;
     shareholders: number;
+    nextPaymentDate?: string;
+    lastDividend?: number;
 }
 
 export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, AdvancedAssetData>> {
@@ -252,7 +256,11 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `Busque dados fundamentalistas do StatusInvest para: ${tickers.join(', ')}. Use EXATAMENTE as categorias: 'Tijolo - Shoppings', 'Tijolo - Lajes Corporativas', 'Tijolo - Logística', 'Tijolo - Híbrido', 'Papel', 'Fundo de Fundos (FOF)', 'Agro (Fiagro)' ou 'Outros'.`;
+    const prompt = `Busque dados fundamentalistas do StatusInvest para: ${tickers.join(', ')}. 
+    
+    Para cada ativo, busque também a próxima data de pagamento de proventos (Data Pagamento) CONFIRMADA e o valor do último dividendo. Se não houver data futura confirmada, retorne null para a data.
+    
+    Use EXATAMENTE as categorias: 'Tijolo - Shoppings', 'Tijolo - Lajes Corporativas', 'Tijolo - Logística', 'Tijolo - Híbrido', 'Papel', 'Fundo de Fundos (FOF)', 'Agro (Fiagro)' ou 'Outros'.`;
 
     return withRetry(async () => {
         const response = await ai.models.generateContent({
@@ -262,6 +270,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                 responseMimeType: "application/json",
                 responseSchema: advancedAssetDataSchema,
                 temperature: 0,
+                tools: [{googleSearch: {}}] // Enable search to find latest dividend dates
             }
         });
         
@@ -279,6 +288,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                         vacancyRate: Number(item.vacancyRate),
                         dailyLiquidity: Number(item.dailyLiquidity || 0),
                         shareholders: Number(item.shareholders || 0),
+                        nextPaymentDate: item.nextPaymentDate || undefined,
+                        lastDividend: Number(item.lastDividend || 0)
                     };
                 }
             });

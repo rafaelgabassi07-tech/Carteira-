@@ -210,6 +210,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         liquidity: liveData.dailyLiquidity,
         shareholders: liveData.shareholders,
         yieldOnCost,
+        nextPaymentDate: liveData.nextPaymentDate, // New Field
+        lastDividend: liveData.lastDividend, // New Field
       };
     }).filter(asset => asset.quantity > EPSILON);
   }, [sourceTransactions, sourceMarketData]);

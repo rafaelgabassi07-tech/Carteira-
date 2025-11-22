@@ -13,6 +13,8 @@ export interface Asset {
   liquidity?: number;
   shareholders?: number;
   yieldOnCost?: number;
+  nextPaymentDate?: string; // Data real de pagamento (YYYY-MM-DD)
+  lastDividend?: number; // Último valor pago
 }
 
 export interface NewsArticle {
@@ -66,7 +68,7 @@ export interface MonthlyIncome {
 
 export interface CalendarEvent {
     ticker: string;
-    eventType: 'Data Com' | 'Pagamento';
+    eventType: 'Confirmado' | 'Previsão';
     date: string;
     projectedAmount?: number;
 }

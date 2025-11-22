@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import BottomNav from './components/BottomNav';
 import PortfolioView from './views/PortfolioView';
@@ -39,6 +38,9 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
+  
+  // Market Status State
+  const [isMarketOpen, setIsMarketOpen] = useState(false);
 
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
     const newToast: ToastMessage = { id: Date.now(), message, type };
@@ -73,7 +75,6 @@ const App: React.FC = () => {
     applyTheme();
     
     // Apply Visual Style (Simple/Premium)
-    // Default to 'premium' if not set (for existing users migrating)
     document.documentElement.dataset.style = preferences.visualStyle || 'premium';
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -104,6 +105,13 @@ const App: React.FC = () => {
     const color = colors[preferences.accentColor] || colors.blue;
     document.documentElement.style.setProperty('--accent-color', color);
     
+    // Helper to set RGB for gradients
+    const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '56, 189, 248';
+    }
+    document.documentElement.style.setProperty('--accent-rgb', hexToRgb(color));
+    
     const currentTheme = document.documentElement.dataset.theme;
     if (currentTheme === 'light') {
          const lightColors: Record<string, string> = {
@@ -115,6 +123,7 @@ const App: React.FC = () => {
         };
         const lightColor = lightColors[preferences.accentColor] || lightColors.blue;
         document.documentElement.style.setProperty('--accent-color', lightColor);
+        document.documentElement.style.setProperty('--accent-rgb', hexToRgb(lightColor));
     }
 
   }, [preferences.accentColor, preferences.systemTheme]); 
@@ -146,7 +155,6 @@ const App: React.FC = () => {
         }
         if (document.visibilityState === 'visible' && preferences.appPin) {
             const timeInBackground = Date.now() - lastVisibleTimestamp.current;
-            // Re-lock if the app was in background for more than 60 seconds
             if (timeInBackground > 60 * 1000) { 
                 setIsLocked(true);
             }
@@ -159,6 +167,29 @@ const App: React.FC = () => {
     };
   }, [preferences.appPin]);
 
+  // Market Status Checker
+  useEffect(() => {
+    const checkMarketStatus = () => {
+      const now = new Date();
+      // Convert to Sao Paulo time
+      const spTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+      
+      const day = spTime.getDay(); // 0 = Sun, 6 = Sat
+      const hour = spTime.getHours();
+      const minute = spTime.getMinutes();
+      
+      // Logic: Mon-Fri (1-5), 10:00 to 17:55 (approx B3 closing)
+      const isWeekday = day >= 1 && day <= 5;
+      const isOpenHours = (hour > 10 || (hour === 10 && minute >= 0)) && (hour < 17 || (hour === 17 && minute <= 55));
+      
+      setIsMarketOpen(isWeekday && isOpenHours);
+    };
+
+    checkMarketStatus();
+    const interval = setInterval(checkMarketStatus, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
+
   const handleTourFinish = () => {
     setDemoMode(false);
     setShowTour(false);
@@ -167,7 +198,6 @@ const App: React.FC = () => {
 
   const navigateTo = (view: View) => {
     setPreviousView(activeView);
-    // Reset settings screen to main when navigating normally
     if (view === 'settings') setSettingsStartScreen('main');
     setActiveView(view);
   };
@@ -227,7 +257,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Pin Lock / Biometric Check
   if (isLocked && preferences.appPin) {
       const biometricsEnabled = localStorage.getItem('security-biometrics') === 'true';
       return (
@@ -246,16 +275,12 @@ const App: React.FC = () => {
     <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout selection:bg-[var(--accent-color)] selection:text-[var(--accent-color-text)]">
        {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
        
-       {/* Sidebar for Desktop & Mobile Landscape 
-           In Premium mode: 'border-none' and generic 'bg-[var(--bg-secondary)]' which becomes glass via CSS 
-           In Simple mode: 'border-r' and solid color
-       */}
-       <aside className={`hidden md:flex flex-col w-64 xl:w-72 h-screen flex-shrink-0 z-20 mobile-landscape-sidebar transition-all duration-300
+       <aside className={`hidden md:flex flex-col w-64 xl:w-72 flex-shrink-0 z-20 mobile-landscape-sidebar transition-all duration-300
             ${isPremium 
-                ? 'bg-[var(--bg-secondary)] backdrop-blur-xl border-none shadow-none mr-4 rounded-r-3xl my-4 ml-4 h-[calc(100vh-2rem)]' 
-                : 'bg-[var(--bg-secondary)] border-r border-[var(--border-color)]'}`
+                ? 'bg-[var(--bg-secondary)] backdrop-blur-2xl border border-[var(--border-color)] shadow-2xl rounded-3xl m-4 h-[calc(100vh-2rem)]' 
+                : 'bg-[var(--bg-secondary)] border-r border-[var(--border-color)] h-screen'}`
        }>
-          <div className="p-6 flex items-center gap-3 sidebar-title mb-2">
+          <div className={`p-6 flex items-center gap-3 sidebar-title mb-2 ${isPremium ? '' : 'pt-8'}`}>
              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent-color)] to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
              </div>
@@ -265,7 +290,7 @@ const App: React.FC = () => {
              </div>
           </div>
           
-          <nav className="flex-1 px-4 space-y-2 overflow-y-auto py-2">
+          <nav className="flex-1 px-4 space-y-2 overflow-y-auto py-2 custom-scrollbar">
              {[
                  { id: 'carteira', label: t('nav_portfolio'), icon: <WalletIcon /> },
                  { id: 'transacoes', label: t('nav_transactions'), icon: <TransactionIcon /> },
@@ -287,13 +312,14 @@ const App: React.FC = () => {
 
           <div className={`p-4 ${isPremium ? '' : 'border-t border-[var(--border-color)]'}`}>
               <div className="bg-[var(--bg-tertiary-hover)]/50 rounded-xl p-3 flex items-center gap-3 backdrop-blur-md border border-[var(--border-color)]/50">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <span className="text-xs font-semibold text-[var(--text-secondary)]">Mercado Aberto</span>
+                  <div className={`w-2.5 h-2.5 rounded-full ${isMarketOpen ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]'}`}></div>
+                  <span className={`text-xs font-bold ${isMarketOpen ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                      {isMarketOpen ? 'Mercado Aberto' : 'Mercado Fechado'}
+                  </span>
               </div>
           </div>
        </aside>
 
-       {/* Main Content */}
        <main className="flex-1 h-screen relative flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-hidden bg-[var(--bg-primary)] relative">
             <ErrorBoundary>
@@ -303,7 +329,6 @@ const App: React.FC = () => {
             </ErrorBoundary>
           </div>
           
-          {/* Mobile Bottom Nav Wrapper */}
           <div className="md:hidden mobile-landscape-bottom-nav">
              {isNavVisible && <BottomNav activeView={activeView} setActiveView={navigateTo} />}
           </div>

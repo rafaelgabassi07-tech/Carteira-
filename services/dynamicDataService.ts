@@ -46,38 +46,39 @@ export const generateDividends = (assets: Asset[], forceRefresh = false): Divide
 };
 
 // Generates calendar events
-// Cache removed to ensure reactivity when portfolio changes
+// MODIFIED: Only shows CONFIRMED payments based on real market data
 export const generateCalendarEvents = (assets: Asset[]): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
     // Only generate if we have assets
     if (assets.length > 0) {
         assets.forEach(asset => {
-             // Prediction logic: usually FIIs pay on 15th
-             const nextPayment = new Date();
-             nextPayment.setDate(15);
-             
-             // If today is past the 15th, assume next month
-             if (new Date().getDate() > 15) {
-                 nextPayment.setMonth(nextPayment.getMonth() + 1);
-             }
+             // STRICT CHECK: Only process if a confirmed date exists
+             if (asset.nextPaymentDate) {
+                 const realDate = new Date(asset.nextPaymentDate);
+                 realDate.setHours(0,0,0,0);
+                 
+                 // Ensure date is valid and usually we show future or very recent past (e.g. today)
+                 // We allow today so the user knows they are getting paid today
+                 if (!isNaN(realDate.getTime()) && realDate >= today) {
+                     
+                     // Use last dividend amount if available for calculation
+                     // If lastDividend is missing but we have a date, we try to estimate with DY, 
+                     // but ideally we want the real amount.
+                     const amountPerShare = asset.lastDividend || (asset.currentPrice * ((asset.dy || 0) / 100)) / 12;
+                     const amount = amountPerShare * asset.quantity;
 
-             const dy = asset.dy || 0;
-             let projectedAmount = 0;
-             
-             // Calculate projected amount based on monthly yield estimate
-             // Formula: (Current Price * (DY Annual / 100)) / 12 * Quantity
-             if (dy > 0 && asset.currentPrice > 0) {
-                 const monthlyPerShare = (asset.currentPrice * (dy / 100)) / 12;
-                 projectedAmount = monthlyPerShare * asset.quantity;
+                     events.push({
+                        ticker: asset.ticker,
+                        eventType: 'Confirmado',
+                        date: realDate.toISOString(),
+                        projectedAmount: amount
+                    });
+                 }
              }
-
-            events.push({
-                ticker: asset.ticker,
-                eventType: 'Pagamento',
-                date: nextPayment.toISOString(),
-                projectedAmount: projectedAmount
-            });
+             // PREDICTION LOGIC REMOVED per user request
         });
     }
     
