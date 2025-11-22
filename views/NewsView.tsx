@@ -11,11 +11,33 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
+// --- Image Helpers ---
+const getFallbackImage = (category?: string) => {
+    const map: Record<string, string> = {
+        'Dividendos': 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=800', // Money/Calculations
+        'Macroeconomia': 'https://images.unsplash.com/photo-1611974765270-ca1258634369?auto=format&fit=crop&q=80&w=800', // Chart/Graph
+        'Resultados': 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=800', // Data analysis
+        'Mercado': 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&q=80&w=800', // Stock market
+        'Imóveis': 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800', // Skyscraper
+        'Geral': 'https://images.unsplash.com/photo-1612178991541-b48cc8e92a4d?auto=format&fit=crop&q=80&w=800', // Coins/Finance
+    };
+    return map[category || 'Geral'] || map['Geral'];
+};
+
 // --- Visual Components ---
 
-const CategoryBadge: React.FC<{ category?: string }> = ({ category }) => {
+const CategoryBadge: React.FC<{ category?: string; transparent?: boolean }> = ({ category, transparent }) => {
     if (!category) return null;
     
+    // Transparent version for Hero image overlay
+    if (transparent) {
+        return (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/40 border border-white/30 text-white uppercase tracking-wider backdrop-blur-md">
+                {category}
+            </span>
+        );
+    }
+
     const colorMap: Record<string, string> = {
         'Dividendos': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
         'Macroeconomia': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
@@ -28,53 +50,66 @@ const CategoryBadge: React.FC<{ category?: string }> = ({ category }) => {
     const style = colorMap[category] || colorMap['Geral'];
 
     return (
-        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${style} uppercase tracking-wider`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${style} uppercase tracking-wider`}>
             {category}
         </span>
     );
 };
 
-const ImpactBadge: React.FC<{ level?: string }> = ({ level }) => {
+const ImpactBadge: React.FC<{ level?: string; transparent?: boolean }> = ({ level, transparent }) => {
     if (!level) return null;
     
     const map: Record<string, { color: string, label: string }> = {
-        'High': { color: 'bg-red-500 text-white', label: 'Alto Impacto' },
-        'Medium': { color: 'bg-yellow-500 text-black', label: 'Médio' },
-        'Low': { color: 'bg-slate-600 text-slate-200', label: 'Baixo' }
+        'High': { color: transparent ? 'bg-red-600/90 text-white' : 'bg-red-500/10 text-red-500 border-red-500/20', label: 'Alto Impacto' },
+        'Medium': { color: transparent ? 'bg-yellow-500/90 text-black' : 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20', label: 'Médio' },
+        'Low': { color: transparent ? 'bg-slate-600/90 text-white' : 'bg-slate-500/10 text-slate-500 border-slate-500/20', label: 'Baixo' }
     };
     
     const data = map[level];
     if (!data) return null;
 
     return (
-        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${data.color} shadow-sm`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${transparent ? 'border-transparent' : ''} ${data.color} uppercase tracking-wider`}>
             {data.label}
         </span>
     );
 };
 
 const NewsHero: React.FC<{ article: NewsArticle; onClick: () => void }> = ({ article, onClick }) => {
+    const bgImage = article.imageUrl || getFallbackImage(article.category);
+
     return (
-        <div onClick={onClick} className="mb-6 relative group cursor-pointer rounded-2xl overflow-hidden shadow-lg border border-[var(--border-color)] active:scale-[0.99] transition-transform">
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-10"></div>
-            {/* Abstract Background based on source/category */}
-            <div className={`absolute inset-0 bg-[var(--bg-tertiary-hover)] opacity-50`}>
-                 <div className="w-full h-full bg-gradient-to-br from-[var(--accent-color)]/20 to-purple-900/20"></div>
-            </div>
+        <div onClick={onClick} className="mb-6 relative h-72 sm:h-80 group cursor-pointer rounded-2xl overflow-hidden shadow-lg border border-[var(--border-color)] active:scale-[0.99] transition-transform">
+            {/* Background Image */}
+            <img 
+                src={bgImage} 
+                alt="News Background" 
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
             
-            <div className="relative z-20 p-5 pt-24 flex flex-col h-full justify-end">
-                <div className="flex gap-2 mb-2">
-                    <ImpactBadge level={article.impactLevel} />
-                    <CategoryBadge category={article.category} />
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent z-10"></div>
+            
+            {/* Content */}
+            <div className="relative z-20 p-6 flex flex-col h-full justify-end">
+                <div className="flex gap-2 mb-3">
+                    <ImpactBadge level={article.impactLevel} transparent />
+                    <CategoryBadge category={article.category} transparent />
                 </div>
-                <h2 className="text-white text-xl font-bold leading-tight mb-2 line-clamp-3 text-shadow-sm">
+                
+                <h2 className="text-white text-xl sm:text-2xl font-bold leading-tight mb-2 text-shadow-sm line-clamp-3">
                     {article.title}
                 </h2>
-                <p className="text-gray-300 text-xs line-clamp-2 mb-3">
-                    {article.impactAnalysis || article.summary}
-                </p>
-                <div className="flex justify-between items-center border-t border-white/10 pt-2">
-                    <span className="text-[10px] font-bold text-[var(--accent-color)] uppercase">{article.source}</span>
+                
+                {article.impactAnalysis && (
+                    <p className="text-gray-300 text-xs sm:text-sm line-clamp-2 mb-4 max-w-2xl">
+                        <span className="text-[var(--accent-color)] font-bold">Análise: </span>
+                        {article.impactAnalysis}
+                    </p>
+                )}
+                
+                <div className="flex justify-between items-center border-t border-white/20 pt-3 mt-1">
+                    <span className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-wider">{article.source}</span>
                     <span className="text-[10px] text-gray-400">{article.date}</span>
                 </div>
             </div>
@@ -89,7 +124,7 @@ const NewsCard: React.FC<{
   addToast: (message: string, type?: ToastMessage['type']) => void;
 }> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
   const { t } = useI18n();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const bgImage = article.imageUrl || getFallbackImage(article.category);
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -100,76 +135,71 @@ const NewsCard: React.FC<{
         url: article.url || window.location.href,
     };
     try {
-        if (navigator.share) {
-            await navigator.share(shareData);
-        } else {
-           addToast(t('toast_share_not_supported'), 'error');
-        }
-    } catch (err) {
-       // Cancelled
-    }
+        if (navigator.share) await navigator.share(shareData);
+        else addToast(t('toast_share_not_supported'), 'error');
+    } catch (err) { }
+  };
+
+  const handleOpen = () => {
+      if (article.url) window.open(article.url, '_blank');
   };
 
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden border border-[var(--border-color)] shadow-sm hover:border-[var(--accent-color)]/30 transition-colors flex flex-col h-full">
-      <div className="p-4 flex-1 flex flex-col">
-        <div className="flex justify-between items-start mb-2">
-            <div className="flex gap-2">
-                {article.impactLevel === 'High' && <ImpactBadge level="High" />}
-                <CategoryBadge category={article.category} />
-            </div>
-            <div className="flex gap-1 -mr-1">
-                 <button onClick={handleShare} className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--accent-color)]">
-                    <ShareIcon className="w-4 h-4" />
-                 </button>
-                 <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className={`p-1.5 rounded-lg hover:bg-[var(--bg-tertiary-hover)] ${isFavorited ? 'text-yellow-400' : 'text-[var(--text-secondary)] hover:text-yellow-400'}`}>
-                    <StarIcon filled={isFavorited} className="w-4 h-4" />
-                 </button>
-            </div>
-        </div>
-
-        <h3 className="text-sm font-bold text-[var(--text-primary)] leading-tight mb-2">{article.title}</h3>
-        
-        {/* Análise de Impacto (Why it matters) */}
-        {article.impactAnalysis && (
-            <div className="bg-[var(--bg-primary)] p-2 rounded-lg mb-3 border-l-2 border-[var(--accent-color)]">
-                <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-0.5">Impacto no Investidor:</p>
-                <p className="text-xs text-[var(--text-primary)] italic">"{article.impactAnalysis}"</p>
-            </div>
-        )}
-
-        <p className={`text-xs text-[var(--text-secondary)] leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}>
-          {article.summary}
-        </p>
-        
-        {article.summary.length > 100 && (
-             <button onClick={() => setIsExpanded(!isExpanded)} className="text-[10px] font-bold text-[var(--accent-color)] mt-1 hover:underline self-start">
-                {isExpanded ? t('read_less') : t('read_more')}
-            </button>
-        )}
+    <div onClick={handleOpen} className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden border border-[var(--border-color)] shadow-sm hover:border-[var(--accent-color)]/40 transition-all flex flex-col h-full cursor-pointer group">
+      {/* Card Image Header */}
+      <div className="h-32 relative overflow-hidden">
+          <img src={bgImage} alt="News" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-90 group-hover:opacity-100" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)] to-transparent opacity-90"></div>
+          
+          <div className="absolute top-2 right-2 flex gap-1 z-10">
+             <button onClick={handleShare} className="p-1.5 rounded-full bg-black/30 backdrop-blur-md text-white hover:bg-[var(--accent-color)] transition-colors">
+                <ShareIcon className="w-3 h-3" />
+             </button>
+             <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className={`p-1.5 rounded-full bg-black/30 backdrop-blur-md transition-colors ${isFavorited ? 'text-yellow-400' : 'text-white hover:text-yellow-400'}`}>
+                <StarIcon filled={isFavorited} className="w-3 h-3" />
+             </button>
+          </div>
+          
+          <div className="absolute bottom-2 left-3">
+              <CategoryBadge category={article.category} />
+          </div>
       </div>
-      
-      <div className="bg-[var(--bg-tertiary-hover)]/30 px-4 py-2 flex justify-between items-center border-t border-[var(--border-color)] mt-auto">
-          <span className="text-[10px] font-bold text-[var(--text-secondary)]">{article.source} • {article.date}</span>
-          {article.url && (
-              <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[var(--accent-color)] hover:underline flex items-center gap-1">
-                  LER NA FONTE <span className="text-[10px]">↗</span>
-              </a>
-          )}
+
+      <div className="p-4 flex-1 flex flex-col">
+        <h3 className="text-sm font-bold text-[var(--text-primary)] leading-tight mb-2 line-clamp-2 group-hover:text-[var(--accent-color)] transition-colors">{article.title}</h3>
+        
+        {article.impactAnalysis && (
+            <div className="mb-3">
+                <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-0.5">Impacto:</p>
+                <p className="text-xs text-[var(--text-primary)] italic line-clamp-2 opacity-80">"{article.impactAnalysis}"</p>
+            </div>
+        )}
+
+        {!article.impactAnalysis && <p className="text-xs text-[var(--text-secondary)] line-clamp-3 mb-3">{article.summary}</p>}
+        
+        <div className="mt-auto flex justify-between items-center pt-3 border-t border-[var(--border-color)]">
+            <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-[var(--accent-color)]">{article.source}</span>
+                <span className="text-[9px] text-[var(--text-secondary)]">{article.date}</span>
+            </div>
+            <span className="text-[10px] font-bold text-[var(--text-primary)] bg-[var(--bg-tertiary-hover)] px-2 py-1 rounded flex items-center gap-1 group-hover:bg-[var(--accent-color)] group-hover:text-white transition-colors">
+                Ler notícia ↗
+            </span>
+        </div>
       </div>
     </div>
   );
 };
 
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] p-4 rounded-xl animate-pulse border border-[var(--border-color)] h-64">
-        <div className="flex gap-2 mb-3">
-            <div className="h-4 bg-gray-700 rounded w-16"></div>
-            <div className="h-4 bg-gray-700 rounded w-20"></div>
+    <div className="bg-[var(--bg-secondary)] rounded-xl overflow-hidden animate-pulse border border-[var(--border-color)] h-72">
+        <div className="h-32 bg-gray-700/50"></div>
+        <div className="p-4">
+            <div className="h-4 bg-gray-700 rounded w-3/4 mb-3"></div>
+            <div className="h-3 bg-gray-700 rounded w-full mb-2"></div>
+            <div className="h-3 bg-gray-700 rounded w-5/6 mb-4"></div>
+            <div className="h-16 bg-gray-800 rounded-lg"></div>
         </div>
-        <div className="h-4 bg-gray-700 rounded w-full mb-2"></div>
-        <div className="h-4 bg-gray-700 rounded w-3/4 mb-4"></div>
-        <div className="h-20 bg-gray-800 rounded-lg mb-2"></div>
     </div>
 );
 
@@ -225,7 +255,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     setError(null);
     
     try {
-      // Simplified key for caching
       const cacheKey = `news_feed_${currentQuery || 'general'}`;
       
       if (!isRefresh) {
@@ -241,7 +270,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       const filter: NewsFilter = {
           query: currentQuery,
           tickers: assetTickers,
-          dateRange: 'week', // Default to week to get better context
+          dateRange: 'week',
       };
 
       const articles = await fetchMarketNews(preferences, filter);
@@ -317,9 +346,10 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       return filtered;
   }, [news, activeTab, favorites, activeCategory]);
 
-  // Separate Hero item (First High Impact or just first item)
-  const heroItem = activeTab === 'all' && activeCategory === 'Todas' && !searchQuery && filteredNews.length > 0 ? filteredNews[0] : null;
-  const listItems = heroItem ? filteredNews.slice(1) : filteredNews;
+  // Separate Hero item (First High Impact or just first item) if searching/filtering is default
+  const showHero = activeTab === 'all' && activeCategory === 'Todas' && !searchQuery && filteredNews.length > 0;
+  const heroItem = showHero ? filteredNews[0] : null;
+  const listItems = showHero ? filteredNews.slice(1) : filteredNews;
 
   return (
     <div 
@@ -337,7 +367,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       </div>
       
       <div className="w-full max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">{t('market_news')}</h1>
           <button 
               onClick={handleRefresh} 
@@ -349,7 +379,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         </div>
 
         {/* Search & Tabs */}
-        <div className="mb-4 space-y-3">
+        <div className="mb-6 space-y-4">
              <input 
                 type="text"
                 placeholder={t('search_news_placeholder')}
@@ -384,7 +414,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             </div>
         </div>
 
-        {loading && <div className="space-y-4"><div className="h-64 bg-[var(--bg-secondary)] rounded-2xl animate-pulse"></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{Array.from({length: 4}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div></div>}
+        {loading && <div className="space-y-4"><div className="h-72 bg-[var(--bg-secondary)] rounded-2xl animate-pulse"></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{Array.from({length: 4}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div></div>}
         
         {error && (
           <div className="bg-red-900/20 border border-red-500/50 text-red-200 px-6 py-8 rounded-2xl text-center">
@@ -406,7 +436,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             )}
 
             {listItems.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                   {listItems.map((article, index) => (
                     <div key={`${article.title}-${index}`} className="h-full">
                         <NewsCard 

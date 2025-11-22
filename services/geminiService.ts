@@ -54,7 +54,8 @@ const newsArticleSchema: Schema = {
         date: { type: Type.STRING, description: "Data YYYY-MM-DD." },
         sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] },
         category: { type: Type.STRING, enum: ["Dividendos", "Macroeconomia", "Resultados", "Mercado", "Imóveis", "Geral"], description: "Categoria principal da notícia." },
-        impactLevel: { type: Type.STRING, enum: ["High", "Medium", "Low"], description: "Nível de impacto potencial nos preços ou dividendos." }
+        impactLevel: { type: Type.STRING, enum: ["High", "Medium", "Low"], description: "Nível de impacto potencial nos preços ou dividendos." },
+        imageUrl: { type: Type.STRING, description: "URL de uma imagem relevante encontrada, ou deixe em branco." }
     },
     required: ["source", "title", "summary", "impactAnalysis", "date", "sentiment", "category", "impactLevel"]
 };
@@ -155,7 +156,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       sourceConstraint = `Priorize notícias das seguintes fontes: ${filter.sources}.`;
   }
 
-  const jsonInstruction = ` Responda ESTRITAMENTE com um array JSON correspondente ao schema: ${JSON.stringify(newsListSchema)}. Analise cada notícia como um especialista em Fundos Imobiliários, preenchendo o campo 'category' e 'impactLevel' com precisão.`;
+  const jsonInstruction = ` Responda ESTRITAMENTE com um array JSON correspondente ao schema: ${JSON.stringify(newsListSchema)}. Analise cada notícia como um especialista em Fundos Imobiliários, preenchendo o campo 'category' e 'impactLevel' com precisão. Tente extrair uma URL de imagem relevante se disponível.`;
   
   let prompt: string;
   if (filter.query && filter.query.trim()) {
@@ -175,8 +176,6 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
-                // Note: We don't use responseSchema here directly because googleSearch tool output handling with schema can sometimes be tricky in 'generateContent',
-                // manual parsing is more robust when combined with tools.
             }
           });
           
