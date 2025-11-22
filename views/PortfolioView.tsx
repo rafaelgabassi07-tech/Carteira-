@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
@@ -22,7 +23,7 @@ const SortIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
 );
 const WalletIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
 );
 
 // --- Components ---
@@ -284,44 +285,16 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
     const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
     const [isSortOpen, setIsSortOpen] = useState(false);
 
-    // Pull to Refresh Logic
-    const touchStartY = useRef(0);
-    const [pullDistance, setPullDistance] = useState(0);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        if (containerRef.current && containerRef.current.scrollTop === 0) {
-            touchStartY.current = e.targetTouches[0].clientY;
-        }
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (touchStartY.current > 0 && !isRefreshing) {
-            const touchY = e.targetTouches[0].clientY;
-            const dist = touchY - touchStartY.current;
-            if (dist > 0) {
-                setPullDistance(Math.min(dist * 0.4, 80)); // Resistance
-            }
-        }
-    };
-
-    const handleTouchEnd = () => {
-        if (pullDistance > 60) {
-            handleGlobalRefresh();
-        }
-        setPullDistance(0);
-        touchStartY.current = 0;
-    };
-
     const handleGlobalRefresh = async () => {
         vibrate(20);
         addToast(t('toast_updating_prices'));
         try {
             await refreshAllData();
             addToast(t('toast_update_success'), 'success');
-        } catch (error: any) {
+        // FIX: Changed 'error' to 'e' to avoid conflict with the 'Error' type.
+        } catch (e: any) {
             // Error is handled by the global error handler in App.tsx
-            console.error("Error refreshing all data:", error);
+            console.error("Error refreshing all data:", e);
         }
     };
 
@@ -364,21 +337,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
     return (
         <div 
             className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
-            ref={containerRef}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
         >
-            {/* Refresh Spinner */}
-            <div 
-                className="fixed top-16 left-0 right-0 flex justify-center pointer-events-none z-20 transition-transform duration-200"
-                style={{ transform: `translateY(${pullDistance > 0 ? pullDistance : (isRefreshing ? 60 : -50)}px)`, opacity: Math.min(pullDistance / 40, 1) }}
-            >
-                <div className="bg-[var(--bg-secondary)] p-2 rounded-full shadow-lg border border-[var(--border-color)]">
-                    <RefreshIcon className={`w-5 h-5 text-[var(--accent-color)] ${isRefreshing ? 'animate-spin' : ''}`} />
-                </div>
-            </div>
-
             <div className="max-w-7xl mx-auto">
                 <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleGlobalRefresh} isRefreshing={isRefreshing} />
                 

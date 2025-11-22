@@ -356,10 +356,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
   
-  const touchStartY = useRef(0);
-  const [pullPosition, setPullPosition] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
 
   useEffect(() => {
@@ -397,7 +393,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           if (cachedNews) {
               setNews(cachedNews);
               setLoading(false);
-              setPullPosition(0);
               return;
           } else {
               // Se não tem cache e não for refresh manual, não carrega nada automaticamente.
@@ -424,7 +419,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setError(err.message || t('unknown_error'));
     } finally {
       setLoading(false);
-      setPullPosition(0);
     }
   }, [t, assetTickers, addToast, preferences, category]);
   
@@ -461,32 +455,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     setLoading(true);
     loadNews(true, searchQuery, dateRange, sourceFilter);
   };
-  
-  const handleTouchStart = (e: React.TouchEvent) => {
-      if(containerRef.current && containerRef.current.scrollTop === 0) {
-          touchStartY.current = e.targetTouches[0].clientY;
-      }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-      if(touchStartY.current > 0 && !loading) {
-          const touchY = e.targetTouches[0].clientY;
-          const pullDistance = touchY - touchStartY.current;
-          if(pullDistance > 0) {
-              if (e.cancelable) e.preventDefault();
-              setPullPosition(Math.min(pullDistance, 100));
-          }
-      }
-  };
-  
-  const handleTouchEnd = () => {
-      if(pullPosition > 70) {
-          handleManualRefresh();
-      } else {
-          setPullPosition(0);
-      }
-      touchStartY.current = 0;
-  };
 
   const displayedNews = useMemo(() => {
       return activeTab === 'favorites' 
@@ -508,18 +476,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   return (
     <div 
         className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6"
-        ref={containerRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
     >
-      <div 
-        className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
-        style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
-      >
-        <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
-      </div>
-      
       <div className="w-full max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-4 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-md py-2">
           <h1 className="text-2xl font-bold">{t('market_news')}</h1>
@@ -530,6 +487,14 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                   aria-label="Filtros"
               >
                   <FilterIcon className="w-5 h-5" />
+              </button>
+              <button 
+                  onClick={handleManualRefresh} 
+                  disabled={loading}
+                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
+                  aria-label={t('refresh_prices')}
+              >
+                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
               </button>
           </div>
         </div>
