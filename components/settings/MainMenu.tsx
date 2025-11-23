@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { MenuScreen } from '../../views/SettingsView';
 import type { ToastMessage } from '../../types';
@@ -19,6 +18,8 @@ import UpdateIcon from '../icons/UpdateIcon';
 import LogoutIcon from '../icons/LogoutIcon';
 import ChevronRightIcon from '../icons/ChevronRightIcon';
 import SparklesIcon from '../icons/SparklesIcon';
+import BookOpenIcon from '../icons/BookOpenIcon';
+import CalculatorIcon from '../icons/CalculatorIcon';
 
 
 const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; isLast?: boolean; isActive?: boolean }> = ({ icon, title, subtitle, onClick, isLast, isActive }) => (
@@ -85,6 +86,8 @@ const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; activeScreen
                 <div>
                     <SectionHeader title={t('about_app')} />
                      <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] overflow-hidden">
+                        <MenuItem isActive={activeScreen === 'calculators'} icon={<CalculatorIcon className="w-5 h-5" />} title={t('calculators')} subtitle={t('calculators_help')} onClick={() => setScreen('calculators')} />
+                        <MenuItem isActive={activeScreen === 'glossary'} icon={<BookOpenIcon className="w-5 h-5" />} title={t('financial_glossary')} subtitle={t('glossary_subtitle')} onClick={() => setScreen('glossary')} />
                         <MenuItem icon={<UpdateIcon className="w-5 h-5" />} title={t('check_for_update')} subtitle={t('version') + ' 1.6.0'} onClick={onShowUpdateModal} />
                         <MenuItem isActive={activeScreen === 'about'} icon={<InfoIcon className="w-5 h-5" />} title={t('about_app')} subtitle={t('help_about')} onClick={() => setScreen('about')} isLast />
                     </div>

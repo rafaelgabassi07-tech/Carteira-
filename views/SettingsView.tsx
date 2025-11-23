@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { ToastMessage } from '../types';
 import { useI18n } from '../contexts/I18nContext';
@@ -15,8 +14,10 @@ import GeneralSettings from '../components/settings/GeneralSettings';
 import TransactionSettings from '../components/settings/TransactionSettings';
 import ApiConnectionSettings from '../components/settings/ApiConnectionSettings';
 import UpdateCheckModal from '../components/modals/UpdateCheckModal';
+import GlossaryView from './GlossaryView';
+import CalculatorsView from './CalculatorsView';
 
-export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections';
+export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections' | 'glossary' | 'calculators';
 
 interface SettingsViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
@@ -47,6 +48,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
             case 'transactions': return <TransactionSettings onBack={onBack} />;
             case 'apiConnections': return <ApiConnectionSettings onBack={onBack} addToast={addToast} />;
             case 'about': return <AboutApp onBack={onBack} />;
+            case 'glossary': return <GlossaryView onBack={onBack} />;
+            case 'calculators': return <CalculatorsView onBack={onBack} />;
             default: return <MainMenu setScreen={setScreen} activeScreen={screen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
         }
     };

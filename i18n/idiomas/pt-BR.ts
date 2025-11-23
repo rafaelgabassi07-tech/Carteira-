@@ -1,4 +1,3 @@
-
 export const ptBR = {
     // Appearance
     themes: 'Temas',
@@ -269,6 +268,8 @@ export const ptBR = {
     calculators: 'Calculadoras',
     calculators_help: 'Ferramentas para simular investimentos.',
     compound_interest: 'Juros Compostos',
+    simple_interest: 'Juros Simples',
+    my_first_million: 'Meu 1º Milhão',
     yoc_calculator: 'Yield on Cost',
     initial_investment: 'Investimento Inicial',
     monthly_contribution: 'Aporte Mensal',
@@ -284,6 +285,15 @@ export const ptBR = {
     projected_monthly_income_calc: 'Renda Mensal Estimada',
     total_position_cost: 'Custo Total da Posição',
     year: 'Ano',
+    compound_interest_chart: 'Evolução dos Juros Compostos',
+    simple_interest_chart: 'Evolução dos Juros Simples',
+    my_first_million_chart_title: 'Jornada para o Milhão',
+    time_to_million: 'Tempo para o Milhão',
+    time_to_million_result: '{{years}} anos e {{months}} meses',
+    goal: 'Meta',
+    simulation: 'Simulação',
+    // FIX: Renamed duplicate key 'result' to 'simulation_result'
+    simulation_result: 'Resultado',
 
     // Tour
     tour_privacy_title: 'Privacidade',
@@ -338,4 +348,37 @@ export const ptBR = {
     checking_for_updates: 'Verificando atualizações...',
     you_are_up_to_date: 'Você está atualizado!',
     channel_stable: 'Canal Estável',
+
+    // Glossary
+    financial_glossary: 'Glossário Financeiro',
+    glossary_subtitle: 'Aprenda os termos do mercado.',
+    glossary_search_placeholder: 'Buscar termo...',
+    glossary_no_results: 'Nenhum termo encontrado.',
+
+    glossary_term_fii: 'FII (Fundo de Investimento Imobiliário)',
+    glossary_desc_fii: 'Um tipo de fundo de investimento que aplica em ativos imobiliários. Os cotistas recebem rendimentos mensais, geralmente isentos de Imposto de Renda.',
+    glossary_term_ticker: 'Ticker',
+    glossary_desc_ticker: 'Código de negociação do ativo na bolsa, como MXRF11 ou HGLG11.',
+    glossary_term_dy: 'Dividend Yield (DY)',
+    glossary_desc_dy: 'Indicador que mede o retorno em dividendos em relação ao preço da cota. Calculado como (Dividendos pagos nos últimos 12 meses) / (Preço da cota).',
+    glossary_term_pvp: 'P/VP (Preço sobre Valor Patrimonial)',
+    glossary_desc_pvp: 'Mede a relação entre o preço de mercado da cota e seu valor patrimonial. P/VP < 1 pode indicar que o fundo está "barato". P/VP > 1 pode indicar que está "caro".',
+    glossary_term_vacancia: 'Vacância',
+    glossary_desc_vacancia: 'Percentual de imóveis vagos em um fundo de tijolo. Quanto menor, melhor.',
+    glossary_term_cota: 'Cota',
+    glossary_desc_cota: 'A menor fração do patrimônio de um fundo, negociada na bolsa de valores.',
+    glossary_term_proventos: 'Proventos / Rendimentos',
+    glossary_desc_proventos: 'Distribuição de lucros aos cotistas, geralmente mensal e isenta de IR para pessoa física.',
+    glossary_term_subscricao: 'Direito de Subscrição',
+    glossary_desc_subscricao: 'Direito oferecido aos cotistas de comprar novas cotas do fundo, geralmente com um preço abaixo do mercado, durante uma nova emissão.',
+    glossary_term_amortizacao: 'Amortização',
+    glossary_desc_amortizacao: 'Devolução de parte do capital investido aos cotistas. Diferente de dividendos, pois não é apenas lucro, mas parte do principal.',
+    glossary_term_ifix: 'IFIX',
+    glossary_desc_ifix: 'Índice de Fundos de Investimentos Imobiliários. É o principal benchmark do mercado de FIIs, refletindo o desempenho médio dos fundos mais negociados.',
+    glossary_term_tijolo: 'Fundos de Tijolo',
+    glossary_desc_tijolo: 'FIIs que investem diretamente em imóveis físicos, como shoppings, galpões logísticos e lajes corporativas.',
+    glossary_term_papel: 'Fundos de Papel (ou Recebíveis)',
+    glossary_desc_papel: 'FIIs que investem em títulos de dívida do setor imobiliário, como CRIs (Certificados de Recebíveis Imobiliários).',
+    glossary_term_fof: 'Fundos de Fundos (FOF)',
+    glossary_desc_fof: 'FIIs que investem em cotas de outros FIIs, buscando diversificar a carteira com uma única cota.',
 };
