@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import type { PortfolioEvolutionPoint } from '../types';
@@ -9,10 +8,10 @@ interface EvolutionChartProps {
 
 const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
     const { formatCurrency, t } = useI18n();
-    const [tooltip, setTooltip] = useState<{ point: PortfolioEvolutionPoint, x: number, y: number } | null>(null);
+    const [tooltip, setTooltip] = useState<{ point: PortfolioEvolutionPoint, x: number, y: number, index: number } | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dimensions, setDimensions] = useState({ width: 300, height: 200 });
+    const [dimensions, setDimensions] = useState({ width: 300, height: 288 });
 
     useLayoutEffect(() => {
         const container = containerRef.current;
@@ -21,37 +20,33 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
         const updateDimensions = () => {
              if (container) {
                  const { width, height } = container.getBoundingClientRect();
-                 // Ensure we don't set 0 dimensions which causes NaN issues
                  if (width > 0 && height > 0) {
                      setDimensions({ width, height });
                  }
              }
         };
 
-        const observer = new ResizeObserver(() => {
-             requestAnimationFrame(updateDimensions);
-        });
-        
+        const observer = new ResizeObserver(updateDimensions);
         observer.observe(container);
-        // Initial call
         updateDimensions();
-
         return () => observer.disconnect();
     }, []);
     
     const { width, height } = dimensions;
-    const padding = { top: 20, right: 10, bottom: 25, left: 35 };
+    const padding = { top: 20, right: 10, bottom: 25, left: 45 };
     const chartWidth = Math.max(0, width - padding.left - padding.right);
     const chartHeight = Math.max(0, height - padding.top - padding.bottom);
-    
-    // Prevent division by zero if data is empty
-    const barSlotWidth = data.length > 0 ? chartWidth / data.length : 0;
-    const barWidth = Math.max(1, barSlotWidth * 0.7);
 
     const maxValue = useMemo(() => {
         const max = Math.max(...data.map(d => Math.max(d.marketValue, d.invested)), 0);
-        return max === 0 ? 1 : max * 1.1; // Add 10% headroom and prevent 0
+        return max === 0 ? 1 : max * 1.1;
     }, [data]);
+
+    const getCoords = (index: number, value: number) => {
+        const x = padding.left + (index / (data.length - 1)) * chartWidth;
+        const y = (height - padding.bottom) - (value / maxValue) * chartHeight;
+        return { x, y };
+    };
 
     const yTicks = useMemo(() => {
         const numTicks = 4;
@@ -60,38 +55,44 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
     }, [maxValue]);
     
     const xLabels = useMemo(() => {
-        if (data.length === 0) return [];
-        const maxLabels = Math.max(1, Math.floor(chartWidth / 50));
+        if (data.length <= 1) return [];
+        const maxLabels = Math.max(2, Math.floor(chartWidth / 60));
         if(data.length <= maxLabels) return data.map((d, i) => ({ label: d.month, index: i }));
-        const step = Math.ceil(data.length / maxLabels);
-        return data.filter((_, i) => i % step === 0).map((d, i) => ({ label: d.month, index: i * step }));
+        const step = Math.ceil((data.length -1) / (maxLabels -1));
+        const indices = new Set([0, data.length-1]);
+        for(let i=1; i<maxLabels-1; i++) {
+            indices.add(i*step);
+        }
+        return Array.from(indices).sort((a,b)=>a-b).map(i => ({ label: data[i].month, index: i }));
     }, [data, chartWidth]);
 
-
-    const handleMouseMove = (event: { clientX: number, clientY: number }) => {
-        if (!svgRef.current || data.length === 0 || barSlotWidth === 0) return;
+    const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+        if (!svgRef.current || data.length === 0) return;
         const rect = svgRef.current.getBoundingClientRect();
-        const x = event.clientX - rect.left; 
+        const x = event.clientX - rect.left;
         
-        const index = Math.min(data.length - 1, Math.max(0, Math.floor((x - padding.left) / barSlotWidth)));
+        const progress = Math.max(0, Math.min(1, (x - padding.left) / chartWidth));
+        const index = Math.round(progress * (data.length - 1));
 
         if (index >= 0 && index < data.length) {
             const pointData = data[index];
-            const barHeight = (pointData.marketValue / maxValue) * chartHeight;
-            const barX = padding.left + index * barSlotWidth + (barSlotWidth / 2);
-            const barY = height - padding.bottom - barHeight;
-            
-            setTooltip({ point: pointData, x: barX, y: barY });
+            const coords = getCoords(index, pointData.marketValue);
+            setTooltip({ point: pointData, x: coords.x, y: coords.y, index });
         }
     };
     
-    if (data.length === 0) {
+    if (data.length < 2) {
         return (
             <div ref={containerRef} className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-xs">
-                <p>Sem dados de evolução.</p>
+                <p>Dados insuficientes para exibir evolução.</p>
             </div>
         );
     }
+    
+    const investedPath = data.map((d, i) => `${getCoords(i, d.invested).x},${getCoords(i, d.invested).y}`).join(' ');
+    const marketValuePath = data.map((d, i) => `${getCoords(i, d.marketValue).x},${getCoords(i, d.marketValue).y}`).join(' ');
+    const marketValueAreaPath = `${padding.left},${height - padding.bottom} ${marketValuePath} ${getCoords(data.length-1, data[data.length-1].marketValue).x},${height - padding.bottom}`;
+    const investedAreaPath = `${padding.left},${height - padding.bottom} ${investedPath} ${getCoords(data.length-1, data[data.length-1].invested).x},${height - padding.bottom}`;
 
     return (
         <div ref={containerRef} className="relative w-full h-full">
@@ -102,20 +103,31 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                 onMouseLeave={() => setTooltip(null)} 
                 onTouchStart={(e) => {
                     const touch = e.touches[0];
-                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY } as React.MouseEvent<SVGSVGElement>);
                 }}
                 onTouchMove={(e) => {
                     const touch = e.touches[0];
-                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY } as React.MouseEvent<SVGSVGElement>);
                 }}
                 className="w-full h-full cursor-crosshair"
             >
+                <defs>
+                    <linearGradient id="marketValueGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--accent-color)" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="var(--accent-color)" stopOpacity={0} />
+                    </linearGradient>
+                     <linearGradient id="investedGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--text-secondary)" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="var(--text-secondary)" stopOpacity={0} />
+                    </linearGradient>
+                </defs>
+                
                 {yTicks.map((tick, i) => {
-                    const y = height - padding.bottom - (tick / maxValue) * chartHeight;
+                    const y = getCoords(0, tick).y;
                     return (
                         <g key={i}>
                             <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="2 2" />
-                            <text x={padding.left - 5} y={y + 3} textAnchor="end" fontSize="9" fill="var(--text-secondary)">
+                            <text x={padding.left - 8} y={y + 3} textAnchor="end" fontSize="9" fill="var(--text-secondary)">
                                 {tick >= 1000 ? `${(tick/1000).toFixed(0)}k` : tick.toFixed(0)}
                             </text>
                         </g>
@@ -123,46 +135,27 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                 })}
                 
                 {xLabels.map(({ label, index }) => (
-                     <text key={index} x={padding.left + index * barSlotWidth + (barSlotWidth / 2)} y={height - 5} textAnchor="middle" fontSize="9" fill="var(--text-secondary)">
+                     <text key={index} x={getCoords(index, 0).x} y={height - 5} textAnchor="middle" fontSize="9" fill="var(--text-secondary)">
                          {label}
                      </text>
                 ))}
+                
+                {/* Area Fills */}
+                <polygon points={investedAreaPath} fill="url(#investedGradient)" />
+                <polygon points={marketValueAreaPath} fill="url(#marketValueGradient)" />
 
-                {data.map((d, i) => {
-                    const barHeight = Math.max(0, (d.marketValue / maxValue) * chartHeight);
-                    const investedHeight = Math.max(0, (d.invested / maxValue) * chartHeight);
-                    // Safe coordinate calculation
-                    const x = padding.left + i * barSlotWidth + (barSlotWidth - barWidth) / 2;
-                    const y = height - padding.bottom - barHeight;
-                    const yInvested = height - padding.bottom - investedHeight;
-
-                    return (
-                        <g key={d.month}>
-                             <rect
-                                x={x}
-                                y={yInvested}
-                                width={barWidth}
-                                height={investedHeight}
-                                fill="var(--text-secondary)"
-                                opacity={0.3}
-                                rx="2"
-                                 className="animate-grow-up"
-                                 style={{ transformOrigin: `bottom`, animationDelay: `${i*30}ms` }}
-                            />
-                            <rect
-                                x={x}
-                                y={y}
-                                width={barWidth}
-                                height={barHeight}
-                                fill="var(--accent-color)"
-                                opacity={0.7}
-                                rx="2"
-                                className="animate-grow-up"
-                                style={{ transformOrigin: `bottom`, animationDelay: `${i*30}ms` }}
-                            />
-                        </g>
-                    );
-                })}
+                {/* Lines */}
+                <polyline fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" points={investedPath} strokeDasharray="3 3" />
+                <polyline fill="none" stroke="var(--accent-color)" strokeWidth="2" points={marketValuePath} />
+                
+                {/* Tooltip */}
+                {tooltip && (
+                    <g>
+                        <line x1={tooltip.x} y1={padding.top} x2={tooltip.x} y2={height - padding.bottom} stroke="var(--border-color)" strokeWidth="1" strokeDasharray="2 2" />
+                        <circle cx={getCoords(tooltip.index, tooltip.point.invested).x} cy={getCoords(tooltip.index, tooltip.point.invested).y} r="4" fill="var(--bg-secondary)" stroke="var(--text-secondary)" strokeWidth="2" />
+                        <circle cx={tooltip.x} cy={tooltip.y} r="4" fill="var(--bg-secondary)" stroke="var(--accent-color)" strokeWidth="2" />
+                    </g>
+                )}
             </svg>
             
             {tooltip && (
@@ -174,6 +167,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                         transform: `translateX(${tooltip.x > width / 2 ? '-110%' : '10%'})`
                     }}
                 >
+                    <p className="text-center font-bold text-[var(--text-primary)] mb-2">{tooltip.point.month}</p>
                     <div className="flex items-center gap-2 mb-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-[var(--text-secondary)] opacity-50" />
                         <span className="text-[var(--text-secondary)]">{t('invested_amount')}:</span>

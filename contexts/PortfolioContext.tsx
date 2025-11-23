@@ -375,8 +375,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // --- Patrimony Evolution Logic ---
 
-  // Step 1: Memoize the calculation. This will run whenever its dependencies change.
-  // It returns the calculated evolution data AND a list of prices it couldn't find.
   const evolutionResult = useMemo(() => {
     const evolution: SegmentEvolutionData = { all_types: [] };
     const missingPrices: { ticker: string, date: string }[] = [];
@@ -397,7 +395,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
         const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
 
-        // Update portfolio state based on transactions up to the end of the current month
         while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
             const tx = sortedTransactions[txIndex];
             if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
@@ -424,22 +421,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const holdings = portfolioState[ticker];
             const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
             const cacheKey = `${ticker}_${endOfMonthISO}`;
-
-            // Try to find the price: 1. Brapi History, 2. Gemini Cache
+            
             let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
             if (historicalPrice === null) {
                 historicalPrice = historicalPriceCache[cacheKey] || null;
             }
             
-            // If still not found, add to "shopping list" and use fallback for this render cycle
             if (historicalPrice === null) {
                 missingPrices.push({ ticker, date: endOfMonthISO });
                 historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
             }
             
-            const marketValue = holdings.quantity * historicalPrice;
             monthInvestedTotal += holdings.totalCost;
-            monthMarketValueTotal += marketValue;
+            monthMarketValueTotal += holdings.quantity * historicalPrice;
         });
 
         const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
@@ -453,32 +447,32 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { evolution, missingPrices };
   }, [sourceTransactions, sourceMarketData, historicalPriceCache]);
   
-  // Step 2: Set the calculated evolution to state.
   useEffect(() => {
       setPortfolioEvolution(evolutionResult.evolution);
   }, [evolutionResult.evolution]);
 
-  // Step 3: This effect watches the "shopping list" of missing prices.
-  // If there's anything on the list, it triggers the fetch.
+  const queriesToFetchJSON = useMemo(() => {
+      const uniqueQueries = [...new Map(evolutionResult.missingPrices.map(item => [`${item.ticker}_${item.date}`, item])).values()];
+      return JSON.stringify(uniqueQueries);
+  }, [evolutionResult.missingPrices]);
+
   useEffect(() => {
-    // FIX: Explicitly type `item` to resolve TypeScript inference issue.
-    const uniqueQueries = [...new Map(evolutionResult.missingPrices.map((item: { ticker: string; date: string }) => [`${item.ticker}_${item.date}`, item])).values()];
-    
-    if (uniqueQueries.length > 0) {
-        const fetcher = async () => {
-            try {
-                const fetchedPrices = await fetchHistoricalPrices(preferences, uniqueQueries);
-                // When prices are fetched, update the cache. This will trigger the `useMemo` in Step 1 to recalculate.
-                if (Object.keys(fetchedPrices).length > 0) {
-                    setHistoricalPriceCache(prev => ({ ...prev, ...fetchedPrices }));
-                }
-            } catch (e) {
-                console.warn("Failed to fetch historical prices via Gemini", e);
-            }
-        };
-        fetcher();
-    }
-  }, [evolutionResult.missingPrices, preferences, setHistoricalPriceCache]);
+      const queriesToFetch = JSON.parse(queriesToFetchJSON);
+      if (queriesToFetch.length > 0) {
+          const fetcher = async () => {
+              try {
+                  const fetchedPrices = await fetchHistoricalPrices(preferences, queriesToFetch);
+                  if (Object.keys(fetchedPrices).length > 0) {
+                      setHistoricalPriceCache(prev => ({ ...prev, ...fetchedPrices }));
+                  }
+              } catch (e) {
+                  console.warn("Failed to fetch historical prices via Gemini", e);
+              }
+          };
+          const timer = setTimeout(fetcher, 500);
+          return () => clearTimeout(timer);
+      }
+  }, [queriesToFetchJSON, preferences, setHistoricalPriceCache]);
 
 
   const value = useMemo(() => ({
