@@ -373,129 +373,112 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return [];
   }, [dividends]);
 
-  useEffect(() => {
-    const calculateEvolution = async () => {
-        if (sourceTransactions.length === 0) {
-            setPortfolioEvolution({ all_types: [] });
-            return;
-        }
+  // --- Patrimony Evolution Logic ---
 
-        const evolution: SegmentEvolutionData = { all_types: [] };
-        const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
-        const firstTxDate = fromISODate(sortedTransactions[0].date);
-        const today = new Date();
-        let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
-        
-        const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
-        let txIndex = 0;
-        const missingPriceQueries: { ticker: string; date: string }[] = [];
+  // Step 1: Memoize the calculation. This will run whenever its dependencies change.
+  // It returns the calculated evolution data AND a list of prices it couldn't find.
+  const evolutionResult = useMemo(() => {
+    const evolution: SegmentEvolutionData = { all_types: [] };
+    const missingPrices: { ticker: string, date: string }[] = [];
 
-        while (currentDate <= today) {
-            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-            const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
+    if (sourceTransactions.length === 0) {
+        return { evolution, missingPrices };
+    }
 
-            while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
-                const tx = sortedTransactions[txIndex];
-                if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
-                
-                if (tx.type === 'Compra') {
-                    portfolioState[tx.ticker].quantity += tx.quantity;
-                    portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
-                } else {
-                    const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
-                    if (portfolioState[tx.ticker].quantity > EPSILON) {
-                        const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
-                        portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
-                        portfolioState[tx.ticker].quantity -= sellQuantity;
-                    }
+    const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
+    const firstTxDate = fromISODate(sortedTransactions[0].date);
+    const today = new Date();
+    let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+    
+    const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
+    let txIndex = 0;
+
+    while (currentDate <= today) {
+        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
+
+        // Update portfolio state based on transactions up to the end of the current month
+        while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
+            const tx = sortedTransactions[txIndex];
+            if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
+            
+            if (tx.type === 'Compra') {
+                portfolioState[tx.ticker].quantity += tx.quantity;
+                portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
+            } else {
+                const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
+                if (portfolioState[tx.ticker].quantity > EPSILON) {
+                    const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
+                    portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
+                    portfolioState[tx.ticker].quantity -= sellQuantity;
                 }
-                if (portfolioState[tx.ticker].quantity < EPSILON) delete portfolioState[tx.ticker];
-                txIndex++;
             }
-
-            Object.keys(portfolioState).forEach(ticker => {
-                const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
-                let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
-                const cacheKey = `${ticker}_${endOfMonthISO}`;
-                if (historicalPrice === null && !historicalPriceCache[cacheKey]) {
-                    missingPriceQueries.push({ ticker, date: endOfMonthISO });
-                }
-            });
-
-            currentDate.setMonth(currentDate.getMonth() + 1);
+            if (portfolioState[tx.ticker].quantity < EPSILON) delete portfolioState[tx.ticker];
+            txIndex++;
         }
+
+        let monthInvestedTotal = 0;
+        let monthMarketValueTotal = 0;
+
+        Object.keys(portfolioState).forEach(ticker => {
+            const holdings = portfolioState[ticker];
+            const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
+            const cacheKey = `${ticker}_${endOfMonthISO}`;
+
+            // Try to find the price: 1. Brapi History, 2. Gemini Cache
+            let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+            if (historicalPrice === null) {
+                historicalPrice = historicalPriceCache[cacheKey] || null;
+            }
+            
+            // If still not found, add to "shopping list" and use fallback for this render cycle
+            if (historicalPrice === null) {
+                missingPrices.push({ ticker, date: endOfMonthISO });
+                historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
+            }
+            
+            const marketValue = holdings.quantity * historicalPrice;
+            monthInvestedTotal += holdings.totalCost;
+            monthMarketValueTotal += marketValue;
+        });
+
+        const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
         
-        const uniqueQueries = [...new Map(missingPriceQueries.map(item => [`${item.ticker}_${item.date}`, item])).values()];
-        if (uniqueQueries.length > 0) {
+        if (monthInvestedTotal > 0 || monthMarketValueTotal > 0) {
+            evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
+        }
+        currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+    
+    return { evolution, missingPrices };
+  }, [sourceTransactions, sourceMarketData, historicalPriceCache]);
+  
+  // Step 2: Set the calculated evolution to state.
+  useEffect(() => {
+      setPortfolioEvolution(evolutionResult.evolution);
+  }, [evolutionResult.evolution]);
+
+  // Step 3: This effect watches the "shopping list" of missing prices.
+  // If there's anything on the list, it triggers the fetch.
+  useEffect(() => {
+    // FIX: Explicitly type `item` to resolve TypeScript inference issue.
+    const uniqueQueries = [...new Map(evolutionResult.missingPrices.map((item: { ticker: string; date: string }) => [`${item.ticker}_${item.date}`, item])).values()];
+    
+    if (uniqueQueries.length > 0) {
+        const fetcher = async () => {
             try {
                 const fetchedPrices = await fetchHistoricalPrices(preferences, uniqueQueries);
-                setHistoricalPriceCache(prev => ({ ...prev, ...fetchedPrices }));
+                // When prices are fetched, update the cache. This will trigger the `useMemo` in Step 1 to recalculate.
+                if (Object.keys(fetchedPrices).length > 0) {
+                    setHistoricalPriceCache(prev => ({ ...prev, ...fetchedPrices }));
+                }
             } catch (e) {
-                console.warn("Failed to fetch some historical prices via Gemini", e);
+                console.warn("Failed to fetch historical prices via Gemini", e);
             }
-        }
-
-        // Re-run calculation with potentially updated cache
-        currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
-        Object.keys(portfolioState).forEach(k => delete portfolioState[k]);
-        txIndex = 0;
-
-        while (currentDate <= today) {
-            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-            const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
-
-            while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
-                 const tx = sortedTransactions[txIndex];
-                if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
-                if (tx.type === 'Compra') {
-                    portfolioState[tx.ticker].quantity += tx.quantity;
-                    portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
-                } else {
-                    const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
-                    if (portfolioState[tx.ticker].quantity > EPSILON) {
-                        const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
-                        portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
-                        portfolioState[tx.ticker].quantity -= sellQuantity;
-                    }
-                }
-                if (portfolioState[tx.ticker].quantity < EPSILON) delete portfolioState[tx.ticker];
-                txIndex++;
-            }
-
-            let monthInvestedTotal = 0;
-            let monthMarketValueTotal = 0;
-
-            Object.keys(portfolioState).forEach(ticker => {
-                const holdings = portfolioState[ticker];
-                const asset = assets.find(a => a.ticker === ticker);
-                const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
-                const cacheKey = `${ticker}_${endOfMonthISO}`;
-
-                let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
-                if (historicalPrice === null) {
-                    historicalPrice = historicalPriceCache[cacheKey] || null;
-                }
-                if (historicalPrice === null) {
-                    historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
-                }
-                
-                const marketValue = holdings.quantity * historicalPrice;
-                monthInvestedTotal += holdings.totalCost;
-                monthMarketValueTotal += marketValue;
-            });
-
-            const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
-            
-            if (monthInvestedTotal > 0 || monthMarketValueTotal > 0) {
-                evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
-            }
-            currentDate.setMonth(currentDate.getMonth() + 1);
-        }
-        setPortfolioEvolution(evolution);
-    };
-
-    calculateEvolution();
-}, [assets, sourceTransactions, sourceMarketData, historicalPriceCache, preferences, setHistoricalPriceCache]);
+        };
+        fetcher();
+    }
+  }, [evolutionResult.missingPrices, preferences, setHistoricalPriceCache]);
 
 
   const value = useMemo(() => ({
