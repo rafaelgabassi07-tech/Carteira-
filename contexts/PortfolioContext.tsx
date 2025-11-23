@@ -415,7 +415,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
               const segment = asset?.segment || 'Outros';
               let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
-              if (historicalPrice === null) historicalPrice = asset?.currentPrice || (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
+              if (historicalPrice === null) {
+                historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
+              }
               
               const marketValue = holdings.quantity * historicalPrice;
               monthInvestedTotal += holdings.totalCost;
