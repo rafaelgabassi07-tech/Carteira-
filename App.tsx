@@ -12,6 +12,7 @@ import PinLockScreen from './components/PinLockScreen';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import Tour from './components/tour/Tour';
+import OfflineBanner from './components/OfflineBanner';
 import type { ToastMessage } from './types';
 import { usePortfolio } from './contexts/PortfolioContext';
 import { useI18n } from './contexts/I18nContext';
@@ -274,6 +275,7 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout selection:bg-[var(--accent-color)] selection:text-[var(--accent-color-text)]">
+       <OfflineBanner />
        {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
        
        <aside className={`hidden md:flex flex-col w-64 xl:w-72 flex-shrink-0 z-20 mobile-landscape-sidebar transition-all duration-300

@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { I18nProvider } from './contexts/I18nContext';
 import { PortfolioProvider } from './contexts/PortfolioContext';
+import { OnlineStatusProvider } from './contexts/OnlineStatusContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -13,10 +14,12 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <I18nProvider>
-      <PortfolioProvider>
-        <App />
-      </PortfolioProvider>
-    </I18nProvider>
+    <OnlineStatusProvider>
+      <I18nProvider>
+        <PortfolioProvider>
+          <App />
+        </PortfolioProvider>
+      </I18nProvider>
+    </OnlineStatusProvider>
   </React.StrictMode>
 );
