@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -51,17 +50,19 @@ function getDomain(url: string): string {
     }
 }
 
-function extractJSON(text: string): any[] | null {
+function extractJSON(text: string): any {
     try {
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
         if (jsonMatch) {
             return JSON.parse(jsonMatch[0]);
         }
         return JSON.parse(text);
     } catch (e) {
+        console.error("Failed to extract JSON from text:", text, e);
         return null;
     }
 }
+
 
 export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<NewsArticle[]> {
   let apiKey: string;
@@ -290,6 +291,64 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         return {};
     }
 }
+
+export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ticker: string; date: string }[]): Promise<Record<string, number>> {
+    if (queries.length === 0) {
+        return {};
+    }
+
+    let apiKey: string;
+    try {
+        apiKey = getGeminiApiKey(prefs);
+    } catch (error: any) {
+        console.warn("Historical price fetch skipped:", error.message);
+        return {};
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    
+    const formattedQueries = queries.map(q => `{"ticker": "${q.ticker}", "date": "${q.date}"}`).join(', ');
+
+    const prompt = `
+      You are a financial data API. For each ticker and date object in the list [${formattedQueries}], find the closing price on that specific date. 
+      Use Google Search for this.
+      Return a single JSON object where the key is a composite string 'TICKER_YYYY-MM-DD' and the value is a number representing the closing price.
+      Do not invent data. If a price cannot be found, omit the key from the response.
+
+      Example response for a query of [{"ticker": "MXRF11", "date": "2023-11-30"}, {"ticker": "HGLG11", "date": "2023-10-31"}]:
+      {
+        "MXRF11_2023-11-30": 10.81,
+        "HGLG11_2023-10-31": 162.50
+      }
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+                temperature: 0,
+            }
+        });
+
+        const data = extractJSON(response.text || "{}");
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+            // Validate that values are numbers
+            Object.keys(data).forEach(key => {
+                if (typeof data[key] !== 'number') {
+                    delete data[key];
+                }
+            });
+            return data;
+        }
+        return {};
+    } catch (error) {
+        console.error("Error fetching historical prices with Gemini:", error);
+        return {};
+    }
+}
+
 
 export async function validateGeminiKey(key: string): Promise<boolean> {
     if (!key || key.trim() === '') return false;

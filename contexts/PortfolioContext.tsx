@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent } from '../types';
-import { fetchAdvancedAssetData } from '../services/geminiService';
+import { fetchAdvancedAssetData, fetchHistoricalPrices } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics, getClosestPrice } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE } from '../constants';
@@ -69,6 +69,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [lastSync, setLastSync] = usePersistentState<number | null>('last_sync', null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
+  const [portfolioEvolution, setPortfolioEvolution] = useState<SegmentEvolutionData>({ all_types: [] });
+  const [historicalPriceCache, setHistoricalPriceCache] = usePersistentState<Record<string, number>>('historical_price_cache', {});
+
 
   const sourceTransactions = useMemo(() => isDemoMode ? DEMO_TRANSACTIONS : transactions, [isDemoMode, transactions]);
   const sourceMarketData = useMemo(() => isDemoMode ? DEMO_MARKET_DATA : marketData, [isDemoMode, marketData]);
@@ -107,12 +110,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const clearCache = useCallback((key?: string) => {
     if (key === 'all') {
       Object.keys(localStorage).forEach(k => { if(k.startsWith('cache_')) localStorage.removeItem(k); });
-      setMarketData({}); setLastSync(null);
+      setMarketData({}); setLastSync(null); setHistoricalPriceCache({});
     } else if (key) {
       CacheManager.clear(key);
-      if (key === 'asset_prices') { setMarketData({}); setLastSync(null); }
+      if (key === 'asset_prices') { setMarketData({}); setLastSync(null); setHistoricalPriceCache({});}
     }
-  }, [setMarketData, setLastSync]);
+  }, [setMarketData, setLastSync, setHistoricalPriceCache]);
 
   const refreshMarketData = useCallback(async (force = false, silent = false) => {
     if (isRefreshing) return;
@@ -182,6 +185,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // 2. Clear related in-memory states that depend on cache
     setLastSync(null);
+    setHistoricalPriceCache({});
 
     // 3. Re-fetch market data. News will now require manual refresh on its own view.
     try {
@@ -192,7 +196,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
         setIsRefreshing(false);
     }
-  }, [isRefreshing, refreshMarketData, setLastSync]);
+  }, [isRefreshing, refreshMarketData, setLastSync, setHistoricalPriceCache]);
 
   const refreshSingleAsset = useCallback(async (ticker: string) => {
     if (!ticker) return;
@@ -369,76 +373,129 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return [];
   }, [dividends]);
 
-  const portfolioEvolution = useMemo(() => {
-      if (sourceTransactions.length === 0) return { all_types: [] };
-      
-      const evolution: SegmentEvolutionData = { all_types: [] };
-      const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
-      const firstTxDate = fromISODate(sortedTransactions[0].date);
-      const today = new Date();
-      let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
-      
-      const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
-      let txIndex = 0;
+  useEffect(() => {
+    const calculateEvolution = async () => {
+        if (sourceTransactions.length === 0) {
+            setPortfolioEvolution({ all_types: [] });
+            return;
+        }
 
-      while (currentDate <= today) {
-          const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-          const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
+        const evolution: SegmentEvolutionData = { all_types: [] };
+        const sortedTransactions = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
+        const firstTxDate = fromISODate(sortedTransactions[0].date);
+        const today = new Date();
+        let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+        
+        const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
+        let txIndex = 0;
+        const missingPriceQueries: { ticker: string; date: string }[] = [];
 
-          while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
-              const tx = sortedTransactions[txIndex];
-              if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
-              
-              if (tx.type === 'Compra') {
-                  portfolioState[tx.ticker].quantity += tx.quantity;
-                  portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
-              } else {
-                  const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
-                  if (portfolioState[tx.ticker].quantity > EPSILON) {
-                      const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
-                      portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
-                      portfolioState[tx.ticker].quantity -= sellQuantity;
-                  }
-              }
-              if (portfolioState[tx.ticker].quantity < EPSILON) delete portfolioState[tx.ticker];
-              txIndex++;
-          }
+        while (currentDate <= today) {
+            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+            const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
 
-          let monthInvestedTotal = 0;
-          let monthMarketValueTotal = 0;
-          const segmentInvested: Record<string, number> = {};
-          const segmentMarketValue: Record<string, number> = {};
+            while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
+                const tx = sortedTransactions[txIndex];
+                if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
+                
+                if (tx.type === 'Compra') {
+                    portfolioState[tx.ticker].quantity += tx.quantity;
+                    portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
+                } else {
+                    const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
+                    if (portfolioState[tx.ticker].quantity > EPSILON) {
+                        const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
+                        portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
+                        portfolioState[tx.ticker].quantity -= sellQuantity;
+                    }
+                }
+                if (portfolioState[tx.ticker].quantity < EPSILON) delete portfolioState[tx.ticker];
+                txIndex++;
+            }
 
-          Object.keys(portfolioState).forEach(ticker => {
-              const holdings = portfolioState[ticker];
-              const asset = assets.find(a => a.ticker === ticker);
-              const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
-              const segment = asset?.segment || 'Outros';
-              let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
-              if (historicalPrice === null) {
-                historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
-              }
-              
-              const marketValue = holdings.quantity * historicalPrice;
-              monthInvestedTotal += holdings.totalCost;
-              monthMarketValueTotal += marketValue;
-              segmentInvested[segment] = (segmentInvested[segment] || 0) + holdings.totalCost;
-              segmentMarketValue[segment] = (segmentMarketValue[segment] || 0) + marketValue;
-          });
+            Object.keys(portfolioState).forEach(ticker => {
+                const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
+                let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+                const cacheKey = `${ticker}_${endOfMonthISO}`;
+                if (historicalPrice === null && !historicalPriceCache[cacheKey]) {
+                    missingPriceQueries.push({ ticker, date: endOfMonthISO });
+                }
+            });
 
-          const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
-          
-          if (monthInvestedTotal > 0 || monthMarketValueTotal > 0) {
-              evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
-              Object.keys(segmentInvested).forEach(segment => {
-                  if (!evolution[segment]) evolution[segment] = [];
-                  evolution[segment].push({ month: monthLabel, invested: segmentInvested[segment], marketValue: segmentMarketValue[segment] });
-              });
-          }
-          currentDate.setMonth(currentDate.getMonth() + 1);
-      }
-      return evolution;
-  }, [sourceTransactions, assets, sourceMarketData]);
+            currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+        
+        const uniqueQueries = [...new Map(missingPriceQueries.map(item => [`${item.ticker}_${item.date}`, item])).values()];
+        if (uniqueQueries.length > 0) {
+            try {
+                const fetchedPrices = await fetchHistoricalPrices(preferences, uniqueQueries);
+                setHistoricalPriceCache(prev => ({ ...prev, ...fetchedPrices }));
+            } catch (e) {
+                console.warn("Failed to fetch some historical prices via Gemini", e);
+            }
+        }
+
+        // Re-run calculation with potentially updated cache
+        currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
+        Object.keys(portfolioState).forEach(k => delete portfolioState[k]);
+        txIndex = 0;
+
+        while (currentDate <= today) {
+            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+            const endOfMonthISO = endOfMonth.toISOString().split('T')[0];
+
+            while (txIndex < sortedTransactions.length && sortedTransactions[txIndex].date <= endOfMonthISO) {
+                 const tx = sortedTransactions[txIndex];
+                if (!portfolioState[tx.ticker]) portfolioState[tx.ticker] = { quantity: 0, totalCost: 0 };
+                if (tx.type === 'Compra') {
+                    portfolioState[tx.ticker].quantity += tx.quantity;
+                    portfolioState[tx.ticker].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
+                } else {
+                    const sellQuantity = Math.min(tx.quantity, portfolioState[tx.ticker].quantity);
+                    if (portfolioState[tx.ticker].quantity > EPSILON) {
+                        const avgPrice = portfolioState[tx.ticker].totalCost / portfolioState[tx.ticker].quantity;
+                        portfolioState[tx.ticker].totalCost -= sellQuantity * avgPrice;
+                        portfolioState[tx.ticker].quantity -= sellQuantity;
+                    }
+                }
+                if (portfolioState[tx.ticker].quantity < EPSILON) delete portfolioState[tx.ticker];
+                txIndex++;
+            }
+
+            let monthInvestedTotal = 0;
+            let monthMarketValueTotal = 0;
+
+            Object.keys(portfolioState).forEach(ticker => {
+                const holdings = portfolioState[ticker];
+                const asset = assets.find(a => a.ticker === ticker);
+                const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
+                const cacheKey = `${ticker}_${endOfMonthISO}`;
+
+                let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+                if (historicalPrice === null) {
+                    historicalPrice = historicalPriceCache[cacheKey] || null;
+                }
+                if (historicalPrice === null) {
+                    historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
+                }
+                
+                const marketValue = holdings.quantity * historicalPrice;
+                monthInvestedTotal += holdings.totalCost;
+                monthMarketValueTotal += marketValue;
+            });
+
+            const monthLabel = currentDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit', timeZone: 'UTC' });
+            
+            if (monthInvestedTotal > 0 || monthMarketValueTotal > 0) {
+                evolution.all_types.push({ month: monthLabel, invested: monthInvestedTotal, marketValue: monthMarketValueTotal });
+            }
+            currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+        setPortfolioEvolution(evolution);
+    };
+
+    calculateEvolution();
+}, [assets, sourceTransactions, sourceMarketData, historicalPriceCache, preferences, setHistoricalPriceCache]);
 
 
   const value = useMemo(() => ({
