@@ -137,8 +137,8 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                     const marketH = (d.marketValue / maxValue) * chartHeight;
                     
                     // Logic for "Gain Stacking"
-                    // Base Bar: Represents the Invested Amount (Cost)
-                    // Top Bar: Represents Gain (Market Value - Invested)
+                    // Base Bar: Represents the Invested Amount (Cost) - Darker/Neutral Color
+                    // Top Bar: Represents Gain (Market Value - Invested) - Vibrant Color
                     
                     const gain = d.marketValue - d.invested;
                     
@@ -150,8 +150,9 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                                 y={yBase - investedH} 
                                 width={barWidth} 
                                 height={investedH} 
-                                fill="var(--text-secondary)"
-                                opacity="0.3"
+                                fill="var(--bg-tertiary-hover)" // Darker, more neutral for base
+                                stroke="var(--border-color)"
+                                strokeWidth="1"
                                 rx={2}
                             />
                             
@@ -162,7 +163,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                                     y={yBase - marketH} // Starts at top of Market Value
                                     width={barWidth}
                                     height={marketH - investedH} // Height is the difference (Gain)
-                                    fill="var(--accent-color)"
+                                    fill="var(--accent-color)" // Vibrant for gain
                                     rx={2}
                                     className="animate-grow-up"
                                     style={{ transformOrigin: `center ${yBase - investedH}px` }}
@@ -184,6 +185,17 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                         </g>
                     );
                 })}
+
+                {/* Optional Trend Line for Invested Amount to help visualize baseline */}
+                <polyline 
+                    points={data.map((d, i) => `${getX(i) + barWidth/2},${getY(d.invested)}`).join(' ')}
+                    fill="none"
+                    stroke="var(--text-secondary)"
+                    strokeWidth="1"
+                    strokeDasharray="4 4"
+                    opacity="0.5"
+                />
+
             </svg>
             
             {tooltip && (
@@ -199,14 +211,14 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                     
                     {/* Market Value (Total Height) */}
                     <div className="flex items-center gap-3 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-[var(--text-primary)]" />
+                        <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]" />
                         <span className="text-[var(--text-secondary)]">{t('patrimony')}</span>
                         <span className="font-bold text-sm ml-auto">{formatCurrency(tooltip.point.marketValue)}</span>
                     </div>
 
                     {/* Invested (Base) */}
                     <div className="flex items-center gap-3 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-[var(--text-secondary)] opacity-50" />
+                        <div className="w-2 h-2 rounded-full bg-[var(--text-secondary)]" />
                         <span className="text-[var(--text-secondary)]">{t('invested_amount')}</span>
                         <span className="font-bold text-sm ml-auto text-[var(--text-secondary)]">{formatCurrency(tooltip.point.invested)}</span>
                     </div>
@@ -215,7 +227,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                     
                     {/* Result (Gain/Loss) */}
                     <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${tooltip.point.marketValue >= tooltip.point.invested ? 'bg-[var(--accent-color)]' : 'bg-[var(--red-text)]'}`} />
+                        <div className={`w-2 h-2 rounded-full ${tooltip.point.marketValue >= tooltip.point.invested ? 'bg-[var(--green-text)]' : 'bg-[var(--red-text)]'}`} />
                         <span className="text-[var(--text-secondary)]">{t('result')}</span>
                         <span className={`font-bold text-sm ml-auto ${tooltip.point.marketValue >= tooltip.point.invested ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
                             {formatCurrency(tooltip.point.marketValue - tooltip.point.invested)}

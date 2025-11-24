@@ -161,12 +161,25 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         }
 
         if (success) {
+             let finalHistory = historyData.map((item: any) => ({
+                date: new Date(item.date * 1000).toISOString().split('T')[0],
+                price: item.close,
+            })).sort((a: any, b: any) => a.date.localeCompare(b.date));
+
+            // CRITICAL FIX: Ensure history has at least the current price point if missing or outdated
+            // This allows the 'Carry-Forward' logic in PortfolioContext to work even if history is empty
+            if (currentPrice > 0) {
+                const todayISO = new Date().toISOString().split('T')[0];
+                const lastHistoryDate = finalHistory.length > 0 ? finalHistory[finalHistory.length - 1].date : '';
+                
+                if (lastHistoryDate !== todayISO) {
+                    finalHistory.push({ date: todayISO, price: currentPrice });
+                }
+            }
+
              allQuotes[ticker.toUpperCase()] = {
                 currentPrice: currentPrice || 0,
-                priceHistory: historyData.map((item: any) => ({
-                    date: new Date(item.date * 1000).toISOString().split('T')[0],
-                    price: item.close,
-                })).sort((a: any, b: any) => a.date.localeCompare(b.date)),
+                priceHistory: finalHistory,
                 dividendsHistory
             };
         } else {

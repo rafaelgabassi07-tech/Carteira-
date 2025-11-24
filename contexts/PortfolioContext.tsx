@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent } from '../types';
 import { fetchAdvancedAssetData, fetchHistoricalPrices } from '../services/geminiService';
@@ -389,6 +390,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
     
     const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
+    const lastKnownPrices: Record<string, number> = {}; // Map to store last known prices for carry-forward
     let txIndex = 0;
 
     while (currentDate <= today) {
@@ -423,14 +425,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const cacheKey = `${ticker}_${endOfMonthISO}`;
             
             let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
+            
             if (historicalPrice === null) {
                 historicalPrice = historicalPriceCache[cacheKey] || null;
             }
             
-            if (historicalPrice === null) {
+            if (historicalPrice !== null) {
+                lastKnownPrices[ticker] = historicalPrice;
+            } else if (lastKnownPrices[ticker]) {
+                historicalPrice = lastKnownPrices[ticker]; // Carry forward logic
+            } else {
                 missingPrices.push({ ticker, date: endOfMonthISO });
-                // Temporary fallback to average cost while we fetch data.
-                // This might show 0 capital gain momentarily until AI fetches data.
+                // If we really have NO history, fallback to cost basis to avoid 0 value
+                // This sets capital gain to 0 temporarily, but avoids graph crash
                 historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
             }
             
