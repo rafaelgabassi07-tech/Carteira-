@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
   <head>
@@ -8,9 +7,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#09090b" />
     <title>Invest Portfolio</title>
+    
+    <!-- Google Fonts Import -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Lato:wght@400;700;900&family=Lora:wght@400;700&family=Poppins:wght@400;700;900&family=Roboto+Mono:wght@400;700&family=Source+Code+Pro:wght@400;700;900&display=swap" rel="stylesheet">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
+        /* Default Font */
+        --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        
         /* Default RGB Values for manipulation */
         --bg-primary-rgb: 9, 9, 11;
         --bg-secondary-rgb: 24, 24, 27;
@@ -39,36 +47,13 @@
       }
 
       /* --- VISUAL STYLES --- */
-
-      /* STYLE: SIMPLE */
       [data-style="simple"] {
           --backdrop-blur: 0px;
           --card-shadow: none;
           --glass-border: 1px solid var(--border-color);
           --glass-highlight: none;
       }
-      [data-style="simple"][data-theme="dark"] {
-          --bg-primary-rgb: 9, 9, 11;
-          --bg-secondary-rgb: 24, 24, 27;
-          --bg-primary: #09090b;
-          --bg-secondary: #18181b;
-          --bg-tertiary-hover: #27272a;
-          --border-color: #27272a;
-          --text-primary: #fafafa;
-          --text-secondary: #a1a1aa;
-      }
-      [data-style="simple"][data-theme="light"] {
-          --bg-primary-rgb: 248, 250, 252;
-          --bg-secondary-rgb: 255, 255, 255;
-          --bg-primary: #f8fafc;
-          --bg-secondary: #ffffff;
-          --bg-tertiary-hover: #f1f5f9;
-          --border-color: #e2e8f0;
-          --text-primary: #0f172a;
-          --text-secondary: #64748b;
-      }
-
-      /* STYLE: PREMIUM (Glassmorphism Enhanced) */
+      
       [data-style="premium"] {
           --backdrop-blur: 40px;
       }
@@ -76,15 +61,11 @@
           --bg-primary-rgb: 5, 5, 5;
           --bg-secondary-rgb: 20, 20, 25;
           --bg-primary: #050505;
-          /* More transparent for depth */
           --bg-secondary: rgba(20, 20, 25, 0.50); 
           --bg-tertiary-hover: rgba(255, 255, 255, 0.08);
           --border-color: rgba(255, 255, 255, 0.08);
-          /* Thinner, subtle border */
           --glass-border: 1px solid rgba(255, 255, 255, 0.08);
-          /* Top inner shine simulating light hitting the glass edge */
           --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
-          /* Softer, deeper shadow */
           --card-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.7);
           --text-primary: #ffffff;
           --text-secondary: #a1a1aa;
@@ -105,6 +86,7 @@
 
       /* GLOBAL BASE STYLES */
       body {
+        font-family: var(--font-family);
         background-color: var(--bg-primary);
         color: var(--text-primary);
         overflow-x: hidden;
@@ -124,12 +106,6 @@
         background-attachment: fixed;
       }
 
-      /* --- UNIVERSAL GLASS COMPONENT CLASSES --- */
-      
-      /* 
-         Overwrite Tailwind utility to use CSS vars for true glass effect 
-         Now includes --glass-highlight for that "expensive 3D glass" look
-      */
       .bg-\[var\(--bg-secondary\)\] {
           background-color: var(--bg-secondary);
           backdrop-filter: blur(var(--backdrop-blur));
@@ -138,7 +114,6 @@
           box-shadow: var(--card-shadow), var(--glass-highlight);
       }
       
-      /* Specific overrides for Floating Elements */
       .glass, .glass-card {
           background-color: var(--bg-secondary);
           backdrop-filter: blur(var(--backdrop-blur));
@@ -148,21 +123,15 @@
       }
       
       [data-style="premium"] .glass {
-          border: var(--glass-border); /* Full border in premium */
-          background-color: rgba(var(--bg-secondary-rgb), 0.75); /* Slightly more opaque for headers */
+          border: var(--glass-border);
+          background-color: rgba(var(--bg-secondary-rgb), 0.75);
           box-shadow: var(--card-shadow), var(--glass-highlight);
       }
 
       /* Scrollbar Polish */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb {
-        background: var(--border-color); 
-        border-radius: 99px;
-      }
+      ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 99px; }
       ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
 
       /* Animations */
@@ -170,30 +139,10 @@
       @keyframes fade-in-up { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes scale-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
       @keyframes grow-up { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-      @keyframes wipe-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-      @keyframes subtle-fade-in { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes slide-in-right { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-      
       .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
       .animate-fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .animate-scale-in { animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .animate-grow-up { animation: grow-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; transform-origin: bottom; }
-      .animate-wipe-in { animation: wipe-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      .animate-subtle-fade-in { animation: subtle-fade-in 0.3s ease-out forwards; }
-      .animate-slide-in-right { animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-      /* Mobile Landscape Overrides */
-      @media (orientation: landscape) and (max-width: 767px) and (min-width: 480px) {
-        .mobile-landscape-layout { flex-direction: row !important; }
-        .mobile-landscape-sidebar { display: flex !important; width: 12rem !important; }
-        .mobile-landscape-sidebar .sidebar-title { padding: 1rem !important; }
-        .mobile-landscape-sidebar .sidebar-title h1 { font-size: 1.125rem !important; }
-        .mobile-landscape-sidebar .sidebar-title p { display: none; }
-        .mobile-landscape-bottom-nav { display: none !important; }
-        .landscape-grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-        .landscape-pb-6 { padding-bottom: 1.5rem !important; }
-        .landscape-fab { bottom: 1.5rem !important; }
-      }
     </style>
   <script type="importmap">
 {

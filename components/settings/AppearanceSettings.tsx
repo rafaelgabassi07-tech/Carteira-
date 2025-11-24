@@ -4,6 +4,7 @@ import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
 import ToggleSwitch from '../ToggleSwitch';
 import PaletteIcon from '../icons/PaletteIcon';
+import TypeIcon from '../icons/TypeIcon';
 
 const AppearanceSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const { t } = useI18n();
@@ -15,23 +16,40 @@ const AppearanceSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
 
             <div className="space-y-6">
                 
-                {/* Banner informativo, pois o acesso principal é pelo menu */}
+                {/* Banners to Galleries */}
                 <div className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl border border-[var(--border-color)] shadow-sm relative overflow-hidden group">
                     <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 bg-[var(--accent-color)] rounded-lg text-[var(--accent-color-text)]">
                                 <PaletteIcon className="w-6 h-6" />
                             </div>
-                            <h4 className="font-bold text-lg">{t('customize_colors_fonts')}</h4>
+                            <h4 className="font-bold text-lg">{t('theme_gallery')}</h4>
                         </div>
                         <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed max-w-xs">
                             {t('open_theme_store_desc')}
                         </p>
                         <div className="inline-flex items-center text-sm font-bold text-[var(--accent-color)]">
-                            {t('open_theme_store')} →
+                           Acesse no menu de Ajustes →
                         </div>
                     </div>
                     <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-[var(--accent-color)] opacity-10 rounded-full blur-2xl group-hover:opacity-20 transition-opacity"></div>
+                </div>
+
+                <div className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl border border-[var(--border-color)] shadow-sm relative overflow-hidden group">
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-[var(--accent-color)] rounded-lg text-[var(--accent-color-text)]">
+                                <TypeIcon className="w-6 h-6" />
+                            </div>
+                            <h4 className="font-bold text-lg">{t('typography')}</h4>
+                        </div>
+                        <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed max-w-xs">
+                            {t('typography_desc')}
+                        </p>
+                         <div className="inline-flex items-center text-sm font-bold text-[var(--accent-color)]">
+                           Acesse no menu de Ajustes →
+                        </div>
+                    </div>
                 </div>
 
                 {/* Interface Settings */}

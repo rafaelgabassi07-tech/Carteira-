@@ -1,10 +1,9 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent } from '../types';
 import { fetchAdvancedAssetData, fetchHistoricalPrices } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics, getClosestPrice, applyThemeToDocument } from '../utils';
-import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES } from '../constants';
+import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS } from '../constants';
 
 // --- Types ---
 interface PortfolioContextType {
@@ -28,7 +27,8 @@ interface PortfolioContextType {
   importTransactions: (transactions: Transaction[]) => void;
   restoreData: (data: { transactions: Transaction[], preferences?: Partial<AppPreferences> }) => void;
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
-  setTheme: (themeId: string) => void; // New Theme Setter
+  setTheme: (themeId: string) => void;
+  setFont: (fontId: string) => void; // Nova função para fonte
   updateUserProfile: (profile: Partial<UserProfile>) => void;
   refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
   refreshAllData: () => Promise<void>;
@@ -47,7 +47,8 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(undefin
 // --- Constants ---
 const DEFAULT_PREFERENCES: AppPreferences = {
     accentColor: 'blue', systemTheme: 'system', visualStyle: 'premium', fontSize: 'medium', compactMode: false,
-    currentThemeId: 'default-dark', // Default Theme ID
+    currentThemeId: 'default-dark',
+    currentFontId: 'inter', // Fonte Padrão
     showCurrencySymbol: true, reduceMotion: false, animationSpeed: 'normal',
     startScreen: 'carteira', hapticFeedback: true, vibrationIntensity: 'medium',
     hideCents: false, privacyOnStart: false, appPin: null,
@@ -79,16 +80,25 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const sourceTransactions = useMemo(() => isDemoMode ? DEMO_TRANSACTIONS : transactions, [isDemoMode, transactions]);
   const sourceMarketData = useMemo(() => isDemoMode ? DEMO_MARKET_DATA : marketData, [isDemoMode, marketData]);
 
-  // --- Theme Management ---
+  // --- Theme & Font Management ---
   useEffect(() => {
-      // Apply theme on load and whenever it changes
       const themeId = preferences.currentThemeId || 'default-dark';
       const theme = APP_THEMES.find(t => t.id === themeId) || APP_THEMES[0];
       applyThemeToDocument(theme);
   }, [preferences.currentThemeId]);
 
+  useEffect(() => {
+      const fontId = preferences.currentFontId || 'inter';
+      const font = APP_FONTS.find(f => f.id === fontId) || APP_FONTS[0];
+      document.documentElement.style.setProperty('--font-family', font.family);
+  }, [preferences.currentFontId]);
+
   const setTheme = useCallback((themeId: string) => {
       setPreferences(prev => ({ ...prev, currentThemeId: themeId }));
+  }, [setPreferences]);
+
+  const setFont = useCallback((fontId: string) => {
+      setPreferences(prev => ({ ...prev, currentFontId: fontId }));
   }, [setPreferences]);
 
 
@@ -146,7 +156,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let hasError = false;
     
     try {
-        // Parallel execution
         const [brapiResult, geminiResult] = await Promise.allSettled([
             fetchBrapiQuotes(preferences, uniqueTickers),
             fetchAdvancedAssetData(preferences, uniqueTickers)
@@ -192,20 +201,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsRefreshing(true);
     setMarketDataError(null);
 
-    // 1. Clear all data caches from localStorage
     Object.keys(localStorage).forEach(k => {
         if (k.startsWith('cache_')) {
             localStorage.removeItem(k);
         }
     });
 
-    // 2. Clear related in-memory states that depend on cache
     setLastSync(null);
     setHistoricalPriceCache({});
 
-    // 3. Re-fetch market data. News will now require manual refresh on its own view.
     try {
-        await refreshMarketData(true, true); // force=true, silent=true
+        await refreshMarketData(true, true);
     } catch (error: any) {
         console.error("Global refresh failed:", error);
         setMarketDataError(error.message);
@@ -234,7 +240,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [preferences, setMarketData]);
 
-  // --- Derived State Calculations ---
   const assets = useMemo((): Asset[] => {
     const portfolioMetrics = calculatePortfolioMetrics(sourceTransactions);
     return Object.keys(portfolioMetrics).map((ticker: string) => {
@@ -271,7 +276,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [assets]);
   
   const getAveragePriceForTransaction = useCallback((transaction: Transaction): number => {
-    // Optimized to avoid filtering all transactions if possible, but logic remains strict
     const transactionsBefore = sourceTransactions
         .filter(t => t.ticker === transaction.ticker && new Date(t.date) <= new Date(transaction.date))
         .sort((a, b) => a.date.localeCompare(b.date));
@@ -309,7 +313,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 if (tx.type === 'Compra') quantity += tx.quantity;
                 else quantity -= tx.quantity;
             } else if (tx.date > targetDate) {
-                break; // Optimization
+                break;
             }
         }
         return quantity > EPSILON ? quantity : 0;
@@ -333,7 +337,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
     });
 
-    // Fallback to projection if no historical data is available
     if (!hasHistoricalData && !isDemoMode) {
       const today = new Date();
       for (let i = 11; i >= 0; i--) {
@@ -376,7 +379,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       const allMonths = Array.from(new Set(Object.keys(incomeMap)));
       if (allMonths.length > 0) {
-        // Create a date object from monthKey for proper sorting
         const dateSortedMonths = allMonths.sort((a, b) => {
             const [m1, y1] = a.split('/');
             const [m2, y2] = b.split('/');
@@ -388,8 +390,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       return [];
   }, [dividends]);
-
-  // --- Patrimony Evolution Logic ---
 
   const evolutionResult = useMemo(() => {
     const evolution: SegmentEvolutionData = { all_types: [] };
@@ -405,7 +405,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let currentDate = new Date(firstTxDate.getFullYear(), firstTxDate.getMonth(), 1);
     
     const portfolioState: Record<string, { quantity: number; totalCost: number }> = {};
-    const lastKnownPrices: Record<string, number> = {}; // Map to store last known prices for carry-forward
+    const lastKnownPrices: Record<string, number> = {};
     let txIndex = 0;
 
     while (currentDate <= today) {
@@ -448,11 +448,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (historicalPrice !== null) {
                 lastKnownPrices[ticker] = historicalPrice;
             } else if (lastKnownPrices[ticker]) {
-                historicalPrice = lastKnownPrices[ticker]; // Carry forward logic
+                historicalPrice = lastKnownPrices[ticker];
             } else {
                 missingPrices.push({ ticker, date: endOfMonthISO });
-                // If we really have NO history, fallback to cost basis to avoid 0 value
-                // This sets capital gain to 0 temporarily, but avoids graph crash
                 historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
             }
             
@@ -476,12 +474,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [evolutionResult.evolution]);
 
   const queriesToFetchJSON = useMemo(() => {
-      // Use a Set to ensure unique queries
       const uniqueQueries = [...new Map(evolutionResult.missingPrices.map((item: { ticker: string; date: string }) => [`${item.ticker}_${item.date}`, item])).values()];
       return JSON.stringify(uniqueQueries);
   }, [evolutionResult.missingPrices]);
 
-  // Use a ref to track if we are currently fetching to avoid duplicate calls in StrictMode
   const isFetchingHistory = useRef(false);
 
   useEffect(() => {
@@ -491,7 +487,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           isFetchingHistory.current = true;
           
           const fetchBatched = async () => {
-              // Process in small batches to avoid overwhelming the AI
               const BATCH_SIZE = 3;
               for (let i = 0; i < queriesToFetch.length; i += BATCH_SIZE) {
                   const batch = queriesToFetch.slice(i, i + BATCH_SIZE);
@@ -503,13 +498,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   } catch (e) {
                       console.warn("Failed to fetch historical prices via Gemini batch", e);
                   }
-                  // Small delay between batches to be nice to the API
                   await new Promise(resolve => setTimeout(resolve, 1200));
               }
               isFetchingHistory.current = false;
           };
 
-          // Add a debounce/delay before starting
           const timer = setTimeout(fetchBatched, 1000);
           return () => {
               clearTimeout(timer);
@@ -541,6 +534,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     restoreData,
     updatePreferences,
     setTheme,
+    setFont,
     updateUserProfile,
     refreshMarketData,
     refreshAllData,
@@ -557,7 +551,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     yieldOnCost, projectedAnnualIncome, monthlyIncome, portfolioEvolution,
     lastSync, isRefreshing, marketDataError, userProfile, 
     addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
-    updatePreferences, setTheme, updateUserProfile, refreshMarketData, refreshAllData, refreshSingleAsset,
+    updatePreferences, setTheme, setFont, updateUserProfile, refreshMarketData, refreshAllData, refreshSingleAsset,
     getAssetByTicker, getAveragePriceForTransaction, setIsDemoMode, setPrivacyMode,
     togglePrivacyMode, resetApp, clearCache
   ]);

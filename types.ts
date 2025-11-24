@@ -1,4 +1,3 @@
-
 export interface DividendHistoryEvent {
   exDate: string;
   paymentDate: string;
@@ -116,12 +115,20 @@ export interface AppTheme {
     isPremium?: boolean;
 }
 
+export interface AppFont {
+    id: string;
+    name: string;
+    family: string;
+    description: string;
+}
+
 export interface AppPreferences {
   // Appearance
-  currentThemeId: string; // Replaces simple accentColor/systemTheme for full themes
-  accentColor: AppColor; // Kept for backward compatibility or simple overrides
-  systemTheme: 'system' | 'light' | 'dark'; // Kept for backward compatibility
-  visualStyle: 'simple' | 'premium'; // New Visual Style Preference
+  currentThemeId: string;
+  currentFontId: string; // Nova preferência de fonte
+  accentColor: AppColor; // Mantido para compatibilidade
+  systemTheme: 'system' | 'light' | 'dark'; // Mantido para compatibilidade
+  visualStyle: 'simple' | 'premium';
   fontSize: 'small' | 'medium' | 'large';
   compactMode: boolean;
   showCurrencySymbol: boolean;

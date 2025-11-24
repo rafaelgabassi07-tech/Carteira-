@@ -7,17 +7,16 @@ import type { AppTheme } from '../types';
 import { vibrate } from '../utils';
 import CheckCircleIcon from '../components/icons/CheckCircleIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
-import TypeIcon from '../components/icons/TypeIcon';
 
 // --- Icons for this view ---
 const MoonIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
     </svg>
 );
 
 const SunIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <circle cx="12" cy="12" r="4" />
         <path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
     </svg>
@@ -33,18 +32,15 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
              style={{ 
                  backgroundColor: c.bgPrimary, 
                  borderColor: c.borderColor,
-                 // Add slight glow for premium preview
                  boxShadow: isPremium ? `0 10px 30px -10px ${c.accentColor}30` : 'none'
              }}>
             
-            {/* Background Gradient for Premium */}
             {isPremium && (
                 <div className="absolute inset-0 pointer-events-none" style={{
                     background: `radial-gradient(circle at 100% 0%, ${c.accentColor}20, transparent 50%), radial-gradient(circle at 0% 100%, ${c.accentColor}10, transparent 50%)`
                 }}></div>
             )}
 
-            {/* Simulated Status Bar */}
             <div className="h-6 w-full flex items-center justify-between px-4 z-10" style={{ backgroundColor: isPremium ? 'transparent' : c.bgPrimary }}>
                 <div className="w-8 h-2 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
                 <div className="flex gap-1">
@@ -53,7 +49,6 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
                 </div>
             </div>
 
-            {/* Header */}
             <div className={`pt-2 pb-3 px-4 flex justify-between items-center z-10 ${isPremium ? 'backdrop-blur-md' : ''}`} 
                  style={{ 
                      borderBottom: `1px solid ${c.borderColor}`,
@@ -66,10 +61,8 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
                 <div className="w-8 h-8 rounded-full opacity-20" style={{ backgroundColor: c.textSecondary }}></div>
             </div>
 
-            {/* Content Scroll */}
             <div className="flex-1 p-4 flex flex-col gap-3 relative overflow-hidden z-0">
                 
-                {/* Summary Card with Chart */}
                 <div className={`w-full rounded-xl p-3 relative overflow-hidden flex flex-col justify-between h-28 ${isPremium ? 'shadow-lg' : 'shadow-sm'}`}
                      style={{ 
                          background: isPremium 
@@ -89,13 +82,11 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
                         <div className="h-2 w-14 rounded-full opacity-80" style={{ backgroundColor: c.greenText }}></div>
                     </div>
 
-                    {/* Abstract Chart Background */}
                     <svg className="absolute bottom-0 right-0 w-full h-20 opacity-20" preserveAspectRatio="none" viewBox="0 0 100 50">
                         <path d="M0 50 L0 30 L20 40 L40 20 L60 35 L80 10 L100 25 L100 50 Z" fill={c.accentColor} />
                     </svg>
                 </div>
 
-                {/* Asset List */}
                 <div className="flex flex-col gap-2 mt-1">
                     {[1, 2].map((i) => (
                         <div key={i} className="h-12 w-full rounded-lg flex items-center px-2 gap-3" 
@@ -119,7 +110,6 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
                 </div>
             </div>
 
-            {/* Bottom Nav */}
             <div className={`h-12 w-full flex justify-around items-center px-2 z-10 ${isPremium ? 'backdrop-blur-md' : ''}`} 
                  style={{ 
                      backgroundColor: isPremium ? `${c.bgSecondary}CC` : c.bgSecondary, 
@@ -137,14 +127,12 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { t } = useI18n();
     const { preferences, setTheme, updatePreferences } = usePortfolio();
     
-    // Initialize filter based on the currently active theme type
     const activeThemeData = useMemo(() => 
         APP_THEMES.find(t => t.id === preferences.currentThemeId) || APP_THEMES[0], 
     [preferences.currentThemeId]);
 
     const [filter, setFilter] = useState<'dark' | 'light'>(activeThemeData.type);
 
-    // Update filter if theme changes externally or on first load (to match current theme)
     useEffect(() => {
         setFilter(activeThemeData.type);
     }, [activeThemeData.type]);
@@ -156,13 +144,11 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     return (
         <div className="h-full flex flex-col">
             <div className="flex-shrink-0">
-                <PageHeader title={t('theme_store')} onBack={onBack} helpText={t('theme_store_desc')} />
+                <PageHeader title={t('theme_gallery')} onBack={onBack} helpText={t('theme_gallery_desc')} />
             </div>
 
-            {/* Content */}
             <div className="overflow-y-auto custom-scrollbar pb-24 md:pb-6 px-1 relative">
                 
-                {/* Hero: Active Theme */}
                 <div className="mb-6 animate-fade-in">
                     <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1">{t('applied')}</h3>
                     <div className="bg-[var(--bg-secondary)] rounded-3xl p-4 border border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/10 relative overflow-hidden">
@@ -186,10 +172,8 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </div>
                 </div>
 
-                {/* Sticky Filter & Visual Style Header */}
                 <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)] -mx-1 px-1 py-3 mb-6 transition-colors duration-300 flex flex-col gap-3">
                     
-                    {/* Row 1: Dark/Light Filter */}
                     <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm">
                         <button
                             onClick={() => { setFilter('dark'); vibrate(); }}
@@ -207,7 +191,6 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         </button>
                     </div>
 
-                    {/* Row 2: Visual Style & Font Size */}
                     <div className="flex items-center justify-between px-1">
                         <div className="flex items-center gap-2 text-[var(--text-secondary)]">
                             <SparklesIcon className="w-4 h-4" />
@@ -228,36 +211,8 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                              </button>
                         </div>
                     </div>
-                    
-                     <div className="flex items-center justify-between px-1 pb-1">
-                        <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                            <TypeIcon className="w-4 h-4" />
-                            <span className="text-xs font-bold uppercase tracking-wider">{t('text_size')}</span>
-                        </div>
-                        <div className="flex bg-[var(--bg-secondary)] p-0.5 rounded-lg border border-[var(--border-color)]">
-                             <button 
-                                onClick={() => { updatePreferences({ fontSize: 'small' }); vibrate(); }}
-                                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.fontSize === 'small' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
-                             >
-                                 Aa
-                             </button>
-                             <button 
-                                onClick={() => { updatePreferences({ fontSize: 'medium' }); vibrate(); }}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${preferences.fontSize === 'medium' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
-                             >
-                                 Aa
-                             </button>
-                             <button 
-                                onClick={() => { updatePreferences({ fontSize: 'large' }); vibrate(); }}
-                                className={`px-3 py-1 text-sm font-bold rounded-md transition-all ${preferences.fontSize === 'large' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
-                             >
-                                 Aa
-                             </button>
-                        </div>
-                    </div>
                 </div>
 
-                {/* Grid */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {filteredThemes.filter(t => t.id !== preferences.currentThemeId).map((theme, idx) => (
                         <div 

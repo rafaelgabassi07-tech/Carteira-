@@ -16,20 +16,31 @@ export const ptBR = {
     font_small: 'Pequeno',
     font_medium: 'Padrão',
     font_large: 'Grande',
-    text_size: 'Texto', // New
+    text_size: 'Tamanho',
+    
+    // Typography (New Section)
+    typography: 'Tipografia',
+    typography_desc: 'Personalize a fonte e o tamanho do texto.',
+    font_family: 'Fonte',
+    font_inter_desc: 'Moderna e versátil, ideal para interfaces.',
+    font_lora_desc: 'Serifada e elegante, para um visual clássico.',
+    font_roboto_mono_desc: 'Técnica e precisa, ótima para números.',
+    font_poppins_desc: 'Geométrica e amigável, com um toque moderno.',
+    font_lato_desc: 'Humanista e clara, excelente para leitura longa.',
+    font_source_code_pro_desc: 'Monoespaçada otimizada para código e dados.',
     
     // Interface Settings (New)
     ui_interface: 'Interface do Usuário',
     compact_mode: 'Modo Compacto',
     show_currency: 'Símbolo da Moeda (R$)',
     reduce_motion: 'Reduzir Movimento',
-    customize_colors_fonts: 'Personalizar Cores e Fontes',
-    open_theme_store_desc: 'Acesse a galeria completa de temas, estilos visuais e tamanhos de texto.',
+    customize_colors_fonts: 'Personalizar Aparência',
+    open_theme_store_desc: 'Acesse a galeria de temas e acabamentos visuais.',
     
     // Theme Store
-    theme_store: 'Loja de Temas',
-    theme_store_desc: 'Personalize cores, acabamento e tipografia.',
-    open_theme_store: 'Abrir Loja de Temas',
+    theme_gallery: 'Galeria de Temas', // Renamed
+    theme_gallery_desc: 'Personalize com cores e acabamentos exclusivos.', // Renamed
+    open_theme_gallery: 'Abrir Galeria de Temas', // Renamed
     filter_all: 'Todos',
     filter_dark: 'Escuros',
     filter_light: 'Claros',

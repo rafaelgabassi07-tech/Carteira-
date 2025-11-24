@@ -64,7 +64,6 @@ const App: React.FC = () => {
     }
   }, [marketDataError, addToast, t]);
   
-  // Theme & Visual Style Management
   useEffect(() => {
     const applyTheme = () => {
         let themeToApply = preferences.systemTheme;
@@ -241,7 +240,7 @@ const App: React.FC = () => {
   const isPremium = preferences.visualStyle === 'premium';
 
   return (
-    <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout selection:bg-[var(--accent-color)] selection:text-[var(--accent-color-text)]">
+    <div className="bg-[var(--bg-primary)] min-h-screen text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout selection:bg-[var(--accent-color)] selection:text-[var(--accent-color-text)]">
        <OfflineBanner />
        
        <aside className={`hidden md:flex flex-col w-64 xl:w-72 flex-shrink-0 z-20 mobile-landscape-sidebar transition-all duration-300

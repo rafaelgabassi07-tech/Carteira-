@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { ToastMessage } from '../types';
 import { useI18n } from '../contexts/I18nContext';
@@ -18,8 +17,9 @@ import UpdateCheckModal from '../components/modals/UpdateCheckModal';
 import GlossaryView from './GlossaryView';
 import CalculatorsView from './CalculatorsView';
 import ThemeStoreView from './ThemeStoreView';
+import FontGalleryView from './FontGalleryView'; // Nova importação
 
-export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections' | 'glossary' | 'calculators' | 'themeStore';
+export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections' | 'glossary' | 'calculators' | 'themeGallery' | 'fontGallery';
 
 interface SettingsViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
@@ -31,12 +31,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const { t } = useI18n();
 
-    // Ensure that on large screens we default to a content view instead of empty state
     const activeDesktopScreen = screen === 'main' ? 'appearance' : screen;
 
-    const getScreenComponent = (currentScreen: MenuScreen, isDesktop = false) => {
-        // On desktop, we don't need the 'back' action to navigate, but we pass it for type compatibility.
-        // The PageHeader component handles hiding the back button visually on desktop.
+    const getScreenComponent = (currentScreen: MenuScreen) => {
         const onBack = () => setScreen('main');
         
         switch (currentScreen) {
@@ -52,7 +49,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
             case 'about': return <AboutApp onBack={onBack} />;
             case 'glossary': return <GlossaryView onBack={onBack} />;
             case 'calculators': return <CalculatorsView onBack={onBack} />;
-            case 'themeStore': return <ThemeStoreView onBack={onBack} />;
+            case 'themeGallery': return <ThemeStoreView onBack={onBack} />;
+            case 'fontGallery': return <FontGalleryView onBack={onBack} />;
             default: return <MainMenu setScreen={setScreen} activeScreen={screen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
         }
     };
@@ -62,13 +60,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
     return (
         <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6">
              <div className="max-w-7xl mx-auto h-full">
-                {/* Header only visible on mobile main screen or if we want a global title */}
                 <h1 className="text-2xl font-bold mb-6 px-1 animate-fade-in lg:mb-8">{t('nav_settings')}</h1>
                 
-                {/* Responsive Grid Layout */}
                 <div className="lg:grid lg:grid-cols-12 lg:gap-8 h-full">
                     
-                    {/* Sidebar (Menu) - Hidden on mobile if showing detail, Always visible on Desktop */}
                     <div className={`lg:col-span-4 lg:block ${screen !== 'main' ? 'hidden' : 'block'}`}>
                         <div className="lg:sticky lg:top-0">
                             <MainMenu 
@@ -80,13 +75,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
                         </div>
                     </div>
 
-                    {/* Content Area - Hidden on mobile if showing menu, Always visible on Desktop */}
                     <div className={`lg:col-span-8 lg:block ${screen === 'main' ? 'hidden' : 'block'}`}>
                         <div className={`bg-[var(--bg-secondary)]/50 lg:bg-[var(--bg-secondary)] lg:border border-[var(--border-color)] lg:p-8 lg:rounded-3xl lg:shadow-sm h-full ${animationClass} lg:animate-fade-in`}>
-                            {/* On desktop, force render the active component or default. On mobile, render based on screen state */}
-                            {/* We use a key to force re-render animation when switching tabs on desktop */}
                             <div key={activeDesktopScreen}>
-                                {getScreenComponent(window.innerWidth >= 1024 ? activeDesktopScreen : screen, window.innerWidth >= 1024)}
+                                {getScreenComponent(window.innerWidth >= 1024 ? activeDesktopScreen : screen)}
                             </div>
                         </div>
                     </div>
