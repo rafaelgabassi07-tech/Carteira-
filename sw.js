@@ -1,8 +1,7 @@
-const CACHE_NAME = 'invest-portfolio-cache-v1.6.0';
+const CACHE_NAME = 'invest-portfolio-cache-v1.6.1';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/index.tsx',
   '/manifest.json',
   'https://cdn-icons-png.flaticon.com/512/5556/5556468.png'
 ];
@@ -24,6 +23,7 @@ self.addEventListener('fetch', event => {
         if (response) {
           return response;
         }
+        // Stale-while-revalidate strategy for other requests could be implemented here
         return fetch(event.request);
       }
     )

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Transaction, TransactionType, ToastMessage } from '../types';
 import FloatingActionButton from '../components/FloatingActionButton';
@@ -10,11 +9,18 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate, getTodayISODate } from '../utils';
 import VirtualList from '../components/VirtualList';
 
-// Tipo auxiliar para a lista virtualizada (cabeçalho de data ou transação)
+// Tipo auxiliar para a lista virtualizada
 type VirtualItem = 
   | { type: 'header'; monthYear: string }
   | { type: 'transaction'; data: Transaction };
 
+interface TransactionsViewProps {
+    initialFilter: string | null;
+    clearFilter: () => void;
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+}
+
+// ... TransactionModal Component (Mantido igual, omitido para brevidade) ...
 const TransactionModal: React.FC<{ 
     onClose: () => void; 
     onSave: (tx: Omit<Transaction, 'id'> & { id?: string }) => void; 
@@ -193,10 +199,10 @@ const TransactionItem = React.memo<{
     }
 
     return (
-        <div onClick={() => { onEdit(transaction); vibrate(); }} style={style} className="bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-0.5 relative group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-[88px] box-border">
-            <div className="flex items-center justify-between pr-10">
+        <div onClick={() => { onEdit(transaction); vibrate(); }} style={style} className="bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-0.5 group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full flex flex-col justify-center">
+            <div className="flex items-center justify-between pr-8">
                 <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm ${isBuy ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0 ${isBuy ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
                         {isBuy ? t('buy_short') : t('sell_short')}
                     </div>
                     <div>
@@ -216,17 +222,17 @@ const TransactionItem = React.memo<{
                 </div>
             </div>
             
-             <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1">
+             <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button 
                     onClick={(e) => { e.stopPropagation(); onEdit(transaction); vibrate(); }}
-                    className="p-2 text-gray-400 hover:text-[var(--accent-color)] hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
+                    className="p-1.5 text-gray-400 hover:text-[var(--accent-color)] hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
                     aria-label={t('edit_transaction')}
                 >
                     <EditIcon className="w-4 h-4" />
                 </button>
                 <button 
                     onClick={handleDelete}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
                     aria-label={t('delete')}
                 >
                     <TrashIcon className="w-4 h-4" />
@@ -235,12 +241,6 @@ const TransactionItem = React.memo<{
         </div>
     );
 });
-
-interface TransactionsViewProps {
-    initialFilter: string | null;
-    clearFilter: () => void;
-    addToast: (message: string, type?: ToastMessage['type']) => void;
-}
 
 const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clearFilter, addToast }) => {
     const { t, locale, formatCurrency } = useI18n();
@@ -284,7 +284,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         });
     }, [filter, transactions, searchQuery, dateRange]);
 
-    // Preparar lista plana para a VirtualList (Substitui o agrupamento antigo)
+    // Flattened list for virtualization
     const virtualItems = useMemo<VirtualItem[]>(() => {
         const sorted = [...filteredTransactions].sort((a, b) => b.date.localeCompare(a.date));
         const items: VirtualItem[] = [];
@@ -340,17 +340,24 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         }
     };
 
-    // Render Function para VirtualList
+    // Function to determine item height based on index/type
+    const getItemHeight = (index: number) => {
+        const item = virtualItems[index];
+        return item.type === 'header' ? 40 : 104; // 40px for header, 104px for transaction card
+    };
+
     const renderVirtualItem = (item: VirtualItem) => {
         if (item.type === 'header') {
             return (
-                <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-2 mt-4 uppercase tracking-widest px-1 sticky top-0 z-10 bg-[var(--bg-primary)]/90 backdrop-blur-sm py-2">
-                    {item.monthYear}
-                </h2>
+                <div className="h-10 flex items-end pb-2 px-1">
+                    <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
+                        {item.monthYear}
+                    </h2>
+                </div>
             );
         }
         return (
-            <div className="mb-3">
+            <div className="h-[104px] pb-3">
                 <TransactionItem 
                     transaction={item.data} 
                     onEdit={setEditingTx} 
@@ -425,7 +432,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                         <VirtualList 
                             items={virtualItems} 
                             renderItem={renderVirtualItem} 
-                            itemHeight={100} // Altura aproximada
+                            getItemHeight={getItemHeight}
                             containerHeight="100%"
                         />
                     </div>

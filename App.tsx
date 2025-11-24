@@ -4,11 +4,12 @@ import PortfolioView from './views/PortfolioView';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
-import LoadingSpinner from './components/LoadingSpinner'; // Novo spinner
+import LoadingSpinner from './components/LoadingSpinner';
 import type { ToastMessage } from './types';
 import { usePortfolio } from './contexts/PortfolioContext';
 import { useI18n } from './contexts/I18nContext';
 import { isLowEndDevice } from './utils';
+import type { MenuScreen } from './views/SettingsView';
 
 // Icons for Sidebar
 import WalletIcon from './components/icons/WalletIcon';
@@ -17,9 +18,7 @@ import NewsIcon from './components/icons/NewsIcon';
 import AnalysisIcon from './components/icons/AnalysisIcon';
 import SettingsIcon from './components/icons/SettingsIcon';
 
-// Code Splitting: Carregamento sob demanda
-// PortfolioView é mantido estático para carregamento imediato da Home
-// As outras telas são carregadas apenas quando necessárias
+// Lazy Load Views
 const NewsView = React.lazy(() => import('./views/NewsView'));
 const SettingsView = React.lazy(() => import('./views/SettingsView'));
 const TransactionsView = React.lazy(() => import('./views/TransactionsView'));
@@ -39,7 +38,7 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [transactionFilter, setTransactionFilter] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-  const [settingsStartScreen, setSettingsStartScreen] = useState<any>('main');
+  const [settingsStartScreen, setSettingsStartScreen] = useState<MenuScreen>('main');
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
@@ -76,9 +75,8 @@ const App: React.FC = () => {
     };
     applyTheme();
     
-    // Detecção de hardware para otimização
     if (isLowEndDevice() && preferences.visualStyle === 'premium') {
-        document.documentElement.dataset.style = 'simple'; // Força modo simples em celulares fracos
+        document.documentElement.dataset.style = 'simple';
     } else {
         document.documentElement.dataset.style = preferences.visualStyle || 'premium';
     }
@@ -91,7 +89,6 @@ const App: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [preferences.systemTheme, preferences.visualStyle]);
   
-  // Font Size Management
   useEffect(() => {
       const root = document.documentElement;
       root.classList.remove('text-sm', 'text-base', 'text-lg');
@@ -190,7 +187,7 @@ const App: React.FC = () => {
     setActiveView(view);
   };
 
-  const navigateToSettings = (screen: any) => {
+  const navigateToSettings = (screen: MenuScreen) => {
       setSettingsStartScreen(screen);
       setActiveView('settings');
   };
@@ -295,7 +292,6 @@ const App: React.FC = () => {
        <main className="flex-1 h-screen relative flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-hidden bg-[var(--bg-primary)] relative">
             <ErrorBoundary>
-              {/* Suspense para carregar Views assincronamente */}
               <Suspense fallback={<LoadingSpinner />}>
                   <div className="view-container h-full animate-subtle-fade-in" key={activeView}>
                     {renderView()}
