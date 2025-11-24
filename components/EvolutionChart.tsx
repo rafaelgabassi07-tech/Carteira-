@@ -137,8 +137,8 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                     const marketH = (d.marketValue / maxValue) * chartHeight;
                     
                     // Logic for "Gain Stacking"
-                    // Base Bar: Represents the Invested Amount (Cost) - Darker/Neutral Color
-                    // Top Bar: Represents Gain (Market Value - Invested) - Vibrant Color
+                    // Base Bar: Represents the Invested Amount (Cost) - 30% Opacity Accent Color
+                    // Top Bar: Represents Gain (Market Value - Invested) - Solid Accent Color
                     
                     const gain = d.marketValue - d.invested;
                     
@@ -150,9 +150,8 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                                 y={yBase - investedH} 
                                 width={barWidth} 
                                 height={investedH} 
-                                fill="var(--bg-tertiary-hover)" // Darker, more neutral for base
-                                stroke="var(--border-color)"
-                                strokeWidth="1"
+                                fill="var(--accent-color)" 
+                                fillOpacity="0.3"
                                 rx={2}
                             />
                             
@@ -163,7 +162,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
                                     y={yBase - marketH} // Starts at top of Market Value
                                     width={barWidth}
                                     height={marketH - investedH} // Height is the difference (Gain)
-                                    fill="var(--accent-color)" // Vibrant for gain
+                                    fill="var(--accent-color)" // Solid Vibrant for gain
                                     rx={2}
                                     className="animate-grow-up"
                                     style={{ transformOrigin: `center ${yBase - investedH}px` }}
@@ -218,7 +217,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data }) => {
 
                     {/* Invested (Base) */}
                     <div className="flex items-center gap-3 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-[var(--text-secondary)]" />
+                        <div className="w-2 h-2 rounded-full bg-[var(--accent-color)] opacity-30" />
                         <span className="text-[var(--text-secondary)]">{t('invested_amount')}</span>
                         <span className="font-bold text-sm ml-auto text-[var(--text-secondary)]">{formatCurrency(tooltip.point.invested)}</span>
                     </div>
