@@ -47,7 +47,7 @@ const MetricItem: React.FC<{ label: string; value: string | number; subValue?: s
 
 const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onViewTransactions }) => {
     const { t, formatCurrency, locale } = useI18n();
-    const { getAssetByTicker, transactions, refreshSingleAsset, dividends } = usePortfolio();
+    const { getAssetByTicker, transactions, refreshSingleAsset } = usePortfolio();
     const [activeTab, setActiveTab] = useState('summary');
     const [isRefreshing, setIsRefreshing] = useState(true);
     
@@ -68,13 +68,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
 
     useEffect(() => {
         const initialLoad = async () => {
-             // Se o ativo já tem dados (ex: preço > 0), não atualiza automaticamente.
-             // Só atualiza se for a primeira vez que carrega dados para este ticker.
-             if (asset && asset.currentPrice > 0) {
-                 setIsRefreshing(false);
-                 return;
-             }
-
              setIsRefreshing(true);
              try {
                 await refreshSingleAsset(ticker);
@@ -83,21 +76,11 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
              }
         };
         initialLoad();
-    }, [ticker, refreshSingleAsset, asset]); // Dependência 'asset' permite revalidar se for null inicialmente
+    }, [ticker, refreshSingleAsset]);
 
     const assetTransactions = useMemo(() => {
         return transactions.filter(tx => tx.ticker === asset?.ticker).sort((a, b) => b.date.localeCompare(a.date));
     }, [transactions, asset?.ticker]);
-
-    const assetDividends = useMemo(() => {
-        return dividends
-            .filter(d => d.ticker === ticker)
-            .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
-    }, [dividends, ticker]);
-
-    const totalDividendsReceived = useMemo(() => {
-        return assetDividends.reduce((acc, div) => acc + (div.quantity * div.amountPerShare), 0);
-    }, [assetDividends]);
 
     if (!asset && !isRefreshing) {
         return (
@@ -118,7 +101,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
 
     return (
         <div className="p-4 pb-20 landscape-pb-6">
-            <div className="max-w-6xl mx-auto">
+            <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center">
                         <button 
@@ -131,28 +114,22 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         <h2 className="text-2xl font-bold tracking-tight">{ticker}</h2>
                     </div>
                     <button onClick={handleRefresh} disabled={isRefreshing} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
-                        <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <RefreshIcon className={`w-6 h-6 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
                 
-                <div className="flex border-b border-[var(--border-color)] mb-4 overflow-x-auto no-scrollbar">
+                <div className="flex border-b border-[var(--border-color)] mb-4">
                     <button
                         onClick={() => setActiveTab('summary')}
-                        className={`pb-2 px-4 text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'summary' ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        className={`pb-2 px-4 text-sm font-bold transition-colors ${activeTab === 'summary' ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
                         {t('summary')}
                     </button>
                     <button
                         onClick={() => setActiveTab('history')}
-                        className={`pb-2 px-4 text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'history' ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        className={`pb-2 px-4 text-sm font-bold transition-colors ${activeTab === 'history' ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
                         {t('history')}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('dividends')}
-                        className={`pb-2 px-4 text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'dividends' ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                    >
-                        {t('dividends_received')}
                     </button>
                 </div>
                 
@@ -185,7 +162,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                              </div>
                              
                              {isRefreshing || !asset ? <IndicatorSkeleton /> : (
-                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     <MetricItem label={t('quantity')} value={asset.quantity} className="animate-fade-in-up" style={{animationDelay: '0ms'}}/>
                                     <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} className="animate-fade-in-up" style={{animationDelay: '50ms'}}/>
                                     <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} className="animate-fade-in-up" style={{animationDelay: '100ms'}}/>
@@ -210,7 +187,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                     />
 
                                     {/* Analysis Section Header */}
-                                    <div className="col-span-full mt-4 mb-1 flex items-center gap-2">
+                                    <div className="col-span-2 sm:col-span-3 mt-4 mb-1 flex items-center gap-2">
                                         <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
                                         <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('nav_analysis')} & {t('data')}</span>
                                         <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
@@ -250,57 +227,20 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 )}
                 {activeTab === 'history' && (
                     <div className="space-y-3 animate-fade-in pb-4">
-                        {assetTransactions.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {assetTransactions.map((tx, index) => (
-                                    <div key={tx.id} className="bg-[var(--bg-secondary)] p-4 rounded-xl text-sm border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${index * 50}ms`}}>
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className={`font-bold text-base mb-0.5 ${tx.type === 'Compra' ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{t(tx.type === 'Compra' ? 'buy' : 'sell')}</p>
-                                                <p className="text-xs text-[var(--text-secondary)] font-medium">{new Date(tx.date).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="font-bold text-[var(--text-primary)]">{formatCurrency(tx.quantity * tx.price)}</p>
-                                                <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{`${tx.quantity} × ${formatCurrency(tx.price)}`}</p>
-                                            </div>
-                                        </div>
+                        {assetTransactions.length > 0 ? assetTransactions.map((tx, index) => (
+                            <div key={tx.id} className="bg-[var(--bg-secondary)] p-4 rounded-xl text-sm border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${index * 50}ms`}}>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className={`font-bold text-base mb-0.5 ${tx.type === 'Compra' ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{t(tx.type === 'Compra' ? 'buy' : 'sell')}</p>
+                                        <p className="text-xs text-[var(--text-secondary)] font-medium">{new Date(tx.date).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
                                     </div>
-                                ))}
-                            </div>
-                        ) : <p className="text-sm text-center text-[var(--text-secondary)] py-12">{t('no_transactions_for_asset')}</p>}
-                    </div>
-                )}
-                {activeTab === 'dividends' && (
-                    <div className="space-y-4 animate-fade-in pb-4">
-                        {assetDividends.length > 0 && (
-                            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] shadow-sm flex justify-between items-center">
-                                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('total_dividends_received')}</span>
-                                <span className="text-xl font-bold text-[var(--green-text)]">{formatCurrency(totalDividendsReceived)}</span>
-                            </div>
-                        )}
-
-                        {assetDividends.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {assetDividends.map((div, index) => (
-                                    <div key={index} className="bg-[var(--bg-secondary)] p-4 rounded-xl text-sm border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${index * 50}ms`}}>
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="font-bold text-base text-[var(--text-primary)] mb-0.5">{new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
-                                                <p className="text-xs text-[var(--text-secondary)] font-medium">{t('shares', { count: div.quantity })}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="font-bold text-[var(--green-text)]">+{formatCurrency(div.quantity * div.amountPerShare)}</p>
-                                                <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{formatCurrency(div.amountPerShare)} {t('per_share')}</p>
-                                            </div>
-                                        </div>
+                                    <div className="text-right">
+                                        <p className="font-bold text-[var(--text-primary)]">{formatCurrency(tx.quantity * tx.price)}</p>
+                                        <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{`${tx.quantity} × ${formatCurrency(tx.price)}`}</p>
                                     </div>
-                                ))}
+                                </div>
                             </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <p className="text-sm text-[var(--text-secondary)]">{t('no_dividends_for_asset')}</p>
-                            </div>
-                        )}
+                        )) : <p className="text-sm text-center text-[var(--text-secondary)] py-12">{t('no_transactions_for_asset')}</p>}
                     </div>
                 )}
             </div>

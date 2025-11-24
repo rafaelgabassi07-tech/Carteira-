@@ -141,7 +141,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                         className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors"
                         aria-label="Configurações"
                     >
-                        <SettingsIcon className="w-5 h-5" />
+                        <SettingsIcon className="w-6 h-6" />
                     </button>
                     {notifications.some(n => !n.read) && (
                         <button onClick={markAllAsRead} className="text-xs bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold px-3 py-1.5 rounded-lg flex items-center whitespace-nowrap">

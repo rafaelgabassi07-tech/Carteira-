@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -5,8 +6,6 @@ import StarIcon from '../components/icons/StarIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import FilterIcon from '../components/icons/FilterIcon';
-import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
-import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
@@ -15,56 +14,17 @@ import { CACHE_TTL } from '../constants';
 const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
     const { t } = useI18n();
     const sentimentMap = {
-        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-300 border-gray-500/30' },
-        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
+        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400' },
+        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400' },
     };
     const sentimentData = sentiment ? sentimentMap[sentiment] : null;
     if (!sentimentData) return null;
     return (
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border backdrop-blur-md ${sentimentData.color}`}>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sentimentData.color}`}>
             {sentimentData.text}
         </span>
     );
-};
-
-// --- Helpers ---
-const getFavicon = (url: string) => {
-    try {
-        if (!url) return '';
-        const domain = new URL(url).hostname;
-        return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-    } catch { return ''; }
-};
-
-const getFallbackImage = (title: string) => {
-    const images = [
-        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80', // Building Glass
-        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80', // Chart
-        'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80', // Keys
-        'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=800&q=80', // Meeting
-        'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=800&q=80', // Model House
-        'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&w=800&q=80', // Money Plant
-        'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=800&q=80', // Stock Screen
-        'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=800&q=80', // Meeting 2
-    ];
-    
-    let hash = 0;
-    for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
-    return images[Math.abs(hash) % images.length];
-};
-
-const timeAgo = (dateString: string) => {
-    try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return "Recente";
-        const now = new Date();
-        const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-        
-        if (seconds < 3600) return "Recente";
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-        return `${Math.floor(seconds / 86400)}d`;
-    } catch { return "Recente"; }
 };
 
 const NewsCard: React.FC<{ 
@@ -74,11 +34,10 @@ const NewsCard: React.FC<{
   addToast: (message: string, type?: ToastMessage['type']) => void;
 }> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
   const { t } = useI18n();
-  const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    e.preventDefault();
     vibrate();
     const shareData = {
         title: article.title,
@@ -92,251 +51,79 @@ const NewsCard: React.FC<{
            addToast(t('toast_share_not_supported'), 'error');
         }
     } catch (err) {
-       // User cancelled
+       // addToast(t('toast_share_cancelled'), 'info');
     }
   };
 
   const handleFavorite = (e: React.MouseEvent) => {
       e.stopPropagation();
-      e.preventDefault();
       vibrate(20);
       onToggleFavorite();
   }
 
   return (
-    <a 
-        href={article.url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="relative rounded-2xl overflow-hidden block h-72 group shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-[var(--border-color)] active:scale-[0.98]"
-    >
-        {/* Background Image */}
-        <div className="absolute inset-0 bg-[var(--bg-secondary)]">
-            <img 
-                src={imgSrc} 
-                alt={article.title}
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                onError={() => setImgSrc(getFallbackImage(article.title))}
-            />
-        </div>
-
-        {/* Gradient Overlay - Stronger at bottom for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 z-10"></div>
-
-        {/* Content */}
-        <div className="absolute inset-0 p-5 flex flex-col justify-between z-20">
-            
-            {/* Top Row: Source & Actions */}
-            <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/10 shadow-sm">
-                    <img src={getFavicon(article.url || '')} className="w-3.5 h-3.5 rounded-sm bg-white/20" onError={(e) => e.currentTarget.style.display = 'none'} />
-                    <span className="text-[10px] font-bold text-white uppercase tracking-wider max-w-[120px] truncate">{article.source}</span>
-                </div>
-                
-                <div className="flex gap-2">
-                    <button onClick={handleFavorite} className={`p-2 rounded-full backdrop-blur-md transition-all ${isFavorited ? 'bg-yellow-500/20 text-yellow-400' : 'bg-black/30 text-white/70 hover:bg-black/50 hover:text-white'}`}>
-                        <StarIcon filled={isFavorited} className="w-4 h-4" />
-                    </button>
-                    <button onClick={handleShare} className="p-2 rounded-full bg-black/30 backdrop-blur-md text-white/70 hover:bg-black/50 hover:text-white transition-all">
-                        <ShareIcon className="w-4 h-4" />
-                    </button>
-                </div>
+    <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col">
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs text-[var(--accent-color)] font-semibold mb-1">{article.source}</p>
+              <h3 className="text-sm font-bold mr-16 leading-tight">{article.title}</h3>
             </div>
-
-            {/* Bottom Row: Title, Summary, Metadata */}
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                    <SentimentBadge sentiment={article.sentiment} />
-                    <span className="text-[10px] text-gray-300 font-medium">• {timeAgo(article.date)}</span>
-                </div>
-
-                <h3 className="text-lg font-extrabold text-white leading-snug line-clamp-3 drop-shadow-lg tracking-tight">
-                    {article.title}
-                </h3>
-                
-                <div className="flex items-center text-[var(--accent-color)] text-xs font-bold group-hover:translate-x-1 transition-transform duration-300 mt-1">
-                    {t('read_more')} <ChevronRightIcon className="w-4 h-4" />
-                </div>
+             <div className="absolute top-2 right-1 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-lg p-0.5">
+               <button
+                  onClick={handleShare}
+                  className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
+                  aria-label={t('share_news')}
+              >
+                  <ShareIcon className="w-4 h-4" />
+              </button>
+              <div className="w-px h-4 bg-[var(--border-color)] mx-0.5"></div>
+              <button
+                  onClick={handleFavorite}
+                  className={`p-2 rounded-full transition-all active:scale-90 ${isFavorited ? 'text-yellow-400 scale-110' : 'text-gray-400 hover:text-yellow-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
+              >
+                  <StarIcon filled={isFavorited} className="w-4 h-4" />
+              </button>
             </div>
         </div>
-    </a>
+        
+        <p className={`text-xs text-[var(--text-secondary)] mt-3 transition-[max-height] duration-500 ease-in-out overflow-hidden leading-relaxed ${isExpanded ? 'max-h-96' : 'max-h-14'}`}>
+          {article.summary}
+        </p>
+
+        <div className="flex justify-between items-center mt-auto pt-3 border-t border-[var(--border-color)]">
+          <div className="flex items-center space-x-3">
+            <SentimentBadge sentiment={article.sentiment} />
+             {article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">{t('view_original')}</a> : <span className="text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider opacity-50">{t('view_original')}</span>}
+          </div>
+          <button onClick={() => setIsExpanded(!isExpanded)} className="text-[var(--accent-color)] text-xs font-bold hover:underline">
+                {isExpanded ? t('read_less') : t('read_more')}
+            </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
-// --- Components ---
-
-const NewsHeroItem: React.FC<{ article: NewsArticle }> = ({ article }) => {
-    const [imgSrc, setImgSrc] = useState(article.imageUrl || getFallbackImage(article.title));
-
-    return (
-        <a 
-            href={article.url} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="group relative w-full h-full block rounded-3xl overflow-hidden shadow-lg border border-[var(--border-color)] cursor-pointer snap-center"
-        >
-            {/* Image Container */}
-            <div className="absolute inset-0 bg-[var(--bg-secondary)]">
-                <img 
-                    src={imgSrc} 
-                    alt={article.title}
-                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                    loading="eager"
-                    onError={() => setImgSrc(getFallbackImage(article.title))}
-                />
-            </div>
-
-            {/* Enhanced Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-[#020617]/70 to-transparent opacity-95 z-10"></div>
-            
-            {/* Top Gradient for Badge Visibility */}
-            <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black/60 to-transparent z-10"></div>
-
-            {/* Content Container */}
-            <div className="absolute inset-0 p-6 flex flex-col justify-between z-20">
-                
-                {/* Header Badge */}
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/10 shadow-sm">
-                        <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
-                             <img src={getFavicon(article.url || '')} className="w-4 h-4" onError={(e) => e.currentTarget.style.display = 'none'} />
-                        </div>
-                        <span className="text-white text-[10px] font-extrabold uppercase tracking-widest text-shadow-sm">{article.source}</span>
-                    </div>
-                </div>
-
-                {/* Main Text */}
-                <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2 text-gray-300">
-                        <span className="text-[10px] font-bold bg-white/10 px-2 py-0.5 rounded text-gray-200">{timeAgo(article.date)}</span>
-                        <div className="h-1 w-1 rounded-full bg-gray-500"></div>
-                        <SentimentBadge sentiment={article.sentiment} />
-                    </div>
-
-                    <h2 className="text-xl md:text-3xl font-black text-white leading-[1.1] tracking-tight line-clamp-3 drop-shadow-md group-hover:text-[var(--accent-color)] transition-colors duration-300">
-                        {article.title}
-                    </h2>
-                    
-                    <p className="text-gray-300 text-xs md:text-sm line-clamp-2 font-medium leading-relaxed max-w-[90%] opacity-90">
-                        {article.summary}
-                    </p>
-
-                    {/* Read Button */}
-                    <div className="mt-2 flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-[var(--accent-color)] flex items-center justify-center text-[var(--accent-color-text)] shadow-lg shadow-[var(--accent-color)]/30 group-hover:scale-110 transition-transform duration-300">
-                            <ChevronRightIcon className="w-5 h-5" />
-                        </div>
-                        <span className="text-xs font-bold text-[var(--accent-color)] opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">Ler matéria</span>
-                    </div>
-                </div>
-            </div>
-        </a>
-    );
-};
-
-const NewsCarousel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => {
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const [activeIndex, setActiveIndex] = useState(0);
-
-    const handleScroll = () => {
-        if (scrollRef.current) {
-            const scrollLeft = scrollRef.current.scrollLeft;
-            const width = scrollRef.current.clientWidth;
-            const newIndex = Math.round(scrollLeft / width);
-            setActiveIndex(newIndex);
-        }
-    };
-
-    const scroll = (direction: 'left' | 'right') => {
-        if (scrollRef.current) {
-            const scrollAmount = scrollRef.current.clientWidth;
-            scrollRef.current.scrollBy({
-                left: direction === 'left' ? -scrollAmount : scrollAmount,
-                behavior: 'smooth'
-            });
-        }
-    };
-
-    if (!articles || articles.length === 0) return null;
-
-    return (
-        <div className="relative mb-8">
-            {/* Desktop Navigation Buttons */}
-            <div className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-30 -ml-4">
-                 <button 
-                    onClick={() => scroll('left')}
-                    className="w-12 h-12 bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-color)] text-[var(--text-primary)] rounded-full flex items-center justify-center shadow-2xl hover:bg-[var(--bg-secondary)] hover:scale-110 transition-all duration-300 disabled:opacity-50"
-                >
-                    <ChevronLeftIcon className="w-6 h-6" />
-                </button>
-            </div>
-            
-            <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-30 -mr-4">
-                <button 
-                    onClick={() => scroll('right')}
-                    className="w-12 h-12 bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-color)] text-[var(--text-primary)] rounded-full flex items-center justify-center shadow-2xl hover:bg-[var(--bg-secondary)] hover:scale-110 transition-all duration-300"
-                >
-                    <ChevronRightIcon className="w-6 h-6" />
-                </button>
-            </div>
-
-            {/* Carousel Container */}
-            <div 
-                ref={scrollRef}
-                onScroll={handleScroll}
-                className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-4 px-1"
-            >
-                {articles.map((article, idx) => (
-                    <div key={idx} className="w-[90%] md:w-[80%] lg:w-[70%] flex-shrink-0 snap-center h-[380px] md:h-[450px]">
-                        <NewsHeroItem article={article} />
-                    </div>
-                ))}
-            </div>
-            
-            {/* Indicators */}
-            <div className="flex justify-center gap-2 mt-1">
-                {articles.map((_, idx) => (
-                    <div 
-                        key={idx} 
-                        className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeIndex ? 'w-6 bg-[var(--accent-color)]' : 'w-1.5 bg-[var(--border-color)]'}`}
-                    ></div>
-                ))}
-            </div>
-        </div>
-    );
-};
-
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl animate-pulse border border-[var(--border-color)] h-72 flex flex-col justify-end">
-        <div className="h-4 bg-gray-700/50 rounded w-1/4 mb-4"></div>
-        <div className="h-6 bg-gray-700/50 rounded w-full mb-2"></div>
-        <div className="h-6 bg-gray-700/50 rounded w-3/4 mb-4"></div>
-        <div className="h-3 bg-gray-700/50 rounded w-full"></div>
+    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg animate-pulse border border-[var(--border-color)]">
+        <div className="h-3 bg-gray-700 rounded w-1/4 mb-3"></div>
+        <div className="h-4 bg-gray-700 rounded w-full mb-2"></div>
+        <div className="h-4 bg-gray-700 rounded w-3/4 mb-4"></div>
+        <div className="h-3 bg-gray-700 rounded w-5/6 mb-2"></div>
+        <div className="h-3 bg-gray-700 rounded w-4/6"></div>
+        <div className="flex justify-between items-center mt-4">
+            <div className="h-3 bg-gray-700 rounded w-1/5"></div>
+            <div className="h-2 bg-gray-700 rounded w-1/3"></div>
+        </div>
     </div>
 );
 
-const CategoryPill: React.FC<{ label: string; isActive: boolean; onClick: () => void }> = ({ label, isActive, onClick }) => (
-    <button
-        onClick={() => { vibrate(); onClick(); }}
-        className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 snap-start border ${
-            isActive 
-                ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/20' 
-                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)]'
-        }`}
-    >
-        {label}
-    </button>
-);
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
   const { assets, preferences } = usePortfolio();
-  
-  const categories = ['Destaques', 'Rendimentos', 'Papel & CRI', 'Logística', 'Shoppings', 'Fiagro', 'Lajes', 'Geral', 'Favoritos'];
-  
-  const [category, setCategory] = useState('Destaques');
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -356,6 +143,10 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
   
+  const touchStartY = useRef(0);
+  const [pullPosition, setPullPosition] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
 
   useEffect(() => {
@@ -383,32 +174,27 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   }
 
   const loadNews = useCallback(async (isRefresh = false, currentQuery: string, currentDateRange: 'today' | 'week' | 'month', currentSource: string) => {
+    if(!isRefresh) setLoading(true);
     setError(null);
     
     try {
-      const filterKey = `news_${currentQuery}_${currentDateRange}_${currentSource}_${category}`.toLowerCase().replace(/\s+/g, '_');
+      const filterKey = `news_${currentQuery}_${currentDateRange}_${currentSource}`.toLowerCase().replace(/\s+/g, '_');
       
       if (!isRefresh) {
           const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
           if (cachedNews) {
               setNews(cachedNews);
               setLoading(false);
-              return;
-          } else {
-              // Se não tem cache e não for refresh manual, não carrega nada automaticamente.
-              setNews([]);
-              setLoading(false);
+              setPullPosition(0);
               return;
           }
       }
 
-      setLoading(true);
       const filter: NewsFilter = {
           query: currentQuery,
           tickers: assetTickers,
           dateRange: currentDateRange,
-          sources: currentSource,
-          category: category
+          sources: currentSource
       };
 
       const articles = await fetchMarketNews(preferences, filter);
@@ -419,18 +205,12 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setError(err.message || t('unknown_error'));
     } finally {
       setLoading(false);
+      setPullPosition(0);
     }
-  }, [t, assetTickers, addToast, preferences, category]);
+  }, [t, assetTickers, addToast, preferences]);
   
-  // Debounced Load
+  // Create a debounced version of the load function for text inputs
   const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);
-
-  // Reset when category changes
-  useEffect(() => {
-      setLoading(true);
-      setNews([]); // Clear current list
-      loadNews(false, searchQuery, dateRange, sourceFilter);
-  }, [category]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setSearchQuery(e.target.value);
@@ -450,11 +230,42 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       loadNews(true, searchQuery, range, sourceFilter);
   };
   
-  const handleManualRefresh = () => {
+  const handleRefresh = () => {
     vibrate();
     setLoading(true);
     loadNews(true, searchQuery, dateRange, sourceFilter);
   };
+  
+  const handleTouchStart = (e: React.TouchEvent) => {
+      if(containerRef.current && containerRef.current.scrollTop === 0) {
+          touchStartY.current = e.targetTouches[0].clientY;
+      }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+      if(touchStartY.current > 0 && !loading) {
+          const touchY = e.targetTouches[0].clientY;
+          const pullDistance = touchY - touchStartY.current;
+          if(pullDistance > 0) {
+              if (e.cancelable) e.preventDefault();
+              setPullPosition(Math.min(pullDistance, 100));
+          }
+      }
+  };
+  
+  const handleTouchEnd = () => {
+      if(pullPosition > 70) {
+          setLoading(true);
+          loadNews(true, searchQuery, dateRange, sourceFilter);
+      } else {
+          setPullPosition(0);
+      }
+      touchStartY.current = 0;
+  };
+
+  useEffect(() => {
+    loadNews(false, '', 'week', ''); // Initial load
+  }, [loadNews]);
 
   const displayedNews = useMemo(() => {
       return activeTab === 'favorites' 
@@ -462,23 +273,23 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         : news;
   }, [news, activeTab, favorites]);
 
-  // Split news for Carousel vs List
-  const { heroNews, listNews } = useMemo(() => {
-      if (activeTab === 'favorites' || searchQuery) {
-          return { heroNews: [], listNews: displayedNews };
-      }
-      return {
-          heroNews: displayedNews.slice(0, 5),
-          listNews: displayedNews.slice(5)
-      };
-  }, [displayedNews, activeTab, searchQuery]);
-
   return (
     <div 
         className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6"
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
     >
+      <div 
+        className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
+        style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
+      >
+        <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
+      </div>
+      
       <div className="w-full max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-4 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-md py-2">
+        <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold">{t('market_news')}</h1>
           <div className="flex gap-2">
                <button 
@@ -486,29 +297,17 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                   className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
                   aria-label="Filtros"
               >
-                  <FilterIcon className="w-5 h-5" />
+                  <FilterIcon className="w-6 h-6" />
               </button>
               <button 
-                  onClick={handleManualRefresh} 
+                  onClick={handleRefresh} 
                   disabled={loading}
                   className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
                   aria-label={t('refresh_prices')}
               >
-                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+                  <RefreshIcon className={`w-6 h-6 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
               </button>
           </div>
-        </div>
-        
-        {/* Categories Scroller */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-4 -mx-4 px-4 snap-x">
-            {categories.map(cat => (
-                <CategoryPill 
-                    key={cat} 
-                    label={cat} 
-                    isActive={category === cat} 
-                    onClick={() => setCategory(cat)} 
-                />
-            ))}
         </div>
         
         {/* Filter Panel */}
@@ -552,7 +351,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           />
         </div>
         
-        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-6 border border-[var(--border-color)] shrink-0">
+        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
             <button 
               onClick={() => { setActiveTab('all'); vibrate(); }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
@@ -582,11 +381,9 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
         {!loading && !error && (
           <div className="flex-1">
-            {heroNews.length > 0 && <NewsCarousel articles={heroNews} />}
-
-            {listNews.length > 0 || heroNews.length > 0 ? (
+            {displayedNews.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 landscape-grid-cols-3">
-                  {listNews.map((article, index) => (
+                  {displayedNews.map((article, index) => (
                   <div 
                       key={`${article.title}-${index}`} 
                       className="animate-fade-in-up h-full" 
@@ -619,16 +416,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                           <p className="text-sm mt-2 max-w-[250px]">{t('no_favorites_subtitle')}</p>
                       </>
                   ) : (
-                      <div className="mt-8">
-                          <p className="font-bold text-lg mb-2">{t('no_news_found')}</p>
-                          <p className="text-sm opacity-75 mb-4">As notícias não carregam automaticamente para economizar seus dados.</p>
-                          <button 
-                            onClick={handleManualRefresh} 
-                            className="px-6 py-3 bg-[var(--accent-color)] text-[var(--accent-color-text)] rounded-xl font-bold shadow-lg"
-                          >
-                              Carregar Notícias
-                          </button>
-                      </div>
+                      <p>{t('no_news_found')}</p>
                   )}
               </div>
             )}

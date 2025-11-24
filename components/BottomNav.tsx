@@ -29,7 +29,7 @@ const NavItem: React.FC<{
       onClick={onClick}
       className={`flex flex-col items-center justify-center w-full pt-2 pb-1 transform transition-all duration-150 active:scale-95 ${activeClass} hover:text-[var(--accent-color)]`}
     >
-      {icon}
+      {React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6' })}
       <span className="text-xs mt-1">{label}</span>
     </button>
   );

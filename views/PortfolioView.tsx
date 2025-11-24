@@ -5,11 +5,10 @@ import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
+import WalletIcon from '../components/icons/WalletIcon'; // Importado globalmente
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import { generateCalendarEvents } from '../services/dynamicDataService';
-import CalendarIcon from '../components/icons/CalendarIcon';
 import { vibrate } from '../utils';
 
 // Icons
@@ -21,9 +20,6 @@ const EyeOffIcon: React.FC<{className?:string}> = ({className}) => (
 );
 const SortIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-);
-const WalletIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
 );
 
 // --- Components ---
@@ -43,16 +39,10 @@ const Header: React.FC<{
     isRefreshing: boolean;
 }> = ({ setActiveView, onShare, onRefresh, isRefreshing }) => {
     const { t } = useI18n();
-    const { privacyMode, togglePrivacyMode, preferences } = usePortfolio();
-    
-    const isPremium = preferences.visualStyle === 'premium';
+    const { privacyMode, togglePrivacyMode } = usePortfolio();
 
     return (
-        <header className={`px-4 py-3 flex justify-between items-center sticky z-30 glass transition-all duration-300 ${
-            isPremium 
-                ? 'top-3 mx-4 rounded-2xl' 
-                : 'top-0 border-b border-[var(--border-color)]'
-        }`}>
+        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300">
             <div className="flex flex-col">
                 <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">Invest</h1>
                 <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
@@ -64,16 +54,16 @@ const Header: React.FC<{
                     className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
-                     <RefreshIcon className="w-5 h-5"/>
+                     <RefreshIcon className="w-6 h-6"/>
                 </button>
-                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
-                     {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
+                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
+                     {privacyMode ? <EyeOffIcon className="w-6 h-6"/> : <EyeIcon className="w-6 h-6"/>}
                 </button>
-                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
-                    <ShareIcon className="w-5 h-5" />
+                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
+                    <ShareIcon className="w-6 h-6" />
                 </button>
-                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
-                    <BellIcon className="w-5 h-5" />
+                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
+                    <BellIcon className="w-6 h-6" />
                 </button>
             </div>
         </header>
@@ -115,7 +105,7 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500 h-full">
+        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
             {/* Decorative Glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
 
@@ -151,75 +141,6 @@ const PortfolioSummary: React.FC = () => {
                     <Metric label={t('capital_gain')}>
                         <p className={unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}><CountUp end={unrealizedGain} formatter={format} /></p>
                     </Metric>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const DividendCalendar: React.FC = () => {
-    const { t, formatCurrency, locale } = useI18n();
-    const { assets } = usePortfolio();
-
-    const events = useMemo(() => generateCalendarEvents(assets), [assets]);
-
-    if (events.length === 0) {
-         return (
-            <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl animate-scale-in flex flex-col items-center text-center justify-center h-full min-h-[200px]">
-                <div className="w-12 h-12 rounded-full bg-[var(--bg-tertiary-hover)] flex items-center justify-center mb-3 text-[var(--text-secondary)]">
-                    <CalendarIcon className="w-6 h-6" />
-                </div>
-                <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('dividend_calendar')}</h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-[150px] leading-relaxed">{t('no_dividends_scheduled')}</p>
-            </div>
-         );
-    }
-
-    return (
-        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl animate-scale-in h-full flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2">
-                    <CalendarIcon className="w-5 h-5 text-[var(--accent-color)]" />
-                    <h3 className="font-bold text-sm uppercase tracking-wider text-[var(--text-primary)]">{t('dividend_calendar')}</h3>
-                </div>
-                <span className="text-[10px] font-bold bg-[var(--accent-color)]/10 text-[var(--accent-color)] px-2 py-0.5 rounded-full">
-                    {t('next_payments')}
-                </span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar max-h-[280px] lg:max-h-none">
-                <div className="space-y-3">
-                    {events.map((event, idx) => {
-                        const dateObj = new Date(event.date);
-                        const userTimezoneOffset = dateObj.getTimezoneOffset() * 60000;
-                        const adjustedDate = new Date(dateObj.getTime() + userTimezoneOffset);
-                        
-                        const day = adjustedDate.getDate();
-                        const month = adjustedDate.toLocaleDateString(locale, { month: 'short' }).toUpperCase().replace('.', '');
-                        const isPaid = event.eventType === 'Pago';
-
-                        return (
-                            <div key={`${event.ticker}-${idx}`} className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${isPaid ? 'bg-[var(--bg-primary)] border-transparent opacity-50' : 'bg-[var(--bg-tertiary-hover)] border-[var(--border-color)]'}`}>
-                                <div className="flex items-center gap-3">
-                                    <div className={`flex flex-col items-center justify-center w-10 h-10 rounded-lg ${isPaid ? 'bg-[var(--text-secondary)]/20 text-[var(--text-secondary)]' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-color)]'}`}>
-                                        <span className="text-[9px] font-bold uppercase leading-none">{month}</span>
-                                        <span className="text-sm font-bold leading-none">{day}</span>
-                                    </div>
-                                    <div>
-                                        <span className="block font-bold text-sm">{event.ticker}</span>
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isPaid ? 'bg-gray-500/20 text-gray-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                                            {event.eventType}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <span className={`block font-bold text-sm ${isPaid ? 'text-[var(--text-secondary)]' : 'text-[var(--green-text)]'}`}>
-                                        {event.projectedAmount ? formatCurrency(event.projectedAmount) : '-'}
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
                 </div>
             </div>
         </div>
@@ -280,21 +201,55 @@ interface PortfolioViewProps {
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
     const { t, formatCurrency } = useI18n();
-    const { assets, privacyMode, preferences, isRefreshing, refreshAllData } = usePortfolio();
+    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
     const [searchQuery, setSearchQuery] = useState('');
+    const [isPullRefreshing, setIsPullRefreshing] = useState(false);
     const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
     const [isSortOpen, setIsSortOpen] = useState(false);
+    
+    const isRefreshing = isContextRefreshing || isPullRefreshing;
 
-    const handleGlobalRefresh = async () => {
+    // Pull to Refresh Logic
+    const touchStartY = useRef(0);
+    const [pullDistance, setPullDistance] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (containerRef.current && containerRef.current.scrollTop === 0) {
+            touchStartY.current = e.targetTouches[0].clientY;
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (touchStartY.current > 0 && !isRefreshing) {
+            const touchY = e.targetTouches[0].clientY;
+            const dist = touchY - touchStartY.current;
+            if (dist > 0) {
+                setPullDistance(Math.min(dist * 0.4, 80)); // Resistance
+            }
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (pullDistance > 60) {
+            handleRefreshPrices();
+        }
+        setPullDistance(0);
+        touchStartY.current = 0;
+    };
+
+    const handleRefreshPrices = async () => {
+        setIsPullRefreshing(true);
         vibrate(20);
         addToast(t('toast_updating_prices'));
         try {
-            await refreshAllData();
+            await refreshMarketData(true);
             addToast(t('toast_update_success'), 'success');
-        // FIX: Changed 'error' to 'e' to avoid conflict with the 'Error' type.
-        } catch (e: any) {
-            // Error is handled by the global error handler in App.tsx
-            console.error("Error refreshing all data:", e);
+        } catch (error: any) {
+            console.error("Error refreshing data:", error);
+            addToast(error.message || t('toast_update_failed'), 'error');
+        } finally {
+            setIsPullRefreshing(false);
         }
     };
 
@@ -337,19 +292,28 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
     return (
         <div 
             className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
+            ref={containerRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
         >
+            {/* Refresh Spinner */}
+            <div 
+                className="fixed top-16 left-0 right-0 flex justify-center pointer-events-none z-20 transition-transform duration-200"
+                style={{ transform: `translateY(${pullDistance > 0 ? pullDistance : (isRefreshing ? 60 : -50)}px)`, opacity: Math.min(pullDistance / 40, 1) }}
+            >
+                <div className="bg-[var(--bg-secondary)] p-2 rounded-full shadow-lg border border-[var(--border-color)]">
+                    <RefreshIcon className={`w-5 h-5 text-[var(--accent-color)] ${isRefreshing ? 'animate-spin' : ''}`} />
+                </div>
+            </div>
+
             <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleGlobalRefresh} isRefreshing={isRefreshing} />
+                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
                 
                 {assets.length > 0 ? (
                     <>
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-7xl mx-auto px-4 mt-6">
-                            <div className="lg:col-span-8">
-                                 <PortfolioSummary />
-                            </div>
-                            <div className="lg:col-span-4">
-                                 <DividendCalendar />
-                            </div>
+                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
+                            <PortfolioSummary />
                         </div>
 
                         <div className="px-4 mt-8">
@@ -370,7 +334,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                                         onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
                                         className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
                                     >
-                                        <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
+                                        <SortIcon className="w-6 h-6 text-[var(--text-secondary)]"/>
                                     </button>
                                     {isSortOpen && (
                                         <>
@@ -401,7 +365,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                             {isRefreshing && processedAssets.length === 0 ? (
                                 <PortfolioSkeleton />
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 landscape-grid-cols-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
                                     {processedAssets.map((asset, index) => (
                                         <AssetListItem 
                                             key={asset.ticker}
@@ -420,7 +384,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
                         <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
-                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                            <WalletIcon className="w-12 h-12 text-[var(--text-secondary)] opacity-50"/>
                         </div>
                         <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
                         <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
