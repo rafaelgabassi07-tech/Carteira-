@@ -6,8 +6,8 @@ export const ptBR = {
     appearance: 'Aparência',
     visual_style: 'Acabamento Visual',
     visual_style_desc: 'Defina a profundidade e transparência.',
-    style_simple: 'Sólido (Minimalista)',
-    style_premium: 'Glass (Translucido)',
+    style_simple: 'Sólido (Flat)',
+    style_premium: 'Glass (Premium)',
     accent_color: 'Cor Principal',
     accent_color_desc: 'A cor que define a identidade do seu app.',
     system_theme: 'Modo de Cor',
@@ -20,7 +20,7 @@ export const ptBR = {
     
     // Theme Store
     theme_store: 'Loja de Temas',
-    theme_store_desc: 'Personalize seu app com paletas exclusivas.',
+    theme_store_desc: 'Personalize com acabamento visual e cores exclusivas.',
     open_theme_store: 'Abrir Loja de Temas',
     filter_all: 'Todos',
     filter_dark: 'Escuros',
@@ -29,6 +29,7 @@ export const ptBR = {
     apply: 'Aplicar',
     applied: 'Em uso',
     preview: 'Prévia',
+    visual_finish: 'Acabamento', // New key
 
     // General
     app_name: 'Invest Portfolio',

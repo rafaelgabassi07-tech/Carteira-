@@ -32,6 +32,42 @@ export const APP_THEMES: AppTheme[] = [
         }
     },
     {
+        id: 'carbon-red',
+        name: 'Carbon GT',
+        type: 'dark',
+        description: 'Inspirado em superesportivos. Preto fosco e vermelho.',
+        colors: {
+            bgPrimary: '#101010',
+            bgSecondary: '#1c1c1c',
+            bgTertiary: '#2a2a2a',
+            textPrimary: '#ffffff',
+            textSecondary: '#9ca3af',
+            borderColor: '#333333',
+            accentColor: '#ef4444', // Vermelho vivo
+            accentText: '#ffffff',
+            greenText: '#22c55e',
+            redText: '#ef4444',
+        }
+    },
+    {
+        id: 'royal-gold',
+        name: 'Royal Gold',
+        type: 'dark',
+        description: 'Acabamento de luxo com toques dourados.',
+        colors: {
+            bgPrimary: '#0f0f11',
+            bgSecondary: '#1a1a1d',
+            bgTertiary: '#252529',
+            textPrimary: '#fffaeb',
+            textSecondary: '#a8a29e',
+            borderColor: '#422006', // Marrom muito sutil
+            accentColor: '#fbbf24', // Dourado
+            accentText: '#451a03',
+            greenText: '#fcd34d', // Dourado claro para positivo
+            redText: '#f87171',
+        }
+    },
+    {
         id: 'midnight-oled',
         name: 'Midnight OLED',
         type: 'dark',
@@ -47,6 +83,24 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#000000',
             greenText: '#22c55e',
             redText: '#ef4444',
+        }
+    },
+    {
+        id: 'cyber-neon',
+        name: 'Cyber Neon',
+        type: 'dark',
+        description: 'Futurista, vibrante e com alto contraste.',
+        colors: {
+            bgPrimary: '#090014', // Roxo muito escuro
+            bgSecondary: '#15002e',
+            bgTertiary: '#2a0a4a',
+            textPrimary: '#e0e7ff',
+            textSecondary: '#a78bfa',
+            borderColor: '#4c1d95',
+            accentColor: '#d946ef', // Magenta Neon
+            accentText: '#ffffff',
+            greenText: '#22d3ee', // Ciano
+            redText: '#fb7185',
         }
     },
     {
@@ -118,6 +172,24 @@ export const APP_THEMES: AppTheme[] = [
             accentColor: '#0284c7',
             accentText: '#ffffff',
             greenText: '#16a34a',
+            redText: '#e11d48',
+        }
+    },
+    {
+        id: 'arctic-ice',
+        name: 'Arctic Ice',
+        type: 'light',
+        description: 'Fresco, azulado e extremamente limpo.',
+        colors: {
+            bgPrimary: '#f0f9ff',
+            bgSecondary: '#ffffff',
+            bgTertiary: '#e0f2fe',
+            textPrimary: '#0c4a6e',
+            textSecondary: '#548ca8',
+            borderColor: '#bae6fd',
+            accentColor: '#0ea5e9',
+            accentText: '#ffffff',
+            greenText: '#0284c7',
             redText: '#e11d48',
         }
     },

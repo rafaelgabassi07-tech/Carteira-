@@ -7,6 +7,7 @@ import { APP_THEMES } from '../constants';
 import type { AppTheme } from '../types';
 import { vibrate } from '../utils';
 import CheckCircleIcon from '../components/icons/CheckCircleIcon';
+import SparklesIcon from '../components/icons/SparklesIcon';
 
 // --- Icons for this view ---
 const MoonIcon = ({ className }: { className?: string }) => (
@@ -23,15 +24,35 @@ const SunIcon = ({ className }: { className?: string }) => (
 );
 
 // --- Realistic Mini App Preview ---
-const PhonePreview: React.FC<{ theme: AppTheme }> = ({ theme }) => {
+const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium' }> = ({ theme, visualStyle }) => {
     const c = theme.colors;
+    const isPremium = visualStyle === 'premium';
     
+    // Helper for hex opacity
+    const withOpacity = (hex: string, alpha: number) => {
+        // Simple hex to rgba simulation for preview purposes if needed, 
+        // but sticking to styles logic is better.
+        return hex;
+    };
+
     return (
-        <div className="w-full aspect-[9/16] md:aspect-video rounded-2xl overflow-hidden relative border shadow-sm flex flex-col select-none transition-transform duration-500" 
-             style={{ backgroundColor: c.bgPrimary, borderColor: c.borderColor }}>
+        <div className="w-full aspect-[9/16] md:aspect-video rounded-2xl overflow-hidden relative border shadow-sm flex flex-col select-none transition-all duration-500" 
+             style={{ 
+                 backgroundColor: c.bgPrimary, 
+                 borderColor: c.borderColor,
+                 // Add slight glow for premium preview
+                 boxShadow: isPremium ? `0 10px 30px -10px ${c.accentColor}30` : 'none'
+             }}>
             
+            {/* Background Gradient for Premium */}
+            {isPremium && (
+                <div className="absolute inset-0 pointer-events-none" style={{
+                    background: `radial-gradient(circle at 100% 0%, ${c.accentColor}20, transparent 50%), radial-gradient(circle at 0% 100%, ${c.accentColor}10, transparent 50%)`
+                }}></div>
+            )}
+
             {/* Simulated Status Bar */}
-            <div className="h-6 w-full flex items-center justify-between px-4 opacity-50" style={{ backgroundColor: c.bgPrimary }}>
+            <div className="h-6 w-full flex items-center justify-between px-4 z-10" style={{ backgroundColor: isPremium ? 'transparent' : c.bgPrimary }}>
                 <div className="w-8 h-2 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
                 <div className="flex gap-1">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
@@ -40,7 +61,11 @@ const PhonePreview: React.FC<{ theme: AppTheme }> = ({ theme }) => {
             </div>
 
             {/* Header */}
-            <div className="pt-2 pb-3 px-4 flex justify-between items-center" style={{ borderBottom: `1px solid ${c.borderColor}` }}>
+            <div className={`pt-2 pb-3 px-4 flex justify-between items-center z-10 ${isPremium ? 'backdrop-blur-md' : ''}`} 
+                 style={{ 
+                     borderBottom: `1px solid ${c.borderColor}`,
+                     backgroundColor: isPremium ? `${c.bgSecondary}80` : c.bgPrimary 
+                 }}>
                 <div className="flex flex-col gap-1.5">
                     <div className="h-2.5 w-16 rounded-full opacity-80" style={{ backgroundColor: c.textPrimary }}></div>
                     <div className="h-1.5 w-10 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
@@ -49,14 +74,17 @@ const PhonePreview: React.FC<{ theme: AppTheme }> = ({ theme }) => {
             </div>
 
             {/* Content Scroll */}
-            <div className="flex-1 p-4 flex flex-col gap-3 relative overflow-hidden">
+            <div className="flex-1 p-4 flex flex-col gap-3 relative overflow-hidden z-0">
                 
                 {/* Summary Card with Chart */}
-                <div className="w-full rounded-xl p-3 relative overflow-hidden shadow-sm flex flex-col justify-between h-28"
+                <div className={`w-full rounded-xl p-3 relative overflow-hidden flex flex-col justify-between h-28 ${isPremium ? 'shadow-lg' : 'shadow-sm'}`}
                      style={{ 
-                         background: `linear-gradient(135deg, ${c.bgSecondary} 0%, ${c.bgPrimary} 100%)`,
+                         background: isPremium 
+                            ? `linear-gradient(135deg, ${c.bgSecondary}AA 0%, ${c.bgSecondary}44 100%)` 
+                            : c.bgSecondary,
                          borderColor: c.borderColor,
-                         borderWidth: '1px'
+                         borderWidth: '1px',
+                         backdropFilter: isPremium ? 'blur(10px)' : 'none'
                      }}>
                     <div className="flex justify-between items-start z-10">
                         <div className="h-1.5 w-12 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
@@ -77,7 +105,13 @@ const PhonePreview: React.FC<{ theme: AppTheme }> = ({ theme }) => {
                 {/* Asset List */}
                 <div className="flex flex-col gap-2 mt-1">
                     {[1, 2].map((i) => (
-                        <div key={i} className="h-12 w-full rounded-lg flex items-center px-2 gap-3" style={{ backgroundColor: c.bgSecondary, borderColor: c.borderColor, borderWidth: '1px' }}>
+                        <div key={i} className="h-12 w-full rounded-lg flex items-center px-2 gap-3" 
+                             style={{ 
+                                 backgroundColor: isPremium ? `${c.bgSecondary}99` : c.bgSecondary, 
+                                 borderColor: c.borderColor, 
+                                 borderWidth: '1px',
+                                 backdropFilter: isPremium ? 'blur(4px)' : 'none'
+                             }}>
                             <div className="w-8 h-8 rounded-md opacity-20" style={{ backgroundColor: c.accentColor }}></div>
                             <div className="flex-1 flex flex-col gap-1.5">
                                 <div className="h-2 w-12 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
@@ -93,7 +127,11 @@ const PhonePreview: React.FC<{ theme: AppTheme }> = ({ theme }) => {
             </div>
 
             {/* Bottom Nav */}
-            <div className="h-12 w-full flex justify-around items-center px-2" style={{ backgroundColor: c.bgSecondary, borderTop: `1px solid ${c.borderColor}` }}>
+            <div className={`h-12 w-full flex justify-around items-center px-2 z-10 ${isPremium ? 'backdrop-blur-md' : ''}`} 
+                 style={{ 
+                     backgroundColor: isPremium ? `${c.bgSecondary}CC` : c.bgSecondary, 
+                     borderTop: `1px solid ${c.borderColor}` 
+                 }}>
                 {[1, 2, 3, 4, 5].map((i) => (
                     <div key={i} className="w-4 h-4 rounded-sm" style={{ backgroundColor: i === 1 ? c.accentColor : c.textSecondary, opacity: i === 1 ? 1 : 0.3 }}></div>
                 ))}
@@ -104,7 +142,7 @@ const PhonePreview: React.FC<{ theme: AppTheme }> = ({ theme }) => {
 
 const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { t } = useI18n();
-    const { preferences, setTheme } = usePortfolio();
+    const { preferences, setTheme, updatePreferences } = usePortfolio();
     
     // Initialize filter based on the currently active theme type
     const activeThemeData = useMemo(() => 
@@ -137,7 +175,7 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <div className="bg-[var(--bg-secondary)] rounded-3xl p-4 border border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/10 relative overflow-hidden">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                             <div className="order-2 md:order-1">
-                                <PhonePreview theme={activeThemeData} />
+                                <PhonePreview theme={activeThemeData} visualStyle={preferences.visualStyle} />
                             </div>
                             <div className="order-1 md:order-2 flex flex-col justify-center">
                                 <div className="flex items-center gap-2 mb-2">
@@ -155,8 +193,10 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </div>
                 </div>
 
-                {/* Sticky Filter Header */}
-                <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)] -mx-1 px-1 py-3 mb-6 transition-colors duration-300">
+                {/* Sticky Filter & Visual Style Header */}
+                <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)] -mx-1 px-1 py-3 mb-6 transition-colors duration-300 flex flex-col gap-3">
+                    
+                    {/* Row 1: Dark/Light Filter */}
                     <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm">
                         <button
                             onClick={() => { setFilter('dark'); vibrate(); }}
@@ -173,6 +213,28 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             {t('filter_light')}
                         </button>
                     </div>
+
+                    {/* Row 2: Visual Style (Integrated) */}
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                            <SparklesIcon className="w-4 h-4" />
+                            <span className="text-xs font-bold uppercase tracking-wider">{t('visual_finish')}</span>
+                        </div>
+                        <div className="flex bg-[var(--bg-secondary)] p-0.5 rounded-lg border border-[var(--border-color)]">
+                             <button 
+                                onClick={() => { updatePreferences({ visualStyle: 'simple' }); vibrate(); }}
+                                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.visualStyle === 'simple' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                             >
+                                 {t('style_simple')}
+                             </button>
+                             <button 
+                                onClick={() => { updatePreferences({ visualStyle: 'premium' }); vibrate(); }}
+                                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.visualStyle === 'premium' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                             >
+                                 {t('style_premium')}
+                             </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Grid */}
@@ -185,7 +247,7 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             style={{ animationDelay: `${idx * 50}ms` }}
                         >
                             <div className="rounded-xl overflow-hidden border border-[var(--border-color)] group-hover:border-transparent transition-colors mb-3 shadow-inner relative">
-                                <PhonePreview theme={theme} />
+                                <PhonePreview theme={theme} visualStyle={preferences.visualStyle} />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
                             </div>
                             <div className="px-1">
