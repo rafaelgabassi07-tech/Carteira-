@@ -70,10 +70,10 @@ const CompoundInterestCalculator: React.FC = () => {
         <div className="space-y-6">
             <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] space-y-5">
                  <h4 className="font-bold text-center text-sm uppercase tracking-wider text-[var(--text-secondary)]">{t('simulation')}</h4>
-                <SliderInput icon={<PiggyBankIcon className="w-4 h-4" />} label={t('initial_investment')} value={initial} setValue={setInitial} min={0} max={50000} step={500} format={(v) => formatCurrency(Number(v))} />
-                <SliderInput icon={<CalendarPlusIcon className="w-4 h-4" />} label={t('monthly_contribution')} value={monthly} setValue={setMonthly} min={0} max={5000} step={50} format={(v) => formatCurrency(Number(v))} />
-                <SliderInput icon={<PercentIcon className="w-4 h-4" />} label={t('annual_interest_rate')} value={rate} setValue={setRate} min={0} max={25} step={0.5} format={(v) => `${Number(v).toFixed(1)}%`} />
-                <SliderInput icon={<ClockIcon className="w-4 h-4" />} label={t('period_in_years')} value={years} setValue={setYears} min={1} max={50} step={1} format={(v) => `${v} anos`} />
+                <SliderInput icon={<PiggyBankIcon className="w-5 h-5" />} label={t('initial_investment')} value={initial} setValue={setInitial} min={0} max={50000} step={500} format={(v) => formatCurrency(Number(v))} />
+                <SliderInput icon={<CalendarPlusIcon className="w-5 h-5" />} label={t('monthly_contribution')} value={monthly} setValue={setMonthly} min={0} max={5000} step={50} format={(v) => formatCurrency(Number(v))} />
+                <SliderInput icon={<PercentIcon className="w-5 h-5" />} label={t('annual_interest_rate')} value={rate} setValue={setRate} min={0} max={25} step={0.5} format={(v) => `${Number(v).toFixed(1)}%`} />
+                <SliderInput icon={<ClockIcon className="w-5 h-5" />} label={t('period_in_years')} value={years} setValue={setYears} min={1} max={50} step={1} format={(v) => `${v} anos`} />
             </div>
              <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] space-y-4">
                 {/* FIX: Changed 'result' to 'simulation_result' to use the non-conflicting key. */}
@@ -114,9 +114,9 @@ const SimpleInterestCalculator: React.FC = () => {
         <div className="space-y-6">
             <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] space-y-5">
                 <h4 className="font-bold text-center text-sm uppercase tracking-wider text-[var(--text-secondary)]">{t('simulation')}</h4>
-                <SliderInput icon={<PiggyBankIcon className="w-4 h-4" />} label={t('initial_investment')} value={initial} setValue={setInitial} min={0} max={100000} step={1000} format={(v) => formatCurrency(Number(v))} />
-                <SliderInput icon={<PercentIcon className="w-4 h-4" />} label={t('annual_interest_rate')} value={rate} setValue={setRate} min={0} max={25} step={0.5} format={(v) => `${Number(v).toFixed(1)}%`} />
-                <SliderInput icon={<ClockIcon className="w-4 h-4" />} label={t('period_in_years')} value={years} setValue={setYears} min={1} max={50} step={1} format={(v) => `${v} anos`} />
+                <SliderInput icon={<PiggyBankIcon className="w-5 h-5" />} label={t('initial_investment')} value={initial} setValue={setInitial} min={0} max={100000} step={1000} format={(v) => formatCurrency(Number(v))} />
+                <SliderInput icon={<PercentIcon className="w-5 h-5" />} label={t('annual_interest_rate')} value={rate} setValue={setRate} min={0} max={25} step={0.5} format={(v) => `${Number(v).toFixed(1)}%`} />
+                <SliderInput icon={<ClockIcon className="w-5 h-5" />} label={t('period_in_years')} value={years} setValue={setYears} min={1} max={50} step={1} format={(v) => `${v} anos`} />
             </div>
              <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] space-y-4">
                 {/* FIX: Changed 'result' to 'simulation_result' to use the non-conflicting key. */}
@@ -173,9 +173,9 @@ const FirstMillionCalculator: React.FC = () => {
         <div className="space-y-6">
              <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] space-y-5">
                  <h4 className="font-bold text-center text-sm uppercase tracking-wider text-[var(--text-secondary)]">{t('simulation')}</h4>
-                <SliderInput icon={<PiggyBankIcon className="w-4 h-4" />} label={t('initial_investment')} value={initial} setValue={setInitial} min={0} max={100000} step={1000} format={(v) => formatCurrency(Number(v))} />
-                <SliderInput icon={<CalendarPlusIcon className="w-4 h-4" />} label={t('monthly_contribution')} value={monthly} setValue={setMonthly} min={0} max={5000} step={100} format={(v) => formatCurrency(Number(v))} />
-                <SliderInput icon={<PercentIcon className="w-4 h-4" />} label={t('annual_interest_rate')} value={rate} setValue={setRate} min={0} max={25} step={0.5} format={(v) => `${Number(v).toFixed(1)}%`} />
+                <SliderInput icon={<PiggyBankIcon className="w-5 h-5" />} label={t('initial_investment')} value={initial} setValue={setInitial} min={0} max={100000} step={1000} format={(v) => formatCurrency(Number(v))} />
+                <SliderInput icon={<CalendarPlusIcon className="w-5 h-5" />} label={t('monthly_contribution')} value={monthly} setValue={setMonthly} min={0} max={5000} step={100} format={(v) => formatCurrency(Number(v))} />
+                <SliderInput icon={<PercentIcon className="w-5 h-5" />} label={t('annual_interest_rate')} value={rate} setValue={setRate} min={0} max={25} step={0.5} format={(v) => `${Number(v).toFixed(1)}%`} />
             </div>
              <div className="bg-gradient-to-tr from-[var(--accent-color)]/20 to-transparent p-4 rounded-2xl border border-[var(--border-color)] text-center shadow-lg">
                 <p className="text-sm uppercase font-bold text-[var(--text-secondary)] tracking-wider">{t('time_to_million')}</p>
@@ -196,9 +196,9 @@ const CalculatorsView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const [activeTab, setActiveTab] = useState('compound');
 
     const TABS = [
-        { id: 'compound', label: t('compound_interest'), icon: <TrendingUpIcon className="w-4 h-4" /> },
-        { id: 'simple', label: t('simple_interest'), icon: <LineChartIcon className="w-4 h-4" /> },
-        { id: 'million', label: t('my_first_million'), icon: <RocketIcon className="w-4 h-4" /> },
+        { id: 'compound', label: t('compound_interest'), icon: <TrendingUpIcon className="w-5 h-5" /> },
+        { id: 'simple', label: t('simple_interest'), icon: <LineChartIcon className="w-5 h-5" /> },
+        { id: 'million', label: t('my_first_million'), icon: <RocketIcon className="w-5 h-5" /> },
     ];
 
     return (

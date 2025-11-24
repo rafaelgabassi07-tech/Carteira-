@@ -11,7 +11,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onClick, id
     <button
       id={id}
       onClick={onClick}
-      className="fixed bottom-20 right-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-sky-500 transition-all z-40 animate-scale-in active:scale-95"
+      className="fixed bottom-20 right-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-sky-500 transition-all z-40 animate-scale-in active:scale-95 landscape-fab"
       aria-label="Adicionar item"
     >
       <PlusIcon className="w-8 h-8" />

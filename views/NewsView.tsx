@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -75,7 +74,7 @@ const NewsCard: React.FC<{
                   className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
                   aria-label={t('share_news')}
               >
-                  <ShareIcon className="w-4 h-4" />
+                  <ShareIcon className="w-5 h-5" />
               </button>
               <div className="w-px h-4 bg-[var(--border-color)] mx-0.5"></div>
               <button
@@ -83,7 +82,7 @@ const NewsCard: React.FC<{
                   className={`p-2 rounded-full transition-all active:scale-90 ${isFavorited ? 'text-yellow-400 scale-110' : 'text-gray-400 hover:text-yellow-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
                   aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
               >
-                  <StarIcon filled={isFavorited} className="w-4 h-4" />
+                  <StarIcon filled={isFavorited} className="w-5 h-5" />
               </button>
             </div>
         </div>
@@ -297,7 +296,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                   className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
                   aria-label="Filtros"
               >
-                  <FilterIcon className="w-6 h-6" />
+                  <FilterIcon className="w-5 h-5" />
               </button>
               <button 
                   onClick={handleRefresh} 
@@ -305,7 +304,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                   className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
                   aria-label={t('refresh_prices')}
               >
-                  <RefreshIcon className={`w-6 h-6 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
               </button>
           </div>
         </div>

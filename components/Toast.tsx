@@ -21,7 +21,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
   }[type];
 
   return (
-    <div className={`fixed bottom-20 left-1/2 -translate-x-1/2 max-w-sm w-full p-4 rounded-lg text-white shadow-lg z-[60] animate-toast-in-out ${bgColor}`}>
+    <div className={`fixed bottom-20 left-1/2 -translate-x-1/2 max-w-sm w-full p-4 rounded-lg text-white shadow-lg z-[60] animate-toast-in-out landscape-fab ${bgColor}`}>
       <p className="text-sm font-medium">{message}</p>
       <style>{`
         @keyframes toast-in-out {

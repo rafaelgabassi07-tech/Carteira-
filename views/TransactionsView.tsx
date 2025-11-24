@@ -199,10 +199,10 @@ const TransactionItem = React.memo<{
     }
 
     return (
-        <div onClick={() => { onEdit(transaction); vibrate(); }} style={style} className="bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-0.5 group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full flex flex-col justify-center">
+        <div onClick={() => { onEdit(transaction); vibrate(); }} style={style} className="transaction-item bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-0.5 group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full flex flex-col justify-center">
             <div className="flex items-center justify-between pr-8">
                 <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0 ${isBuy ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
+                    <div className={`transaction-icon w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0 ${isBuy ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
                         {isBuy ? t('buy_short') : t('sell_short')}
                     </div>
                     <div>
@@ -228,14 +228,14 @@ const TransactionItem = React.memo<{
                     className="p-1.5 text-gray-400 hover:text-[var(--accent-color)] hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
                     aria-label={t('edit_transaction')}
                 >
-                    <EditIcon className="w-4 h-4" />
+                    <EditIcon className="w-5 h-5" />
                 </button>
                 <button 
                     onClick={handleDelete}
                     className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
                     aria-label={t('delete')}
                 >
-                    <TrashIcon className="w-4 h-4" />
+                    <TrashIcon className="w-5 h-5" />
                 </button>
             </div>
         </div>

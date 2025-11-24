@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useI18n } from '../../contexts/I18nContext';
@@ -41,7 +40,7 @@ const ChangelogCard: React.FC<{
                 <div className="px-4 pb-4 space-y-3">
                      {devNote && (
                         <div className="bg-[var(--bg-primary)] p-3 rounded-lg border-l-4 border-[var(--accent-color)] italic text-sm text-[var(--text-secondary)]">
-                            <p className="font-bold not-italic text-[var(--text-primary)] mb-1 flex items-center gap-2"><MessageSquareIcon className="w-4 h-4"/> {t(devNote.title)}</p>
+                            <p className="font-bold not-italic text-[var(--text-primary)] mb-1 flex items-center gap-2"><MessageSquareIcon className="w-5 h-5"/> {t(devNote.title)}</p>
                             "{t(devNote.content)}"
                         </div>
                     )}
@@ -86,26 +85,26 @@ const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             isLatest: true,
             devNote: { title: 'dev_note_title', content: 'dev_note_content' },
             sections: [
-                { titleKey: 'changelog_news_title_1_6_0', color: 'text-sky-400', icon: <RocketIcon className="w-4 h-4"/>, itemsKey: 'changelog_news_items_1_6_0' },
-                { titleKey: 'changelog_improvements_title_1_6_0', color: 'text-purple-400', icon: <WrenchIcon className="w-4 h-4"/>, itemsKey: 'changelog_improvements_items_1_6_0' },
-                { titleKey: 'changelog_fixes_title_1_6_0', color: 'text-emerald-400', icon: <BugIcon className="w-4 h-4"/>, itemsKey: 'changelog_fixes_items_1_6_0' }
+                { titleKey: 'changelog_news_title_1_6_0', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_0' },
+                { titleKey: 'changelog_improvements_title_1_6_0', color: 'text-purple-400', icon: <WrenchIcon className="w-5 h-5"/>, itemsKey: 'changelog_improvements_items_1_6_0' },
+                { titleKey: 'changelog_fixes_title_1_6_0', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_fixes_items_1_6_0' }
             ]
         },
         {
             version: 'changelog_version_title_1_5_0',
             isLatest: false,
             sections: [
-                { titleKey: 'changelog_news_title_1_5_0', color: 'text-sky-400', icon: <RocketIcon className="w-4 h-4"/>, itemsKey: 'changelog_news_items_1_5_0' },
-                { titleKey: 'changelog_improvements_title_1_5_0', color: 'text-purple-400', icon: <WrenchIcon className="w-4 h-4"/>, itemsKey: 'changelog_improvements_items_1_5_0' },
-                { titleKey: 'changelog_fixes_title_1_5_0', color: 'text-emerald-400', icon: <BugIcon className="w-4 h-4"/>, itemsKey: 'changelog_fixes_items_1_5_0' }
+                { titleKey: 'changelog_news_title_1_5_0', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_5_0' },
+                { titleKey: 'changelog_improvements_title_1_5_0', color: 'text-purple-400', icon: <WrenchIcon className="w-5 h-5"/>, itemsKey: 'changelog_improvements_items_1_5_0' },
+                { titleKey: 'changelog_fixes_title_1_5_0', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_fixes_items_1_5_0' }
             ]
         },
         {
             version: 'changelog_version_title_1_4_3',
             isLatest: false,
             sections: [
-                { titleKey: 'changelog_news_title_1_4_3', color: 'text-sky-400', icon: <RocketIcon className="w-4 h-4"/>, itemsKey: 'changelog_news_items_1_4_3' },
-                { titleKey: 'changelog_fixes_title_1_4_3', color: 'text-emerald-400', icon: <BugIcon className="w-4 h-4"/>, itemsKey: 'changelog_fixes_items_1_4_3' }
+                { titleKey: 'changelog_news_title_1_4_3', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_4_3' },
+                { titleKey: 'changelog_fixes_title_1_4_3', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_fixes_items_1_4_3' }
             ]
         },
     ];

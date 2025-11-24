@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import type { View, } from '../App';
 import type { NotificationType } from '../types';
@@ -141,7 +140,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                         className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors"
                         aria-label="Configurações"
                     >
-                        <SettingsIcon className="w-6 h-6" />
+                        <SettingsIcon className="w-5 h-5" />
                     </button>
                     {notifications.some(n => !n.read) && (
                         <button onClick={markAllAsRead} className="text-xs bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold px-3 py-1.5 rounded-lg flex items-center whitespace-nowrap">
@@ -185,9 +184,9 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                                                     {/* Delete Button (Visible on hover or touch actions in future) */}
                                                     <button 
                                                         onClick={(e) => deleteNotification(e, notification.id)}
-                                                        className="text-gray-400 hover:text-red-500 p-1 -mr-2 -mt-2 rounded-full hover:bg-[var(--bg-primary)] transition-colors z-10"
+                                                        className="text-gray-400 hover:text-red-500 p-1.5 -mr-2 -mt-2 rounded-full hover:bg-[var(--bg-primary)] transition-colors z-10"
                                                     >
-                                                        <TrashIcon className="w-4 h-4" />
+                                                        <TrashIcon className="w-5 h-5" />
                                                     </button>
                                                 </div>
                                                 <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">{notification.description}</p>
@@ -195,7 +194,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                                                     <p className="text-[10px] text-[var(--text-secondary)] opacity-70">{new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                                                     {notification.relatedTicker && (
                                                         <div className="flex items-center text-[var(--accent-color)] text-[10px] font-bold gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            VER ATIVO <ChevronRightIcon className="w-3 h-3" />
+                                                            VER ATIVO <ChevronRightIcon className="w-4 h-4" />
                                                         </div>
                                                     )}
                                                 </div>

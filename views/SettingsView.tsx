@@ -9,7 +9,6 @@ import SecuritySettings from '../components/settings/SecuritySettings';
 import NotificationSettings from '../components/settings/NotificationSettings';
 import BackupRestore from '../components/settings/BackupRestore';
 import AboutApp from '../components/settings/AboutApp';
-import AppearanceSettings from '../components/settings/AppearanceSettings';
 import GeneralSettings from '../components/settings/GeneralSettings';
 import TransactionSettings from '../components/settings/TransactionSettings';
 import ApiConnectionSettings from '../components/settings/ApiConnectionSettings';
@@ -18,7 +17,7 @@ import GlossaryView from './GlossaryView';
 import CalculatorsView from './CalculatorsView';
 import ThemeStoreView from './ThemeStoreView';
 
-export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections' | 'glossary' | 'calculators' | 'themeGallery';
+export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'general' | 'transactions' | 'apiConnections' | 'glossary' | 'calculators' | 'themeGallery';
 
 interface SettingsViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
@@ -30,7 +29,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const { t } = useI18n();
 
-    const activeDesktopScreen = screen === 'main' ? 'appearance' : screen;
+    const activeDesktopScreen = screen === 'main' ? 'general' : screen;
 
     const getScreenComponent = (currentScreen: MenuScreen) => {
         const onBack = () => setScreen('main');
@@ -41,7 +40,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
             case 'security': return <SecuritySettings onBack={onBack} addToast={addToast} />;
             case 'notifications': return <NotificationSettings onBack={onBack} />;
             case 'backup': return <BackupRestore onBack={onBack} addToast={addToast} />;
-            case 'appearance': return <AppearanceSettings onBack={onBack} />;
             case 'general': return <GeneralSettings onBack={onBack} />;
             case 'transactions': return <TransactionSettings onBack={onBack} />;
             case 'apiConnections': return <ApiConnectionSettings onBack={onBack} addToast={addToast} />;

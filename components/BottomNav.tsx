@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { View } from '../App';
 import WalletIcon from './icons/WalletIcon';
@@ -27,10 +26,10 @@ const NavItem: React.FC<{
     <button
       id={id}
       onClick={onClick}
-      className={`flex flex-col items-center justify-center w-full pt-2 pb-1 transform transition-all duration-150 active:scale-95 ${activeClass} hover:text-[var(--accent-color)]`}
+      className={`bottom-nav-item flex flex-col items-center justify-center w-full pt-2 pb-1 transform transition-all duration-150 active:scale-95 ${activeClass} hover:text-[var(--accent-color)]`}
     >
-      {React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6' })}
-      <span className="text-xs mt-1">{label}</span>
+      {React.cloneElement(icon as React.ReactElement, { className: 'icon w-6 h-6' })}
+      <span className="label text-xs mt-1">{label}</span>
     </button>
   );
 };
@@ -51,7 +50,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-16 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] max-w-md mx-auto z-40">
+    <div className="bottom-nav fixed bottom-0 left-0 right-0 h-16 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] max-w-md mx-auto z-40">
       <div className="flex justify-around items-center h-full">
         {navItems.map((item) => (
           <NavItem

@@ -39,6 +39,13 @@ const AppearanceSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <div>
+                                <p className="font-bold text-sm">{t('compact_mode')}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">{t('compact_mode_desc')}</p>
+                            </div>
+                            <ToggleSwitch enabled={preferences.compactMode} setEnabled={(val) => updatePreferences({ compactMode: val })} />
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <div>
                                 <p className="font-bold text-sm">{t('reduce_motion')}</p>
                             </div>
                             <ToggleSwitch enabled={preferences.reduceMotion} setEnabled={(val) => updatePreferences({ reduceMotion: val })} />

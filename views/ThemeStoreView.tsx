@@ -33,11 +33,11 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
     const isPremium = visualStyle === 'premium';
     
     return (
-        <div className="w-full aspect-[9/16] md:aspect-video rounded-2xl overflow-hidden relative border shadow-sm flex flex-col select-none transition-all duration-500" 
+        <div className="w-full max-w-[150px] md:max-w-[180px] mx-auto md:mx-0 aspect-[9/19] rounded-xl overflow-hidden relative border shadow-sm flex flex-col select-none transition-all duration-500" 
              style={{ 
                  backgroundColor: c.bgPrimary, 
                  borderColor: c.borderColor,
-                 boxShadow: isPremium ? `0 10px 30px -10px ${c.accentColor}30` : 'none'
+                 boxShadow: isPremium ? `0 10px 20px -10px ${c.accentColor}20` : 'none'
              }}>
             
             {isPremium && (
@@ -46,29 +46,29 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
                 }}></div>
             )}
 
-            <div className="h-6 w-full flex items-center justify-between px-4 z-10" style={{ backgroundColor: isPremium ? 'transparent' : c.bgPrimary }}>
-                <div className="w-8 h-2 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
+            <div className="h-5 w-full flex items-center justify-between px-2 z-10" style={{ backgroundColor: isPremium ? 'transparent' : c.bgPrimary }}>
+                <div className="w-6 h-1.5 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
                 <div className="flex gap-1">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
-                    <div className="w-3 h-3 rounded-full" style={{ border: `1px solid ${c.textSecondary}` }}></div>
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
+                    <div className="w-2 h-2 rounded-full" style={{ border: `1px solid ${c.textSecondary}` }}></div>
                 </div>
             </div>
 
-            <div className={`pt-2 pb-3 px-4 flex justify-between items-center z-10 ${isPremium ? 'backdrop-blur-md' : ''}`} 
+            <div className={`pt-1 pb-2 px-3 flex justify-between items-center z-10 ${isPremium ? 'backdrop-blur-sm' : ''}`} 
                  style={{ 
                      borderBottom: `1px solid ${c.borderColor}`,
                      backgroundColor: isPremium ? `${c.bgSecondary}80` : c.bgPrimary 
                  }}>
-                <div className="flex flex-col gap-1.5">
-                    <div className="h-2.5 w-16 rounded-full opacity-80" style={{ backgroundColor: c.textPrimary }}></div>
-                    <div className="h-1.5 w-10 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
+                <div className="flex flex-col gap-1">
+                    <div className="h-2 w-12 rounded-full opacity-80" style={{ backgroundColor: c.textPrimary }}></div>
+                    <div className="h-1 w-8 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
                 </div>
-                <div className="w-8 h-8 rounded-full opacity-20" style={{ backgroundColor: c.textSecondary }}></div>
+                <div className="w-6 h-6 rounded-full opacity-20" style={{ backgroundColor: c.textSecondary }}></div>
             </div>
 
-            <div className="flex-1 p-4 flex flex-col gap-3 relative overflow-hidden z-0">
+            <div className="flex-1 p-2 flex flex-col gap-2 relative overflow-hidden z-0">
                 
-                <div className={`w-full rounded-xl p-3 relative overflow-hidden flex flex-col justify-between h-28 ${isPremium ? 'shadow-lg' : 'shadow-sm'}`}
+                <div className={`w-full rounded-lg p-2 relative overflow-hidden flex flex-col justify-between flex-1 ${isPremium ? 'shadow-md' : 'shadow-sm'}`}
                      style={{ 
                          background: isPremium 
                             ? `linear-gradient(135deg, ${c.bgSecondary}AA 0%, ${c.bgSecondary}44 100%)` 
@@ -78,50 +78,50 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
                          backdropFilter: isPremium ? 'blur(10px)' : 'none'
                      }}>
                     <div className="flex justify-between items-start z-10">
-                        <div className="h-1.5 w-12 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
-                        <div className="h-3 w-3 rounded-full opacity-80" style={{ backgroundColor: c.greenText }}></div>
+                        <div className="h-1 w-8 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
+                        <div className="w-2 h-2 rounded-full opacity-80" style={{ backgroundColor: c.greenText }}></div>
                     </div>
                     
                     <div className="z-10">
-                        <div className="h-5 w-24 rounded-md mb-1" style={{ backgroundColor: c.textPrimary }}></div>
-                        <div className="h-2 w-14 rounded-full opacity-80" style={{ backgroundColor: c.greenText }}></div>
+                        <div className="h-4 w-16 rounded-md mb-0.5" style={{ backgroundColor: c.textPrimary }}></div>
+                        <div className="h-1.5 w-10 rounded-full opacity-80" style={{ backgroundColor: c.greenText }}></div>
                     </div>
 
-                    <svg className="absolute bottom-0 right-0 w-full h-20 opacity-20" preserveAspectRatio="none" viewBox="0 0 100 50">
+                    <svg className="absolute bottom-0 right-0 w-full h-12 opacity-20" preserveAspectRatio="none" viewBox="0 0 100 50">
                         <path d="M0 50 L0 30 L20 40 L40 20 L60 35 L80 10 L100 25 L100 50 Z" fill={c.accentColor} />
                     </svg>
                 </div>
 
-                <div className="flex flex-col gap-2 mt-1">
+                <div className="flex flex-col gap-1.5 mt-1">
                     {[1, 2].map((i) => (
-                        <div key={i} className="h-12 w-full rounded-lg flex items-center px-2 gap-3" 
+                        <div key={i} className="h-8 w-full rounded-md flex items-center px-1.5 gap-2" 
                              style={{ 
                                  backgroundColor: isPremium ? `${c.bgSecondary}99` : c.bgSecondary, 
                                  borderColor: c.borderColor, 
                                  borderWidth: '1px',
                                  backdropFilter: isPremium ? 'blur(4px)' : 'none'
                              }}>
-                            <div className="w-8 h-8 rounded-md opacity-20" style={{ backgroundColor: c.accentColor }}></div>
-                            <div className="flex-1 flex flex-col gap-1.5">
-                                <div className="h-2 w-12 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
-                                <div className="h-1.5 w-8 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
+                            <div className="w-6 h-6 rounded-sm opacity-20" style={{ backgroundColor: c.accentColor }}></div>
+                            <div className="flex-1 flex flex-col gap-1">
+                                <div className="h-1.5 w-8 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
+                                <div className="h-1 w-6 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
                             </div>
-                            <div className="flex flex-col items-end gap-1.5">
-                                <div className="h-2 w-10 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
-                                <div className="h-1.5 w-6 rounded-full" style={{ backgroundColor: i === 1 ? c.greenText : c.redText }}></div>
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="h-1.5 w-6 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
+                                <div className="h-1 w-4 rounded-full" style={{ backgroundColor: i === 1 ? c.greenText : c.redText }}></div>
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            <div className={`h-12 w-full flex justify-around items-center px-2 z-10 ${isPremium ? 'backdrop-blur-md' : ''}`} 
+            <div className={`h-8 w-full flex justify-around items-center px-2 z-10 ${isPremium ? 'backdrop-blur-sm' : ''}`} 
                  style={{ 
                      backgroundColor: isPremium ? `${c.bgSecondary}CC` : c.bgSecondary, 
                      borderTop: `1px solid ${c.borderColor}` 
                  }}>
                 {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="w-4 h-4 rounded-sm" style={{ backgroundColor: i === 1 ? c.accentColor : c.textSecondary, opacity: i === 1 ? 1 : 0.3 }}></div>
+                    <div key={i} className="w-3 h-3 rounded-sm" style={{ backgroundColor: i === 1 ? c.accentColor : c.textSecondary, opacity: i === 1 ? 1 : 0.3 }}></div>
                 ))}
             </div>
         </div>
@@ -148,22 +148,21 @@ const ThemesSection: React.FC = () => {
 
     return (
         <div className="px-1">
-            <div className="mb-6 animate-fade-in">
-                <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1">{t('applied')}</h3>
-                <div className="bg-[var(--bg-secondary)] rounded-3xl p-4 border border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/10 relative overflow-hidden">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                        <div className="order-2 md:order-1">
+            <div className="mb-4 animate-fade-in">
+                <div className="bg-[var(--bg-secondary)] rounded-2xl p-3 border border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/10 relative overflow-hidden">
+                    <div className="flex flex-col md:flex-row gap-4 items-center">
+                        <div className="w-full md:w-auto flex-shrink-0">
                             <PhonePreview theme={activeThemeData} visualStyle={preferences.visualStyle} />
                         </div>
-                        <div className="order-1 md:order-2 flex flex-col justify-center">
-                            <div className="flex items-center gap-2 mb-2">
-                                <CheckCircleIcon className="w-6 h-6 text-[var(--accent-color)]" filled />
-                                <h2 className="text-2xl font-bold text-[var(--text-primary)]">{activeThemeData.name}</h2>
+                        <div className="flex-1 w-full">
+                            <div className="flex items-center gap-2 mb-1">
+                                <CheckCircleIcon className="w-5 h-5 text-[var(--accent-color)]" filled />
+                                <h2 className="text-xl font-bold text-[var(--text-primary)]">{activeThemeData.name}</h2>
                             </div>
-                            <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">{activeThemeData.description}</p>
-                            <div className="flex gap-2">
+                            <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed">{activeThemeData.description}</p>
+                            <div className="flex gap-1.5">
                                 {Object.values(activeThemeData.colors).slice(0, 5).map((c, i) => (
-                                    <div key={i} className="w-6 h-6 rounded-full border border-[var(--border-color)] shadow-sm" style={{ backgroundColor: c }}></div>
+                                    <div key={i} className="w-5 h-5 rounded-full border border-[var(--border-color)] shadow-sm" style={{ backgroundColor: c }}></div>
                                 ))}
                             </div>
                         </div>
@@ -177,21 +176,21 @@ const ThemesSection: React.FC = () => {
                         onClick={() => { setFilter('dark'); vibrate(); }}
                         className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${filter === 'dark' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md transform scale-[1.02]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
-                        <MoonIcon className="w-4 h-4" />
+                        <MoonIcon className="w-5 h-5" />
                         {t('filter_dark')}
                     </button>
                     <button
                         onClick={() => { setFilter('light'); vibrate(); }}
                         className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${filter === 'light' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md transform scale-[1.02]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
-                        <SunIcon className="w-4 h-4" />
+                        <SunIcon className="w-5 h-5" />
                         {t('filter_light')}
                     </button>
                 </div>
 
                 <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                        <SparklesIcon className="w-4 h-4" />
+                        <SparklesIcon className="w-5 h-5" />
                         <span className="text-xs font-bold uppercase tracking-wider">{t('visual_finish')}</span>
                     </div>
                     <div className="flex bg-[var(--bg-secondary)] p-0.5 rounded-lg border border-[var(--border-color)]">
@@ -216,19 +215,16 @@ const ThemesSection: React.FC = () => {
                     <div 
                         key={theme.id} 
                         onClick={() => { setTheme(theme.id); vibrate(20); }}
-                        className="group bg-[var(--bg-secondary)] rounded-2xl p-3 border border-[var(--border-color)] hover:border-[var(--accent-color)] hover:-translate-y-1 transition-all duration-300 cursor-pointer animate-fade-in-up shadow-sm hover:shadow-xl"
+                        className="group rounded-2xl border border-transparent hover:border-[var(--accent-color)] hover:-translate-y-1 transition-all duration-300 cursor-pointer animate-fade-in-up shadow-sm hover:shadow-xl overflow-hidden"
                         style={{ animationDelay: `${idx * 50}ms` }}
                     >
-                        <div className="rounded-xl overflow-hidden border border-[var(--border-color)] group-hover:border-transparent transition-colors mb-3 shadow-inner relative">
+                        <div className="shadow-inner relative">
                             <PhonePreview theme={theme} visualStyle={preferences.visualStyle} />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
-                        </div>
-                        <div className="px-1">
-                            <div className="flex justify-between items-center mb-1">
-                                <h4 className="font-bold text-sm text-[var(--text-primary)] truncate pr-2">{theme.name}</h4>
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.colors.accentColor }}></div>
+                            <div className="absolute bottom-0 left-0 right-0 p-2.5 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none">
+                                <h4 className="font-bold text-sm text-white truncate">{theme.name}</h4>
+                                <p className="text-xs text-gray-300 line-clamp-1">{theme.description}</p>
                             </div>
-                            <p className="text-[10px] text-[var(--text-secondary)] line-clamp-1">{theme.description}</p>
                         </div>
                     </div>
                 ))}
@@ -279,7 +275,7 @@ const TypographySection: React.FC = () => {
 
             <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/90 backdrop-blur-xl -mx-1 px-1 py-3 mb-2">
                  <h3 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
-                    <TypeIcon className="w-4 h-4" />
+                    <TypeIcon className="w-5 h-5" />
                     {t('text_size')}
                 </h3>
                 <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm">
@@ -322,14 +318,14 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     onClick={() => setActiveTab('themes')}
                     className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'themes' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                 >
-                    <PaletteIcon className="w-4 h-4" />
+                    <PaletteIcon className="w-5 h-5" />
                     {t('tab_themes')}
                 </button>
                  <button
                     onClick={() => setActiveTab('typography')}
                     className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'typography' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                 >
-                    <TypeIcon className="w-4 h-4" />
+                    <TypeIcon className="w-5 h-5" />
                     {t('tab_typography')}
                 </button>
             </div>

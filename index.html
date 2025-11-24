@@ -143,6 +143,59 @@
       .animate-fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .animate-scale-in { animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .animate-grow-up { animation: grow-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; transform-origin: bottom; }
+
+      /* --- COMPACT MODE --- */
+      .compact .asset-list-item { padding: 0.75rem; }
+      .compact .asset-list-item .asset-icon { width: 2.25rem; height: 2.25rem; font-size: 0.75rem; }
+      
+      .compact .transaction-item { padding: 0.75rem; }
+      .compact .transaction-item .transaction-icon { width: 2.25rem; height: 2.25rem; }
+
+      .compact .menu-item { padding: 0.625rem 1rem; }
+      .compact .menu-item .menu-icon { width: 2rem; height: 2rem; }
+
+      .compact .bottom-nav { height: 3.5rem; }
+      .compact .bottom-nav-item { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+      .compact .bottom-nav-item .icon { width: 1.25rem; height: 1.25rem; }
+      .compact .bottom-nav-item .label { font-size: 10px; margin-top: 2px; }
+      
+      .compact .metric-item { padding: 0.625rem; }
+      .compact .metric-item .metric-label { margin-bottom: 0.125rem; }
+      .compact .metric-item .metric-value { font-size: 1rem; line-height: 1.5rem; }
+      
+      /* --- MOBILE LANDSCAPE --- */
+      /* Basic Layout Adjustments */
+      @media (max-width: 1023px) and (orientation: landscape) {
+        .mobile-landscape-layout {
+          display: grid;
+          grid-template-columns: 240px 1fr;
+          padding-left: 0;
+        }
+        .mobile-landscape-bottom-nav {
+          display: none;
+        }
+        .landscape-pb-6 {
+          padding-bottom: 1.5rem !important;
+        }
+        .landscape-fab {
+          bottom: 1.5rem !important;
+          right: 1.5rem !important;
+        }
+      }
+      /* Grid adjustments for specific views */
+      @media (max-width: 1023px) and (orientation: landscape) and (min-width: 640px) {
+        .landscape-grid-cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .landscape-grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      /* Sidebar Visibility */
+      .mobile-landscape-sidebar { display: none; }
+      @media (max-width: 1023px) and (orientation: landscape) {
+        .mobile-landscape-sidebar { display: block; }
+      }
     </style>
   <script type="importmap">
 {

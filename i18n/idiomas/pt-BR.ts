@@ -31,6 +31,7 @@ export const ptBR = {
     // Interface Settings
     ui_interface: 'Interface do Usuário',
     compact_mode: 'Modo Compacto',
+    compact_mode_desc: 'Reduz o espaçamento para exibir mais informações na tela.',
     show_currency: 'Símbolo da Moeda (R$)',
     reduce_motion: 'Reduzir Movimento',
     customize_colors_fonts: 'Personalizar Aparência',
@@ -135,7 +136,7 @@ export const ptBR = {
     // Analysis View
     monthly_income: 'Renda Mensal',
     avg_monthly_income_12m: 'Média Mensal (12m)',
-    diversification: 'Diversificação',
+    diversification: 'Alocação por Setor',
     evolution_of_patrimony: 'Evolução Patrimonial',
     analysis_period_6m: '6 Meses',
     analysis_period_12m: '1 Ano',

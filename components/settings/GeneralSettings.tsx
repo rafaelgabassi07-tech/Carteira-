@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
@@ -38,6 +39,21 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                  <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
                     <p className="font-bold text-sm">{t('haptic_feedback')}</p>
                     <ToggleSwitch enabled={preferences.hapticFeedback} setEnabled={(val) => updatePreferences({ hapticFeedback: val })} />
+                </div>
+
+                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+                    <div>
+                        <p className="font-bold text-sm">{t('compact_mode')}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{t('compact_mode_desc')}</p>
+                    </div>
+                    <ToggleSwitch enabled={preferences.compactMode} setEnabled={(val) => updatePreferences({ compactMode: val })} />
+                </div>
+
+                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+                    <div>
+                        <p className="font-bold text-sm">{t('reduce_motion')}</p>
+                    </div>
+                    <ToggleSwitch enabled={preferences.reduceMotion} setEnabled={(val) => updatePreferences({ reduceMotion: val })} />
                 </div>
             </div>
         </div>
