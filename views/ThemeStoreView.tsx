@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import PageHeader from '../components/PageHeader';
 import { useI18n } from '../contexts/I18nContext';
@@ -8,6 +7,7 @@ import type { AppTheme } from '../types';
 import { vibrate } from '../utils';
 import CheckCircleIcon from '../components/icons/CheckCircleIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
+import TypeIcon from '../components/icons/TypeIcon';
 
 // --- Icons for this view ---
 const MoonIcon = ({ className }: { className?: string }) => (
@@ -28,13 +28,6 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
     const c = theme.colors;
     const isPremium = visualStyle === 'premium';
     
-    // Helper for hex opacity
-    const withOpacity = (hex: string, alpha: number) => {
-        // Simple hex to rgba simulation for preview purposes if needed, 
-        // but sticking to styles logic is better.
-        return hex;
-    };
-
     return (
         <div className="w-full aspect-[9/16] md:aspect-video rounded-2xl overflow-hidden relative border shadow-sm flex flex-col select-none transition-all duration-500" 
              style={{ 
@@ -214,7 +207,7 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         </button>
                     </div>
 
-                    {/* Row 2: Visual Style (Integrated) */}
+                    {/* Row 2: Visual Style & Font Size */}
                     <div className="flex items-center justify-between px-1">
                         <div className="flex items-center gap-2 text-[var(--text-secondary)]">
                             <SparklesIcon className="w-4 h-4" />
@@ -232,6 +225,33 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.visualStyle === 'premium' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
                              >
                                  {t('style_premium')}
+                             </button>
+                        </div>
+                    </div>
+                    
+                     <div className="flex items-center justify-between px-1 pb-1">
+                        <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                            <TypeIcon className="w-4 h-4" />
+                            <span className="text-xs font-bold uppercase tracking-wider">{t('text_size')}</span>
+                        </div>
+                        <div className="flex bg-[var(--bg-secondary)] p-0.5 rounded-lg border border-[var(--border-color)]">
+                             <button 
+                                onClick={() => { updatePreferences({ fontSize: 'small' }); vibrate(); }}
+                                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.fontSize === 'small' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                             >
+                                 Aa
+                             </button>
+                             <button 
+                                onClick={() => { updatePreferences({ fontSize: 'medium' }); vibrate(); }}
+                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${preferences.fontSize === 'medium' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                             >
+                                 Aa
+                             </button>
+                             <button 
+                                onClick={() => { updatePreferences({ fontSize: 'large' }); vibrate(); }}
+                                className={`px-3 py-1 text-sm font-bold rounded-md transition-all ${preferences.fontSize === 'large' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                             >
+                                 Aa
                              </button>
                         </div>
                     </div>

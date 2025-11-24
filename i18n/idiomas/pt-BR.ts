@@ -1,13 +1,12 @@
-
 export const ptBR = {
     // Appearance
     themes: 'Temas',
     themes_subtitle: 'Cores, estilo e modo escuro.',
-    appearance: 'Aparência',
+    appearance: 'Aparência & Interface', // Renamed
     visual_style: 'Acabamento Visual',
     visual_style_desc: 'Defina a profundidade e transparência.',
-    style_simple: 'Sólido (Flat)',
-    style_premium: 'Glass (Premium)',
+    style_simple: 'Flat',
+    style_premium: 'Glass',
     accent_color: 'Cor Principal',
     accent_color_desc: 'A cor que define a identidade do seu app.',
     system_theme: 'Modo de Cor',
@@ -17,10 +16,19 @@ export const ptBR = {
     font_small: 'Pequeno',
     font_medium: 'Padrão',
     font_large: 'Grande',
+    text_size: 'Texto', // New
+    
+    // Interface Settings (New)
+    ui_interface: 'Interface do Usuário',
+    compact_mode: 'Modo Compacto',
+    show_currency: 'Símbolo da Moeda (R$)',
+    reduce_motion: 'Reduzir Movimento',
+    customize_colors_fonts: 'Personalizar Cores e Fontes',
+    open_theme_store_desc: 'Acesse a galeria completa de temas, estilos visuais e tamanhos de texto.',
     
     // Theme Store
     theme_store: 'Loja de Temas',
-    theme_store_desc: 'Personalize com acabamento visual e cores exclusivas.',
+    theme_store_desc: 'Personalize cores, acabamento e tipografia.',
     open_theme_store: 'Abrir Loja de Temas',
     filter_all: 'Todos',
     filter_dark: 'Escuros',
@@ -29,7 +37,7 @@ export const ptBR = {
     apply: 'Aplicar',
     applied: 'Em uso',
     preview: 'Prévia',
-    visual_finish: 'Acabamento', // New key
+    visual_finish: 'Acabamento',
 
     // General
     app_name: 'Invest Portfolio',
@@ -275,7 +283,6 @@ export const ptBR = {
     // Other
     start_screen: 'Tela Inicial',
     haptic_feedback: 'Feedback Tátil',
-    restart_tutorial: 'Reiniciar Tutorial',
     unknown_error: 'Erro desconhecido',
 
     // Calculators
@@ -306,32 +313,7 @@ export const ptBR = {
     time_to_million_result: '{{years}} anos e {{months}} meses',
     goal: 'Meta',
     simulation: 'Simulação',
-    // FIX: Renamed duplicate key 'result' to 'simulation_result'
     simulation_result: 'Resultado',
-
-    // Tour
-    tour_privacy_title: 'Privacidade',
-    tour_privacy_content: 'Toque aqui para ocultar os valores sensíveis da sua carteira.',
-    tour_notifications_title: 'Notificações',
-    tour_notifications_content: 'Acompanhe alertas de preços e dividendos aqui.',
-    tour_step1_title: 'Resumo da Carteira',
-    tour_step1_content: 'Aqui você vê o valor total, rendimentos e performance geral dos seus ativos.',
-    tour_sort_title: 'Organização',
-    tour_sort_content: 'Ordene seus ativos por valor, nome ou performance.',
-    tour_share_title: 'Compartilhar',
-    tour_share_content: 'Compartilhe um resumo da sua carteira (sem valores sensíveis) com amigos.',
-    tour_step2_title: 'Adicionar Ativo',
-    tour_step2_content: 'Comece adicionando sua primeira compra de ações ou FIIs.',
-    tour_step2_content_existing: 'Adicione novas compras ou vendas rapidamente aqui.',
-    tour_analysis_title: 'Análise',
-    tour_analysis_content: 'Visualize gráficos de evolução, diversificação e renda passiva.',
-    tour_news_title: 'Notícias com IA',
-    tour_news_content: 'Receba notícias personalizadas sobre seus ativos, analisadas por Inteligência Artificial.',
-    tour_settings_title: 'Ajustes',
-    tour_settings_content: 'Configure backup, segurança, tema e conexões de API.',
-    skip_tour: 'Pular',
-    finish_tour: 'Concluir',
-    next_step: 'Próximo',
 
     // Changelog
     latest: 'Recente',
