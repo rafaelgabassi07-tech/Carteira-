@@ -1,3 +1,4 @@
+
 export const ptBR = {
     // Appearance
     themes: 'Temas',
@@ -16,6 +17,18 @@ export const ptBR = {
     font_small: 'Pequeno',
     font_medium: 'Padrão',
     font_large: 'Grande',
+    
+    // Theme Store
+    theme_store: 'Loja de Temas',
+    theme_store_desc: 'Personalize seu app com paletas exclusivas.',
+    open_theme_store: 'Abrir Loja de Temas',
+    filter_all: 'Todos',
+    filter_dark: 'Escuros',
+    filter_light: 'Claros',
+    filter_colorful: 'Coloridos',
+    apply: 'Aplicar',
+    applied: 'Em uso',
+    preview: 'Prévia',
 
     // General
     app_name: 'Invest Portfolio',

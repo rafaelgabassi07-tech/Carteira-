@@ -3,8 +3,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent } from '../types';
 import { fetchAdvancedAssetData, fetchHistoricalPrices } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
-import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics, getClosestPrice } from '../utils';
-import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE } from '../constants';
+import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics, getClosestPrice, applyThemeToDocument } from '../utils';
+import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES } from '../constants';
 
 // --- Types ---
 interface PortfolioContextType {
@@ -28,6 +28,7 @@ interface PortfolioContextType {
   importTransactions: (transactions: Transaction[]) => void;
   restoreData: (data: { transactions: Transaction[], preferences?: Partial<AppPreferences> }) => void;
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
+  setTheme: (themeId: string) => void; // New Theme Setter
   updateUserProfile: (profile: Partial<UserProfile>) => void;
   refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
   refreshAllData: () => Promise<void>;
@@ -46,6 +47,7 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(undefin
 // --- Constants ---
 const DEFAULT_PREFERENCES: AppPreferences = {
     accentColor: 'blue', systemTheme: 'system', visualStyle: 'premium', fontSize: 'medium', compactMode: false,
+    currentThemeId: 'default-dark', // Default Theme ID
     showCurrencySymbol: true, reduceMotion: false, animationSpeed: 'normal',
     startScreen: 'carteira', hapticFeedback: true, vibrationIntensity: 'medium',
     hideCents: false, restartTutorial: false, privacyOnStart: false, appPin: null,
@@ -76,6 +78,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const sourceTransactions = useMemo(() => isDemoMode ? DEMO_TRANSACTIONS : transactions, [isDemoMode, transactions]);
   const sourceMarketData = useMemo(() => isDemoMode ? DEMO_MARKET_DATA : marketData, [isDemoMode, marketData]);
+
+  // --- Theme Management ---
+  useEffect(() => {
+      // Apply theme on load and whenever it changes
+      const themeId = preferences.currentThemeId || 'default-dark';
+      const theme = APP_THEMES.find(t => t.id === themeId) || APP_THEMES[0];
+      applyThemeToDocument(theme);
+  }, [preferences.currentThemeId]);
+
+  const setTheme = useCallback((themeId: string) => {
+      setPreferences(prev => ({ ...prev, currentThemeId: themeId }));
+  }, [setPreferences]);
+
 
   // --- Actions ---
   const addTransaction = useCallback((transaction: Transaction) => setTransactions(prev => [...prev, transaction]), [setTransactions]);
@@ -525,6 +540,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     importTransactions,
     restoreData,
     updatePreferences,
+    setTheme,
     updateUserProfile,
     refreshMarketData,
     refreshAllData,
@@ -541,7 +557,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     yieldOnCost, projectedAnnualIncome, monthlyIncome, portfolioEvolution,
     lastSync, isRefreshing, marketDataError, userProfile, 
     addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
-    updatePreferences, updateUserProfile, refreshMarketData, refreshAllData, refreshSingleAsset,
+    updatePreferences, setTheme, updateUserProfile, refreshMarketData, refreshAllData, refreshSingleAsset,
     getAssetByTicker, getAveragePriceForTransaction, setIsDemoMode, setPrivacyMode,
     togglePrivacyMode, resetApp, clearCache
   ]);

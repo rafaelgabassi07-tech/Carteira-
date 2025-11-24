@@ -1,9 +1,7 @@
 
-import type { Asset, UserProfile, Transaction, Dividend, CalendarEvent, MonthlyIncome, DividendHistoryEvent } from './types';
+import type { Asset, UserProfile, Transaction, Dividend, CalendarEvent, MonthlyIncome, DividendHistoryEvent, AppTheme } from './types';
 
 // --- Cache Time-To-Live (TTLs) em Milissegundos ---
-// Definido para ~100 anos para garantir que os dados nunca expirem sozinhos.
-// A atualização ocorre apenas manualmente pelo usuário.
 const INFINITE_TTL = 100 * 365 * 24 * 60 * 60 * 1000;
 
 export const CACHE_TTL = {
@@ -12,6 +10,154 @@ export const CACHE_TTL = {
     DIVIDENDS: INFINITE_TTL,
     CALENDAR: INFINITE_TTL,
 };
+
+// --- THEMES ---
+export const APP_THEMES: AppTheme[] = [
+    {
+        id: 'default-dark',
+        name: 'Padrão Dark',
+        type: 'dark',
+        description: 'O tema clássico e elegante do Invest.',
+        colors: {
+            bgPrimary: '#09090b',
+            bgSecondary: '#18181b',
+            bgTertiary: '#27272a',
+            textPrimary: '#fafafa',
+            textSecondary: '#a1a1aa',
+            borderColor: '#27272a',
+            accentColor: '#38bdf8',
+            accentText: '#09090b',
+            greenText: '#4ade80',
+            redText: '#f87171',
+        }
+    },
+    {
+        id: 'midnight-oled',
+        name: 'Midnight OLED',
+        type: 'dark',
+        description: 'Preto absoluto para economia de bateria.',
+        colors: {
+            bgPrimary: '#000000',
+            bgSecondary: '#0a0a0a',
+            bgTertiary: '#171717',
+            textPrimary: '#ffffff',
+            textSecondary: '#888888',
+            borderColor: '#1f1f1f',
+            accentColor: '#ffffff',
+            accentText: '#000000',
+            greenText: '#22c55e',
+            redText: '#ef4444',
+        }
+    },
+    {
+        id: 'dracula',
+        name: 'Dracula',
+        type: 'dark',
+        description: 'Famoso tema com tons de roxo e contraste suave.',
+        colors: {
+            bgPrimary: '#282a36',
+            bgSecondary: '#44475a',
+            bgTertiary: '#6272a4',
+            textPrimary: '#f8f8f2',
+            textSecondary: '#bd93f9',
+            borderColor: '#6272a4',
+            accentColor: '#ff79c6',
+            accentText: '#282a36',
+            greenText: '#50fa7b',
+            redText: '#ff5555',
+        }
+    },
+    {
+        id: 'ocean-depths',
+        name: 'Ocean Depths',
+        type: 'dark',
+        description: 'Tons profundos de azul marinho.',
+        colors: {
+            bgPrimary: '#0f172a',
+            bgSecondary: '#1e293b',
+            bgTertiary: '#334155',
+            textPrimary: '#f1f5f9',
+            textSecondary: '#94a3b8',
+            borderColor: '#334155',
+            accentColor: '#38bdf8',
+            accentText: '#0f172a',
+            greenText: '#34d399',
+            redText: '#f87171',
+        }
+    },
+    {
+        id: 'forest-dark',
+        name: 'Deep Forest',
+        type: 'dark',
+        description: 'Inspirado na natureza com tons de verde.',
+        colors: {
+            bgPrimary: '#022c22',
+            bgSecondary: '#064e3b',
+            bgTertiary: '#065f46',
+            textPrimary: '#ecfdf5',
+            textSecondary: '#6ee7b7',
+            borderColor: '#047857',
+            accentColor: '#34d399',
+            accentText: '#022c22',
+            greenText: '#6ee7b7',
+            redText: '#fda4af',
+        }
+    },
+    {
+        id: 'default-light',
+        name: 'Padrão Light',
+        type: 'light',
+        description: 'Claro, limpo e profissional.',
+        colors: {
+            bgPrimary: '#f8fafc',
+            bgSecondary: '#ffffff',
+            bgTertiary: '#f1f5f9',
+            textPrimary: '#0f172a',
+            textSecondary: '#64748b',
+            borderColor: '#e2e8f0',
+            accentColor: '#0284c7',
+            accentText: '#ffffff',
+            greenText: '#16a34a',
+            redText: '#e11d48',
+        }
+    },
+    {
+        id: 'sepia-comfort',
+        name: 'Sepia Comfort',
+        type: 'light',
+        description: 'Fundo amarelado suave para leitura.',
+        colors: {
+            bgPrimary: '#fbf7f0',
+            bgSecondary: '#fffefb',
+            bgTertiary: '#f0e6d2',
+            textPrimary: '#433422',
+            textSecondary: '#8c7b67',
+            borderColor: '#e6dbcc',
+            accentColor: '#d97706',
+            accentText: '#ffffff',
+            greenText: '#059669',
+            redText: '#dc2626',
+        }
+    },
+    {
+        id: 'corporate-gray',
+        name: 'Corporate',
+        type: 'light',
+        description: 'Monocromático e sério.',
+        colors: {
+            bgPrimary: '#f3f4f6',
+            bgSecondary: '#ffffff',
+            bgTertiary: '#e5e7eb',
+            textPrimary: '#111827',
+            textSecondary: '#6b7280',
+            borderColor: '#d1d5db',
+            accentColor: '#4b5563',
+            accentText: '#ffffff',
+            greenText: '#059669',
+            redText: '#b91c1c',
+        }
+    }
+];
 
 export const MOCK_ASSETS: Omit<Asset, 'quantity' | 'avgPrice' | 'yieldOnCost'>[] = [];
 

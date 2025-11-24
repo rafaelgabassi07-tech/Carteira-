@@ -1,6 +1,6 @@
 
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
-import type { Transaction } from './types';
+import type { Transaction, AppTheme } from './types';
 
 // --- Hook para estado persistente no localStorage ---
 export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatch<SetStateAction<T>>] {
@@ -58,6 +58,53 @@ export const copyToClipboard = async (text: string): Promise<boolean> => {
     return false;
   }
 };
+
+// --- Theme Engine Utilities ---
+
+const hexToRgb = (hex: string): string => {
+    // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
+    const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+        return r + r + g + g + b + b;
+    });
+
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? 
+        `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` 
+        : '0, 0, 0';
+}
+
+export const applyThemeToDocument = (theme: AppTheme) => {
+    if (!document) return;
+    const root = document.documentElement;
+    
+    // 1. Set the data-theme attribute for broad CSS selectors
+    root.dataset.theme = theme.type;
+
+    // 2. Inject CSS Variables for Colors
+    // We set both the HEX value (e.g. --bg-primary) and the RGB value (e.g. --bg-primary-rgb)
+    // Tailwind uses the RGB value for opacity utilities: bg-[var(--bg-primary)]/50
+    
+    const setVar = (name: string, value: string) => {
+        root.style.setProperty(`--${name}`, value);
+        // Also set the RGB version for Tailwind opacity modifiers
+        root.style.setProperty(`--${name}-rgb`, hexToRgb(value));
+    };
+
+    setVar('bg-primary', theme.colors.bgPrimary);
+    setVar('bg-secondary', theme.colors.bgSecondary);
+    setVar('bg-tertiary-hover', theme.colors.bgTertiary);
+    setVar('text-primary', theme.colors.textPrimary);
+    setVar('text-secondary', theme.colors.textSecondary);
+    setVar('border-color', theme.colors.borderColor);
+    setVar('accent-color', theme.colors.accentColor);
+    
+    // Special cases (might not need RGB for all)
+    root.style.setProperty('--accent-color-text', theme.colors.accentText);
+    root.style.setProperty('--green-text', theme.colors.greenText);
+    root.style.setProperty('--red-text', theme.colors.redText);
+};
+
 
 // --- Date Utilities (Timezone Safe) ---
 

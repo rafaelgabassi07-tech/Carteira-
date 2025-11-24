@@ -94,10 +94,33 @@ export type SortOption = 'valueDesc' | 'valueAsc' | 'tickerAsc' | 'performanceDe
 
 export type AppColor = 'blue' | 'green' | 'purple' | 'orange' | 'rose';
 
+export interface ThemeColors {
+    bgPrimary: string;
+    bgSecondary: string;
+    bgTertiary: string;
+    textPrimary: string;
+    textSecondary: string;
+    borderColor: string;
+    accentColor: string;
+    accentText: string;
+    greenText: string;
+    redText: string;
+}
+
+export interface AppTheme {
+    id: string;
+    name: string;
+    type: 'dark' | 'light';
+    description: string;
+    colors: ThemeColors;
+    isPremium?: boolean;
+}
+
 export interface AppPreferences {
   // Appearance
-  accentColor: AppColor;
-  systemTheme: 'system' | 'light' | 'dark';
+  currentThemeId: string; // Replaces simple accentColor/systemTheme for full themes
+  accentColor: AppColor; // Kept for backward compatibility or simple overrides
+  systemTheme: 'system' | 'light' | 'dark'; // Kept for backward compatibility
   visualStyle: 'simple' | 'premium'; // New Visual Style Preference
   fontSize: 'small' | 'medium' | 'large';
   compactMode: boolean;
