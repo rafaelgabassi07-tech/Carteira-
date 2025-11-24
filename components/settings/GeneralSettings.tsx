@@ -1,3 +1,4 @@
+
 import React from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
@@ -6,18 +7,13 @@ import { usePortfolio } from '../../contexts/PortfolioContext';
 
 const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const { t } = useI18n();
-    const { preferences, updatePreferences, setDemoMode } = usePortfolio();
+    const { preferences, updatePreferences } = usePortfolio();
     
     const startScreens = [
         { id: 'carteira', label: t('nav_portfolio') },
         { id: 'analise', label: t('nav_analysis') },
         { id: 'noticias', label: t('nav_news') },
     ];
-    
-    const handleRestartTutorial = () => {
-        updatePreferences({ restartTutorial: true });
-        window.location.reload();
-    };
 
     return (
         <div>
@@ -42,12 +38,6 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                  <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
                     <p className="font-bold text-sm">{t('haptic_feedback')}</p>
                     <ToggleSwitch enabled={preferences.hapticFeedback} setEnabled={(val) => updatePreferences({ hapticFeedback: val })} />
-                </div>
-
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                    <button onClick={handleRestartTutorial} className="w-full text-center font-bold text-[var(--accent-color)] text-sm">
-                        {t('restart_tutorial')}
-                    </button>
                 </div>
             </div>
         </div>

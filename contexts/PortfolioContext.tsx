@@ -50,7 +50,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     currentThemeId: 'default-dark', // Default Theme ID
     showCurrencySymbol: true, reduceMotion: false, animationSpeed: 'normal',
     startScreen: 'carteira', hapticFeedback: true, vibrationIntensity: 'medium',
-    hideCents: false, restartTutorial: false, privacyOnStart: false, appPin: null,
+    hideCents: false, privacyOnStart: false, appPin: null,
     defaultBrokerage: 0, csvSeparator: ',', decimalPrecision: 2, defaultSort: 'valueDesc',
     dateFormat: 'dd/mm/yyyy', priceAlertThreshold: 5, globalIncomeGoal: 1000,
     segmentGoals: {}, dndEnabled: false, dndStart: '22:00', dndEnd: '07:00',

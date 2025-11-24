@@ -1,79 +1,102 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import PageHeader from '../components/PageHeader';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { APP_THEMES } from '../constants';
 import type { AppTheme } from '../types';
 import { vibrate } from '../utils';
-import PaletteIcon from '../components/icons/PaletteIcon';
+import CheckCircleIcon from '../components/icons/CheckCircleIcon';
 
-// --- Mini App Preview Component ---
-// This component renders a stylized, non-functional version of the app UI
-// using the inline styles from the passed 'theme' object.
-const ThemePreview: React.FC<{ theme: AppTheme }> = ({ theme }) => {
+// --- Icons for this view ---
+const MoonIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </svg>
+);
+
+const SunIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+    </svg>
+);
+
+// --- Realistic Mini App Preview ---
+const PhonePreview: React.FC<{ theme: AppTheme }> = ({ theme }) => {
     const c = theme.colors;
-    return (
-        <div className="w-full h-32 rounded-xl overflow-hidden relative border shadow-sm transition-all group-hover:scale-105" style={{ backgroundColor: c.bgPrimary, borderColor: c.borderColor }}>
-            {/* Fake Header */}
-            <div className="h-8 w-full flex items-center px-3 justify-between" style={{ backgroundColor: c.bgSecondary, borderBottom: `1px solid ${c.borderColor}` }}>
-                <div className="flex flex-col gap-1">
-                    <div className="h-1.5 w-10 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
-                    <div className="h-1 w-6 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
-                </div>
-                <div className="h-4 w-4 rounded-full" style={{ backgroundColor: c.bgTertiary }}></div>
-            </div>
-            
-            {/* Fake Content */}
-            <div className="p-3 flex gap-2">
-                {/* Summary Card */}
-                <div className="flex-1 h-16 rounded-lg p-2 flex flex-col justify-between shadow-sm" style={{ backgroundColor: c.bgSecondary, border: `1px solid ${c.borderColor}` }}>
-                    <div className="h-1.5 w-8 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
-                    <div className="h-3 w-16 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
-                    <div className="flex gap-1">
-                        <div className="h-1 w-10 rounded-full" style={{ backgroundColor: c.greenText }}></div>
-                    </div>
-                </div>
-                {/* Side Element (Chart placeholder) */}
-                <div className="w-8 h-16 rounded-lg shadow-sm flex items-end justify-center pb-1" style={{ backgroundColor: c.bgSecondary, border: `1px solid ${c.borderColor}` }}>
-                     <div className="w-3 h-10 rounded-sm" style={{ backgroundColor: c.accentColor }}></div>
-                </div>
-            </div>
-            
-            {/* Floating Action Button Preview */}
-            <div className="absolute bottom-2 right-2 w-6 h-6 rounded-full shadow-md flex items-center justify-center" style={{ backgroundColor: c.accentColor }}>
-                <div className="w-2 h-2 bg-white rounded-sm opacity-80"></div>
-            </div>
-        </div>
-    );
-};
-
-const ThemeCard: React.FC<{ theme: AppTheme; isActive: boolean; onApply: (id: string) => void }> = ({ theme, isActive, onApply }) => {
-    const { t } = useI18n();
     
-    const handleApply = () => {
-        vibrate();
-        onApply(theme.id);
-    };
-
     return (
-        <div className={`flex flex-col p-3 rounded-2xl border transition-all duration-300 group ${isActive ? 'bg-[var(--bg-secondary)] border-[var(--accent-color)] ring-1 ring-[var(--accent-color)]/50' : 'bg-[var(--bg-secondary)] border-[var(--border-color)] hover:border-[var(--accent-color)]/50'}`}>
-            <ThemePreview theme={theme} />
+        <div className="w-full aspect-[9/16] md:aspect-video rounded-2xl overflow-hidden relative border shadow-sm flex flex-col select-none transition-transform duration-500" 
+             style={{ backgroundColor: c.bgPrimary, borderColor: c.borderColor }}>
             
-            <div className="mt-3 flex flex-col flex-1">
-                <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-bold text-sm text-[var(--text-primary)]">{theme.name}</h3>
-                    {isActive && <span className="text-[10px] font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-1.5 py-0.5 rounded uppercase">{t('applied')}</span>}
+            {/* Simulated Status Bar */}
+            <div className="h-6 w-full flex items-center justify-between px-4 opacity-50" style={{ backgroundColor: c.bgPrimary }}>
+                <div className="w-8 h-2 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
+                <div className="flex gap-1">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.textSecondary }}></div>
+                    <div className="w-3 h-3 rounded-full" style={{ border: `1px solid ${c.textSecondary}` }}></div>
                 </div>
-                <p className="text-[10px] text-[var(--text-secondary)] line-clamp-2 mb-3 flex-1">{theme.description}</p>
+            </div>
+
+            {/* Header */}
+            <div className="pt-2 pb-3 px-4 flex justify-between items-center" style={{ borderBottom: `1px solid ${c.borderColor}` }}>
+                <div className="flex flex-col gap-1.5">
+                    <div className="h-2.5 w-16 rounded-full opacity-80" style={{ backgroundColor: c.textPrimary }}></div>
+                    <div className="h-1.5 w-10 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
+                </div>
+                <div className="w-8 h-8 rounded-full opacity-20" style={{ backgroundColor: c.textSecondary }}></div>
+            </div>
+
+            {/* Content Scroll */}
+            <div className="flex-1 p-4 flex flex-col gap-3 relative overflow-hidden">
                 
-                <button 
-                    onClick={handleApply}
-                    disabled={isActive}
-                    className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] cursor-default' : 'bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--accent-color)] hover:text-[var(--accent-color-text)] hover:border-[var(--accent-color)] shadow-sm'}`}
-                >
-                    {isActive ? t('applied') : t('apply')}
-                </button>
+                {/* Summary Card with Chart */}
+                <div className="w-full rounded-xl p-3 relative overflow-hidden shadow-sm flex flex-col justify-between h-28"
+                     style={{ 
+                         background: `linear-gradient(135deg, ${c.bgSecondary} 0%, ${c.bgPrimary} 100%)`,
+                         borderColor: c.borderColor,
+                         borderWidth: '1px'
+                     }}>
+                    <div className="flex justify-between items-start z-10">
+                        <div className="h-1.5 w-12 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
+                        <div className="h-3 w-3 rounded-full opacity-80" style={{ backgroundColor: c.greenText }}></div>
+                    </div>
+                    
+                    <div className="z-10">
+                        <div className="h-5 w-24 rounded-md mb-1" style={{ backgroundColor: c.textPrimary }}></div>
+                        <div className="h-2 w-14 rounded-full opacity-80" style={{ backgroundColor: c.greenText }}></div>
+                    </div>
+
+                    {/* Abstract Chart Background */}
+                    <svg className="absolute bottom-0 right-0 w-full h-20 opacity-20" preserveAspectRatio="none" viewBox="0 0 100 50">
+                        <path d="M0 50 L0 30 L20 40 L40 20 L60 35 L80 10 L100 25 L100 50 Z" fill={c.accentColor} />
+                    </svg>
+                </div>
+
+                {/* Asset List */}
+                <div className="flex flex-col gap-2 mt-1">
+                    {[1, 2].map((i) => (
+                        <div key={i} className="h-12 w-full rounded-lg flex items-center px-2 gap-3" style={{ backgroundColor: c.bgSecondary, borderColor: c.borderColor, borderWidth: '1px' }}>
+                            <div className="w-8 h-8 rounded-md opacity-20" style={{ backgroundColor: c.accentColor }}></div>
+                            <div className="flex-1 flex flex-col gap-1.5">
+                                <div className="h-2 w-12 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
+                                <div className="h-1.5 w-8 rounded-full opacity-60" style={{ backgroundColor: c.textSecondary }}></div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5">
+                                <div className="h-2 w-10 rounded-full" style={{ backgroundColor: c.textPrimary }}></div>
+                                <div className="h-1.5 w-6 rounded-full" style={{ backgroundColor: i === 1 ? c.greenText : c.redText }}></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Bottom Nav */}
+            <div className="h-12 w-full flex justify-around items-center px-2" style={{ backgroundColor: c.bgSecondary, borderTop: `1px solid ${c.borderColor}` }}>
+                {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="w-4 h-4 rounded-sm" style={{ backgroundColor: i === 1 ? c.accentColor : c.textSecondary, opacity: i === 1 ? 1 : 0.3 }}></div>
+                ))}
             </div>
         </div>
     );
@@ -82,10 +105,20 @@ const ThemeCard: React.FC<{ theme: AppTheme; isActive: boolean; onApply: (id: st
 const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { t } = useI18n();
     const { preferences, setTheme } = usePortfolio();
-    const [filter, setFilter] = useState<'all' | 'dark' | 'light'>('all');
+    
+    // Initialize filter based on the currently active theme type
+    const activeThemeData = useMemo(() => 
+        APP_THEMES.find(t => t.id === preferences.currentThemeId) || APP_THEMES[0], 
+    [preferences.currentThemeId]);
+
+    const [filter, setFilter] = useState<'dark' | 'light'>(activeThemeData.type);
+
+    // Update filter if theme changes externally or on first load (to match current theme)
+    useEffect(() => {
+        setFilter(activeThemeData.type);
+    }, [activeThemeData.type]);
 
     const filteredThemes = useMemo(() => {
-        if (filter === 'all') return APP_THEMES;
         return APP_THEMES.filter(t => t.type === filter);
     }, [filter]);
 
@@ -95,35 +128,83 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <PageHeader title={t('theme_store')} onBack={onBack} helpText={t('theme_store_desc')} />
             </div>
 
-            {/* Filters */}
-            <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-1 flex-shrink-0">
-                {[
-                    { id: 'all', label: t('filter_all') },
-                    { id: 'dark', label: t('filter_dark') },
-                    { id: 'light', label: t('filter_light') },
-                ].map(f => (
-                    <button
-                        key={f.id}
-                        onClick={() => { setFilter(f.id as any); vibrate(); }}
-                        className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${filter === f.id ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-md' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)]'}`}
-                    >
-                        {f.label}
-                    </button>
-                ))}
-            </div>
+            {/* Content */}
+            <div className="overflow-y-auto custom-scrollbar pb-24 md:pb-6 px-1 relative">
+                
+                {/* Hero: Active Theme */}
+                <div className="mb-6 animate-fade-in">
+                    <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1">{t('applied')}</h3>
+                    <div className="bg-[var(--bg-secondary)] rounded-3xl p-4 border border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/10 relative overflow-hidden">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                            <div className="order-2 md:order-1">
+                                <PhonePreview theme={activeThemeData} />
+                            </div>
+                            <div className="order-1 md:order-2 flex flex-col justify-center">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <CheckCircleIcon className="w-6 h-6 text-[var(--accent-color)]" filled />
+                                    <h2 className="text-2xl font-bold text-[var(--text-primary)]">{activeThemeData.name}</h2>
+                                </div>
+                                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">{activeThemeData.description}</p>
+                                <div className="flex gap-2">
+                                    {Object.values(activeThemeData.colors).slice(0, 5).map((c, i) => (
+                                        <div key={i} className="w-6 h-6 rounded-full border border-[var(--border-color)] shadow-sm" style={{ backgroundColor: c }}></div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-            <div className="overflow-y-auto pr-1 custom-scrollbar pb-24 md:pb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredThemes.map((theme, idx) => (
-                        <div key={theme.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 50}ms` }}>
-                            <ThemeCard 
-                                theme={theme} 
-                                isActive={preferences.currentThemeId === theme.id} 
-                                onApply={setTheme}
-                            />
+                {/* Sticky Filter Header */}
+                <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)] -mx-1 px-1 py-3 mb-6 transition-colors duration-300">
+                    <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm">
+                        <button
+                            onClick={() => { setFilter('dark'); vibrate(); }}
+                            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${filter === 'dark' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md transform scale-[1.02]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        >
+                            <MoonIcon className="w-4 h-4" />
+                            {t('filter_dark')}
+                        </button>
+                        <button
+                            onClick={() => { setFilter('light'); vibrate(); }}
+                            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${filter === 'light' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md transform scale-[1.02]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        >
+                            <SunIcon className="w-4 h-4" />
+                            {t('filter_light')}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredThemes.filter(t => t.id !== preferences.currentThemeId).map((theme, idx) => (
+                        <div 
+                            key={theme.id} 
+                            onClick={() => { setTheme(theme.id); vibrate(20); }}
+                            className="group bg-[var(--bg-secondary)] rounded-2xl p-3 border border-[var(--border-color)] hover:border-[var(--accent-color)] hover:-translate-y-1 transition-all duration-300 cursor-pointer animate-fade-in-up shadow-sm hover:shadow-xl"
+                            style={{ animationDelay: `${idx * 50}ms` }}
+                        >
+                            <div className="rounded-xl overflow-hidden border border-[var(--border-color)] group-hover:border-transparent transition-colors mb-3 shadow-inner relative">
+                                <PhonePreview theme={theme} />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+                            </div>
+                            <div className="px-1">
+                                <div className="flex justify-between items-center mb-1">
+                                    <h4 className="font-bold text-sm text-[var(--text-primary)] truncate pr-2">{theme.name}</h4>
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.colors.accentColor }}></div>
+                                </div>
+                                <p className="text-[10px] text-[var(--text-secondary)] line-clamp-1">{theme.description}</p>
+                            </div>
                         </div>
                     ))}
                 </div>
+                
+                {filteredThemes.filter(t => t.id !== preferences.currentThemeId).length === 0 && (
+                    <div className="text-center py-10 text-[var(--text-secondary)] animate-fade-in">
+                        <p className="text-sm font-medium">Todos os temas desta categoria já estão em uso ou não há opções disponíveis.</p>
+                    </div>
+                )}
+
             </div>
         </div>
     );

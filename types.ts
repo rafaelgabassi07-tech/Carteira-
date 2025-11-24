@@ -133,7 +133,6 @@ export interface AppPreferences {
   hapticFeedback: boolean;
   vibrationIntensity: 'light' | 'medium' | 'heavy';
   hideCents: boolean;
-  restartTutorial: boolean;
 
   // Security
   privacyOnStart: boolean;

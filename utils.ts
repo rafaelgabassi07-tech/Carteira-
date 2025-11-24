@@ -1,8 +1,8 @@
-
-import { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import { useState, useEffect, Dispatch, SetStateAction, useRef } from 'react';
 import type { Transaction, AppTheme } from './types';
 
-// --- Hook para estado persistente no localStorage ---
+// --- Hook para estado persistente no localStorage com Debounce ---
+// Otimização: Evita travar a UI escrevendo no disco a cada tecla digitada
 export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatch<SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
     try {
@@ -20,12 +20,29 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatc
     }
   });
 
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(state));
-    } catch (error) {
-      console.error(`Error setting localStorage key “${key}”:`, error);
+    // Cancela o timeout anterior se o estado mudar rapidamente
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
+
+    // Agenda a gravação no localStorage para daqui a 1000ms (1 segundo)
+    // Isso evita que a UI trave se o estado mudar muito rápido (ex: digitando ou slider)
+    timeoutRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(key, JSON.stringify(state));
+      } catch (error) {
+        console.error(`Error setting localStorage key “${key}”:`, error);
+      }
+    }, 1000);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [key, state]);
 
   return [state, setState];
@@ -36,6 +53,21 @@ export const vibrate = (pattern: number | number[] = 10) => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     navigator.vibrate(pattern);
   }
+};
+
+// --- Hardware Detection for Performance ---
+export const isLowEndDevice = (): boolean => {
+    if (typeof navigator !== 'undefined') {
+        // Se tiver menos de 4 núcleos ou pouca memória (se a API estiver disponível)
+        if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) {
+            return true;
+        }
+        // @ts-ignore - deviceMemory is non-standard but useful
+        if (navigator.deviceMemory && navigator.deviceMemory < 4) {
+            return true;
+        }
+    }
+    return false;
 };
 
 // --- Debounce Utility ---
@@ -237,32 +269,18 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
     return metrics;
 };
 
-/**
- * Finds the price for a given date from a sorted price history.
- * If the exact date is not found, it returns the price of the most recent previous date.
- * If the target date is before any history, it returns the first available price.
- */
 export const getClosestPrice = (history: { date: string; price: number }[], targetDate: string): number | null => {
     if (!history || history.length === 0) return null;
-    
-    // If target date is before the first record, use the first record.
-    if (targetDate < history[0].date) {
-        return history[0].price;
-    }
+    if (targetDate < history[0].date) return history[0].price;
 
     let closestPrice = null;
     for (const point of history) {
-        if (point.date <= targetDate) {
-            closestPrice = point.price;
-        } else {
-            // Since history is sorted, we can break early
-            break;
-        }
+        if (point.date <= targetDate) closestPrice = point.price;
+        else break;
     }
     return closestPrice;
 };
 
-// --- WebAuthn Helpers ---
 export function bufferEncode(value: ArrayBuffer): string {
     return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(value))))
         .replace(/\+/g, '-')
@@ -277,8 +295,6 @@ export function bufferDecode(value: string): ArrayBuffer {
     const raw = atob(padded);
     const buffer = new ArrayBuffer(raw.length);
     const arr = new Uint8Array(buffer);
-    for (let i = 0; i < raw.length; i++) {
-        arr[i] = raw.charCodeAt(i);
-    }
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
     return buffer;
 }

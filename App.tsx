@@ -1,21 +1,14 @@
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import PortfolioView from './views/PortfolioView';
-import NewsView from './views/NewsView';
-import SettingsView, { type MenuScreen } from './views/SettingsView';
-import TransactionsView from './views/TransactionsView';
-import NotificationsView from './views/NotificationsView';
-import AnalysisView from './views/AnalysisView';
-import AssetDetailView from './views/AssetDetailView';
-import PinLockScreen from './components/PinLockScreen';
+import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
-import Tour from './components/tour/Tour';
-import OfflineBanner from './components/OfflineBanner';
+import LoadingSpinner from './components/LoadingSpinner'; // Novo spinner
 import type { ToastMessage } from './types';
 import { usePortfolio } from './contexts/PortfolioContext';
 import { useI18n } from './contexts/I18nContext';
+import { isLowEndDevice } from './utils';
 
 // Icons for Sidebar
 import WalletIcon from './components/icons/WalletIcon';
@@ -24,24 +17,33 @@ import NewsIcon from './components/icons/NewsIcon';
 import AnalysisIcon from './components/icons/AnalysisIcon';
 import SettingsIcon from './components/icons/SettingsIcon';
 
+// Code Splitting: Carregamento sob demanda
+// PortfolioView é mantido estático para carregamento imediato da Home
+// As outras telas são carregadas apenas quando necessárias
+const NewsView = React.lazy(() => import('./views/NewsView'));
+const SettingsView = React.lazy(() => import('./views/SettingsView'));
+const TransactionsView = React.lazy(() => import('./views/TransactionsView'));
+const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
+const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
+const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
+const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
+
 export type View = 'carteira' | 'transacoes' | 'analise' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail';
 export type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
-  const { assets, preferences, setDemoMode, isDemoMode, marketDataError, setPrivacyMode } = usePortfolio();
+  const { assets, preferences, marketDataError, setPrivacyMode } = usePortfolio();
   const { t } = useI18n();
   const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'carteira');
   const [previousView, setPreviousView] = useState<View>('carteira');
-  const [showTour, setShowTour] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [transactionFilter, setTransactionFilter] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-  const [settingsStartScreen, setSettingsStartScreen] = useState<MenuScreen>('main');
+  const [settingsStartScreen, setSettingsStartScreen] = useState<any>('main');
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   
-  // Market Status State
   const [isMarketOpen, setIsMarketOpen] = useState(false);
 
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
@@ -52,7 +54,6 @@ const App: React.FC = () => {
     }, 3000);
   }, []);
 
-  // Global handler for background data sync errors
   useEffect(() => {
     if (marketDataError) {
         const isCompleteMessage = marketDataError.includes("Falha ao atualizar:") || marketDataError.includes("Token da API");
@@ -66,7 +67,6 @@ const App: React.FC = () => {
   
   // Theme & Visual Style Management
   useEffect(() => {
-    // Apply Theme (Light/Dark)
     const applyTheme = () => {
         let themeToApply = preferences.systemTheme;
         if (preferences.systemTheme === 'system') {
@@ -76,8 +76,12 @@ const App: React.FC = () => {
     };
     applyTheme();
     
-    // Apply Visual Style (Simple/Premium)
-    document.documentElement.dataset.style = preferences.visualStyle || 'premium';
+    // Detecção de hardware para otimização
+    if (isLowEndDevice() && preferences.visualStyle === 'premium') {
+        document.documentElement.dataset.style = 'simple'; // Força modo simples em celulares fracos
+    } else {
+        document.documentElement.dataset.style = preferences.visualStyle || 'premium';
+    }
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
@@ -107,7 +111,6 @@ const App: React.FC = () => {
     const color = colors[preferences.accentColor] || colors.blue;
     document.documentElement.style.setProperty('--accent-color', color);
     
-    // Helper to set RGB for gradients
     const hexToRgb = (hex: string) => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '56, 189, 248';
@@ -132,13 +135,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!isLocked) {
-        const hasVisited = localStorage.getItem('hasVisited');
-        
-        if (!hasVisited || preferences.restartTutorial) {
-            setDemoMode(true);
-            setShowTour(true);
-        }
-
         if (!isInitialized) {
             if (preferences.privacyOnStart) {
               setPrivacyMode(true);
@@ -147,9 +143,8 @@ const App: React.FC = () => {
             setIsInitialized(true);
         }
     }
-  }, [isLocked, preferences.startScreen, isInitialized, preferences.restartTutorial, setDemoMode, preferences.privacyOnStart, setPrivacyMode]);
+  }, [isLocked, preferences.startScreen, isInitialized, preferences.privacyOnStart, setPrivacyMode]);
   
-  // Re-lock on backgrounding
   useEffect(() => {
     const handleVisibilityChange = () => {
         if (document.visibilityState === 'hidden') {
@@ -169,18 +164,15 @@ const App: React.FC = () => {
     };
   }, [preferences.appPin]);
 
-  // Market Status Checker
   useEffect(() => {
     const checkMarketStatus = () => {
       const now = new Date();
-      // Convert to Sao Paulo time
       const spTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
       
-      const day = spTime.getDay(); // 0 = Sun, 6 = Sat
+      const day = spTime.getDay();
       const hour = spTime.getHours();
       const minute = spTime.getMinutes();
       
-      // Logic: Mon-Fri (1-5), 10:00 to 17:55 (approx B3 closing)
       const isWeekday = day >= 1 && day <= 5;
       const isOpenHours = (hour > 10 || (hour === 10 && minute >= 0)) && (hour < 17 || (hour === 17 && minute <= 55));
       
@@ -188,15 +180,9 @@ const App: React.FC = () => {
     };
 
     checkMarketStatus();
-    const interval = setInterval(checkMarketStatus, 60000); // Check every minute
+    const interval = setInterval(checkMarketStatus, 60000);
     return () => clearInterval(interval);
   }, []);
-
-  const handleTourFinish = () => {
-    setDemoMode(false);
-    setShowTour(false);
-    localStorage.setItem('hasVisited', 'true');
-  };
 
   const navigateTo = (view: View) => {
     setPreviousView(activeView);
@@ -204,7 +190,7 @@ const App: React.FC = () => {
     setActiveView(view);
   };
 
-  const navigateToSettings = (screen: MenuScreen) => {
+  const navigateToSettings = (screen: any) => {
       setSettingsStartScreen(screen);
       setActiveView('settings');
   };
@@ -227,18 +213,9 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (activeView) {
       case 'carteira':
-        return <PortfolioView 
-            setActiveView={navigateTo} 
-            setTransactionFilter={setTransactionFilter}
-            onSelectAsset={handleSelectAsset}
-            addToast={addToast}
-        />;
+        return <PortfolioView setActiveView={navigateTo} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
       case 'transacoes':
-        return <TransactionsView 
-            initialFilter={transactionFilter}
-            clearFilter={() => setTransactionFilter(null)}
-            addToast={addToast}
-        />;
+        return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
        case 'analise':
         return <AnalysisView addToast={addToast} />;
       case 'noticias':
@@ -250,23 +227,16 @@ const App: React.FC = () => {
       case 'assetDetail':
         return <AssetDetailView ticker={selectedTicker!} onBack={handleBack} onViewTransactions={handleViewTransactions} />;
       default:
-        return <PortfolioView 
-            setActiveView={navigateTo} 
-            setTransactionFilter={setTransactionFilter}
-            onSelectAsset={handleSelectAsset}
-            addToast={addToast}
-        />;
+        return <PortfolioView setActiveView={navigateTo} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
     }
   };
 
   if (isLocked && preferences.appPin) {
       const biometricsEnabled = localStorage.getItem('security-biometrics') === 'true';
       return (
-        <PinLockScreen 
-            correctPin={preferences.appPin} 
-            onUnlock={() => setIsLocked(false)} 
-            allowBiometrics={biometricsEnabled}
-        />
+        <Suspense fallback={null}>
+            <PinLockScreen correctPin={preferences.appPin} onUnlock={() => setIsLocked(false)} allowBiometrics={biometricsEnabled} />
+        </Suspense>
       );
   }
 
@@ -276,7 +246,6 @@ const App: React.FC = () => {
   return (
     <div className="bg-[var(--bg-primary)] min-h-screen font-sans text-[var(--text-primary)] transition-colors duration-300 flex flex-col md:flex-row overflow-hidden mobile-landscape-layout selection:bg-[var(--accent-color)] selection:text-[var(--accent-color-text)]">
        <OfflineBanner />
-       {showTour && <Tour onFinish={handleTourFinish} isPortfolioEmpty={isDemoMode ? false : assets.length === 0} />}
        
        <aside className={`hidden md:flex flex-col w-64 xl:w-72 flex-shrink-0 z-20 mobile-landscape-sidebar transition-all duration-300
             ${isPremium 
@@ -326,9 +295,12 @@ const App: React.FC = () => {
        <main className="flex-1 h-screen relative flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-hidden bg-[var(--bg-primary)] relative">
             <ErrorBoundary>
-              <div className="view-container h-full animate-subtle-fade-in" key={activeView}>
-                {renderView()}
-              </div>
+              {/* Suspense para carregar Views assincronamente */}
+              <Suspense fallback={<LoadingSpinner />}>
+                  <div className="view-container h-full animate-subtle-fade-in" key={activeView}>
+                    {renderView()}
+                  </div>
+              </Suspense>
             </ErrorBoundary>
           </div>
           
