@@ -54,8 +54,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         let currentPrice = 0;
         const urlBase = `https://brapi.dev/api/quote/${ticker}`;
 
-        // Strategy: Try 1y (Premium/Full) -> 5d (Free/Short) -> Current Price (Fallback)
-        // We add dividends=true to all requests to get dividend history
+        // Strategy: Try 1y (Premium/Full) -> 3mo (Intermediate) -> 5d (Free/Short) -> Current Price (Fallback)
         
         // 1. Try Long Range (1y)
         try {
@@ -87,10 +86,38 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             }
         }
 
-        // 2. Try Short Range (5d) - If 1y failed or was forbidden
+        // 2. Try Intermediate Range (3mo) - Better than 5d if 1y fails
         if (!success) {
              try {
-                await delay(200); // Small delay to be nice to API
+                await delay(200); 
+                const response = await fetch(`${urlBase}?range=3mo&dividends=true&token=${token}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const result = data.results?.[0];
+                     if (result) {
+                        currentPrice = result.regularMarketPrice;
+                        historyData = result.historicalDataPrice || [];
+                        // Dividends logic same as above
+                        if (result.dividendData?.historicalDataPrice) {
+                            dividendsHistory = result.dividendData.historicalDataPrice.map((item: any) => ({
+                                exDate: new Date(item.date * 1000).toISOString().split('T')[0],
+                                paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
+                                value: item.dividends?.[0]?.value || 0
+                            })).filter(d => d.value > 0);
+                        }
+                        success = true;
+                    }
+                }
+            } catch (e) {
+                console.warn(`Failed to fetch 3mo for ${ticker}`, e);
+            }
+        }
+
+        // 3. Try Short Range (5d) - If others failed
+        if (!success) {
+             try {
+                await delay(200); 
                 const response = await fetch(`${urlBase}?range=5d&dividends=true&token=${token}`);
                 
                 if (response.ok) {
@@ -114,7 +141,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             }
         }
 
-        // 3. Current Price Only (Last Resort)
+        // 4. Current Price Only (Last Resort)
         if (!success) {
              try {
                 await delay(200);

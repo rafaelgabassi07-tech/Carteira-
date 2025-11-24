@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent } from '../types';
 import { fetchAdvancedAssetData, fetchHistoricalPrices } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -429,6 +429,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             
             if (historicalPrice === null) {
                 missingPrices.push({ ticker, date: endOfMonthISO });
+                // Temporary fallback to average cost while we fetch data.
+                // This might show 0 capital gain momentarily until AI fetches data.
                 historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
             }
             
@@ -452,25 +454,45 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [evolutionResult.evolution]);
 
   const queriesToFetchJSON = useMemo(() => {
-      const uniqueQueries = [...new Map(evolutionResult.missingPrices.map(item => [`${item.ticker}_${item.date}`, item])).values()];
+      // Use a Set to ensure unique queries
+      const uniqueQueries = [...new Map(evolutionResult.missingPrices.map((item: { ticker: string; date: string }) => [`${item.ticker}_${item.date}`, item])).values()];
       return JSON.stringify(uniqueQueries);
   }, [evolutionResult.missingPrices]);
 
+  // Use a ref to track if we are currently fetching to avoid duplicate calls in StrictMode
+  const isFetchingHistory = useRef(false);
+
   useEffect(() => {
       const queriesToFetch = JSON.parse(queriesToFetchJSON);
-      if (queriesToFetch.length > 0) {
-          const fetcher = async () => {
-              try {
-                  const fetchedPrices = await fetchHistoricalPrices(preferences, queriesToFetch);
-                  if (Object.keys(fetchedPrices).length > 0) {
-                      setHistoricalPriceCache(prev => ({ ...prev, ...fetchedPrices }));
+      
+      if (queriesToFetch.length > 0 && !isFetchingHistory.current) {
+          isFetchingHistory.current = true;
+          
+          const fetchBatched = async () => {
+              // Process in small batches to avoid overwhelming the AI
+              const BATCH_SIZE = 3;
+              for (let i = 0; i < queriesToFetch.length; i += BATCH_SIZE) {
+                  const batch = queriesToFetch.slice(i, i + BATCH_SIZE);
+                  try {
+                      const fetchedPrices = await fetchHistoricalPrices(preferences, batch);
+                      if (Object.keys(fetchedPrices).length > 0) {
+                          setHistoricalPriceCache(prev => ({ ...prev, ...fetchedPrices }));
+                      }
+                  } catch (e) {
+                      console.warn("Failed to fetch historical prices via Gemini batch", e);
                   }
-              } catch (e) {
-                  console.warn("Failed to fetch historical prices via Gemini", e);
+                  // Small delay between batches to be nice to the API
+                  await new Promise(resolve => setTimeout(resolve, 1200));
               }
+              isFetchingHistory.current = false;
           };
-          const timer = setTimeout(fetcher, 500);
-          return () => clearTimeout(timer);
+
+          // Add a debounce/delay before starting
+          const timer = setTimeout(fetchBatched, 1000);
+          return () => {
+              clearTimeout(timer);
+              isFetchingHistory.current = false;
+          };
       }
   }, [queriesToFetchJSON, preferences, setHistoricalPriceCache]);
 

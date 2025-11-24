@@ -52,10 +52,17 @@ function getDomain(url: string): string {
 
 function extractJSON(text: string): any {
     try {
+        // Try to match code block first
+        const codeBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+            return JSON.parse(codeBlockMatch[1]);
+        }
+        // Try generic object/array match
         const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
         if (jsonMatch) {
             return JSON.parse(jsonMatch[0]);
         }
+        // Try parsing raw text
         return JSON.parse(text);
     } catch (e) {
         console.error("Failed to extract JSON from text:", text, e);
@@ -310,12 +317,16 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
     const formattedQueries = queries.map(q => `{"ticker": "${q.ticker}", "date": "${q.date}"}`).join(', ');
 
     const prompt = `
-      You are a financial data API. For each ticker and date object in the list [${formattedQueries}], find the closing price on that specific date. 
-      Use Google Search for this.
-      Return a single JSON object where the key is a composite string 'TICKER_YYYY-MM-DD' and the value is a number representing the closing price.
-      Do not invent data. If a price cannot be found, omit the key from the response.
-
-      Example response for a query of [{"ticker": "MXRF11", "date": "2023-11-30"}, {"ticker": "HGLG11", "date": "2023-10-31"}]:
+      You are a financial data API. For each ticker and date object in this JSON list: [${formattedQueries}], find the **closing price (cotação de fechamento)** on that specific date. 
+      
+      IMPORTANT:
+      1. Use Google Search to find the exact historical close price.
+      2. If the date was a weekend or holiday, find the closing price of the **nearest previous trading day**.
+      3. Return ONLY a single valid JSON object.
+      4. The keys of the JSON object MUST be the composite string 'TICKER_YYYY-MM-DD' exactly as requested.
+      5. The value MUST be a number.
+      
+      Example Output format:
       {
         "MXRF11_2023-11-30": 10.81,
         "HGLG11_2023-10-31": 162.50
@@ -333,14 +344,25 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
         });
 
         const data = extractJSON(response.text || "{}");
+        
         if (data && typeof data === 'object' && !Array.isArray(data)) {
-            // Validate that values are numbers
+            // Validate that values are numbers and filter garbage
+            const cleanData: Record<string, number> = {};
             Object.keys(data).forEach(key => {
-                if (typeof data[key] !== 'number') {
-                    delete data[key];
+                if (typeof data[key] === 'number') {
+                    // Basic sanity check for FII prices (avoiding zero or negative unless legit, though 0 is suspicious)
+                    if (data[key] > 0) {
+                        cleanData[key] = data[key];
+                    }
+                } else if (typeof data[key] === 'string') {
+                    // Try to parse string numbers like "10,50" or "10.50"
+                    const num = parseFloat(data[key].replace(',', '.'));
+                    if (!isNaN(num) && num > 0) {
+                        cleanData[key] = num;
+                    }
                 }
             });
-            return data;
+            return cleanData;
         }
         return {};
     } catch (error) {
