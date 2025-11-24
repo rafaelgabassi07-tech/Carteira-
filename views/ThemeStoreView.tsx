@@ -2,27 +2,32 @@ import React, { useState, useMemo, useEffect } from 'react';
 import PageHeader from '../components/PageHeader';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import { APP_THEMES } from '../constants';
+import { APP_THEMES, APP_FONTS } from '../constants';
 import type { AppTheme } from '../types';
 import { vibrate } from '../utils';
 import CheckCircleIcon from '../components/icons/CheckCircleIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
+import TypeIcon from '../components/icons/TypeIcon';
+import PaletteIcon from '../components/icons/PaletteIcon';
+import LayoutGridIcon from '../components/icons/LayoutGridIcon';
+import ToggleSwitch from '../components/ToggleSwitch';
 
 // --- Icons for this view ---
 const MoonIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
     </svg>
 );
 
 const SunIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <circle cx="12" cy="12" r="4" />
         <path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
     </svg>
 );
 
-// --- Realistic Mini App Preview ---
+// --- Sub-Components for the View ---
+
 const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium' }> = ({ theme, visualStyle }) => {
     const c = theme.colors;
     const isPremium = visualStyle === 'premium';
@@ -123,10 +128,10 @@ const PhonePreview: React.FC<{ theme: AppTheme, visualStyle: 'simple' | 'premium
     );
 };
 
-const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+const ThemesSection: React.FC = () => {
     const { t } = useI18n();
     const { preferences, setTheme, updatePreferences } = usePortfolio();
-    
+
     const activeThemeData = useMemo(() => 
         APP_THEMES.find(t => t.id === preferences.currentThemeId) || APP_THEMES[0], 
     [preferences.currentThemeId]);
@@ -142,106 +147,198 @@ const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }, [filter]);
 
     return (
+        <div className="px-1">
+            <div className="mb-6 animate-fade-in">
+                <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1">{t('applied')}</h3>
+                <div className="bg-[var(--bg-secondary)] rounded-3xl p-4 border border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/10 relative overflow-hidden">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <div className="order-2 md:order-1">
+                            <PhonePreview theme={activeThemeData} visualStyle={preferences.visualStyle} />
+                        </div>
+                        <div className="order-1 md:order-2 flex flex-col justify-center">
+                            <div className="flex items-center gap-2 mb-2">
+                                <CheckCircleIcon className="w-6 h-6 text-[var(--accent-color)]" filled />
+                                <h2 className="text-2xl font-bold text-[var(--text-primary)]">{activeThemeData.name}</h2>
+                            </div>
+                            <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">{activeThemeData.description}</p>
+                            <div className="flex gap-2">
+                                {Object.values(activeThemeData.colors).slice(0, 5).map((c, i) => (
+                                    <div key={i} className="w-6 h-6 rounded-full border border-[var(--border-color)] shadow-sm" style={{ backgroundColor: c }}></div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)] -mx-1 px-1 py-3 mb-6 transition-colors duration-300 flex flex-col gap-3">
+                <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm">
+                    <button
+                        onClick={() => { setFilter('dark'); vibrate(); }}
+                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${filter === 'dark' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md transform scale-[1.02]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                    >
+                        <MoonIcon className="w-4 h-4" />
+                        {t('filter_dark')}
+                    </button>
+                    <button
+                        onClick={() => { setFilter('light'); vibrate(); }}
+                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${filter === 'light' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md transform scale-[1.02]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                    >
+                        <SunIcon className="w-4 h-4" />
+                        {t('filter_light')}
+                    </button>
+                </div>
+
+                <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                        <SparklesIcon className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-wider">{t('visual_finish')}</span>
+                    </div>
+                    <div className="flex bg-[var(--bg-secondary)] p-0.5 rounded-lg border border-[var(--border-color)]">
+                         <button 
+                            onClick={() => { updatePreferences({ visualStyle: 'simple' }); vibrate(); }}
+                            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.visualStyle === 'simple' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                         >
+                             {t('style_simple')}
+                         </button>
+                         <button 
+                            onClick={() => { updatePreferences({ visualStyle: 'premium' }); vibrate(); }}
+                            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.visualStyle === 'premium' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                         >
+                             {t('style_premium')}
+                         </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredThemes.filter(t => t.id !== preferences.currentThemeId).map((theme, idx) => (
+                    <div 
+                        key={theme.id} 
+                        onClick={() => { setTheme(theme.id); vibrate(20); }}
+                        className="group bg-[var(--bg-secondary)] rounded-2xl p-3 border border-[var(--border-color)] hover:border-[var(--accent-color)] hover:-translate-y-1 transition-all duration-300 cursor-pointer animate-fade-in-up shadow-sm hover:shadow-xl"
+                        style={{ animationDelay: `${idx * 50}ms` }}
+                    >
+                        <div className="rounded-xl overflow-hidden border border-[var(--border-color)] group-hover:border-transparent transition-colors mb-3 shadow-inner relative">
+                            <PhonePreview theme={theme} visualStyle={preferences.visualStyle} />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+                        </div>
+                        <div className="px-1">
+                            <div className="flex justify-between items-center mb-1">
+                                <h4 className="font-bold text-sm text-[var(--text-primary)] truncate pr-2">{theme.name}</h4>
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.colors.accentColor }}></div>
+                            </div>
+                            <p className="text-[10px] text-[var(--text-secondary)] line-clamp-1">{theme.description}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const TypographySection: React.FC = () => {
+    const { t } = useI18n();
+    const { preferences, updatePreferences } = usePortfolio();
+
+    const handleSetFont = (fontId: string) => {
+        vibrate(20);
+        updatePreferences({ currentFontId: fontId });
+    };
+
+    return (
+        <div className="px-1 space-y-8">
+            <div>
+                <h3 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1">{t('font_family')}</h3>
+                <div className="space-y-4">
+                    {APP_FONTS.map(font => {
+                        const isActive = preferences.currentFontId === font.id;
+                        return (
+                            <div 
+                                key={font.id} 
+                                onClick={() => handleSetFont(font.id)}
+                                className={`bg-[var(--bg-secondary)] rounded-2xl p-4 border transition-all duration-200 cursor-pointer hover:-translate-y-0.5 ${isActive ? 'border-[var(--accent-color)] ring-2 ring-[var(--accent-color)]/20 shadow-lg' : 'border-[var(--border-color)] hover:border-[var(--accent-color)]/50'}`}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h4 className="font-bold text-lg" style={{ fontFamily: font.family }}>{font.name}</h4>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">{t(font.description)}</p>
+                                    </div>
+                                    {isActive && <CheckCircleIcon filled className="w-6 h-6 text-[var(--accent-color)] flex-shrink-0" />}
+                                </div>
+                                <div className="mt-4 p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-color)]">
+                                    <p className="text-sm" style={{ fontFamily: font.family }}>
+                                        A rápida raposa marrom salta sobre o cão preguiçoso. 123.456,78
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/90 backdrop-blur-xl -mx-1 px-1 py-3 mb-2">
+                 <h3 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+                    <TypeIcon className="w-4 h-4" />
+                    {t('text_size')}
+                </h3>
+                <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm">
+                    <button 
+                        onClick={() => { updatePreferences({ fontSize: 'small' }); vibrate(); }}
+                        className={`flex-1 py-3 text-xs font-bold rounded-lg transition-all ${preferences.fontSize === 'small' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md' : 'text-[var(--text-secondary)]'}`}
+                    >
+                        {t('font_small')}
+                    </button>
+                    <button 
+                        onClick={() => { updatePreferences({ fontSize: 'medium' }); vibrate(); }}
+                        className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${preferences.fontSize === 'medium' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md' : 'text-[var(--text-secondary)]'}`}
+                    >
+                        {t('font_medium')}
+                    </button>
+                    <button 
+                        onClick={() => { updatePreferences({ fontSize: 'large' }); vibrate(); }}
+                        className={`flex-1 py-3 text-base font-bold rounded-lg transition-all ${preferences.fontSize === 'large' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md' : 'text-[var(--text-secondary)]'}`}
+                    >
+                        {t('font_large')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ThemeStoreView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+    const { t } = useI18n();
+    const [activeTab, setActiveTab] = useState<'themes' | 'typography'>('themes');
+
+    return (
         <div className="h-full flex flex-col">
             <div className="flex-shrink-0">
                 <PageHeader title={t('theme_gallery')} onBack={onBack} helpText={t('theme_gallery_desc')} />
             </div>
 
-            <div className="overflow-y-auto custom-scrollbar pb-24 md:pb-6 px-1 relative">
-                
-                <div className="mb-6 animate-fade-in">
-                    <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1">{t('applied')}</h3>
-                    <div className="bg-[var(--bg-secondary)] rounded-3xl p-4 border border-[var(--accent-color)] shadow-lg shadow-[var(--accent-color)]/10 relative overflow-hidden">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                            <div className="order-2 md:order-1">
-                                <PhonePreview theme={activeThemeData} visualStyle={preferences.visualStyle} />
-                            </div>
-                            <div className="order-1 md:order-2 flex flex-col justify-center">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <CheckCircleIcon className="w-6 h-6 text-[var(--accent-color)]" filled />
-                                    <h2 className="text-2xl font-bold text-[var(--text-primary)]">{activeThemeData.name}</h2>
-                                </div>
-                                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">{activeThemeData.description}</p>
-                                <div className="flex gap-2">
-                                    {Object.values(activeThemeData.colors).slice(0, 5).map((c, i) => (
-                                        <div key={i} className="w-6 h-6 rounded-full border border-[var(--border-color)] shadow-sm" style={{ backgroundColor: c }}></div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] mb-6 shadow-inner mx-1">
+                <button
+                    onClick={() => setActiveTab('themes')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'themes' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                >
+                    <PaletteIcon className="w-4 h-4" />
+                    {t('tab_themes')}
+                </button>
+                 <button
+                    onClick={() => setActiveTab('typography')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'typography' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                >
+                    <TypeIcon className="w-4 h-4" />
+                    {t('tab_typography')}
+                </button>
+            </div>
+
+            <div className="overflow-y-auto custom-scrollbar pb-24 md:pb-6 flex-1">
+                <div key={activeTab} className="animate-fade-in">
+                    {activeTab === 'themes' && <ThemesSection />}
+                    {activeTab === 'typography' && <TypographySection />}
                 </div>
-
-                <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)] -mx-1 px-1 py-3 mb-6 transition-colors duration-300 flex flex-col gap-3">
-                    
-                    <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm">
-                        <button
-                            onClick={() => { setFilter('dark'); vibrate(); }}
-                            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${filter === 'dark' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md transform scale-[1.02]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                        >
-                            <MoonIcon className="w-4 h-4" />
-                            {t('filter_dark')}
-                        </button>
-                        <button
-                            onClick={() => { setFilter('light'); vibrate(); }}
-                            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${filter === 'light' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md transform scale-[1.02]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                        >
-                            <SunIcon className="w-4 h-4" />
-                            {t('filter_light')}
-                        </button>
-                    </div>
-
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                            <SparklesIcon className="w-4 h-4" />
-                            <span className="text-xs font-bold uppercase tracking-wider">{t('visual_finish')}</span>
-                        </div>
-                        <div className="flex bg-[var(--bg-secondary)] p-0.5 rounded-lg border border-[var(--border-color)]">
-                             <button 
-                                onClick={() => { updatePreferences({ visualStyle: 'simple' }); vibrate(); }}
-                                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.visualStyle === 'simple' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
-                             >
-                                 {t('style_simple')}
-                             </button>
-                             <button 
-                                onClick={() => { updatePreferences({ visualStyle: 'premium' }); vibrate(); }}
-                                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${preferences.visualStyle === 'premium' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
-                             >
-                                 {t('style_premium')}
-                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {filteredThemes.filter(t => t.id !== preferences.currentThemeId).map((theme, idx) => (
-                        <div 
-                            key={theme.id} 
-                            onClick={() => { setTheme(theme.id); vibrate(20); }}
-                            className="group bg-[var(--bg-secondary)] rounded-2xl p-3 border border-[var(--border-color)] hover:border-[var(--accent-color)] hover:-translate-y-1 transition-all duration-300 cursor-pointer animate-fade-in-up shadow-sm hover:shadow-xl"
-                            style={{ animationDelay: `${idx * 50}ms` }}
-                        >
-                            <div className="rounded-xl overflow-hidden border border-[var(--border-color)] group-hover:border-transparent transition-colors mb-3 shadow-inner relative">
-                                <PhonePreview theme={theme} visualStyle={preferences.visualStyle} />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
-                            </div>
-                            <div className="px-1">
-                                <div className="flex justify-between items-center mb-1">
-                                    <h4 className="font-bold text-sm text-[var(--text-primary)] truncate pr-2">{theme.name}</h4>
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.colors.accentColor }}></div>
-                                </div>
-                                <p className="text-[10px] text-[var(--text-secondary)] line-clamp-1">{theme.description}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                
-                {filteredThemes.filter(t => t.id !== preferences.currentThemeId).length === 0 && (
-                    <div className="text-center py-10 text-[var(--text-secondary)] animate-fade-in">
-                        <p className="text-sm font-medium">Todos os temas desta categoria já estão em uso ou não há opções disponíveis.</p>
-                    </div>
-                )}
-
             </div>
         </div>
     );

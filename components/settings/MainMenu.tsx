@@ -20,8 +20,6 @@ import ChevronRightIcon from '../icons/ChevronRightIcon';
 import SparklesIcon from '../icons/SparklesIcon';
 import BookOpenIcon from '../icons/BookOpenIcon';
 import CalculatorIcon from '../icons/CalculatorIcon';
-import TypeIcon from '../icons/TypeIcon';
-
 
 const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; isLast?: boolean; isActive?: boolean }> = ({ icon, title, subtitle, onClick, isLast, isActive }) => (
     <div
@@ -69,7 +67,6 @@ const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; activeScreen
                     <SectionHeader title={t('app')} />
                     <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] overflow-hidden">
                         <MenuItem isActive={activeScreen === 'themeGallery'} icon={<PaletteIcon className="w-5 h-5" />} title={t('theme_gallery')} subtitle={t('theme_gallery_desc')} onClick={() => setScreen('themeGallery')} />
-                        <MenuItem isActive={activeScreen === 'fontGallery'} icon={<TypeIcon className="w-5 h-5" />} title={t('typography')} subtitle={t('typography_desc')} onClick={() => setScreen('fontGallery')} />
                         <MenuItem isActive={activeScreen === 'appearance'} icon={<SparklesIcon className="w-5 h-5" />} title={t('appearance')} subtitle={t('ui_interface')} onClick={() => setScreen('appearance')} />
                         <MenuItem isActive={activeScreen === 'general'} icon={<SettingsIcon className="w-5 h-5" />} title={t('general')} subtitle={t('start_screen') + ', ' + t('haptic_feedback') + '...'} onClick={() => setScreen('general')} />
                         <MenuItem isActive={activeScreen === 'security'} icon={<ShieldIcon className="w-5 h-5" />} title={t('security')} subtitle={t('app_lock_pin') + ', ' + t('biometric_login') + '...'} onClick={() => setScreen('security')} />

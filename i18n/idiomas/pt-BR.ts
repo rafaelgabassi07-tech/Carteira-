@@ -2,7 +2,7 @@ export const ptBR = {
     // Appearance
     themes: 'Temas',
     themes_subtitle: 'Cores, estilo e modo escuro.',
-    appearance: 'Aparência & Interface', // Renamed
+    appearance: 'Aparência & Interface',
     visual_style: 'Acabamento Visual',
     visual_style_desc: 'Defina a profundidade e transparência.',
     style_simple: 'Flat',
@@ -18,18 +18,17 @@ export const ptBR = {
     font_large: 'Grande',
     text_size: 'Tamanho',
     
-    // Typography (New Section)
+    // Typography
     typography: 'Tipografia',
-    typography_desc: 'Personalize a fonte e o tamanho do texto.',
     font_family: 'Fonte',
     font_inter_desc: 'Moderna e versátil, ideal para interfaces.',
     font_lora_desc: 'Serifada e elegante, para um visual clássico.',
     font_roboto_mono_desc: 'Técnica e precisa, ótima para números.',
     font_poppins_desc: 'Geométrica e amigável, com um toque moderno.',
-    font_lato_desc: 'Humanista e clara, excelente para leitura longa.',
-    font_source_code_pro_desc: 'Monoespaçada otimizada para código e dados.',
+    font_lato_desc: 'Humanista e clara, excelente para longas leituras.',
+    font_source_code_pro_desc: 'Monoespaçada e limpa, para máxima clareza de dados.',
     
-    // Interface Settings (New)
+    // Interface Settings
     ui_interface: 'Interface do Usuário',
     compact_mode: 'Modo Compacto',
     show_currency: 'Símbolo da Moeda (R$)',
@@ -37,14 +36,14 @@ export const ptBR = {
     customize_colors_fonts: 'Personalizar Aparência',
     open_theme_store_desc: 'Acesse a galeria de temas e acabamentos visuais.',
     
-    // Theme Store
-    theme_gallery: 'Galeria de Temas', // Renamed
-    theme_gallery_desc: 'Personalize com cores e acabamentos exclusivos.', // Renamed
-    open_theme_gallery: 'Abrir Galeria de Temas', // Renamed
-    filter_all: 'Todos',
+    // Theme Gallery (Merged)
+    theme_gallery: 'Galeria de Temas',
+    theme_gallery_desc: 'Personalize cores, fontes, acabamento e mais.',
+    open_theme_gallery: 'Abrir Galeria de Temas',
+    tab_themes: 'Temas',
+    tab_typography: 'Tipografia',
     filter_dark: 'Escuros',
     filter_light: 'Claros',
-    filter_colorful: 'Coloridos',
     apply: 'Aplicar',
     applied: 'Em uso',
     preview: 'Prévia',
@@ -213,7 +212,6 @@ export const ptBR = {
     app: 'Aplicativo',
     general: 'Geral',
     security: 'Segurança',
-    // data: 'Dados', // Duplicated key removed
     transactions_data: 'Transações',
     api_connections: 'Conexões API',
     api_connections_desc: 'Configure chaves de API para dados em tempo real.',
@@ -325,7 +323,7 @@ export const ptBR = {
     goal: 'Meta',
     simulation: 'Simulação',
     simulation_result: 'Resultado',
-
+    
     // Changelog
     latest: 'Recente',
     changelog_version_title_1_6_0: 'Versão 1.6.0',
@@ -338,30 +336,11 @@ export const ptBR = {
     dev_note_title: 'Nota do Desenvolvedor',
     dev_note_content: 'Obrigado por usar o Invest Portfolio! Estamos trabalhando duro para trazer mais recursos.',
     
-    changelog_version_title_1_5_0: 'Versão 1.5.0',
-    changelog_news_title_1_5_0: 'Novidades',
-    changelog_news_items_1_5_0: 'Backup e Restauração de dados.|Configurações de API personalizadas.',
-    changelog_improvements_title_1_5_0: 'Melhorias',
-    changelog_improvements_items_1_5_0: 'Interface mais limpa.',
-    changelog_fixes_title_1_5_0: 'Correções',
-    changelog_fixes_items_1_5_0: 'Correção de bugs menores.',
-
-    changelog_version_title_1_4_3: 'Versão 1.4.3',
-    changelog_news_title_1_4_3: 'Novidades',
-    changelog_news_items_1_4_3: 'Primeira versão estável.',
-    changelog_fixes_title_1_4_3: 'Correções',
-    changelog_fixes_items_1_4_3: 'Estabilidade geral.',
-    
-    checking_for_updates: 'Verificando atualizações...',
-    you_are_up_to_date: 'Você está atualizado!',
-    channel_stable: 'Canal Estável',
-
     // Glossary
     financial_glossary: 'Glossário Financeiro',
     glossary_subtitle: 'Aprenda os termos do mercado.',
     glossary_search_placeholder: 'Buscar termo...',
     glossary_no_results: 'Nenhum termo encontrado.',
-
     glossary_term_fii: 'FII (Fundo de Investimento Imobiliário)',
     glossary_desc_fii: 'Um tipo de fundo de investimento que aplica em ativos imobiliários. Os cotistas recebem rendimentos mensais, geralmente isentos de Imposto de Renda.',
     glossary_term_ticker: 'Ticker',

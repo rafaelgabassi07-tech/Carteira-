@@ -17,9 +17,8 @@ import UpdateCheckModal from '../components/modals/UpdateCheckModal';
 import GlossaryView from './GlossaryView';
 import CalculatorsView from './CalculatorsView';
 import ThemeStoreView from './ThemeStoreView';
-import FontGalleryView from './FontGalleryView'; // Nova importação
 
-export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections' | 'glossary' | 'calculators' | 'themeGallery' | 'fontGallery';
+export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'backup' | 'about' | 'appearance' | 'general' | 'transactions' | 'apiConnections' | 'glossary' | 'calculators' | 'themeGallery';
 
 interface SettingsViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
@@ -50,7 +49,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
             case 'glossary': return <GlossaryView onBack={onBack} />;
             case 'calculators': return <CalculatorsView onBack={onBack} />;
             case 'themeGallery': return <ThemeStoreView onBack={onBack} />;
-            case 'fontGallery': return <FontGalleryView onBack={onBack} />;
             default: return <MainMenu setScreen={setScreen} activeScreen={screen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
         }
     };

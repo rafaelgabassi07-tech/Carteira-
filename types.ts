@@ -56,7 +56,6 @@ export interface Transaction {
     price: number;
     date: string;
     costs?: number;
-    // FIX: Add optional 'notes' property to Transaction interface
     notes?: string;
 }
 
@@ -125,9 +124,9 @@ export interface AppFont {
 export interface AppPreferences {
   // Appearance
   currentThemeId: string;
-  currentFontId: string; // Nova preferência de fonte
-  accentColor: AppColor; // Mantido para compatibilidade
-  systemTheme: 'system' | 'light' | 'dark'; // Mantido para compatibilidade
+  currentFontId: string;
+  accentColor: AppColor;
+  systemTheme: 'system' | 'light' | 'dark';
   visualStyle: 'simple' | 'premium';
   fontSize: 'small' | 'medium' | 'large';
   compactMode: boolean;
@@ -143,7 +142,7 @@ export interface AppPreferences {
 
   // Security
   privacyOnStart: boolean;
-  appPin: string | null; // 4 digit pin or null
+  appPin: string | null;
 
   // Data & Transactions
   defaultBrokerage: number;
@@ -155,7 +154,7 @@ export interface AppPreferences {
   // Notifications & Goals
   priceAlertThreshold: number; // %
   globalIncomeGoal: number;
-  segmentGoals: Record<string, number>; // New: Goals per segment
+  segmentGoals: Record<string, number>;
   dndEnabled: boolean;
   dndStart: string;
   dndEnd: string;

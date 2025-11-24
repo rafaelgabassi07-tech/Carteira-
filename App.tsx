@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
-import PortfolioView from './views/PortfolioView';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
@@ -19,6 +18,7 @@ import AnalysisIcon from './components/icons/AnalysisIcon';
 import SettingsIcon from './components/icons/SettingsIcon';
 
 // Lazy Load Views
+const PortfolioView = React.lazy(() => import('./views/PortfolioView'));
 const NewsView = React.lazy(() => import('./views/NewsView'));
 const SettingsView = React.lazy(() => import('./views/SettingsView'));
 const TransactionsView = React.lazy(() => import('./views/TransactionsView'));

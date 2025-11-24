@@ -50,6 +50,11 @@ const TransactionSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     <p className="font-bold text-sm">{t('hide_cents')}</p>
                     <ToggleSwitch enabled={preferences.hideCents} setEnabled={(val) => updatePreferences({ hideCents: val })} />
                 </div>
+                
+                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+                    <p className="font-bold text-sm">{t('show_currency')}</p>
+                    <ToggleSwitch enabled={preferences.showCurrencySymbol} setEnabled={(val) => updatePreferences({ showCurrencySymbol: val })} />
+                </div>
             </div>
         </div>
     );

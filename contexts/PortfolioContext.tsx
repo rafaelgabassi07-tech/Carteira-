@@ -28,7 +28,7 @@ interface PortfolioContextType {
   restoreData: (data: { transactions: Transaction[], preferences?: Partial<AppPreferences> }) => void;
   updatePreferences: (prefs: Partial<AppPreferences>) => void;
   setTheme: (themeId: string) => void;
-  setFont: (fontId: string) => void; // Nova função para fonte
+  setFont: (fontId: string) => void;
   updateUserProfile: (profile: Partial<UserProfile>) => void;
   refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
   refreshAllData: () => Promise<void>;
@@ -48,7 +48,7 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(undefin
 const DEFAULT_PREFERENCES: AppPreferences = {
     accentColor: 'blue', systemTheme: 'system', visualStyle: 'premium', fontSize: 'medium', compactMode: false,
     currentThemeId: 'default-dark',
-    currentFontId: 'inter', // Fonte Padrão
+    currentFontId: 'inter',
     showCurrencySymbol: true, reduceMotion: false, animationSpeed: 'normal',
     startScreen: 'carteira', hapticFeedback: true, vibrationIntensity: 'medium',
     hideCents: false, privacyOnStart: false, appPin: null,
