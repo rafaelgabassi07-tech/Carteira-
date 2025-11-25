@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -76,7 +77,6 @@ const NewsCard: React.FC<{
                   className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
                   aria-label={t('share_news')}
               >
-                  {/* FIX: Corrected icon size for UI consistency */}
                   <ShareIcon className="w-5 h-5" />
               </button>
               <div className="w-px h-4 bg-[var(--border-color)] mx-0.5"></div>
@@ -85,7 +85,6 @@ const NewsCard: React.FC<{
                   className={`p-2 rounded-full transition-all active:scale-90 ${isFavorited ? 'text-yellow-400 scale-110' : 'text-gray-400 hover:text-yellow-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
                   aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
               >
-                  {/* FIX: Corrected icon size for UI consistency */}
                   <StarIcon filled={isFavorited} className="w-5 h-5" />
               </button>
             </div>
@@ -126,7 +125,6 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  // FIX: Destructure logApiUsage from usePortfolio to log API stats.
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -177,7 +175,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       }
   }
 
-  // FIX: Correctly handle the object returned by fetchMarketNews and log API usage.
   const loadNews = useCallback(async (isRefresh = false, currentQuery: string, currentDateRange: 'today' | 'week' | 'month', currentSource: string) => {
     if(!isRefresh) setLoading(true);
     setError(null);
@@ -202,6 +199,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           sources: currentSource
       };
 
+      // FIX: Destructure the result from fetchMarketNews and handle stats.
       const { data: articles, stats } = await fetchMarketNews(preferences, filter);
       if (stats.bytesReceived > 0) {
         logApiUsage('gemini', { requests: 1, ...stats });
