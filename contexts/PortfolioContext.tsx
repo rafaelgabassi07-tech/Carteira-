@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent, AppStats } from '../types';
 import { fetchAdvancedAssetData, fetchHistoricalPrices } from '../services/geminiService';
@@ -300,7 +301,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         dividendsHistory: combinedHistory,
         dy: liveData.dy,
         pvp: liveData.pvp,
-        segment: liveData.sector || 'Outros',
+        // Prioritize Gemini's 'assetType' over 'sector'
+        segment: liveData.assetType || liveData.sector || 'Outros',
         administrator: liveData.administrator,
         vacancyRate: liveData.vacancyRate,
         liquidity: liveData.dailyLiquidity,

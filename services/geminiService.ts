@@ -105,23 +105,6 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         config: {
             tools: [{googleSearch: {}}],
             temperature: 0.1,
-            // @google/genai-search-grounding-fix: The `googleSearch` tool does not support `responseMimeType` or `responseSchema`.
-            // responseMimeType: "application/json",
-            // responseSchema: {
-            //     type: Type.ARRAY,
-            //     items: {
-            //         type: Type.OBJECT,
-            //         properties: {
-            //             title: { type: Type.STRING, description: "Título exato da matéria" },
-            //             source: { type: Type.STRING, description: "Nome do Site (ex: InfoMoney)" },
-            //             date: { type: Type.STRING, description: "Data no formato YYYY-MM-DD" },
-            //             summary: { type: Type.STRING, description: "Resumo em 1 frase curta e impactante." },
-            //             url: { type: Type.STRING, description: "Link real para a notícia" },
-            //             sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] },
-            //         },
-            //         required: ["title", "source", "date", "summary", "url"],
-            //     }
-            // }
         }
       });
       
@@ -132,7 +115,6 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       
       let articles: NewsArticle[] = [];
       try {
-        // @google/genai-search-grounding-fix: Extract JSON from markdown code block if present.
         const jsonMatch = textResponse.match(/```(json)?([\s\S]*?)```/);
         const parsableText = jsonMatch ? jsonMatch[2] : textResponse;
         articles = JSON.parse(parsableText);
@@ -205,7 +187,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { nextPaymentDate?: string; lastDividend?: number; recentDividends?: DividendHistoryEvent[] }>, stats: { bytesSent: number, bytesReceived: number } }> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { nextPaymentDate?: string; lastDividend?: number; recentDividends?: DividendHistoryEvent[]; assetType?: string }>, stats: { bytesSent: number, bytesReceived: number } }> {
     const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (tickers.length === 0) {
         return emptyReturn;
@@ -224,26 +206,24 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const prompt = `
       Você é um analista de dados financeiros especializado em Fundos Imobiliários (FIIs) do Brasil.
-      Sua tarefa é buscar as informações de dividendos mais recentes e confirmadas para os tickers: ${tickersString}.
-      Para cada ticker, busque:
+      Sua tarefa é buscar informações detalhadas e categorizar os ativos: ${tickersString}.
+      
+      Para cada ticker, busque e retorne:
       1. "nextPaymentDate": A data de pagamento do PRÓXIMO dividendo (formato "YYYY-MM-DD"). Use null se não anunciado.
       2. "lastDividend": O valor do ÚLTIMO dividendo PAGO por cota. Use null se não encontrar.
-      3. "recentDividends": Um array com os 3 ÚLTIMOS anúncios de proventos (pagos ou a pagar). Cada item deve ser um objeto com "exDate" (data com), "paymentDate" (data de pagamento) e "value" (valor por cota), todos em formato string "YYYY-MM-DD" e número.
+      3. "recentDividends": Um array com os 3 ÚLTIMOS anúncios de proventos. Ex: [{ "exDate": "...", "paymentDate": "...", "value": 0.10 }].
+      4. "assetType": A CLASSIFICAÇÃO MACRO do ativo. 
+         - Regras de Classificação RIGOROSAS:
+         - Se for um FII de Galpões, Shoppings, Lajes, Renda Urbana, Híbrido de Imóveis ou Varejo -> Classifique como "Tijolo". (Ex: GARE11, HGLG11, VISC11, HGRU11, ALZR11 são "Tijolo").
+         - Se investir em CRIs, Recebíveis Imobiliários -> Classifique como "Papel". (Ex: MXRF11, KNCR11, CPTS11).
+         - Se investir majoritariamente em cotas de outros FIIs -> Classifique como "FOF". (Ex: BCFF11).
+         - Se for do agronegócio (Fiagro) -> Classifique como "Fiagro". (Ex: SNAG11, VGIA11).
+         - Se for de Infraestrutura -> Classifique como "Infra".
+         - Caso contrário -> "Outros".
 
       Retorne um único objeto JSON onde cada chave é o ticker em maiúsculas.
       
-      Exemplo de resposta para um ticker:
-      "MXRF11": {
-        "nextPaymentDate": "2024-08-15",
-        "lastDividend": 0.11,
-        "recentDividends": [
-          { "exDate": "2024-07-31", "paymentDate": "2024-08-15", "value": 0.11 },
-          { "exDate": "2024-06-30", "paymentDate": "2024-07-15", "value": 0.10 },
-          { "exDate": "2024-05-31", "paymentDate": "2024-06-14", "value": 0.10 }
-        ]
-      }
-      
-      NÃO INVENTE dados. Se não encontrar, use null para o valor ou um array vazio []. Baseie-se apenas em fontes confiáveis (RI, StatusInvest, FIIs.com.br, etc.).
+      IMPORTANTE: GARE11 é um fundo de TIJOLO (Híbrido/Renda Urbana), NÃO é FOF. Seja preciso.
     `;
     const bytesSent = new Blob([prompt]).size;
 
@@ -265,7 +245,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
         if (jsonMatch) {
             const parsedData = JSON.parse(jsonMatch[0]);
-            const sanitizedData: Record<string, { nextPaymentDate?: string; lastDividend?: number; recentDividends?: DividendHistoryEvent[] }> = {};
+            const sanitizedData: Record<string, { nextPaymentDate?: string; lastDividend?: number; recentDividends?: DividendHistoryEvent[]; assetType?: string }> = {};
             for (const ticker of tickers) {
                 const data = parsedData[ticker.toUpperCase()];
                 if (data) {
@@ -274,7 +254,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                         lastDividend: typeof data.lastDividend === 'number' ? data.lastDividend : undefined,
                         recentDividends: Array.isArray(data.recentDividends) ? data.recentDividends.filter((d: any): d is DividendHistoryEvent => 
                             d && typeof d.exDate === 'string' && typeof d.paymentDate === 'string' && typeof d.value === 'number'
-                        ) : undefined
+                        ) : undefined,
+                        assetType: ['Tijolo', 'Papel', 'FOF', 'Fiagro', 'Infra'].includes(data.assetType) ? data.assetType : 'Outros'
                     };
                 }
             }

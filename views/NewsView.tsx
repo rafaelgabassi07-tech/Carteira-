@@ -74,7 +74,7 @@ const NewsCard: React.FC<{
                   className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
                   aria-label={t('share_news')}
               >
-                  <ShareIcon className="w-5 h-5" />
+                  <ShareIcon className="w-4 h-4" />
               </button>
               <div className="w-px h-4 bg-[var(--border-color)] mx-0.5"></div>
               <button
@@ -82,7 +82,7 @@ const NewsCard: React.FC<{
                   className={`p-2 rounded-full transition-all active:scale-90 ${isFavorited ? 'text-yellow-400 scale-110' : 'text-gray-400 hover:text-yellow-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
                   aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
               >
-                  <StarIcon filled={isFavorited} className="w-5 h-5" />
+                  <StarIcon filled={isFavorited} className="w-4 h-4" />
               </button>
             </div>
         </div>
@@ -122,7 +122,6 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  // @google/genai-fix: Destructure logApiUsage to track API statistics.
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -197,14 +196,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           sources: currentSource
       };
 
-      // @google/genai-fix: The `fetchMarketNews` function returns an object with `data` and `stats`. Destructure the response to get the `articles` array and handle API usage stats.
       const { data: articles, stats } = await fetchMarketNews(preferences, filter);
-      if (stats.bytesReceived > 0) {
+      if (stats && stats.bytesReceived > 0) {
         logApiUsage('gemini', { requests: 1, ...stats });
       }
 
-      setNews(articles);
-      if(articles.length > 0) CacheManager.set(filterKey, articles);
+      setNews(articles || []);
+      if(articles && articles.length > 0) CacheManager.set(filterKey, articles);
 
     } catch (err: any) {
       setError(err.message || t('unknown_error'));
@@ -212,7 +210,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setLoading(false);
       setPullPosition(0);
     }
-    // @google/genai-fix: Update dependency array to include `logApiUsage`.
   }, [t, assetTickers, preferences, logApiUsage]);
   
   // Create a debounced version of the load function for text inputs

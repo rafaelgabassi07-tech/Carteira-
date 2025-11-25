@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -18,13 +19,20 @@ const colors = [
 ];
 
 const sectorColorMap: Record<string, string> = {
-    'Logística': '#161c2d',
-    'Híbrido': '#1face8',
-    'Papel': '#4575f0',
-    'Shoppings': '#7d899e',
-    'Lajes Corporativas': '#ec4899',
-    'Fundos de Fundos': '#f97316',
-    'Outros': '#94a3b8'
+    // Novas Categorias Macro
+    'Tijolo': '#f97316', // Laranja
+    'Papel': '#3b82f6', // Azul
+    'Fiagro': '#22c55e', // Verde
+    'FOF': '#a855f7', // Roxo
+    'Infra': '#eab308', // Amarelo
+    'Outros': '#94a3b8', // Cinza
+
+    // Legacy / Fallback mappings
+    'Logística': '#f97316',
+    'Híbrido': '#fb923c',
+    'Shoppings': '#fbbf24',
+    'Lajes Corporativas': '#f59e0b',
+    'Fundos de Fundos': '#a855f7',
 };
 
 
