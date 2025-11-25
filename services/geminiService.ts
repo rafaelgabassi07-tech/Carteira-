@@ -1,7 +1,7 @@
 
 
 import { GoogleGenAI, Type } from '@google/genai';
-import type { NewsArticle, AppPreferences } from '../types';
+import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
 function getGeminiApiKey(prefs: AppPreferences): string {
     if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
@@ -205,7 +205,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { nextPaymentDate?: string; lastDividend?: number }>, stats: { bytesSent: number, bytesReceived: number } }> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { nextPaymentDate?: string; lastDividend?: number; recentDividends?: DividendHistoryEvent[] }>, stats: { bytesSent: number, bytesReceived: number } }> {
     const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (tickers.length === 0) {
         return emptyReturn;
@@ -224,17 +224,26 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const prompt = `
       Você é um analista de dados financeiros especializado em Fundos Imobiliários (FIIs) do Brasil.
-      Sua tarefa é buscar as informações de dividendos mais recentes e confirmadas para os seguintes tickers: ${tickersString}.
-      
-      Use a busca do Google para encontrar a "data de pagamento" do próximo dividendo já anunciado e o valor do "último provento pago" por cota.
-      
+      Sua tarefa é buscar as informações de dividendos mais recentes e confirmadas para os tickers: ${tickersString}.
+      Para cada ticker, busque:
+      1. "nextPaymentDate": A data de pagamento do PRÓXIMO dividendo (formato "YYYY-MM-DD"). Use null se não anunciado.
+      2. "lastDividend": O valor do ÚLTIMO dividendo PAGO por cota. Use null se não encontrar.
+      3. "recentDividends": Um array com os 3 ÚLTIMOS anúncios de proventos (pagos ou a pagar). Cada item deve ser um objeto com "exDate" (data com), "paymentDate" (data de pagamento) e "value" (valor por cota), todos em formato string "YYYY-MM-DD" e número.
+
       Retorne um único objeto JSON onde cada chave é o ticker em maiúsculas.
-      Para cada ticker, o valor deve ser um objeto com as chaves "nextPaymentDate" e "lastDividend".
-
-      - "nextPaymentDate": Deve ser uma string no formato "YYYY-MM-DD". Se a data de pagamento ainda não foi anunciada, use null.
-      - "lastDividend": Deve ser um número representando o valor do último dividendo pago. Se não encontrar, use null.
-
-      NÃO INVENTE dados. Se não encontrar uma informação, use null. Baseie-se apenas em fontes confiáveis (RI, StatusInvest, FIIs.com.br, etc.).
+      
+      Exemplo de resposta para um ticker:
+      "MXRF11": {
+        "nextPaymentDate": "2024-08-15",
+        "lastDividend": 0.11,
+        "recentDividends": [
+          { "exDate": "2024-07-31", "paymentDate": "2024-08-15", "value": 0.11 },
+          { "exDate": "2024-06-30", "paymentDate": "2024-07-15", "value": 0.10 },
+          { "exDate": "2024-05-31", "paymentDate": "2024-06-14", "value": 0.10 }
+        ]
+      }
+      
+      NÃO INVENTE dados. Se não encontrar, use null para o valor ou um array vazio []. Baseie-se apenas em fontes confiáveis (RI, StatusInvest, FIIs.com.br, etc.).
     `;
     const bytesSent = new Blob([prompt]).size;
 
@@ -256,13 +265,16 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
         if (jsonMatch) {
             const parsedData = JSON.parse(jsonMatch[0]);
-            const sanitizedData: Record<string, { nextPaymentDate?: string; lastDividend?: number }> = {};
+            const sanitizedData: Record<string, { nextPaymentDate?: string; lastDividend?: number; recentDividends?: DividendHistoryEvent[] }> = {};
             for (const ticker of tickers) {
                 const data = parsedData[ticker.toUpperCase()];
                 if (data) {
                     sanitizedData[ticker.toUpperCase()] = {
                         nextPaymentDate: typeof data.nextPaymentDate === 'string' && data.nextPaymentDate.match(/^\d{4}-\d{2}-\d{2}$/) ? data.nextPaymentDate : undefined,
-                        lastDividend: typeof data.lastDividend === 'number' ? data.lastDividend : undefined
+                        lastDividend: typeof data.lastDividend === 'number' ? data.lastDividend : undefined,
+                        recentDividends: Array.isArray(data.recentDividends) ? data.recentDividends.filter((d: any): d is DividendHistoryEvent => 
+                            d && typeof d.exDate === 'string' && typeof d.paymentDate === 'string' && typeof d.value === 'number'
+                        ) : undefined
                     };
                 }
             }

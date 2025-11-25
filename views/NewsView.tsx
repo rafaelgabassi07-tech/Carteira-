@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -124,7 +122,7 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  // FIX: Destructure logApiUsage to track API statistics.
+  // @google/genai-fix: Destructure logApiUsage to track API statistics.
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -199,8 +197,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           sources: currentSource
       };
 
-      // FIX: The `fetchMarketNews` function returns an object with `data` and `stats`.
-      // Destructure the response to get the `articles` array and handle API usage stats.
+      // @google/genai-fix: The `fetchMarketNews` function returns an object with `data` and `stats`. Destructure the response to get the `articles` array and handle API usage stats.
       const { data: articles, stats } = await fetchMarketNews(preferences, filter);
       if (stats.bytesReceived > 0) {
         logApiUsage('gemini', { requests: 1, ...stats });
@@ -215,7 +212,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setLoading(false);
       setPullPosition(0);
     }
-    // FIX: Update dependency array to include `logApiUsage` and remove unused `addToast`.
+    // @google/genai-fix: Update dependency array to include `logApiUsage`.
   }, [t, assetTickers, preferences, logApiUsage]);
   
   // Create a debounced version of the load function for text inputs

@@ -278,13 +278,26 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const totalInvested = metric.quantity * avgPrice;
       const yieldOnCost = totalInvested > 0 && liveData.dy > 0 ? ((currentPrice * (liveData.dy / 100)) / avgPrice) * 100 : 0;
       
+      // Merge and de-duplicate dividend histories, giving Gemini's recent data precedence
+      const brapiHistory = liveData.dividendsHistory || [];
+      const geminiHistory = liveData.recentDividends || [];
+      const historyMap = new Map<string, DividendHistoryEvent>();
+
+      brapiHistory.forEach((event: DividendHistoryEvent) => {
+        if (event.exDate) historyMap.set(event.exDate, event);
+      });
+      geminiHistory.forEach((event: DividendHistoryEvent) => {
+        if (event.exDate) historyMap.set(event.exDate, event);
+      });
+      const combinedHistory = Array.from(historyMap.values()).sort((a, b) => b.exDate.localeCompare(a.exDate));
+
       return {
         ticker,
         quantity: metric.quantity,
         avgPrice,
         currentPrice,
         priceHistory: liveData.priceHistory || [],
-        dividendsHistory: liveData.dividendsHistory || [],
+        dividendsHistory: combinedHistory,
         dy: liveData.dy,
         pvp: liveData.pvp,
         segment: liveData.sector || 'Outros',
