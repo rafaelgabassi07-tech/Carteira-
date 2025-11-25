@@ -1,4 +1,3 @@
-
 import type { AppPreferences, DividendHistoryEvent } from '../types';
 
 interface BrapiHistoricalData {
@@ -38,14 +37,19 @@ function getBrapiToken(prefs: AppPreferences): string {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[], dividendsHistory: DividendHistoryEvent[] }>> {
+export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<{
+    quotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[], dividendsHistory: DividendHistoryEvent[] }>,
+    stats: { bytesReceived: number }
+}> {
+    const emptyReturn = { quotes: {}, stats: { bytesReceived: 0 } };
     if (tickers.length === 0) {
-        return {};
+        return emptyReturn;
     }
 
     const token = getBrapiToken(prefs);
     const allQuotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[], dividendsHistory: DividendHistoryEvent[] }> = {};
     const failedTickers: string[] = [];
+    let totalBytesReceived = 0;
 
     for (const ticker of tickers) {
         let success = false;
@@ -53,20 +57,19 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         let dividendsHistory: DividendHistoryEvent[] = [];
         let currentPrice = 0;
         const urlBase = `https://brapi.dev/api/quote/${ticker}`;
-
-        // Strategy: Try 1y (Premium/Full) -> 3mo (Intermediate) -> 5d (Free/Short) -> Current Price (Fallback)
         
-        // 1. Try Long Range (1y)
-        try {
-            const response = await fetch(`${urlBase}?range=1y&dividends=true&token=${token}`);
-            
-            if (response.status === 403 || response.status === 401) {
-                throw new Error("FORBIDDEN_TIER");
-            }
-            
-            if (response.ok) {
-                const data = await response.json();
+        const fetchData = async (range: string): Promise<boolean> => {
+            try {
+                const response = await fetch(`${urlBase}?range=${range}&dividends=true&token=${token}`);
+                const text = await response.text();
+                totalBytesReceived += new Blob([text]).size;
+
+                if (response.status === 403 || response.status === 401) throw new Error("FORBIDDEN_TIER");
+                if (!response.ok) return false;
+                
+                const data = JSON.parse(text);
                 const result = data.results?.[0];
+
                 if (result) {
                     currentPrice = result.regularMarketPrice;
                     historyData = result.historicalDataPrice || [];
@@ -77,87 +80,38 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                             value: item.dividends?.[0]?.value || 0
                         })).filter(d => d.value > 0);
                     }
-                    success = true;
+                    return true;
                 }
-            }
-        } catch (e: any) {
-            if (e.message !== "FORBIDDEN_TIER") {
-                 console.warn(`Failed to fetch 1y for ${ticker} (Retrying with shorter range...):`, e.message);
-            }
-        }
-
-        // 2. Try Intermediate Range (3mo) - Better than 5d if 1y fails
-        if (!success) {
-             try {
-                await delay(200); 
-                const response = await fetch(`${urlBase}?range=3mo&dividends=true&token=${token}`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const result = data.results?.[0];
-                     if (result) {
-                        currentPrice = result.regularMarketPrice;
-                        historyData = result.historicalDataPrice || [];
-                        // Dividends logic same as above
-                        if (result.dividendData?.historicalDataPrice) {
-                            dividendsHistory = result.dividendData.historicalDataPrice.map((item: any) => ({
-                                exDate: new Date(item.date * 1000).toISOString().split('T')[0],
-                                paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
-                                value: item.dividends?.[0]?.value || 0
-                            })).filter(d => d.value > 0);
-                        }
-                        success = true;
-                    }
+                return false;
+            } catch (e: any) {
+                if (e.message !== "FORBIDDEN_TIER") {
+                    console.warn(`Failed to fetch ${range} for ${ticker}:`, e.message);
                 }
-            } catch (e) {
-                console.warn(`Failed to fetch 3mo for ${ticker}`, e);
+                return false;
             }
-        }
-
-        // 3. Try Short Range (5d) - If others failed
+        };
+        
+        success = await fetchData('1y');
+        if (!success) { await delay(200); success = await fetchData('3mo'); }
+        if (!success) { await delay(200); success = await fetchData('5d'); }
+        
+        // Fallback for current price only
         if (!success) {
-             try {
-                await delay(200); 
-                const response = await fetch(`${urlBase}?range=5d&dividends=true&token=${token}`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const result = data.results?.[0];
-                     if (result) {
-                        currentPrice = result.regularMarketPrice;
-                        historyData = result.historicalDataPrice || [];
-                        if (result.dividendData?.historicalDataPrice) {
-                            dividendsHistory = result.dividendData.historicalDataPrice.map((item: any) => ({
-                                exDate: new Date(item.date * 1000).toISOString().split('T')[0],
-                                paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
-                                value: item.dividends?.[0]?.value || 0
-                            })).filter(d => d.value > 0);
-                        }
-                        success = true;
-                    }
-                }
-            } catch (e) {
-                console.warn(`Failed to fetch 5d for ${ticker}`, e);
-            }
-        }
-
-        // 4. Current Price Only (Last Resort)
-        if (!success) {
-             try {
+            try {
                 await delay(200);
                 const response = await fetch(`${urlBase}?token=${token}`);
-                 if (response.ok) {
-                    const data = await response.json();
+                const text = await response.text();
+                totalBytesReceived += new Blob([text]).size;
+                if (response.ok) {
+                    const data = JSON.parse(text);
                     const result = data.results?.[0];
-                     if (result) {
+                    if (result) {
                         currentPrice = result.regularMarketPrice;
-                        historyData = []; // No history
+                        historyData = [];
                         success = true;
                     }
                 }
-            } catch (e) {
-                console.error(`Failed fallback for ${ticker}`, e);
-            }
+            } catch (e) { console.error(`Failed fallback for ${ticker}`, e); }
         }
 
         if (success) {
@@ -166,12 +120,9 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                 price: item.close,
             })).sort((a: any, b: any) => a.date.localeCompare(b.date));
 
-            // CRITICAL FIX: Ensure history has at least the current price point if missing or outdated
-            // This allows the 'Carry-Forward' logic in PortfolioContext to work even if history is empty
             if (currentPrice > 0) {
                 const todayISO = new Date().toISOString().split('T')[0];
                 const lastHistoryDate = finalHistory.length > 0 ? finalHistory[finalHistory.length - 1].date : '';
-                
                 if (lastHistoryDate !== todayISO) {
                     finalHistory.push({ date: todayISO, price: currentPrice });
                 }
@@ -191,7 +142,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         throw new Error(`Falha ao atualizar ativos: ${failedTickers.slice(0,3).join(', ')}... Verifique conexão.`);
     }
 
-    return allQuotes;
+    return { quotes: allQuotes, stats: { bytesReceived: totalBytesReceived } };
 }
 
 export async function validateBrapiToken(token: string): Promise<boolean> {

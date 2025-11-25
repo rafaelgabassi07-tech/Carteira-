@@ -20,33 +20,13 @@ const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?
 );
 
 const IncomeCard: React.FC = () => {
-    const { t, formatCurrency } = useI18n();
-    const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
+    const { t } = useI18n();
     
-    const average = useMemo(() => {
-         const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
-         return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
-    }, [monthlyIncome]);
-
     return (
         <AnalysisCard title={t('monthly_income')} delay={100}>
-            <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
-                    <span className="font-semibold text-lg text-[var(--green-text)]">
-                        <CountUp end={average} formatter={formatCurrency} />
-                    </span>
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
-                    <span className="font-semibold text-lg text-[var(--green-text)]">
-                        <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
-                    </span>
-                </div>
+            <div className="h-48 w-full flex items-center justify-center text-sm text-[var(--text-secondary)]">
+                {/* Conteúdo removido para começar do zero */}
             </div>
-             <div className="h-48 w-full">
-                 <BarChart data={monthlyIncome} />
-             </div>
         </AnalysisCard>
     );
 };

@@ -122,7 +122,8 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  const { assets, preferences } = usePortfolio();
+  // @google/genai-error-fix: Destructure logApiUsage to log API statistics.
+  const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,7 +197,10 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           sources: currentSource
       };
 
-      const articles = await fetchMarketNews(preferences, filter);
+      // @google/genai-error-fix: `fetchMarketNews` returns an object { data, stats }. Destructure it to get the articles array.
+      const { data: articles, stats } = await fetchMarketNews(preferences, filter);
+      logApiUsage('gemini', { requests: 1, ...stats });
+
       setNews(articles);
       if(articles.length > 0) CacheManager.set(filterKey, articles);
 
@@ -206,7 +210,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setLoading(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, addToast, preferences]);
+  // @google/genai-error-fix: Add logApiUsage to dependency array and remove unused addToast.
+  }, [t, assetTickers, preferences, logApiUsage]);
   
   // Create a debounced version of the load function for text inputs
   const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);

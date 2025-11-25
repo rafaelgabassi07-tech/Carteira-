@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
 function getGeminiApiKey(prefs: AppPreferences): string {
@@ -50,34 +50,14 @@ function getDomain(url: string): string {
     }
 }
 
-function extractJSON(text: string): any {
-    try {
-        // Try to match code block first
-        const codeBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-        if (codeBlockMatch) {
-            return JSON.parse(codeBlockMatch[1]);
-        }
-        // Try generic object/array match
-        const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
-        }
-        // Try parsing raw text
-        return JSON.parse(text);
-    } catch (e) {
-        console.error("Failed to extract JSON from text:", text, e);
-        return null;
-    }
-}
-
-
-export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<NewsArticle[]> {
+export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<{ data: NewsArticle[], stats: { bytesSent: number, bytesReceived: number } }> {
+  const emptyReturn = { data: [], stats: { bytesSent: 0, bytesReceived: 0 } };
   let apiKey: string;
   try {
     apiKey = getGeminiApiKey(prefs);
   } catch (error: any) {
     console.warn("News fetch skipped:", error.message);
-    return [];
+    return emptyReturn;
   }
   
   const ai = new GoogleGenAI({ apiKey });
@@ -110,21 +90,11 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
   const prompt = `
     Você é um agregador de notícias de Fundos Imobiliários (FIIs).
     Pesquise no Google sobre: "${searchQuery}".
-    
-    Retorne um JSON Array com 10 notícias REAIS e RECENTES (${timeTerm}).
+    Retorne 10 notícias REAIS e RECENTES (${timeTerm}).
     NÃO INVENTE notícias. Use os dados do Grounding.
-    
-    [
-      {
-        "title": "Título exato da matéria",
-        "source": "Nome do Site (ex: InfoMoney)",
-        "date": "YYYY-MM-DD",
-        "summary": "Resumo em 1 frase curta e impactante.",
-        "url": "Link real",
-        "sentiment": "Neutral"
-      }
-    ]
+    Retorne um array de objetos JSON com as seguintes chaves: "title", "source", "date" (YYYY-MM-DD), "summary" (1 frase), "url", "sentiment" ("Positive", "Neutral", "Negative").
   `;
+  const bytesSent = new Blob([prompt]).size;
 
   try {
       const response = await ai.models.generateContent({
@@ -133,17 +103,43 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         config: {
             tools: [{googleSearch: {}}],
             temperature: 0.1,
+            // @google/genai-search-grounding-fix: The `googleSearch` tool does not support `responseMimeType` or `responseSchema`.
+            // responseMimeType: "application/json",
+            // responseSchema: {
+            //     type: Type.ARRAY,
+            //     items: {
+            //         type: Type.OBJECT,
+            //         properties: {
+            //             title: { type: Type.STRING, description: "Título exato da matéria" },
+            //             source: { type: Type.STRING, description: "Nome do Site (ex: InfoMoney)" },
+            //             date: { type: Type.STRING, description: "Data no formato YYYY-MM-DD" },
+            //             summary: { type: Type.STRING, description: "Resumo em 1 frase curta e impactante." },
+            //             url: { type: Type.STRING, description: "Link real para a notícia" },
+            //             sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"] },
+            //         },
+            //         required: ["title", "source", "date", "summary", "url"],
+            //     }
+            // }
         }
       });
       
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-      const textResponse = response.text || "";
+      const textResponse = response.text || "[]";
+      const bytesReceived = new Blob([textResponse]).size;
+      const stats = { bytesSent, bytesReceived };
       
-      let articles: NewsArticle[] = extractJSON(textResponse) || [];
+      let articles: NewsArticle[] = [];
+      try {
+        // @google/genai-search-grounding-fix: Extract JSON from markdown code block if present.
+        const jsonMatch = textResponse.match(/```(json)?([\s\S]*?)```/);
+        const parsableText = jsonMatch ? jsonMatch[2] : textResponse;
+        articles = JSON.parse(parsableText);
+      } catch (e) {
+          console.error("Failed to parse JSON from Gemini:", textResponse, e);
+          articles = [];
+      }
 
       // --- PIPELINE DE RECUPERAÇÃO E CORREÇÃO (FAIL-SAFE) ---
-      
-      // 1. Se o JSON veio vazio mas tem chunks, reconstrua a partir dos chunks (Prioridade: Dados Reais)
       if (articles.length === 0 && groundingChunks.length > 0) {
           console.log("Usando Fallback de Grounding Chunks");
           const uniqueLinks = new Set();
@@ -154,15 +150,11 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
                 if (uniqueLinks.has(url)) return null;
                 uniqueLinks.add(url);
                 
-                // Clean title (remove site name suffix like " - InfoMoney")
                 let title = c.web!.title!;
                 const separatorIndex = title.lastIndexOf(' - ');
                 if (separatorIndex > 10) title = title.substring(0, separatorIndex);
 
-                // Avoid using URL as title
-                if (title.includes('http') || title.includes('.com')) {
-                    return null; // Skip garbage titles
-                }
+                if (title.includes('http') || title.includes('.com')) return null;
 
                 return {
                     title: title,
@@ -176,10 +168,8 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             })
             .filter((item): item is NewsArticle => item !== null);
       }
-      // 2. Se o JSON veio preenchido, valide os links com o Grounding para evitar alucinação
       else if (articles.length > 0) {
           articles = articles.map(article => {
-              // Tenta achar o link real que a IA usou
               const matchedChunk = groundingChunks.find(c => 
                   c.web?.uri === article.url || 
                   (c.web?.title && article.title && c.web.title.includes(article.title.substring(0, 15)))
@@ -188,9 +178,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
               const realUrl = matchedChunk?.web?.uri || article.url;
               const cleanSource = getDomain(realUrl || '');
               
-              // If IA hallucinated a source/title that is just a domain, clean it
               if (article.title && (article.title.includes(cleanSource) || article.title.includes('.com'))) {
-                  // Try to recover title from chunk if available
                   if (matchedChunk?.web?.title) {
                       article.title = matchedChunk.web.title;
                   }
@@ -202,23 +190,23 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
                   source: article.source || cleanSource,
                   date: article.date || new Date().toISOString(),
                   sentiment: article.sentiment || 'Neutral',
-                  // Fallback summary if empty
                   summary: article.summary || "Acesse para ler os detalhes."
               };
           });
       }
 
-      return articles.slice(0, 15);
+      return { data: articles.slice(0, 15), stats };
 
   } catch (error) {
       console.error("Erro busca notícias:", error);
-      return [];
+      return emptyReturn;
   }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<Record<string, { nextPaymentDate?: string; lastDividend?: number }>> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { nextPaymentDate?: string; lastDividend?: number }>, stats: { bytesSent: number, bytesReceived: number } }> {
+    const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (tickers.length === 0) {
-        return {};
+        return emptyReturn;
     }
 
     let apiKey: string;
@@ -226,7 +214,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         apiKey = getGeminiApiKey(prefs);
     } catch (error: any) {
         console.warn("Advanced asset data fetch skipped:", error.message);
-        return {};
+        return emptyReturn;
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -245,23 +233,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       - "lastDividend": Deve ser um número representando o valor do último dividendo pago. Se não encontrar, use null.
 
       NÃO INVENTE dados. Se não encontrar uma informação, use null. Baseie-se apenas em fontes confiáveis (RI, StatusInvest, FIIs.com.br, etc.).
-
-      Exemplo de formato de resposta para a busca por MXRF11, HGLG11:
-      {
-        "MXRF11": {
-          "nextPaymentDate": "2024-07-15",
-          "lastDividend": 0.10
-        },
-        "HGLG11": {
-          "nextPaymentDate": "2024-07-15",
-          "lastDividend": 1.10
-        },
-        "TICKER_SEM_DADOS": {
-          "nextPaymentDate": null,
-          "lastDividend": 0.95
-        }
-      }
     `;
+    const bytesSent = new Blob([prompt]).size;
 
     try {
         const response = await ai.models.generateContent({
@@ -274,6 +247,9 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         });
 
         const textResponse = response.text || "{}";
+        const bytesReceived = new Blob([textResponse]).size;
+        const stats = { bytesSent, bytesReceived };
+        
         const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
 
         if (jsonMatch) {
@@ -288,20 +264,21 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                     };
                 }
             }
-            return sanitizedData;
+            return { data: sanitizedData, stats };
         }
 
-        return {};
+        return { data: {}, stats };
 
     } catch (error) {
         console.error("Erro ao buscar dados avançados de ativos com Gemini:", error);
-        return {};
+        return emptyReturn;
     }
 }
 
-export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ticker: string; date: string }[]): Promise<Record<string, number>> {
+export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ticker: string; date: string }[]): Promise<{ data: Record<string, number>, stats: { bytesSent: number, bytesReceived: number } }> {
+    const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: number } };
     if (queries.length === 0) {
-        return {};
+        return emptyReturn;
     }
 
     let apiKey: string;
@@ -309,7 +286,7 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
         apiKey = getGeminiApiKey(prefs);
     } catch (error: any) {
         console.warn("Historical price fetch skipped:", error.message);
-        return {};
+        return emptyReturn;
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -325,13 +302,8 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
       3. Return ONLY a single valid JSON object.
       4. The keys of the JSON object MUST be the composite string 'TICKER_YYYY-MM-DD' exactly as requested.
       5. The value MUST be a number.
-      
-      Example Output format:
-      {
-        "MXRF11_2023-11-30": 10.81,
-        "HGLG11_2023-10-31": 162.50
-      }
     `;
+    const bytesSent = new Blob([prompt]).size;
 
     try {
         const response = await ai.models.generateContent({
@@ -343,31 +315,29 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
             }
         });
 
-        const data = extractJSON(response.text || "{}");
+        const textResponse = response.text || "{}";
+        const bytesReceived = new Blob([textResponse]).size;
+        const stats = { bytesSent, bytesReceived };
+
+        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+        const data = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
         
         if (data && typeof data === 'object' && !Array.isArray(data)) {
-            // Validate that values are numbers and filter garbage
             const cleanData: Record<string, number> = {};
             Object.keys(data).forEach(key => {
                 if (typeof data[key] === 'number') {
-                    // Basic sanity check for FII prices (avoiding zero or negative unless legit, though 0 is suspicious)
-                    if (data[key] > 0) {
-                        cleanData[key] = data[key];
-                    }
+                    if (data[key] > 0) cleanData[key] = data[key];
                 } else if (typeof data[key] === 'string') {
-                    // Try to parse string numbers like "10,50" or "10.50"
                     const num = parseFloat(data[key].replace(',', '.'));
-                    if (!isNaN(num) && num > 0) {
-                        cleanData[key] = num;
-                    }
+                    if (!isNaN(num) && num > 0) cleanData[key] = num;
                 }
             });
-            return cleanData;
+            return { data: cleanData, stats };
         }
-        return {};
+        return { data: {}, stats };
     } catch (error) {
         console.error("Error fetching historical prices with Gemini:", error);
-        return {};
+        return emptyReturn;
     }
 }
 

@@ -19,16 +19,15 @@ const NotificationSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => 
     return (
         <div>
             <PageHeader title={t('notifications')} onBack={onBack} helpText={t('help_notifications')} />
-
-            <div className="space-y-4">
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] space-y-4">
+                <div className="flex justify-between items-center">
                     <div>
                         <p className="font-bold">{t('price_alerts')}</p>
                     </div>
                     <ToggleSwitch enabled={settings.price} setEnabled={(val) => updateSetting('price', val)} />
                 </div>
                 
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+                <div className="flex justify-between items-center">
                     <div>
                         <p className="font-bold">{t('dividend_announcements')}</p>
                     </div>

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
@@ -146,9 +144,8 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
     return (
         <div>
             <PageHeader title={t('security')} onBack={onBack} helpText={t('help_security')} />
-
-            <div className="space-y-4">
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] space-y-4">
+                <div className="flex justify-between items-center">
                     <div>
                         <p className="font-bold">{t('privacy_on_start')}</p>
                         <p className="text-xs text-[var(--text-secondary)]">{preferences.privacyOnStart ? t('enabled') : t('disabled')}</p>
@@ -156,27 +153,25 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
                     <ToggleSwitch enabled={preferences.privacyOnStart} setEnabled={(val) => updatePreferences({ privacyOnStart: val })} />
                 </div>
                 
-                 <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+                <div className="flex justify-between items-center">
                     <div>
                         <p className="font-bold">{t('biometric_login')}</p>
-                         <p className="text-xs text-[var(--text-secondary)]">{biometricsEnabled ? t('enabled') : t('disabled')}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{biometricsEnabled ? t('enabled') : t('disabled')}</p>
                     </div>
                     <ToggleSwitch enabled={biometricsEnabled} setEnabled={handleBiometricsToggle} />
                 </div>
 
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <p className="font-bold">{t('app_lock_pin')}</p>
-                            <p className="text-xs text-[var(--text-secondary)]">{preferences.appPin ? '****' : t('disabled')}</p>
-                        </div>
-                        <button 
-                            onClick={() => preferences.appPin ? handleRemovePin() : setShowPinModal(true)}
-                            className={`px-4 py-1.5 text-xs font-bold rounded-md ${preferences.appPin ? 'bg-red-500/20 text-red-400' : 'bg-[var(--accent-color)] text-[var(--accent-color-text)]'}`}
-                        >
-                            {preferences.appPin ? t('delete') : t('add')}
-                        </button>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <p className="font-bold">{t('app_lock_pin')}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{preferences.appPin ? '****' : t('disabled')}</p>
                     </div>
+                    <button 
+                        onClick={() => preferences.appPin ? handleRemovePin() : setShowPinModal(true)}
+                        className={`px-4 py-1.5 text-xs font-bold rounded-md ${preferences.appPin ? 'bg-red-500/20 text-red-400' : 'bg-[var(--accent-color)] text-[var(--accent-color-text)]'}`}
+                    >
+                        {preferences.appPin ? t('delete') : t('add')}
+                    </button>
                 </div>
             </div>
             

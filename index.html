@@ -55,7 +55,7 @@
       }
       
       [data-style="premium"] {
-          --backdrop-blur: 40px;
+          --backdrop-blur: 32px;
       }
       [data-style="premium"][data-theme="dark"] {
           --bg-primary-rgb: 5, 5, 5;
@@ -63,10 +63,10 @@
           --bg-primary: #050505;
           --bg-secondary: rgba(20, 20, 25, 0.50); 
           --bg-tertiary-hover: rgba(255, 255, 255, 0.08);
-          --border-color: rgba(255, 255, 255, 0.08);
-          --glass-border: 1px solid rgba(255, 255, 255, 0.08);
-          --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
-          --card-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.7);
+          --border-color: rgba(255, 255, 255, 0.1);
+          --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+          --glass-highlight: inset 0 1.5px 0 0 rgba(255, 255, 255, 0.08);
+          --card-shadow: 0 16px 50px -16px rgba(0, 0, 0, 0.7);
           --text-primary: #ffffff;
           --text-secondary: #a1a1aa;
       }
@@ -74,12 +74,12 @@
           --bg-primary-rgb: 240, 244, 248;
           --bg-secondary-rgb: 255, 255, 255;
           --bg-primary: #f0f4f8;
-          --bg-secondary: rgba(255, 255, 255, 0.60);
+          --bg-secondary: rgba(255, 255, 255, 0.50);
           --bg-tertiary-hover: rgba(255, 255, 255, 0.85);
-          --border-color: rgba(0, 0, 0, 0.06); 
-          --glass-border: 1px solid rgba(255, 255, 255, 0.6);
-          --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
-          --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
+          --border-color: rgba(0, 0, 0, 0.08); 
+          --glass-border: 1px solid rgba(255, 255, 255, 0.7);
+          --glass-highlight: inset 0 1.5px 0 0 rgba(255, 255, 255, 0.6);
+          --card-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.1);
           --text-primary: #1e293b; 
           --text-secondary: #475569; 
       }
@@ -95,15 +95,33 @@
         padding-bottom: var(--safe-bottom);
         -webkit-tap-highlight-color: transparent;
       }
+      
+      @keyframes aurora {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+      }
 
       /* Premium Background Effect (Aurora) */
       body[data-style="premium"] {
+        background-size: 400% 400%;
         background-image: 
-          radial-gradient(circle at 0% 0%, rgba(var(--accent-rgb, 56, 189, 248), 0.15), transparent 50%),
-          radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.10), transparent 40%),
-          radial-gradient(circle at 100% 100%, rgba(var(--accent-rgb, 56, 189, 248), 0.08), transparent 50%),
-          radial-gradient(circle at 0% 100%, rgba(168, 85, 247, 0.08), transparent 50%);
+          radial-gradient(circle at 10% 20%, rgba(var(--accent-rgb, 56, 189, 248), 0.15), transparent 40%),
+          radial-gradient(circle at 80% 10%, rgba(139, 92, 246, 0.10), transparent 40%),
+          radial-gradient(circle at 90% 90%, rgba(var(--accent-rgb, 56, 189, 248), 0.08), transparent 50%),
+          radial-gradient(circle at 20% 90%, rgba(168, 85, 247, 0.08), transparent 50%);
         background-attachment: fixed;
+        animation: aurora 20s ease-in-out infinite;
+      }
+      
+      body[data-style="premium"]::after {
+        content: '';
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.025"/></svg>');
+        z-index: -1;
       }
 
       .bg-\[var\(--bg-secondary\)\] {
@@ -114,18 +132,23 @@
           box-shadow: var(--card-shadow), var(--glass-highlight);
       }
       
-      .glass, .glass-card {
+      .glass {
           background-color: var(--bg-secondary);
           backdrop-filter: blur(var(--backdrop-blur));
           -webkit-backdrop-filter: blur(var(--backdrop-blur));
-          border-bottom: 1px solid var(--border-color);
           box-shadow: var(--glass-highlight);
       }
       
       [data-style="premium"] .glass {
           border: var(--glass-border);
-          background-color: rgba(var(--bg-secondary-rgb), 0.75);
+          background-color: rgba(var(--bg-secondary-rgb), 0.70);
           box-shadow: var(--card-shadow), var(--glass-highlight);
+      }
+      
+      /* Fix for headers that should ONLY have a bottom border in premium mode */
+      [data-style="premium"] header.glass {
+        border: none;
+        border-bottom: 1px solid var(--border-color);
       }
 
       /* Scrollbar Polish */

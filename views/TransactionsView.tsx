@@ -7,12 +7,6 @@ import TrashIcon from '../components/icons/TrashIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate, getTodayISODate } from '../utils';
-import VirtualList from '../components/VirtualList';
-
-// Tipo auxiliar para a lista virtualizada
-type VirtualItem = 
-  | { type: 'header'; monthYear: string }
-  | { type: 'transaction'; data: Transaction };
 
 interface TransactionsViewProps {
     initialFilter: string | null;
@@ -176,9 +170,8 @@ const TransactionModal: React.FC<{
 const TransactionItem = React.memo<{ 
     transaction: Transaction, 
     onEdit: (tx: Transaction) => void, 
-    onDelete: (id: string) => void, 
-    style?: React.CSSProperties 
-}>(({ transaction, onEdit, onDelete, style }) => {
+    onDelete: (id: string) => void
+}>(({ transaction, onEdit, onDelete }) => {
     const { t, locale, formatCurrency } = useI18n();
     const { getAveragePriceForTransaction } = usePortfolio();
     const isBuy = transaction.type === 'Compra';
@@ -199,7 +192,7 @@ const TransactionItem = React.memo<{
     }
 
     return (
-        <div onClick={() => { onEdit(transaction); vibrate(); }} style={style} className="transaction-item bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-0.5 group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full flex flex-col justify-center">
+        <div onClick={() => { onEdit(transaction); vibrate(); }} className="transaction-item bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-0.5 group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full flex flex-col justify-center">
             <div className="flex items-center justify-between pr-8">
                 <div className="flex items-center space-x-3">
                     <div className={`transaction-icon w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0 ${isBuy ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
@@ -284,23 +277,15 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         });
     }, [filter, transactions, searchQuery, dateRange]);
 
-    // Flattened list for virtualization
-    const virtualItems = useMemo<VirtualItem[]>(() => {
+    const groupedTransactions = useMemo(() => {
         const sorted = [...filteredTransactions].sort((a, b) => b.date.localeCompare(a.date));
-        const items: VirtualItem[] = [];
-        let currentMonthYear = '';
-
-        sorted.forEach(tx => {
+        return sorted.reduce<Record<string, Transaction[]>>((acc, tx) => {
             const date = new Date(tx.date);
             const monthYear = date.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
-            
-            if (monthYear !== currentMonthYear) {
-                currentMonthYear = monthYear;
-                items.push({ type: 'header', monthYear });
-            }
-            items.push({ type: 'transaction', data: tx });
-        });
-        return items;
+            if (!acc[monthYear]) acc[monthYear] = [];
+            acc[monthYear].push(tx);
+            return acc;
+        }, {});
     }, [filteredTransactions, locale]);
 
     const summary = useMemo(() => {
@@ -338,33 +323,6 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         if (window.confirm(t('confirm_delete_transaction'))) {
              handleDeleteTransaction(txId);
         }
-    };
-
-    // Function to determine item height based on index/type
-    const getItemHeight = (index: number) => {
-        const item = virtualItems[index];
-        return item.type === 'header' ? 40 : 104; // 40px for header, 104px for transaction card
-    };
-
-    const renderVirtualItem = (item: VirtualItem) => {
-        if (item.type === 'header') {
-            return (
-                <div className="h-10 flex items-end pb-2 px-1">
-                    <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
-                        {item.monthYear}
-                    </h2>
-                </div>
-            );
-        }
-        return (
-            <div className="h-[104px] pb-3">
-                <TransactionItem 
-                    transaction={item.data} 
-                    onEdit={setEditingTx} 
-                    onDelete={handleConfirmDelete}
-                />
-            </div>
-        );
     };
     
     return (
@@ -427,24 +385,33 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                     </div>
                 )}
 
-                {virtualItems.length > 0 ? (
-                    <div className="flex-1 min-h-0">
-                        <VirtualList 
-                            items={virtualItems} 
-                            renderItem={renderVirtualItem} 
-                            getItemHeight={getItemHeight}
-                            containerHeight="100%"
-                        />
-                    </div>
-                ) : (
-                    <div className="text-center text-[var(--text-secondary)] py-20 animate-fade-in">
-                        <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--border-color)]">
-                            <EditIcon className="w-6 h-6 opacity-50"/>
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                    {Object.keys(groupedTransactions).length > 0 ? (
+                        Object.entries(groupedTransactions).map(([monthYear, txs]) => (
+                            <div key={monthYear} className="mb-6 animate-fade-in-up">
+                                <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-widest px-1 sticky top-0 z-10 bg-[var(--bg-primary)]/90 backdrop-blur-sm py-2 -mx-4 px-4">{monthYear}</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 landscape-grid-cols-2">
+                                    {(txs as Transaction[]).map((tx, index) => (
+                                        <TransactionItem 
+                                            key={tx.id} 
+                                            transaction={tx} 
+                                            onEdit={setEditingTx} 
+                                            onDelete={handleConfirmDelete}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center text-[var(--text-secondary)] py-20 animate-fade-in h-full flex flex-col justify-center items-center">
+                            <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--border-color)]">
+                                <EditIcon className="w-6 h-6 opacity-50"/>
+                            </div>
+                          <p className="font-bold">{t('no_transactions_found')}</p>
+                          <p className="text-xs mt-2 max-w-xs mx-auto">{t('no_transactions_subtitle')}</p>
                         </div>
-                      <p className="font-bold">{t('no_transactions_found')}</p>
-                      <p className="text-xs mt-2 max-w-xs mx-auto">{t('no_transactions_subtitle')}</p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
             
             <FloatingActionButton id="fab-add-transaction" onClick={() => { setShowAddModal(true); vibrate(); }} />

@@ -18,19 +18,19 @@ import UpdateIcon from '../icons/UpdateIcon';
 import LogoutIcon from '../icons/LogoutIcon';
 import ChevronRightIcon from '../icons/ChevronRightIcon';
 import SparklesIcon from '../icons/SparklesIcon';
-import BookOpenIcon from '../icons/BookOpenIcon';
 import CalculatorIcon from '../icons/CalculatorIcon';
+import BookOpenIcon from '../icons/BookOpenIcon';
 
-const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; isLast?: boolean; isActive?: boolean }> = ({ icon, title, subtitle, onClick, isLast, isActive }) => (
+const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; isLast?: boolean; }> = ({ icon, title, subtitle, onClick, isLast }) => (
     <div
         onClick={() => { onClick(); vibrate(); }}
-        className={`menu-item flex items-center space-x-4 p-4 hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-200 cursor-pointer active:scale-[0.98] ${!isLast ? 'border-b border-[var(--border-color)]' : ''} ${isActive ? 'bg-[var(--bg-tertiary-hover)] border-l-4 border-l-[var(--accent-color)]' : 'border-l-4 border-l-transparent'}`}
+        className={`menu-item flex items-center space-x-4 p-4 hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-200 cursor-pointer active:scale-[0.98] ${!isLast ? 'border-b border-[var(--border-color)]' : ''}`}
     >
-        <div className={`menu-icon flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg shadow-sm transition-colors ${isActive ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'bg-[var(--bg-primary)] text-[var(--accent-color)]'}`}>
+        <div className="menu-icon flex-shrink-0 w-12 h-12 flex items-center justify-center bg-[var(--bg-primary)] text-[var(--accent-color)] rounded-xl shadow-sm border border-[var(--border-color)]">
             {icon}
         </div>
         <div className="flex-1 min-w-0">
-            <p className={`font-bold text-sm truncate ${isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]'}`}>{title}</p>
+            <p className="font-bold text-sm truncate text-[var(--text-primary)]">{title}</p>
             <p className="text-xs text-[var(--text-secondary)] truncate">{subtitle}</p>
         </div>
         <ChevronRightIcon className="w-4 h-4 text-[var(--text-secondary)] flex-shrink-0" />
@@ -42,34 +42,100 @@ const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdate
     const { t } = useI18n();
     const { userProfile, resetApp } = usePortfolio();
 
-    const menuItems = [
+    const accountItems = [
         { screen: 'profile', icon: <UserIcon />, title: t('my_profile'), subtitle: userProfile.name },
-        { screen: 'themeGallery', icon: <PaletteIcon />, title: t('theme_gallery'), subtitle: t('theme_gallery_desc') },
-        { screen: 'general', icon: <SettingsIcon />, title: t('general'), subtitle: t('start_screen') + ", " + t('haptic_feedback') },
         { screen: 'security', icon: <ShieldIcon />, title: t('security'), subtitle: t('app_lock_pin') + ", " + t('biometric_login') },
+    ];
+
+    const personalizationItems = [
+        { screen: 'appearance', icon: <PaletteIcon />, title: t('appearance'), subtitle: t('themes_subtitle') },
+        { screen: 'general', icon: <SettingsIcon />, title: t('general'), subtitle: t('start_screen') + ", " + t('haptic_feedback') },
         { screen: 'notifications', icon: <BellIcon />, title: t('notifications'), subtitle: t('price_alerts') + ", " + t('dividend_announcements') },
+    ];
+
+    const dataItems = [
         { screen: 'transactions', icon: <TransactionIcon />, title: t('transactions_data'), subtitle: t('default_brokerage') + ", " + t('default_sort') },
         { screen: 'apiConnections', icon: <SparklesIcon />, title: t('api_connections'), subtitle: t('api_connections_desc') },
         { screen: 'backup', icon: <DatabaseIcon />, title: t('backup_restore'), subtitle: t('export_data_json') + ", " + t('import_data') },
+    ];
+    
+    const toolsItems = [
         { screen: 'calculators', icon: <CalculatorIcon />, title: t('calculators'), subtitle: t('calculators_help') },
         { screen: 'glossary', icon: <BookOpenIcon />, title: t('financial_glossary'), subtitle: t('glossary_subtitle') },
         { screen: 'about', icon: <InfoIcon />, title: t('about_app'), subtitle: t('version') + ", " + t('terms_of_service') },
     ];
 
     return (
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
-            {menuItems.map(item => (
-                <MenuItem
-                    key={item.screen}
-                    icon={item.icon}
-                    title={item.title}
-                    subtitle={item.subtitle}
-                    onClick={() => setScreen(item.screen as MenuScreen)}
-                    isActive={activeScreen === item.screen}
-                />
-            ))}
+        <div className="space-y-6">
+            {/* Account Category */}
+            <div>
+                <h3 className="px-4 pb-2 text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('settings_category_account')}</h3>
+                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
+                    {accountItems.map((item, index) => (
+                        <MenuItem
+                            key={item.screen}
+                            icon={item.icon}
+                            title={item.title}
+                            subtitle={item.subtitle}
+                            onClick={() => setScreen(item.screen as MenuScreen)}
+                            isLast={index === accountItems.length - 1}
+                        />
+                    ))}
+                </div>
+            </div>
 
-            <div className="p-2 space-y-2">
+            {/* Personalization Category */}
+            <div>
+                <h3 className="px-4 pb-2 text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('settings_category_personalization')}</h3>
+                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
+                    {personalizationItems.map((item, index) => (
+                        <MenuItem
+                            key={item.screen}
+                            icon={item.icon}
+                            title={item.title}
+                            subtitle={item.subtitle}
+                            onClick={() => setScreen(item.screen as MenuScreen)}
+                            isLast={index === personalizationItems.length - 1}
+                        />
+                    ))}
+                </div>
+            </div>
+            
+             {/* Data Category */}
+            <div>
+                <h3 className="px-4 pb-2 text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('settings_category_data_integrations')}</h3>
+                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
+                    {dataItems.map((item, index) => (
+                        <MenuItem
+                            key={item.screen}
+                            icon={item.icon}
+                            title={item.title}
+                            subtitle={item.subtitle}
+                            onClick={() => setScreen(item.screen as MenuScreen)}
+                            isLast={index === dataItems.length - 1}
+                        />
+                    ))}
+                </div>
+            </div>
+            
+            {/* Tools Category */}
+            <div>
+                <h3 className="px-4 pb-2 text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('settings_category_tools_info')}</h3>
+                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
+                    {toolsItems.map((item, index) => (
+                        <MenuItem
+                            key={item.screen}
+                            icon={item.icon}
+                            title={item.title}
+                            subtitle={item.subtitle}
+                            onClick={() => setScreen(item.screen as MenuScreen)}
+                            isLast={index === toolsItems.length - 1}
+                        />
+                    ))}
+                </div>
+            </div>
+
+             <div className="p-2 space-y-2">
                 <button onClick={onShowUpdateModal} className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-3 rounded-lg hover:bg-[var(--bg-tertiary-hover)] transition-colors">
                     <UpdateIcon className="w-4 h-4" />
                     {t('check_for_update')}

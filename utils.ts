@@ -28,7 +28,7 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatc
       clearTimeout(timeoutRef.current);
     }
 
-    // Agenda a gravação no localStorage para daqui a 1000ms (1 segundo)
+    // Agenda a gravação no localStorage para daqui a 300ms
     // Isso evita que a UI trave se o estado mudar muito rápido (ex: digitando ou slider)
     timeoutRef.current = setTimeout(() => {
       try {
@@ -36,7 +36,7 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatc
       } catch (error) {
         console.error(`Error setting localStorage key “${key}”:`, error);
       }
-    }, 1000);
+    }, 300);
 
     return () => {
       if (timeoutRef.current) {
@@ -50,7 +50,7 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatc
 
 // --- Função para feedback de vibração ---
 export const vibrate = (pattern: number | number[] = 10) => { 
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+  if (typeof navigator !== 'undefined' && navigator.vibrate && window.matchMedia('(hover: none)').matches) { // Vibrate only on touch devices
     navigator.vibrate(pattern);
   }
 };

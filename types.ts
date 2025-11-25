@@ -121,6 +121,17 @@ export interface AppFont {
     description: string;
 }
 
+export interface ApiStats {
+    requests: number;
+    bytesSent: number;
+    bytesReceived: number;
+}
+
+export interface AppStats {
+    gemini: ApiStats;
+    brapi: ApiStats;
+}
+
 export interface AppPreferences {
   // Appearance
   currentThemeId: string;

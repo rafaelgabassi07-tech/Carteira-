@@ -76,8 +76,7 @@ const CompoundInterestCalculator: React.FC = () => {
                 <SliderInput icon={<ClockIcon className="w-5 h-5" />} label={t('period_in_years')} value={years} setValue={setYears} min={1} max={50} step={1} format={(v) => `${v} anos`} />
             </div>
              <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] space-y-4">
-                {/* FIX: Changed 'result' to 'simulation_result' to use the non-conflicting key. */}
-                <h4 className="font-bold text-center text-sm uppercase tracking-wider text-[var(--text-secondary)]">{t('simulation_result')}</h4>
+                <h4 className="font-bold text-center text-sm uppercase tracking-wider text-[var(--text-secondary)]">{t('result')}</h4>
                  <div className="grid grid-cols-2 gap-3">
                     <ResultCard label={t('total_invested_chart')}>
                         <p className="font-bold text-lg text-[var(--text-secondary)]"><CountUp end={finalData.invested} formatter={formatCurrency} /></p>
@@ -119,8 +118,7 @@ const SimpleInterestCalculator: React.FC = () => {
                 <SliderInput icon={<ClockIcon className="w-5 h-5" />} label={t('period_in_years')} value={years} setValue={setYears} min={1} max={50} step={1} format={(v) => `${v} anos`} />
             </div>
              <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] space-y-4">
-                {/* FIX: Changed 'result' to 'simulation_result' to use the non-conflicting key. */}
-                <h4 className="font-bold text-center text-sm uppercase tracking-wider text-[var(--text-secondary)]">{t('simulation_result')}</h4>
+                <h4 className="font-bold text-center text-sm uppercase tracking-wider text-[var(--text-secondary)]">{t('result')}</h4>
                  <div className="grid grid-cols-2 gap-3">
                     <ResultCard label={t('total_invested_chart')}><p className="font-bold text-lg text-[var(--text-secondary)]"><CountUp end={finalData.invested} formatter={formatCurrency} /></p></ResultCard>
                     <ResultCard label={t('total_interest_chart')}><p className="font-bold text-lg text-[var(--green-text)]"><CountUp end={finalData.total - finalData.invested} formatter={formatCurrency} /></p></ResultCard>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent } from '../types';
+import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, SegmentEvolutionData, PortfolioEvolutionPoint, DividendHistoryEvent, AppStats } from '../types';
 import { fetchAdvancedAssetData, fetchHistoricalPrices } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics, getClosestPrice, applyThemeToDocument } from '../utils';
@@ -21,6 +21,7 @@ interface PortfolioContextType {
   isRefreshing: boolean;
   marketDataError: string | null;
   userProfile: UserProfile;
+  apiStats: AppStats;
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (transaction: Transaction) => void;
   deleteTransaction: (id: string) => void;
@@ -40,6 +41,8 @@ interface PortfolioContextType {
   togglePrivacyMode: () => void;
   resetApp: () => void;
   clearCache: (key?: string) => void;
+  logApiUsage: (api: 'gemini' | 'brapi', stats: { requests: number; bytesSent?: number; bytesReceived?: number }) => void;
+  resetApiStats: () => void;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -60,6 +63,10 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     brapiToken: null,
     autoBackup: false, betaFeatures: false, devMode: false
 };
+const DEFAULT_API_STATS: AppStats = {
+    gemini: { requests: 0, bytesSent: 0, bytesReceived: 0 },
+    brapi: { requests: 0, bytesSent: 0, bytesReceived: 0 }
+};
 const EPSILON = 0.000001; // For floating point comparisons
 
 // --- Provider ---
@@ -75,10 +82,25 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
   const [portfolioEvolution, setPortfolioEvolution] = useState<SegmentEvolutionData>({ all_types: [] });
   const [historicalPriceCache, setHistoricalPriceCache] = usePersistentState<Record<string, number>>('historical_price_cache', {});
-
+  const [apiStats, setApiStats] = usePersistentState<AppStats>('api_stats', DEFAULT_API_STATS);
 
   const sourceTransactions = useMemo(() => isDemoMode ? DEMO_TRANSACTIONS : transactions, [isDemoMode, transactions]);
   const sourceMarketData = useMemo(() => isDemoMode ? DEMO_MARKET_DATA : marketData, [isDemoMode, marketData]);
+
+  // --- API Stats Management ---
+  const logApiUsage = useCallback((api: 'gemini' | 'brapi', stats: { requests: number; bytesSent?: number; bytesReceived?: number }) => {
+      setApiStats(prev => {
+          const newStats = { ...prev };
+          newStats[api] = {
+              requests: newStats[api].requests + stats.requests,
+              bytesSent: newStats[api].bytesSent + (stats.bytesSent || 0),
+              bytesReceived: newStats[api].bytesReceived + (stats.bytesReceived || 0),
+          };
+          return newStats;
+      });
+  }, [setApiStats]);
+  
+  const resetApiStats = useCallback(() => setApiStats(DEFAULT_API_STATS), [setApiStats]);
 
   // --- Theme & Font Management ---
   useEffect(() => {
@@ -165,8 +187,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const updated = { ...prev };
             
             if (brapiResult.status === 'fulfilled') {
-                Object.keys(brapiResult.value).forEach(ticker => {
-                    updated[ticker] = { ...(updated[ticker] || {}), ...brapiResult.value[ticker] };
+                logApiUsage('brapi', { requests: uniqueTickers.length, bytesReceived: brapiResult.value.stats.bytesReceived });
+                Object.keys(brapiResult.value.quotes).forEach(ticker => {
+                    updated[ticker] = { ...(updated[ticker] || {}), ...brapiResult.value.quotes[ticker] };
                 });
             } else {
                 console.error("Brapi Error:", brapiResult.reason);
@@ -175,8 +198,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
 
             if (geminiResult.status === 'fulfilled') {
-                 Object.keys(geminiResult.value).forEach(ticker => {
-                    updated[ticker] = { ...(updated[ticker] || {}), ...geminiResult.value[ticker] };
+                 logApiUsage('gemini', { requests: 1, ...geminiResult.value.stats });
+                 Object.keys(geminiResult.value.data).forEach(ticker => {
+                    updated[ticker] = { ...(updated[ticker] || {}), ...geminiResult.value.data[ticker] };
                 });
             } else {
                 console.error("Gemini Error:", geminiResult.reason);
@@ -193,7 +217,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
         if (!silent) setIsRefreshing(false);
     }
-  }, [isRefreshing, lastSync, sourceTransactions, preferences, setMarketData, setLastSync]);
+  }, [isRefreshing, lastSync, sourceTransactions, preferences, setMarketData, setLastSync, logApiUsage]);
 
   const refreshAllData = useCallback(async () => {
     if (isRefreshing) return;
@@ -223,13 +247,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const refreshSingleAsset = useCallback(async (ticker: string) => {
     if (!ticker) return;
     try {
-        const priceData = await fetchBrapiQuotes(preferences, [ticker]);
-        const advancedData = await fetchAdvancedAssetData(preferences, [ticker]);
+        const { quotes, stats: brapiStats } = await fetchBrapiQuotes(preferences, [ticker]);
+        logApiUsage('brapi', { requests: 1, bytesReceived: brapiStats.bytesReceived });
+
+        const { data: advancedData, stats: geminiStats } = await fetchAdvancedAssetData(preferences, [ticker]);
+        logApiUsage('gemini', { requests: 1, ...geminiStats });
+
         setMarketData(prev => {
             const updated = { ...prev };
             updated[ticker] = { 
                 ...(prev[ticker] || {}), 
-                ...priceData[ticker], 
+                ...quotes[ticker], 
                 ...advancedData[ticker] 
             };
             return updated;
@@ -238,7 +266,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setMarketDataError(error.message);
         throw error;
     }
-  }, [preferences, setMarketData]);
+  }, [preferences, setMarketData, logApiUsage]);
 
   const assets = useMemo((): Asset[] => {
     const portfolioMetrics = calculatePortfolioMetrics(sourceTransactions);
@@ -491,7 +519,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               for (let i = 0; i < queriesToFetch.length; i += BATCH_SIZE) {
                   const batch = queriesToFetch.slice(i, i + BATCH_SIZE);
                   try {
-                      const fetchedPrices = await fetchHistoricalPrices(preferences, batch);
+                      const { data: fetchedPrices, stats } = await fetchHistoricalPrices(preferences, batch);
+                      logApiUsage('gemini', { requests: 1, ...stats });
                       if (Object.keys(fetchedPrices).length > 0) {
                           setHistoricalPriceCache(prev => ({ ...prev, ...fetchedPrices }));
                       }
@@ -509,7 +538,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               isFetchingHistory.current = false;
           };
       }
-  }, [queriesToFetchJSON, preferences, setHistoricalPriceCache]);
+  }, [queriesToFetchJSON, preferences, setHistoricalPriceCache, logApiUsage]);
 
 
   const value = useMemo(() => ({
@@ -527,6 +556,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     isRefreshing,
     marketDataError,
     userProfile,
+    apiStats,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -546,14 +576,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     togglePrivacyMode,
     resetApp,
     clearCache,
+    logApiUsage,
+    resetApiStats,
   }), [
     assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
     yieldOnCost, projectedAnnualIncome, monthlyIncome, portfolioEvolution,
-    lastSync, isRefreshing, marketDataError, userProfile, 
+    lastSync, isRefreshing, marketDataError, userProfile, apiStats,
     addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
     updatePreferences, setTheme, setFont, updateUserProfile, refreshMarketData, refreshAllData, refreshSingleAsset,
     getAssetByTicker, getAveragePriceForTransaction, setIsDemoMode, setPrivacyMode,
-    togglePrivacyMode, resetApp, clearCache
+    togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats
   ]);
 
   return (

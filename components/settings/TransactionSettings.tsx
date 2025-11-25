@@ -18,9 +18,8 @@ const TransactionSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     return (
         <div>
             <PageHeader title={t('transactions_data')} onBack={onBack} />
-
-            <div className="space-y-4">
-                 <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)]">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] space-y-6">
+                <div>
                     <label htmlFor="brokerage" className="font-bold text-sm">{t('default_brokerage')}</label>
                     <input
                         id="brokerage"
@@ -31,7 +30,7 @@ const TransactionSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     />
                 </div>
                 
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)]">
+                <div>
                     <h4 className="font-bold mb-3 text-sm">{t('default_sort')}</h4>
                     <div className="bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--border-color)] space-y-1">
                         {sortOptions.map(opt => (
@@ -46,12 +45,12 @@ const TransactionSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     </div>
                 </div>
 
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+                <div className="flex justify-between items-center">
                     <p className="font-bold text-sm">{t('hide_cents')}</p>
                     <ToggleSwitch enabled={preferences.hideCents} setEnabled={(val) => updatePreferences({ hideCents: val })} />
                 </div>
                 
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg flex justify-between items-center border border-[var(--border-color)]">
+                <div className="flex justify-between items-center">
                     <p className="font-bold text-sm">{t('show_currency')}</p>
                     <ToggleSwitch enabled={preferences.showCurrencySymbol} setEnabled={(val) => updatePreferences({ showCurrencySymbol: val })} />
                 </div>

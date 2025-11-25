@@ -106,10 +106,9 @@ const BackupRestore: React.FC<{ onBack: () => void; addToast: (message: string, 
     return (
         <div>
             <PageHeader title={t('backup_restore')} onBack={onBack} helpText={t('help_backup')} />
-
-            <div className="space-y-4">
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                    <p className="font-bold mb-1">{t('backup_export_desc')}</p>
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] space-y-6">
+                <div>
+                    <p className="font-bold mb-1 text-sm">{t('backup_export_desc')}</p>
                     <div className="flex flex-col sm:flex-row gap-2 mt-3">
                          <button onClick={handleExportJson} className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold py-3 rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-colors">
                             <DownloadIcon className="w-4 h-4" />
@@ -122,10 +121,10 @@ const BackupRestore: React.FC<{ onBack: () => void; addToast: (message: string, 
                     </div>
                 </div>
 
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-color)]">
-                    <p className="font-bold mb-1">{t('backup_import_desc')}</p>
+                <div>
+                    <p className="font-bold mb-1 text-sm">{t('backup_import_desc')}</p>
                     <div className="mt-3">
-                        <label className="w-full flex items-center justify-center gap-2 bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-secondary)] font-bold py-3 rounded-lg cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:text-white transition-colors">
+                        <label className="w-full flex items-center justify-center gap-2 bg-[var(--bg-primary)] border border-dashed border-[var(--border-color)] text-[var(--text-secondary)] font-bold py-3 rounded-lg cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:text-white transition-colors">
                             <UploadIcon className="w-4 h-4" />
                             {t('import_data')}
                             <input type="file" accept=".json,.csv" onChange={handleImport} className="hidden" />

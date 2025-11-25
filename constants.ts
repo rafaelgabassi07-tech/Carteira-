@@ -39,7 +39,7 @@ export const APP_THEMES: AppTheme[] = [
         id: 'default-dark',
         name: 'Padrão Dark',
         type: 'dark',
-        description: 'O tema clássico e elegante do Invest.',
+        description: 'Um visual sóbrio e focado, com tons de cinza escuro e o azul ciano clássico do Invest para destaque.',
         colors: {
             bgPrimary: '#09090b',
             bgSecondary: '#18181b',
@@ -51,13 +51,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#09090b',
             greenText: '#4ade80',
             redText: '#f87171',
-        }
+        },
+        isPremium: false,
     },
     {
         id: 'carbon-red',
         name: 'Carbon GT',
         type: 'dark',
-        description: 'Inspirado em superesportivos. Preto fosco e vermelho.',
+        description: 'Velocidade e precisão, com preto carbono fosco e detalhes em vermelho de alta performance.',
         colors: {
             bgPrimary: '#101010',
             bgSecondary: '#1c1c1c',
@@ -69,13 +70,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#ffffff',
             greenText: '#22c55e',
             redText: '#ef4444',
-        }
+        },
+        isPremium: true,
     },
     {
         id: 'royal-gold',
         name: 'Royal Gold',
         type: 'dark',
-        description: 'Acabamento de luxo com toques dourados.',
+        description: 'Elegância atemporal. Um tema sofisticado com preto profundo e realces em ouro polido.',
         colors: {
             bgPrimary: '#0f0f11',
             bgSecondary: '#1a1a1d',
@@ -87,13 +89,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#451a03',
             greenText: '#fcd34d', // Dourado claro para positivo
             redText: '#f87171',
-        }
+        },
+        isPremium: true,
     },
     {
         id: 'midnight-oled',
         name: 'Midnight OLED',
         type: 'dark',
-        description: 'Preto absoluto para economia de bateria.',
+        description: 'Contraste máximo. Preto puro para telas OLED, ideal para focar nos dados e economizar bateria.',
         colors: {
             bgPrimary: '#000000',
             bgSecondary: '#0a0a0a',
@@ -105,13 +108,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#000000',
             greenText: '#22c55e',
             redText: '#ef4444',
-        }
+        },
+        isPremium: false,
     },
     {
         id: 'cyber-neon',
         name: 'Cyber Neon',
         type: 'dark',
-        description: 'Futurista, vibrante e com alto contraste.',
+        description: 'Uma viagem cyberpunk. Roxo profundo e magenta neon para uma interface vibrante e futurista.',
         colors: {
             bgPrimary: '#090014', // Roxo muito escuro
             bgSecondary: '#15002e',
@@ -123,13 +127,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#ffffff',
             greenText: '#22d3ee', // Ciano
             redText: '#fb7185',
-        }
+        },
+        isPremium: true,
     },
     {
         id: 'dracula',
         name: 'Dracula',
         type: 'dark',
-        description: 'Famoso tema com tons de roxo e contraste suave.',
+        description: 'O lendário tema dos desenvolvedores. Tons de roxo, rosa e ciano com contraste confortável.',
         colors: {
             bgPrimary: '#282a36',
             bgSecondary: '#44475a',
@@ -141,13 +146,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#282a36',
             greenText: '#50fa7b',
             redText: '#ff5555',
-        }
+        },
+        isPremium: false,
     },
     {
         id: 'ocean-depths',
         name: 'Ocean Depths',
         type: 'dark',
-        description: 'Tons profundos de azul marinho.',
+        description: 'Mergulhe na tranquilidade. Azul marinho profundo e ciano, inspirado nas profundezas do oceano.',
         colors: {
             bgPrimary: '#0f172a',
             bgSecondary: '#1e293b',
@@ -159,13 +165,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#0f172a',
             greenText: '#34d399',
             redText: '#f87171',
-        }
+        },
+        isPremium: true,
     },
     {
         id: 'forest-dark',
         name: 'Deep Forest',
         type: 'dark',
-        description: 'Inspirado na natureza com tons de verde.',
+        description: 'Calma e crescimento. Tons de verde escuro e menta, evocando a serenidade de uma floresta densa.',
         colors: {
             bgPrimary: '#022c22',
             bgSecondary: '#064e3b',
@@ -177,13 +184,33 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#022c22',
             greenText: '#6ee7b7',
             redText: '#fda4af',
-        }
+        },
+        isPremium: true,
+    },
+    {
+        id: 'nordic-night',
+        name: 'Nordic Night',
+        type: 'dark',
+        description: 'Minimalismo escandinavo. Paleta de cores frias e suaves para uma experiência calma e profissional.',
+        colors: {
+            bgPrimary: '#2E3440',
+            bgSecondary: '#3B4252',
+            bgTertiary: '#434C5E',
+            textPrimary: '#ECEFF4',
+            textSecondary: '#D8DEE9',
+            borderColor: '#4C566A',
+            accentColor: '#88C0D0',
+            accentText: '#2E3440',
+            greenText: '#A3BE8C',
+            redText: '#BF616A',
+        },
+        isPremium: false,
     },
     {
         id: 'default-light',
         name: 'Padrão Light',
         type: 'light',
-        description: 'Claro, limpo e profissional.',
+        description: 'Clareza e simplicidade. Um tema clean com excelente legibilidade para uso durante o dia.',
         colors: {
             bgPrimary: '#f8fafc',
             bgSecondary: '#ffffff',
@@ -195,13 +222,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#ffffff',
             greenText: '#16a34a',
             redText: '#e11d48',
-        }
+        },
+        isPremium: false,
     },
     {
         id: 'arctic-ice',
         name: 'Arctic Ice',
         type: 'light',
-        description: 'Fresco, azulado e extremamente limpo.',
+        description: 'Refrescante e moderno. Tons de azul gelo e branco puro para uma interface nítida e arejada.',
         colors: {
             bgPrimary: '#f0f9ff',
             bgSecondary: '#ffffff',
@@ -213,13 +241,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#ffffff',
             greenText: '#0284c7',
             redText: '#e11d48',
-        }
+        },
+        isPremium: true,
     },
     {
         id: 'sepia-comfort',
         name: 'Sepia Comfort',
         type: 'light',
-        description: 'Fundo amarelado suave para leitura.',
+        description: 'Conforto para os olhos. Tons de sépia quentes que reduzem o cansaço visual, ideal para longas leituras.',
         colors: {
             bgPrimary: '#fbf7f0',
             bgSecondary: '#fffefb',
@@ -231,13 +260,14 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#ffffff',
             greenText: '#059669',
             redText: '#dc2626',
-        }
+        },
+        isPremium: false,
     },
     {
         id: 'corporate-gray',
         name: 'Corporate',
         type: 'light',
-        description: 'Monocromático e sério.',
+        description: 'Foco e profissionalismo. Um tema minimalista em escala de cinza para um ambiente de trabalho sério.',
         colors: {
             bgPrimary: '#f3f4f6',
             bgSecondary: '#ffffff',
@@ -249,7 +279,46 @@ export const APP_THEMES: AppTheme[] = [
             accentText: '#ffffff',
             greenText: '#059669',
             redText: '#b91c1c',
-        }
+        },
+        isPremium: false,
+    },
+    {
+        id: 'minty-fresh',
+        name: 'Minty Fresh',
+        type: 'light',
+        description: 'Energia e renovação. Verde menta vibrante e branco para uma sensação de frescor e modernidade.',
+        colors: {
+            bgPrimary: '#F5FFFA',
+            bgSecondary: '#FFFFFF',
+            bgTertiary: '#E6F8F0',
+            textPrimary: '#025940',
+            textSecondary: '#5C8C7E',
+            borderColor: '#D1EAE2',
+            accentColor: '#3DDDA0',
+            accentText: '#025940',
+            greenText: '#027C55',
+            redText: '#D94D4D',
+        },
+        isPremium: false,
+    },
+    {
+        id: 'sakura-pink',
+        name: 'Sakura Pink',
+        type: 'light',
+        description: 'Delicadeza e harmonia. Tons suaves de rosa e branco, inspirados na beleza das flores de cerejeira.',
+        colors: {
+            bgPrimary: '#FFF5F7',
+            bgSecondary: '#FFFFFF',
+            bgTertiary: '#FFE3E9',
+            textPrimary: '#5C3740',
+            textSecondary: '#966F79',
+            borderColor: '#FADADD',
+            accentColor: '#FF8FAB',
+            accentText: '#FFFFFF',
+            greenText: '#50A684',
+            redText: '#E5536C',
+        },
+        isPremium: false,
     }
 ];
 

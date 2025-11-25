@@ -93,23 +93,11 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
     const DONUT_RADIUS = 42;
     const DONUT_STROKE_WIDTH = 16;
 
-    const getTranslationKey = (segmentName: string) => {
-        return segmentName
-            .toLowerCase()
-            .replace(' - ', '_')
-            .replace(/ /g, '_')
-            .replace(/\(|\)/g, '');
-    };
-
     return (
         <div className="flex flex-col md:flex-row items-center gap-8 p-4 animate-fade-in">
             <div className="relative w-40 h-40 flex-shrink-0">
                 <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
-                    <circle cx="50" cy="50" r={DONUT_RADIUS} fill="transparent" stroke="var(--border-color)" strokeWidth={DONUT_STROKE_WIDTH} opacity={0.05}/>
-                    
-                    {hasGoals && <PieRing data={goalData} radius={DONUT_RADIUS} strokeWidth={DONUT_STROKE_WIDTH / 2} animate={animate} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex} />}
-                    
-                    <PieRing data={data} radius={hasGoals ? DONUT_RADIUS / 2 : DONUT_RADIUS} strokeWidth={hasGoals ? DONUT_STROKE_WIDTH / 1.5 : DONUT_STROKE_WIDTH} animate={animate} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex}/>
+                    <PieRing data={data} radius={DONUT_RADIUS} strokeWidth={DONUT_STROKE_WIDTH} animate={animate} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex}/>
                 </svg>
             </div>
              <div className="w-full flex-1 space-y-3">
@@ -124,7 +112,7 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                         >
                             <div className="flex items-center gap-3">
                                 <div className="w-3 h-3 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: color }}></div>
-                                <span className="text-[var(--text-primary)] font-medium text-sm">{t(getTranslationKey(slice.name)) || slice.name}</span>
+                                <span className="text-[var(--text-primary)] font-medium text-sm">{slice.name}</span>
                             </div>
                             <div className="text-right font-mono">
                                 <span className="font-bold text-sm text-[var(--text-primary)] tracking-tight">{formatCurrency(slice.value)}</span>

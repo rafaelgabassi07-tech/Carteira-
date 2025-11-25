@@ -1,8 +1,8 @@
 export const ptBR = {
-    // Appearance
+    // Appearance (Restored Section)
+    appearance: 'Aparência & Interface',
     themes: 'Temas',
     themes_subtitle: 'Cores, estilo e modo escuro.',
-    appearance: 'Aparência & Interface',
     visual_style: 'Acabamento Visual',
     visual_style_desc: 'Defina a profundidade e transparência.',
     style_simple: 'Flat',
@@ -36,19 +36,26 @@ export const ptBR = {
     reduce_motion: 'Reduzir Movimento',
     customize_colors_fonts: 'Personalizar Aparência',
     open_theme_store_desc: 'Acesse a galeria de temas e acabamentos visuais.',
+    open_theme_gallery: 'Abrir Galeria de Temas',
     
     // Theme Gallery (Merged)
     theme_gallery: 'Galeria de Temas',
     theme_gallery_desc: 'Personalize cores, fontes, acabamento e mais.',
-    open_theme_gallery: 'Abrir Galeria de Temas',
     tab_themes: 'Temas',
     tab_typography: 'Tipografia',
     filter_dark: 'Escuros',
     filter_light: 'Claros',
+    flat: 'Flat',
+    glass: 'Glass',
     apply: 'Aplicar',
     applied: 'Em uso',
-    preview: 'Prévia',
+    preview: 'Pré-visualização',
     visual_finish: 'Acabamento',
+    preview_card_title: 'Ativo Exemplo',
+    preview_card_subtitle: '100 cotas',
+    preview_card_value: 'R$ 1.520,42',
+    preview_card_profit: '+R$ 88,10 (+5,8%)',
+    preview_button_text: 'Adicionar',
 
     // General
     app_name: 'Invest Portfolio',
@@ -74,6 +81,7 @@ export const ptBR = {
     filter: 'Filtrar',
     all: 'Todos',
     version: 'Versão',
+    result: 'Resultado',
     
     // Navigation
     nav_portfolio: 'Carteira',
@@ -112,7 +120,6 @@ export const ptBR = {
     // Asset Detail
     asset_not_found: 'Ativo não encontrado',
     current_position: 'Posição Atual',
-    result: 'Resultado',
     key_indicators: 'Indicadores',
     data: 'Dados',
     dy_12m: 'DY (12m)',
@@ -209,11 +216,15 @@ export const ptBR = {
     no_notifications_subtitle: 'Você não tem novas notificações no momento.',
 
     // Settings - Main
+    settings_category_account: 'Conta',
+    settings_category_personalization: 'Personalização',
+    settings_category_data_integrations: 'Dados e Integrações',
+    settings_category_tools_info: 'Ferramentas e Informações',
     my_profile: 'Meu Perfil',
     app: 'Aplicativo',
     general: 'Geral',
     security: 'Segurança',
-    transactions_data: 'Transações',
+    transactions_data: 'Transações e Dados',
     api_connections: 'Conexões API',
     api_connections_desc: 'Configure chaves de API para dados em tempo real.',
     backup_restore: 'Backup e Restauração',
@@ -267,6 +278,14 @@ export const ptBR = {
     toast_connection_success: 'Conexão bem sucedida!',
     toast_connection_failed: 'Falha na conexão. Verifique a chave.',
     toast_key_saved: 'Chaves salvas com sucesso.',
+    api_usage_stats: 'Estatísticas de Uso da API',
+    requests: 'Requisições',
+    data_transferred: 'Dados Transferidos',
+    sent: 'Enviado',
+    received: 'Recebido',
+    reset_stats: 'Resetar Estatísticas',
+    confirm_reset_stats: 'Tem certeza que deseja zerar as estatísticas de uso da API?',
+
 
     backup_export_desc: 'Exporte seus dados para manter uma cópia de segurança.',
     export_data_json: 'Exportar Backup (JSON)',
@@ -323,7 +342,6 @@ export const ptBR = {
     time_to_million_result: '{{years}} anos e {{months}} meses',
     goal: 'Meta',
     simulation: 'Simulação',
-    simulation_result: 'Resultado',
     
     // Changelog
     latest: 'Recente',
