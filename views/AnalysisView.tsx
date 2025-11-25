@@ -8,7 +8,6 @@ import CountUp from '../components/CountUp';
 import { vibrate } from '../utils';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import type { ToastMessage } from '../types';
-import AssetAllocationCard from '../components/AssetAllocationCard';
 
 const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number; className?: string }> = ({ title, children, action, delay = 0, className = '' }) => (
     <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${className}`} style={{ animationDelay: `${delay}ms` }}>
@@ -82,10 +81,9 @@ const DiversificationCard: React.FC = () => {
 
 interface AnalysisViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
-    onSelectAsset: (ticker: string) => void;
 }
 
-const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) => {
+const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
     const { t } = useI18n();
     const { refreshMarketData, isRefreshing } = usePortfolio();
 
@@ -120,9 +118,6 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                     </div>
                     <IncomeCard />
                     <DiversificationCard />
-                    <div className="lg:col-span-2">
-                        <AssetAllocationCard onSelectAsset={onSelectAsset} />
-                    </div>
                 </div>
             </div>
         </div>

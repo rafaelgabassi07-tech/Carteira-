@@ -138,7 +138,7 @@ const App: React.FC = () => {
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
-      case 'analise': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
+      case 'analise': return <AnalysisView addToast={addToast} />;
       case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
       default: return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
     }
