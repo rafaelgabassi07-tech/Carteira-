@@ -8,6 +8,7 @@ import CountUp from '../components/CountUp';
 import { vibrate } from '../utils';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import type { ToastMessage } from '../types';
+import AssetAllocationCard from '../components/AssetAllocationCard';
 
 const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number; className?: string }> = ({ title, children, action, delay = 0, className = '' }) => (
     <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${className}`} style={{ animationDelay: `${delay}ms` }}>
@@ -20,13 +21,33 @@ const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?
 );
 
 const IncomeCard: React.FC = () => {
-    const { t } = useI18n();
+    const { t, formatCurrency } = useI18n();
+    const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
     
+    const average = useMemo(() => {
+         const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
+         return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
+    }, [monthlyIncome]);
+
     return (
         <AnalysisCard title={t('monthly_income')} delay={100}>
-            <div className="h-48 w-full flex items-center justify-center text-sm text-[var(--text-secondary)]">
-                {/* Conteúdo removido para começar do zero */}
+            <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
+                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                        <CountUp end={average} formatter={formatCurrency} />
+                    </span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
+                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                        <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
+                    </span>
+                </div>
             </div>
+             <div className="h-48 w-full">
+                 <BarChart data={monthlyIncome} />
+             </div>
         </AnalysisCard>
     );
 };
@@ -61,9 +82,10 @@ const DiversificationCard: React.FC = () => {
 
 interface AnalysisViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
+    onSelectAsset: (ticker: string) => void;
 }
 
-const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
+const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) => {
     const { t } = useI18n();
     const { refreshMarketData, isRefreshing } = usePortfolio();
 
@@ -98,6 +120,9 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
                     </div>
                     <IncomeCard />
                     <DiversificationCard />
+                    <div className="lg:col-span-2">
+                        <AssetAllocationCard onSelectAsset={onSelectAsset} />
+                    </div>
                 </div>
             </div>
         </div>

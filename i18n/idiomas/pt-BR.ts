@@ -144,6 +144,7 @@ export const ptBR = {
     monthly_income: 'Renda Mensal',
     avg_monthly_income_12m: 'Média Mensal (12m)',
     diversification: 'Alocação por Setor',
+    asset_allocation: 'Aplicação por Ativos',
     evolution_of_patrimony: 'Evolução Patrimonial',
     analysis_period_6m: '6 Meses',
     analysis_period_12m: '1 Ano',

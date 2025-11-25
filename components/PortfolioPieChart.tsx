@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -84,12 +82,6 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
         return () => clearTimeout(timer);
     }, []);
     
-    const goalData = React.useMemo(() => {
-        return data.map(slice => ({ ...slice, percentage: goals[slice.name] || 0 }));
-    }, [data, goals]);
-
-    const hasGoals = Object.values(goals).some(g => Number(g) > 0);
-    
     const DONUT_RADIUS = 42;
     const DONUT_STROKE_WIDTH = 16;
 
@@ -100,24 +92,36 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                     <PieRing data={data} radius={DONUT_RADIUS} strokeWidth={DONUT_STROKE_WIDTH} animate={animate} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex}/>
                 </svg>
             </div>
-             <div className="w-full flex-1 space-y-3">
+             <div className="w-full flex-1 space-y-2">
                 {data.map((slice, index) => {
                      const color = sectorColorMap[slice.name] || colors[index % colors.length];
+                     const goal = goals[slice.name] || 0;
                      return (
                         <div 
                             key={slice.name} 
-                            className={`flex items-center justify-between text-base transition-all duration-200 p-1 rounded-lg cursor-pointer ${hoveredIndex === index ? 'bg-[var(--bg-tertiary-hover)]' : ''}`}
+                            className={`p-2 rounded-lg cursor-pointer transition-all ${hoveredIndex === index ? 'bg-[var(--bg-tertiary-hover)]' : ''}`}
                             onMouseEnter={() => setHoveredIndex(index)}
                             onMouseLeave={() => setHoveredIndex(null)}
                         >
-                            <div className="flex items-center gap-3">
-                                <div className="w-3 h-3 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: color }}></div>
-                                <span className="text-[var(--text-primary)] font-medium text-sm">{slice.name}</span>
+                            <div className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: color }}></div>
+                                    <span className="text-[var(--text-primary)] font-medium">{slice.name}</span>
+                                </div>
+                                <div className="font-mono font-bold text-[var(--text-primary)] tracking-tight">
+                                    {slice.percentage.toFixed(1)}%
+                                </div>
                             </div>
-                            <div className="text-right font-mono">
-                                <span className="font-bold text-sm text-[var(--text-primary)] tracking-tight">{formatCurrency(slice.value)}</span>
-                                <span className="text-xs text-[var(--text-secondary)] ml-2">({slice.percentage.toFixed(1)}%)</span>
-                            </div>
+                            {goal > 0 && (
+                                <div className="relative w-full h-1.5 bg-[var(--bg-primary)] rounded-full mt-1.5 ml-5">
+                                    <div className="h-full rounded-full" style={{ width: `${slice.percentage}%`, backgroundColor: color }}></div>
+                                    <div 
+                                        className="absolute top-[-2px] h-2.5 w-0.5 bg-white/80 rounded-full" 
+                                        style={{ left: `${goal}%` }} 
+                                        title={`Meta: ${goal}%`}
+                                    ></div>
+                                </div>
+                            )}
                         </div>
                      );
                 })}
