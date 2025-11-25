@@ -1,3 +1,5 @@
+
+
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle, AppPreferences } from '../types';
 
@@ -276,7 +278,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 }
 
 export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ticker: string; date: string }[]): Promise<{ data: Record<string, number>, stats: { bytesSent: number, bytesReceived: number } }> {
-    const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: number } };
+    const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (queries.length === 0) {
         return emptyReturn;
     }
