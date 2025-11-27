@@ -63,7 +63,7 @@ const App: React.FC = () => {
   }, [swRegistration, addToast, t]);
 
   const showUpdateToast = useCallback((reg: ServiceWorkerRegistration) => {
-      // Check if we haven't already shown the toast for this registration to avoid spam
+      // Check if we haven't already shown the toast for this registration
       if (swRegistration === reg) return;
       
       console.log("Patch available via SW waiting state.");
@@ -82,24 +82,24 @@ const App: React.FC = () => {
   useEffect(() => {
       // 1. Event Listener (updates arriving while app is open)
       const handleSWUpdate = (e: Event) => {
+          console.log("SW Event Triggered");
           const detail = (e as CustomEvent).detail as ServiceWorkerRegistration;
           showUpdateToast(detail);
       };
       window.addEventListener('sw-update-available', handleSWUpdate);
 
-      // 2. Continuous Polling for Waiting Workers
-      // This ensures that if the update downloaded in the background while the app was idle,
-      // we still catch it and show the button.
+      // 2. Continuous Polling for Waiting Workers (Aggressive)
       const checkForUpdates = () => {
           if ('serviceWorker' in navigator) {
               navigator.serviceWorker.getRegistration()
                 .then(reg => {
                     if (reg && reg.waiting) {
+                        console.log("SW Polling found waiting worker");
                         showUpdateToast(reg);
                     }
                 })
                 .catch(err => {
-                    console.debug("SW check skipped (env restricted):", err);
+                    // Silence error in preview env
                 });
           }
       };
@@ -107,8 +107,8 @@ const App: React.FC = () => {
       // Check immediately
       checkForUpdates();
 
-      // Check every 5 seconds
-      const intervalId = setInterval(checkForUpdates, 5000);
+      // Check frequently (every 3 seconds) to catch background updates
+      const intervalId = setInterval(checkForUpdates, 3000);
 
       return () => {
           window.removeEventListener('sw-update-available', handleSWUpdate);
@@ -130,7 +130,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (marketDataError && !marketDataError.includes("Chave de API")) {
-        // Clean error message or just show specific critical ones
         if (marketDataError.includes("Falha") || marketDataError.includes("Token")) {
              addToast(marketDataError, 'error');
         }

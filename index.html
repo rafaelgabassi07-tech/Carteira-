@@ -207,30 +207,42 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(reg => {
-            // Function to emit update event
-            const emitUpdate = (registration) => {
-               window.dispatchEvent(new CustomEvent('sw-update-available', { detail: registration }));
-            };
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => {
+              
+              const emitUpdate = (registration) => {
+                 window.dispatchEvent(new CustomEvent('sw-update-available', { detail: registration }));
+              };
 
-            // 1. Check if there's already a waiting worker (update downloaded but not activated)
-            if (reg.waiting) {
-              emitUpdate(reg);
-            }
+              // 1. Check for waiting worker immediately (update ready)
+              if (reg.waiting) {
+                emitUpdate(reg);
+              }
 
-            // 2. Listen for new updates found
-            reg.addEventListener('updatefound', () => {
-              const newWorker = reg.installing;
-              newWorker.addEventListener('statechange', () => {
-                // If the new worker is installed and there is already a controller (meaning it's an update, not first load)
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  emitUpdate(reg);
+              // 2. Detect if a worker is currently installing
+              if (reg.installing) {
+                 reg.installing.addEventListener('statechange', (e) => {
+                    if (e.target.state === 'installed' && navigator.serviceWorker.controller) {
+                       emitUpdate(reg);
+                    }
+                 });
+              }
+
+              // 3. Listen for future updates
+              reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      emitUpdate(reg);
+                    }
+                  });
                 }
               });
+            })
+            .catch(err => {
+              console.debug('Service Worker registration failed (likely preview env):', err);
             });
-          }).catch(err => {
-            console.warn('Service Worker registration failed:', err);
-          });
 
           // Reload page when the new service worker takes control
           navigator.serviceWorker.addEventListener('controllerchange', () => {

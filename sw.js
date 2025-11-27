@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v1.6.8';
+const CACHE_NAME = 'invest-portfolio-cache-v1.6.9';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -16,7 +16,7 @@ self.addEventListener('install', event => {
       })
   );
   // NOTA: Removemos self.skipWaiting() para impedir atualização automática.
-  // A atualização só ocorre quando o usuário clica em "Baixar".
+  // A atualização só ocorre quando o usuário clica em "Baixar" (envia mensagem SKIP_WAITING).
 });
 
 self.addEventListener('fetch', event => {
