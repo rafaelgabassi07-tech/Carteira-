@@ -9,6 +9,8 @@ import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
+import PortfolioPieChart from '../components/PortfolioPieChart';
+import BarChart from '../components/BarChart';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -26,12 +28,76 @@ const WalletIcon: React.FC<{className?:string}> = ({className}) => (
 
 // --- Components ---
 
-interface PortfolioViewProps {
-    setActiveView: (view: View) => void;
-    setTransactionFilter: (ticker: string) => void;
-    onSelectAsset: (ticker: string) => void;
-    addToast: (message: string, type?: ToastMessage['type']) => void;
-}
+const DashboardCard: React.FC<{ title: string; children: React.ReactNode; delay?: number; className?: string }> = ({ title, children, delay = 0, className = '' }) => (
+    <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${className}`} style={{ animationDelay: `${delay}ms` }}>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-sm text-[var(--text-primary)] uppercase tracking-wide">{title}</h3>
+        </div>
+        {children}
+    </div>
+);
+
+const IncomeCard: React.FC = () => {
+    const { t, formatCurrency } = useI18n();
+    const { monthlyIncome, projectedAnnualIncome, privacyMode } = usePortfolio();
+    
+    const average = useMemo(() => {
+         const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
+         return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
+    }, [monthlyIncome]);
+
+    return (
+        <DashboardCard title={t('monthly_income')} delay={100}>
+            <div className={`grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)] ${privacyMode ? 'blur-sm opacity-50 select-none' : ''}`}>
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
+                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                        <CountUp end={average} formatter={formatCurrency} />
+                    </span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
+                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                        <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
+                    </span>
+                </div>
+            </div>
+             <div className={`h-40 w-full ${privacyMode ? 'blur-md opacity-30' : ''}`}>
+                 <BarChart data={monthlyIncome} />
+             </div>
+        </DashboardCard>
+    );
+};
+
+const DiversificationCard: React.FC = () => {
+    const { t } = useI18n();
+    const { assets, preferences, privacyMode } = usePortfolio();
+    
+    const data = useMemo(() => {
+        const segments: Record<string, number> = {};
+        let totalValue = 0;
+        assets.forEach(a => {
+            const val = a.quantity * a.currentPrice;
+            const seg = a.segment || t('outros');
+            segments[seg] = (segments[seg] || 0) + val;
+            totalValue += val;
+        });
+        
+        return Object.entries(segments).map(([name, value]) => ({
+            name,
+            value,
+            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
+        })).sort((a, b) => b.value - a.value);
+    }, [assets, t]);
+
+    return (
+        <DashboardCard title={t('diversification')} delay={200}>
+            <div className={`${privacyMode ? 'blur-sm opacity-50' : ''}`}>
+                <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
+            </div>
+        </DashboardCard>
+    );
+};
 
 const PortfolioSkeleton: React.FC = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
@@ -201,7 +267,14 @@ const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: ()
     );
 });
 
-const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast, setTransactionFilter }) => {
+interface PortfolioViewProps {
+    setActiveView: (view: View) => void;
+    setTransactionFilter: (ticker: string) => void;
+    onSelectAsset: (ticker: string) => void;
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+}
+
+const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
     const { t, formatCurrency } = useI18n();
     const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
     const [searchQuery, setSearchQuery] = useState('');
@@ -316,6 +389,12 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                     <>
                         <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
                             <PortfolioSummary />
+                        </div>
+
+                        {/* --- Dashboard Insights Section (New) --- */}
+                        <div className="px-4 mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <IncomeCard />
+                            <DiversificationCard />
                         </div>
 
                         <div className="px-4 mt-8">

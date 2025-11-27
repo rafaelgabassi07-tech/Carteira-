@@ -1,8 +1,8 @@
 
 export const ptBR = {
     // App / Navigation
-    main_portfolio: 'Carteira Principal',
-    nav_portfolio: 'Carteira',
+    main_portfolio: 'Dashboard',
+    nav_portfolio: 'Dashboard',
     nav_transactions: 'Transações',
     nav_analysis: 'Análise',
     nav_news: 'Notícias',
@@ -14,7 +14,7 @@ export const ptBR = {
     try_again: 'Tentar novamente',
     
     // Portfolio View
-    my_portfolio: 'Minha Carteira',
+    my_portfolio: 'Resumo Geral',
     total_invested: 'Total Investido',
     yield_on_cost: 'Yield on Cost',
     projected_annual_income: 'Renda Anual Projetada',

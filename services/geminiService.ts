@@ -13,7 +13,6 @@ function getGeminiApiKey(prefs: AppPreferences): string {
     throw new Error("Chave de API do Gemini não configurada.");
 }
 
-// ... (News logic remains similar, just type refinement) ...
 export interface NewsFilter {
     tickers?: string[];
     dateRange?: 'today' | 'week' | 'month';
@@ -23,18 +22,113 @@ export interface NewsFilter {
 }
 
 export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<{ data: NewsArticle[], stats: { bytesSent: number, bytesReceived: number } }> {
-    // Implementation for news fetching (simplified for brevity, assuming existing logic is mostly ok but needs error handling)
-    // ... (Standard news fetch logic)
     const emptyReturn = { data: [], stats: { bytesSent: 0, bytesReceived: 0 } };
+    
+    let apiKey: string;
     try {
-        const apiKey = getGeminiApiKey(prefs);
-        const ai = new GoogleGenAI({ apiKey });
-        const prompt = `Busque notícias recentes sobre FIIs e Mercado Financeiro. JSON Array format.`;
-        // ... (Existing implementation)
-        // Placeholder to keep file valid if user doesn't change this part much, 
-        // but emphasizing the Historical Prices update below.
-        return emptyReturn; 
-    } catch (e) { return emptyReturn; }
+        apiKey = getGeminiApiKey(prefs);
+    } catch (error) {
+        console.warn("News fetch skipped (No Key):", error);
+        return emptyReturn;
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    
+    // Contexto de busca
+    let searchContext = "sobre o Mercado Financeiro e Fundos Imobiliários (FIIs) no Brasil";
+    if (filter.tickers && filter.tickers.length > 0) {
+        const tickers = filter.tickers.slice(0, 5).join(', ');
+        searchContext = `focado nos ativos: ${tickers}, e no mercado geral de FIIs`;
+    }
+    if (filter.query) {
+        searchContext += `. Tópico específico: ${filter.query}`;
+    }
+
+    const prompt = `
+      ATUE COMO UM JORNALISTA FINANCEIRO SÊNIOR.
+      TAREFA: Busque as notícias mais recentes e impactantes ${searchContext}.
+      
+      REGRAS OBRIGATÓRIAS:
+      1. Use a ferramenta Google Search para encontrar fatos reais e recentes (últimos dias).
+      2. Retorne EXATAMENTE 6 notícias relevantes.
+      3. O formato de saída deve ser APENAS um JSON Array válido. SEM markdown, SEM texto antes ou depois.
+      
+      FORMATO JSON:
+      [
+        {
+          "title": "Manchete clara e informativa",
+          "summary": "Resumo curto do fato (max 150 caracteres)",
+          "source": "Nome do Veículo (ex: InfoMoney, Valor)",
+          "date": "YYYY-MM-DD",
+          "sentiment": "Positive" | "Neutral" | "Negative"
+        }
+      ]
+    `;
+
+    const bytesSent = new Blob([prompt]).size;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+                temperature: 0.4, 
+            }
+        });
+
+        const textResponse = response.text || "[]";
+        const bytesReceived = new Blob([textResponse]).size;
+        const stats = { bytesSent, bytesReceived };
+
+        // Limpeza e Parsing do JSON
+        let cleanJson = textResponse;
+        // Remove code blocks markdown se existirem
+        cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        
+        let articles: NewsArticle[] = [];
+        try {
+            articles = JSON.parse(cleanJson);
+        } catch (e) {
+            console.error("Erro ao fazer parse do JSON de notícias:", e, cleanJson);
+            return emptyReturn;
+        }
+
+        if (!Array.isArray(articles)) return emptyReturn;
+
+        // GROUNDING: Vincular URLs reais dos metadados de busca
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+        
+        // Filtra apenas chunks que são do tipo WEB e possuem URI
+        const webChunks = groundingChunks.filter(c => c.web && c.web.uri);
+
+        articles = articles.map((article, index) => {
+            let url = `https://www.google.com/search?q=${encodeURIComponent(article.title + " " + article.source)}`;
+            
+            // Tenta pegar URL do grounding se disponível na mesma posição aproximada
+            // A IA geralmente processa e retorna na ordem, mas não é garantido 1:1, é uma heurística.
+            if (index < webChunks.length) {
+                url = webChunks[index].web!.uri;
+                // Se a fonte estiver vazia ou genérica, tenta pegar do chunk
+                if ((!article.source || article.source === 'Fonte Desconhecida') && webChunks[index].web!.title) {
+                    article.source = webChunks[index].web!.title;
+                }
+            }
+
+            return {
+                ...article,
+                url,
+                // Garante data válida se a IA falhar
+                date: article.date || new Date().toISOString()
+            };
+        });
+
+        return { data: articles, stats };
+
+    } catch (error: any) {
+        console.error("Gemini News Error:", error);
+        return emptyReturn;
+    }
 }
 
 // --- CRITICAL UPGRADE: Historical Prices ---
