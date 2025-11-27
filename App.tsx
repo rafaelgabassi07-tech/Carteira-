@@ -24,10 +24,9 @@ const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
 
 export type View = 'carteira' | 'transacoes' | 'analise' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail';
-export type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
-  const { assets, preferences, marketDataError, setPrivacyMode, setTheme } = usePortfolio();
+  const { assets, preferences, marketDataError, setTheme } = usePortfolio();
   const { t } = useI18n();
   const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'carteira');
   const [previousView, setPreviousView] = useState<View>('carteira');
@@ -47,9 +46,9 @@ const App: React.FC = () => {
     }, 3000);
   }, []);
 
+  // Responsive & Theme Handlers
   useEffect(() => {
     const handleResize = () => {
-      // Check specifically for mobile landscape (width > height but still small screen)
       const isLandscape = window.innerWidth > window.innerHeight && window.innerWidth < 1024;
       setIsMobileLandscape(isLandscape);
     };
@@ -59,15 +58,13 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (marketDataError) {
-        const isCompleteMessage = marketDataError.includes("Falha ao atualizar:") || marketDataError.includes("Token da API");
-        if (isCompleteMessage) {
-            addToast(marketDataError, 'error');
-        } else if (!marketDataError.includes("Chave de API")) {
-            addToast(`${t('toast_update_failed')}: ${marketDataError}`, 'error');
+    if (marketDataError && !marketDataError.includes("Chave de API")) {
+        // Clean error message or just show specific critical ones
+        if (marketDataError.includes("Falha") || marketDataError.includes("Token")) {
+             addToast(marketDataError, 'error');
         }
     }
-  }, [marketDataError, addToast, t]);
+  }, [marketDataError, addToast]);
   
   useEffect(() => {
     const applyTheme = () => {
@@ -79,10 +76,8 @@ const App: React.FC = () => {
     };
     applyTheme();
     
-    // Auto-apply premium style if not low-end device
     const visualStyle = (isLowEndDevice() && preferences.visualStyle === 'premium') ? 'simple' : preferences.visualStyle;
     document.documentElement.dataset.style = visualStyle;
-
     document.documentElement.classList.toggle('compact', preferences.compactMode);
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -90,12 +85,10 @@ const App: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', applyTheme);
   }, [preferences.systemTheme, preferences.visualStyle, preferences.compactMode, setTheme]);
 
-
   useEffect(() => {
     const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
-            const timeInBackground = Date.now() - lastVisibleTimestamp.current;
-            if (preferences.appPin && timeInBackground > 60000) { // Lock after 1 minute
+            if (preferences.appPin && (Date.now() - lastVisibleTimestamp.current > 60000)) {
                 setIsLocked(true);
             }
         } else {
@@ -106,6 +99,7 @@ const App: React.FC = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [preferences.appPin]);
 
+  // Navigation Handlers
   const handleSetView = (view: View) => {
     setPreviousView(activeView);
     setActiveView(view);
@@ -117,9 +111,7 @@ const App: React.FC = () => {
     handleSetView('assetDetail');
   };
   
-  const handleBackFromDetail = () => {
-    handleSetView(previousView);
-  };
+  const handleBackFromDetail = () => handleSetView(previousView);
 
   const handleViewTransactionsForAsset = (ticker: string) => {
     setTransactionFilter(ticker);
@@ -145,49 +137,43 @@ const App: React.FC = () => {
   };
 
   if (isLocked) {
-      return (
-          <Suspense fallback={<LoadingSpinner />}>
-             <PinLockScreen onUnlock={() => setIsLocked(false)} correctPin={preferences.appPin!} allowBiometrics={!!localStorage.getItem('biometric-credential-id')} />
-          </Suspense>
-      );
+      return <Suspense fallback={<LoadingSpinner />}><PinLockScreen onUnlock={() => setIsLocked(false)} correctPin={preferences.appPin!} allowBiometrics={!!localStorage.getItem('biometric-credential-id')} /></Suspense>;
   }
 
+  // CSS Grid Layout ensures Desktop Sidebar is respected properly
   return (
     <ErrorBoundary>
-      <div className="flex h-screen w-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
+      <div className="h-screen w-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden grid grid-cols-1 lg:grid-cols-[var(--sidebar-width)_1fr] transition-all duration-300">
+        
         <OfflineBanner />
         
-        {/* Desktop Sidebar (Visible only on LG+) */}
-        <Sidebar activeView={activeView} setActiveView={handleSetView} />
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block h-full border-r border-[var(--border-color)] bg-[var(--bg-secondary)] z-20">
+            <Sidebar activeView={activeView} setActiveView={handleSetView} />
+        </div>
 
-        {/* Mobile Landscape Sidebar (Visible only on landscape mobile/tablet) */}
+        {/* Mobile Landscape Sidebar (Conditional) */}
         {isMobileLandscape && (
-            <div className="mobile-landscape-sidebar h-full overflow-y-auto bg-[var(--bg-secondary)] border-r border-[var(--border-color)] flex-shrink-0 w-64">
+            <div className="fixed left-0 top-0 bottom-0 w-64 z-30 bg-[var(--bg-secondary)] border-r border-[var(--border-color)] overflow-y-auto">
                  <div className="p-4">
-                    <MainMenu 
-                        setScreen={(s: MenuScreen) => {
-                            setActiveView('settings');
-                            setSettingsStartScreen(s);
-                        }} 
-                        addToast={addToast} 
-                        activeScreen={activeView === 'settings' ? settingsStartScreen : undefined}
-                        onShowUpdateModal={() => {}}
-                    />
+                    <MainMenu setScreen={(s) => { setActiveView('settings'); setSettingsStartScreen(s); }} addToast={addToast} onShowUpdateModal={() => {}} />
                 </div>
             </div>
         )}
         
-        {/* Main Content Area */}
-        <main id="main-content" className="flex-1 flex flex-col h-full overflow-hidden relative w-full">
+        {/* Main Content */}
+        <main className={`relative h-full w-full overflow-hidden flex flex-col ${isMobileLandscape ? 'pl-64' : ''}`}>
           <Suspense fallback={<LoadingSpinner />}>
-            <div className="h-full overflow-y-auto no-scrollbar lg:p-6 lg:max-w-6xl lg:mx-auto lg:w-full">
-                {renderView()}
+            <div className="h-full w-full overflow-y-auto custom-scrollbar p-0 lg:p-8">
+                <div className="mx-auto w-full max-w-[1600px]">
+                    {renderView()}
+                </div>
             </div>
           </Suspense>
         </main>
         
-        {/* Mobile Bottom Nav (Hidden on LG+) */}
-        <div className={`w-full max-w-md mx-auto z-40 ${isMobileLandscape ? 'hidden' : ''}`}>
+        {/* Mobile Bottom Nav (Hidden on LG) */}
+        <div className={`lg:hidden z-40 ${isMobileLandscape ? 'hidden' : ''}`}>
            <BottomNav activeView={activeView} setActiveView={handleSetView} />
         </div>
 

@@ -20,50 +20,39 @@ const NavItem: React.FC<{
   icon: React.ReactNode;
   isActive: boolean;
   onClick: () => void;
-  id?: string;
-}> = ({ label, icon, isActive, onClick, id }) => {
-  const activeClass = isActive ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)]';
+}> = ({ label, icon, isActive, onClick }) => {
+  const activeClass = isActive ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)] opacity-70';
   return (
     <button
-      id={id}
       onClick={onClick}
-      className={`bottom-nav-item flex flex-col items-center justify-center w-full pt-2 pb-1 transform transition-all duration-150 active:scale-95 ${activeClass} hover:text-[var(--accent-color)]`}
+      className={`bottom-nav-item flex flex-col items-center justify-center w-full pt-3 pb-1 transform transition-all duration-150 active:scale-95 ${activeClass}`}
     >
-      {React.cloneElement(icon as React.ReactElement, { className: 'icon w-6 h-6' })}
-      <span className="label text-xs mt-1">{label}</span>
+      <div className={`transition-transform duration-200 ${isActive ? '-translate-y-1' : ''}`}>
+        {React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6 mb-1' })}
+      </div>
+      <span className={`text-[10px] font-medium tracking-wide ${isActive ? 'opacity-100' : 'opacity-0 translate-y-2'} transition-all duration-200 absolute bottom-1`}>
+          {label}
+      </span>
     </button>
   );
 };
 
 const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
   const { t } = useI18n();
-  const navItems: { label: string; view: View; icon: React.ReactNode }[] = [
-    { label: t('nav_portfolio'), view: 'carteira', icon: <WalletIcon /> },
-    { label: t('nav_transactions'), view: 'transacoes', icon: <TransactionIcon /> },
-    { label: t('nav_analysis'), view: 'analise', icon: <AnalysisIcon /> },
-    { label: t('nav_news'), view: 'noticias', icon: <NewsIcon /> },
-    { label: t('nav_settings'), view: 'settings', icon: <SettingsIcon /> },
-  ];
-
+  
   const handleNavClick = (view: View) => {
     vibrate();
     setActiveView(view);
   };
 
   return (
-    <div className="bottom-nav fixed bottom-0 left-0 right-0 h-16 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] max-w-md mx-auto z-40 lg:hidden">
-      <div className="flex justify-around items-center h-full">
-        {navItems.map((item) => (
-          <NavItem
-            key={item.view}
-            id={`nav-${item.view}`}
-            label={item.label}
-            view={item.view}
-            icon={item.icon}
-            isActive={activeView === item.view}
-            onClick={() => handleNavClick(item.view)}
-          />
-        ))}
+    <div className="fixed bottom-0 left-0 right-0 h-[68px] bg-[var(--bg-secondary)]/90 backdrop-blur-lg border-t border-[var(--border-color)] z-[100] lg:hidden pb-safe">
+      <div className="flex justify-around items-center h-full px-2">
+        <NavItem label={t('nav_portfolio')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
+        <NavItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
+        <NavItem label={t('nav_analysis')} view="analise" icon={<AnalysisIcon />} isActive={activeView === 'analise'} onClick={() => handleNavClick('analise')} />
+        <NavItem label={t('nav_news')} view="noticias" icon={<NewsIcon />} isActive={activeView === 'noticias'} onClick={() => handleNavClick('noticias')} />
+        <NavItem label={t('nav_settings')} view="settings" icon={<SettingsIcon />} isActive={activeView === 'settings'} onClick={() => handleNavClick('settings')} />
       </div>
     </div>
   );

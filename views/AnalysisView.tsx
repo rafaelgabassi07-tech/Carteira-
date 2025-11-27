@@ -1,7 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import PatrimonyEvolutionCard from '../components/PatrimonyEvolutionCard';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 import BarChart from '../components/BarChart';
 import CountUp from '../components/CountUp';
@@ -113,9 +113,6 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
                     </button>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="lg:col-span-2">
-                        <PatrimonyEvolutionCard />
-                    </div>
                     <IncomeCard />
                     <DiversificationCard />
                 </div>

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
@@ -24,6 +25,13 @@ const WalletIcon: React.FC<{className?:string}> = ({className}) => (
 );
 
 // --- Components ---
+
+interface PortfolioViewProps {
+    setActiveView: (view: View) => void;
+    setTransactionFilter: (ticker: string) => void;
+    onSelectAsset: (ticker: string) => void;
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+}
 
 const PortfolioSkeleton: React.FC = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
@@ -163,16 +171,16 @@ const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: ()
     }
 
     return (
-        <div onClick={() => { onClick(); vibrate(); }} style={style} className="asset-list-item p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm h-full flex flex-col justify-between">
+        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm h-full flex flex-col justify-between">
             <div>
                 <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center space-x-3">
-                        <div className="asset-icon w-11 h-11 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-sm text-[var(--accent-color)] border border-[var(--border-color)] shadow-inner">
+                        <div className="w-11 h-11 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-sm text-[var(--accent-color)] border border-[var(--border-color)] shadow-inner">
                             {asset.ticker.substring(0, 4)}
                         </div>
                         <div>
-                             <span className="asset-ticker font-bold text-base block leading-tight text-[var(--text-primary)]">{asset.ticker}</span>
-                             <span className="asset-shares text-xs text-[var(--text-secondary)]">{t('shares', {count: asset.quantity})}</span>
+                             <span className="font-bold text-base block leading-tight text-[var(--text-primary)]">{asset.ticker}</span>
+                             <span className="text-xs text-[var(--text-secondary)]">{t('shares', {count: asset.quantity})}</span>
                         </div>
                     </div>
                     <div className={`text-right transition-all duration-300 ${privacyMode ? 'blur-sm select-none opacity-60' : ''}`}>
@@ -193,14 +201,7 @@ const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: ()
     );
 });
 
-interface PortfolioViewProps {
-    setActiveView: (view: View) => void;
-    setTransactionFilter: (ticker: string) => void;
-    onSelectAsset: (ticker: string) => void;
-    addToast: (message: string, type?: ToastMessage['type']) => void;
-}
-
-const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
+const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast, setTransactionFilter }) => {
     const { t, formatCurrency } = useI18n();
     const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
     const [searchQuery, setSearchQuery] = useState('');
