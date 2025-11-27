@@ -207,7 +207,10 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js');
+          navigator.serviceWorker.register('/sw.js').catch(err => {
+            // Silently fail or log if origin doesn't match (common in preview envs)
+            console.warn('Service Worker registration failed (likely due to preview environment):', err);
+          });
         });
       }
     </script>

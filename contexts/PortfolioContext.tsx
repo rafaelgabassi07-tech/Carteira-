@@ -155,16 +155,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               const next = { ...prev };
               
               if(brapiRes.status === 'fulfilled') {
-                  logApiUsage('brapi', { requests: tickers.length, bytesReceived: brapiRes.value.stats.bytesReceived });
-                  Object.entries(brapiRes.value.quotes).forEach(([tkr, data]) => {
+                  const res = brapiRes.value;
+                  logApiUsage('brapi', { requests: tickers.length, bytesReceived: res.stats.bytesReceived });
+                  Object.entries(res.quotes).forEach(([tkr, data]) => {
                       next[tkr] = { ...(next[tkr] || {}), ...data, lastUpdated: Date.now() };
                   });
               }
 
               if(geminiRes.status === 'fulfilled') {
-                  logApiUsage('gemini', { requests: 1, ...(geminiRes.value.stats as any) });
-                  Object.entries(geminiRes.value.data).forEach(([tkr, data]) => {
-                      next[tkr] = { ...(next[tkr] || {}), ...data, lastUpdated: Date.now() };
+                  // Explicit cast to handle tuple vs array inference in Promise.allSettled
+                  const res = geminiRes.value as { data: any; stats: { bytesSent: number; bytesReceived: number } };
+                  logApiUsage('gemini', { requests: 1, ...res.stats });
+                  Object.entries(res.data).forEach(([tkr, data]) => {
+                      next[tkr] = { ...(next[tkr] || {}), ...(data as object), lastUpdated: Date.now() };
                   });
               }
               return next;
@@ -312,6 +315,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Dividends & Income (HISTORICAL ACCURACY FIX)
   const { dividends, monthlyIncome, projectedAnnualIncome, yieldOnCost } = useMemo(() => {
       const divs: Dividend[] = [];
+      // Key as YYYY-MM for correct sorting
       const incomeMap: Record<string, number> = {};
       let projIncome = 0;
       let totalInv = 0;
@@ -350,19 +354,23 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       paymentDate: event.paymentDate
                   });
 
-                  const mKey = fromISODate(event.paymentDate).toLocaleDateString('pt-BR', {month:'short', year:'2-digit'});
-                  incomeMap[mKey] = (incomeMap[mKey] || 0) + totalReceived;
+                  // Use YYYY-MM as key for sorting (e.g., "2023-10")
+                  const dateObj = fromISODate(event.paymentDate);
+                  const sortKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                  incomeMap[sortKey] = (incomeMap[sortKey] || 0) + totalReceived;
               }
           });
       });
 
+      // Convert map to array and sort by key (chronologically), then format label
       const mIncome = Object.entries(incomeMap)
-        .map(([m, v]) => ({ month: m, total: v }))
-        .sort((a, b) => {
-            // Sort by date (assuming "MMM/YY" format requires parsing)
-            // Simple heuristic: parsing back to date for sort
-            // Note: This relies on 'pt-BR' format logic, ideally store YYYY-MM as key for sorting first
-            return 0; // Rely on natural insertion order or implement strict sort if needed
+        .sort((a, b) => a[0].localeCompare(b[0])) // Sort keys "2023-10", "2023-11", etc.
+        .map(([key, total]) => {
+            const [year, month] = key.split('-').map(Number);
+            // Create date for formatting (using day 1 to avoid timezone shifts)
+            const date = new Date(year, month - 1, 1);
+            const label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+            return { month: label, total };
         });
 
       return { 
