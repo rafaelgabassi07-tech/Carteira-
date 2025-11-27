@@ -72,24 +72,27 @@ const ChangelogCard: React.FC<{
 };
 
 // --- Main Modal Component ---
-const UpdateCheckModal: React.FC<{ onClose: () => void; updateAvailable?: boolean; onUpdate?: () => void }> = ({ onClose, updateAvailable, onUpdate }) => {
+const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { t } = useI18n();
-    const [checking, setChecking] = useState(!updateAvailable);
+    const [checking, setChecking] = useState(true);
 
     useEffect(() => {
-        if (!updateAvailable) {
-            const timer = setTimeout(() => setChecking(false), 1200);
-            return () => clearTimeout(timer);
-        } else {
-            setChecking(false);
-        }
-    }, [updateAvailable]);
+        // Simulated check since updates are automatic in background
+        const timer = setTimeout(() => setChecking(false), 2000);
+        return () => clearTimeout(timer);
+    }, []);
 
     const changelogData = [
         {
-            version: 'changelog_version_title_1_6_9',
+            version: 'changelog_version_title_1_7_0',
             isLatest: true,
-            devNote: { title: 'dev_note_title', content: 'dev_note_content' },
+            sections: [
+                { titleKey: 'changelog_news_title_1_7_0', color: 'text-emerald-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_7_0' },
+            ]
+        },
+        {
+            version: 'changelog_version_title_1_6_9',
+            isLatest: false,
             sections: [
                 { titleKey: 'changelog_news_title_1_6_9', color: 'text-emerald-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_9' },
             ]
@@ -99,34 +102,6 @@ const UpdateCheckModal: React.FC<{ onClose: () => void; updateAvailable?: boolea
             isLatest: false,
             sections: [
                 { titleKey: 'changelog_news_title_1_6_8', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_8' },
-            ]
-        },
-        {
-            version: 'changelog_version_title_1_6_7',
-            isLatest: false,
-            sections: [
-                { titleKey: 'changelog_news_title_1_6_7', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_7' },
-            ]
-        },
-        {
-            version: 'changelog_version_title_1_6_6',
-            isLatest: false,
-            sections: [
-                { titleKey: 'changelog_news_title_1_6_6', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_6' },
-            ]
-        },
-        {
-            version: 'changelog_version_title_1_6_5',
-            isLatest: false,
-            sections: [
-                { titleKey: 'changelog_news_title_1_6_5', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_5' },
-            ]
-        },
-        {
-            version: 'changelog_version_title_1_6_4',
-            isLatest: false,
-            sections: [
-                { titleKey: 'changelog_news_title_1_6_4', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_4' },
             ]
         }
     ];
@@ -148,24 +123,14 @@ const UpdateCheckModal: React.FC<{ onClose: () => void; updateAvailable?: boolea
                     <>
                         <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-6 border border-[var(--border-color)] flex flex-col md:flex-row md:items-center gap-4 animate-fade-in-up">
                             <div className="flex items-center gap-3">
-                                <div className={`w-12 h-12 flex-shrink-0 ${updateAvailable ? 'bg-amber-500/10 text-amber-500' : 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'} rounded-full flex items-center justify-center`}>
-                                    {updateAvailable ? <DownloadIcon className="w-6 h-6" /> : <CheckCircleIcon className="w-7 h-7" />}
+                                <div className={`w-12 h-12 flex-shrink-0 bg-[var(--accent-color)]/10 text-[var(--accent-color)] rounded-full flex items-center justify-center`}>
+                                    <CheckCircleIcon className="w-7 h-7" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg">{updateAvailable ? t('new_version_available') : t('you_are_up_to_date')}</h3>
-                                    <p className="text-xs text-[var(--text-secondary)]">{t('version')} {updateAvailable ? '1.6.9' : '1.6.9'} • {t('channel_stable')}</p>
+                                    <h3 className="font-bold text-lg">{t('you_are_up_to_date')}</h3>
+                                    <p className="text-xs text-[var(--text-secondary)]">{t('version')} 1.7.0 • {t('channel_stable')}</p>
                                 </div>
                             </div>
-                            
-                            {updateAvailable && onUpdate && (
-                                <button 
-                                    onClick={() => { vibrate(); onUpdate(); }}
-                                    className="w-full md:w-auto ml-auto bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <DownloadIcon className="w-4 h-4" />
-                                    {t('update_available_action')}
-                                </button>
-                            )}
                         </div>
 
                         <div className="flex-1 overflow-y-auto pr-1 no-scrollbar pb-safe space-y-3">

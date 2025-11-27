@@ -1,10 +1,9 @@
-
 import React from 'react';
 import type { View } from '../App';
+import LayoutGridIcon from './icons/LayoutGridIcon';
 import WalletIcon from './icons/WalletIcon';
 import TransactionIcon from './icons/TransactionIcon';
 import NewsIcon from './icons/NewsIcon';
-import AnalysisIcon from './icons/AnalysisIcon';
 import SettingsIcon from './icons/SettingsIcon';
 import BellIcon from './icons/BellIcon';
 import UserIcon from './icons/UserIcon';
@@ -74,8 +73,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
         <div className="px-6 py-2">
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-50 mb-2">Menu Principal</p>
         </div>
-        <SidebarItem label={t('nav_portfolio')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
-        <SidebarItem label={t('nav_analysis')} view="analise" icon={<AnalysisIcon />} isActive={activeView === 'analise'} onClick={() => handleNavClick('analise')} />
+        <SidebarItem label={t('nav_portfolio')} view="carteira" icon={<LayoutGridIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
+        <SidebarItem label={t('nav_analysis')} view="analise" icon={<WalletIcon />} isActive={activeView === 'analise'} onClick={() => handleNavClick('analise')} />
         <SidebarItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
         <SidebarItem label={t('nav_news')} view="noticias" icon={<NewsIcon />} isActive={activeView === 'noticias'} onClick={() => handleNavClick('noticias')} />
         

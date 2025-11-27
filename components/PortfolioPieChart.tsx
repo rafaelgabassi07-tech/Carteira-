@@ -111,13 +111,18 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                             onMouseEnter={() => setHoveredIndex(index)}
                             onMouseLeave={() => setHoveredIndex(null)}
                         >
-                            <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2.5 h-2.5 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: color }}></div>
-                                    <span className="text-[var(--text-primary)] font-medium">{slice.name}</span>
+                                    <span className="text-[var(--text-primary)] font-medium text-sm">{slice.name}</span>
                                 </div>
-                                <div className="font-mono font-bold text-[var(--text-primary)] tracking-tight">
-                                    {slice.percentage.toFixed(1)}%
+                                <div className="text-right">
+                                    <div className="font-bold text-[var(--text-primary)] text-sm">
+                                        {formatCurrency(slice.value)}
+                                    </div>
+                                    <div className="text-[10px] text-[var(--text-secondary)] font-mono">
+                                        {slice.percentage.toFixed(1)}%
+                                    </div>
                                 </div>
                             </div>
                             {goal > 0 && (

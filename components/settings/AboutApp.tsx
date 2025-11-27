@@ -18,7 +18,7 @@ const AboutApp: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     <img src="https://cdn-icons-png.flaticon.com/512/5556/5556468.png" alt="App Logo" className="w-20 h-20 mb-4" />
                     <h1 className="text-2xl font-bold">Invest Portfolio</h1>
                     <p className="text-[var(--text-secondary)]">{t('about_app_desc')}</p>
-                    <p className="text-xs text-gray-500 mt-2">{t('version')} 1.6.9</p>
+                    <p className="text-xs text-gray-500 mt-2">{t('version')} 1.7.0</p>
                 </div>
 
                 <div className="space-y-2">

@@ -209,42 +209,13 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then(reg => {
-              
-              const emitUpdate = (registration) => {
-                 window.dispatchEvent(new CustomEvent('sw-update-available', { detail: registration }));
-              };
-
-              // 1. Check for waiting worker immediately (update ready)
-              if (reg.waiting) {
-                emitUpdate(reg);
-              }
-
-              // 2. Detect if a worker is currently installing
-              if (reg.installing) {
-                 reg.installing.addEventListener('statechange', (e) => {
-                    if (e.target.state === 'installed' && navigator.serviceWorker.controller) {
-                       emitUpdate(reg);
-                    }
-                 });
-              }
-
-              // 3. Listen for future updates
-              reg.addEventListener('updatefound', () => {
-                const newWorker = reg.installing;
-                if (newWorker) {
-                  newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                      emitUpdate(reg);
-                    }
-                  });
-                }
-              });
+              console.log('SW registered:', reg);
             })
             .catch(err => {
               console.debug('Service Worker registration failed (likely preview env):', err);
             });
-
-          // Reload page when the new service worker takes control
+            
+          // Reload page when the new service worker takes control (Standard PWA behavior)
           navigator.serviceWorker.addEventListener('controllerchange', () => {
              window.location.reload();
           });

@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import type { ToastMessage } from '../types';
 import { useI18n } from '../contexts/I18nContext';
-import { vibrate } from '../utils';
 
 // Import sub-components
 import MainMenu from '../components/settings/MainMenu';
@@ -65,7 +65,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
                     {renderScreen()}
                 </div>
              </div>
-            {showUpdateModal && <UpdateCheckModal onClose={() => setShowUpdateModal(false)} />}
+            {showUpdateModal && (
+                <UpdateCheckModal 
+                    onClose={() => setShowUpdateModal(false)} 
+                />
+            )}
             <style>{`
                 @keyframes slide-in-right {
                     from { opacity: 0; transform: translateX(20px); }

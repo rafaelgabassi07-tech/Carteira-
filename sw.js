@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v1.6.9';
+const CACHE_NAME = 'invest-portfolio-cache-v1.7.0';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -8,6 +8,9 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', event => {
+  // Force the waiting service worker to become the active service worker.
+  self.skipWaiting();
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -15,8 +18,6 @@ self.addEventListener('install', event => {
         return cache.addAll(urlsToCache);
       })
   );
-  // NOTA: Removemos self.skipWaiting() para impedir atualização automática.
-  // A atualização só ocorre quando o usuário clica em "Baixar" (envia mensagem SKIP_WAITING).
 });
 
 self.addEventListener('fetch', event => {
@@ -29,13 +30,6 @@ self.addEventListener('fetch', event => {
         return fetch(event.request);
       })
   );
-});
-
-// Listener para ativar a atualização apenas quando o usuário solicitar via App.tsx
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
 });
 
 self.addEventListener('activate', event => {
@@ -51,4 +45,6 @@ self.addEventListener('activate', event => {
       );
     })
   );
+  // Take control of all clients immediately
+  event.waitUntil(self.clients.claim());
 });

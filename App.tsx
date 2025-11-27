@@ -12,7 +12,6 @@ import { useI18n } from './contexts/I18nContext';
 import { isLowEndDevice } from './utils';
 import type { MenuScreen } from './views/SettingsView';
 import MainMenu from './components/settings/MainMenu';
-import DownloadIcon from './components/icons/DownloadIcon';
 
 // Lazy Load Views
 const PortfolioView = React.lazy(() => import('./views/PortfolioView'));
@@ -39,9 +38,6 @@ const App: React.FC = () => {
   const lastVisibleTimestamp = useRef(Date.now());
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
   
-  // SW Update State
-  const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
-  
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
     const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
     setToast(newToast);
@@ -51,71 +47,6 @@ const App: React.FC = () => {
         }, duration);
     }
   }, []);
-
-  // --- SW Update Logic ---
-  const applyUpdate = useCallback((reg?: ServiceWorkerRegistration) => {
-      const registration = reg || swRegistration;
-      if (registration && registration.waiting) {
-          addToast(t('installing_update'), 'info');
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-          setSwRegistration(null);
-      }
-  }, [swRegistration, addToast, t]);
-
-  const showUpdateToast = useCallback((reg: ServiceWorkerRegistration) => {
-      // Check if we haven't already shown the toast for this registration
-      if (swRegistration === reg) return;
-      
-      console.log("Patch available via SW waiting state.");
-      setSwRegistration(reg);
-      addToast(
-          t('new_version_available'), 
-          'info', 
-          { 
-              label: t('download_update'), 
-              onClick: () => applyUpdate(reg) 
-          }, 
-          0 // Infinite duration until clicked
-      );
-  }, [addToast, t, applyUpdate, swRegistration]);
-
-  useEffect(() => {
-      // 1. Event Listener (updates arriving while app is open)
-      const handleSWUpdate = (e: Event) => {
-          console.log("SW Event Triggered");
-          const detail = (e as CustomEvent).detail as ServiceWorkerRegistration;
-          showUpdateToast(detail);
-      };
-      window.addEventListener('sw-update-available', handleSWUpdate);
-
-      // 2. Continuous Polling for Waiting Workers (Aggressive)
-      const checkForUpdates = () => {
-          if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.getRegistration()
-                .then(reg => {
-                    if (reg && reg.waiting) {
-                        console.log("SW Polling found waiting worker");
-                        showUpdateToast(reg);
-                    }
-                })
-                .catch(err => {
-                    // Silence error in preview env
-                });
-          }
-      };
-
-      // Check immediately
-      checkForUpdates();
-
-      // Check frequently (every 3 seconds) to catch background updates
-      const intervalId = setInterval(checkForUpdates, 3000);
-
-      return () => {
-          window.removeEventListener('sw-update-available', handleSWUpdate);
-          clearInterval(intervalId);
-      };
-  }, [showUpdateToast]);
-
 
   // Responsive & Theme Handlers
   useEffect(() => {
@@ -197,7 +128,7 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'carteira': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
       case 'noticias': return <NewsView addToast={addToast} />;
-      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} onUpdateApp={() => applyUpdate()} updateAvailable={!!swRegistration} />;
+      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
       case 'analise': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
@@ -225,7 +156,7 @@ const App: React.FC = () => {
         {isMobileLandscape && (
             <div className="fixed left-0 top-0 bottom-0 w-64 z-30 bg-[var(--bg-secondary)] border-r border-[var(--border-color)] overflow-y-auto">
                  <div className="p-4">
-                    <MainMenu setScreen={(s) => { setActiveView('settings'); setSettingsStartScreen(s); }} addToast={addToast} onShowUpdateModal={() => {}} updateAvailable={!!swRegistration} />
+                    <MainMenu setScreen={(s) => { setActiveView('settings'); setSettingsStartScreen(s); }} addToast={addToast} onShowUpdateModal={() => {}} />
                 </div>
             </div>
         )}
