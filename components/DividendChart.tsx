@@ -17,6 +17,7 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 300, height: 200 });
+    const [isClicked, setIsClicked] = useState(false);
 
     useLayoutEffect(() => {
         const container = containerRef.current;
@@ -35,6 +36,12 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
         return () => observer.disconnect();
     }, []);
 
+    const handleClick = () => {
+        vibrate();
+        setIsClicked(true);
+        setTimeout(() => setIsClicked(false), 200);
+    };
+
     // Filter Data based on Period
     const filteredData = useMemo(() => {
         if (!data || data.length === 0) return [];
@@ -50,7 +57,6 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
         else if (period === '5y') cutoffDate = new Date(now.getFullYear() - 5, now.getMonth(), 1);
 
         const result = sortedData.filter(d => new Date(d.paymentDate) >= cutoffDate);
-        // If filter returns too few items for 6m/1y, maybe show at least last X items? Keeping standard logic for now.
         return result;
     }, [data, period]);
 
@@ -111,7 +117,10 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
     }
 
     return (
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] p-4 shadow-sm animate-fade-in-up">
+        <div 
+            className={`bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] p-4 shadow-sm animate-fade-in-up transition-transform duration-200 ${isClicked ? 'scale-[1.02]' : ''}`}
+            onClick={handleClick}
+        >
             {/* Header & Filters */}
             <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-[var(--text-primary)] text-sm px-1">Histórico de Pagamentos</h3>
@@ -119,7 +128,7 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                     {(['6m', '1y', '5y', 'all'] as Period[]).map((p) => (
                         <button
                             key={p}
-                            onClick={() => handlePeriodChange(p)}
+                            onClick={(e) => { e.stopPropagation(); handlePeriodChange(p); }}
                             className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${period === p ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                         >
                             {p === 'all' ? 'Máx' : p.toUpperCase()}
