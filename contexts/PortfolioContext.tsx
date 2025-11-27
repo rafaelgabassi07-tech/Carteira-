@@ -344,24 +344,34 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // --- Portfolio Evolution Calculation (Optimized for Daily Oscillation) ---
   const portfolioEvolution = useMemo((): SegmentEvolutionData => {
       const points: PortfolioEvolutionPoint[] = [];
-      const today = new Date();
-      const todayISODate = today.toISOString().split('T')[0];
       
-      // Generate dates for the last 30 days (Daily)
-      const checkDates: string[] = [];
-      for(let i=29; i>=0; i--) { // 0 to 29 = 30 days
+      // Use local dates to avoid timezone offset issues (e.g., graph stopping at 9 PM)
+      const today = new Date();
+      const dates: Date[] = [];
+      for(let i=29; i>=0; i--) {
           const d = new Date();
           d.setDate(today.getDate() - i);
-          checkDates.push(d.toISOString().split('T')[0]);
+          d.setHours(0,0,0,0);
+          dates.push(d);
       }
       
       const sortedTx = [...sourceTransactions].sort((a,b) => a.date.localeCompare(b.date));
 
-      checkDates.forEach(dateStr => {
+      // Helper to get ISO string YYYY-MM-DD locally
+      const toLocalISO = (date: Date) => {
+          const offset = date.getTimezoneOffset();
+          const local = new Date(date.getTime() - (offset*60*1000));
+          return local.toISOString().split('T')[0];
+      };
+
+      const todayStr = toLocalISO(today);
+
+      dates.forEach(dateObj => {
+          const dateStr = toLocalISO(dateObj);
           let invested = 0;
           const holdings: Record<string, { qty: number, avgPrice: number }> = {};
 
-          // 1. Reconstruct Holdings & Invested Capital
+          // 1. Reconstruct Holdings & Invested Capital for this specific date
           for(const tx of sortedTx) {
               if(tx.date > dateStr) break;
               const cost = (tx.quantity * tx.price) + (tx.costs||0);
@@ -375,46 +385,51 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   invested += cost;
               } else {
                   holdings[tx.ticker].qty -= tx.quantity;
-                  // Selling reduces invested capital proportionally
                   const removedCost = tx.quantity * holdings[tx.ticker].avgPrice;
                   invested -= removedCost;
               }
           }
 
-          // 2. Calculate Market Value with "Last Known Price" Logic
+          // 2. Calculate Market Value
           let marketVal = 0;
           Object.keys(holdings).forEach(t => {
-              if(holdings[t].qty > 0.00001) {
+              const qty = holdings[t].qty;
+              if(qty > 0.00001) {
                   const assetData = (sourceMarketData as any)[t.toUpperCase()];
                   const history = assetData?.priceHistory || [];
                   
-                  // Find the most recent price on or before this date
-                  // This logic carries over Friday's price to Sat/Sun
                   let price = 0;
-                  
-                  // Optimization: Use reverse find or just simple filter+pop since history is small
-                  const relevantPriceObj = history
-                    .filter((h: any) => h.date <= dateStr)
-                    .pop();
 
-                  if (relevantPriceObj) {
-                      price = relevantPriceObj.price;
-                  } else {
-                      // If no history exists before this date (e.g. recently added asset), use avgPrice as fallback
-                      price = holdings[t].avgPrice;
-                  }
-
-                  // Override: If it's TODAY, try to use real-time currentPrice if available
-                  if (dateStr === todayISODate && assetData?.currentPrice > 0) {
+                  // PRIORITY 1: If it is TODAY, use the Real-Time Price
+                  if (dateStr === todayStr && assetData?.currentPrice > 0) {
                       price = assetData.currentPrice;
+                  } 
+                  else {
+                      // PRIORITY 2: Exact Historical Match or Carry Forward (Last known price before or on date)
+                      // History is usually sorted ascending. Reverse search is better.
+                      // Since array is small (30-365 items), filter is fine.
+                      const relevant = history.filter((h: any) => h.date <= dateStr).pop();
+                      
+                      if (relevant) {
+                          price = relevant.price;
+                      } else {
+                          // PRIORITY 3: Backfill (If no history *before* this date, e.g., asset added before history start)
+                          // Look for the *first* available price in history (future relative to this graph point)
+                          const firstFuture = history.find((h: any) => h.date > dateStr);
+                          if (firstFuture) {
+                              price = firstFuture.price;
+                          } else {
+                              // PRIORITY 4: Last Resort - Average Price (Cost) or Current Price fallback
+                              // Using currentPrice here helps if history is completely missing but we have a live quote
+                              price = assetData?.currentPrice || holdings[t].avgPrice;
+                          }
+                      }
                   }
 
-                  marketVal += holdings[t].qty * price;
+                  marketVal += qty * price;
               }
           });
 
-          // Use specific date object for formatting to avoid timezone shifts
-          const dateObj = new Date(dateStr + 'T12:00:00');
           points.push({ 
               month: dateObj.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'}),
               invested: Math.max(0, invested), 

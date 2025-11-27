@@ -41,21 +41,24 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
 
     const { min, max } = useMemo(() => {
         const allValues = data.flatMap(d => [d.marketValue, d.invested]);
-        const maxVal = Math.max(...allValues, 0);
-        const minVal = Math.min(...allValues, maxVal); // Ensure min <= max
+        if (allValues.length === 0) return { min: 0, max: 100 };
+
+        const maxVal = Math.max(...allValues);
+        const minVal = Math.min(...allValues); 
         
-        // Dynamic scaling: If using line chart, zoom in to show oscillation.
-        // If bar chart, usually start at 0 is better, but user wants oscillation visibility.
-        // Let's use a "soft" minimum to accentuate curves.
         const range = maxVal - minVal;
         
-        // Add padding (10% top, 10% bottom relative to range)
-        // Avoid 0 if possible for line charts to show detail
+        // If flat line (range 0), create artificial range
+        if (range === 0) {
+            return { min: maxVal * 0.95, max: maxVal * 1.05 };
+        }
+
+        // Add 10% padding top/bottom for "breathing room"
+        // We want to zoom in on the variation, so we don't force start at 0 for line charts
         let effectiveMin = minVal - (range * 0.1);
         let effectiveMax = maxVal + (range * 0.1);
         
         if (effectiveMin < 0 || chartType === 'bar') effectiveMin = 0;
-        if (effectiveMax === 0) effectiveMax = 100; // fallback
 
         return { min: effectiveMin, max: effectiveMax };
     }, [data, chartType]);
@@ -219,11 +222,9 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                     // Bar Chart Implementation
                     data.map((d, i) => {
                         const x = getX(i);
-                        const yBase = height - padding.bottom;
                         // For bars in zoom mode, we must clamp to the visible area
                         const investedY = getY(d.invested);
                         const marketY = getY(d.marketValue);
-                        const baseLineY = getY(Math.max(0, min)); // Should visually be bottom if min > 0
 
                         // Calculate heights relative to the visible floor (height - padding.bottom)
                         // This logic gets complex with non-zero baselines for bars.
