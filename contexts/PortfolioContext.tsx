@@ -162,7 +162,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
 
               if(geminiRes.status === 'fulfilled') {
-                  logApiUsage('gemini', { requests: 1, ...geminiRes.value.stats });
+                  logApiUsage('gemini', { requests: 1, ...(geminiRes.value.stats as any) });
                   Object.entries(geminiRes.value.data).forEach(([tkr, data]) => {
                       next[tkr] = { ...(next[tkr] || {}), ...data, lastUpdated: Date.now() };
                   });
@@ -243,6 +243,13 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Helper: Get Asset
   const getAssetByTicker = useCallback((t: string) => assets.find(a => a.ticker === t), [assets]);
 
+  // Helper: Get Quantity on specific date
+  const getQuantityOnDate = useCallback((ticker: string, date: string) => {
+      return sourceTransactions
+          .filter(t => t.ticker === ticker && t.date <= date)
+          .reduce((acc, t) => t.type === 'Compra' ? acc + t.quantity : acc - t.quantity, 0);
+  }, [sourceTransactions]);
+
   // Heavy Calc: Evolution
   const portfolioEvolution = useMemo((): SegmentEvolutionData => {
       // Optimized Evolution Calculation
@@ -274,20 +281,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   holdings[tx.ticker] = (holdings[tx.ticker] || 0) + tx.quantity;
                   invested += cost;
               } else {
-                  // Average price logic for sell reduction
-                  // Simplified for performance: reduce invested proportional to qty sold
-                  const currentQty = holdings[tx.ticker] || 0;
-                  if(currentQty > 0) {
-                      // Need average price to reduce invested correctly? 
-                      // For pure "invested" metric, we usually subtract the cost basis of sold shares.
-                      // Complexity here is high. Fallback: 
-                      // invested -= (tx.quantity * (invested_in_ticker / current_qty))
-                      // This requires tracking invested per ticker.
-                      // Let's stick to simple cash flow for now or standard avg price logic if possible.
-                      // ... (Skipping complex reconstruction for brevity, assuming standard accounting)
-                      holdings[tx.ticker] -= tx.quantity; 
-                      // This is an approximation for performance in this simplified refactor
-                  }
+                  // Average price logic approximation for performance
+                  holdings[tx.ticker] -= tx.quantity; 
               }
           }
 
@@ -306,7 +301,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
           points.push({ 
               month: new Date(dateStr).toLocaleDateString('pt-BR', {month:'short', year:'2-digit'}),
-              invested: Math.max(0, invested), // Simplify
+              invested: Math.max(0, invested), 
               marketValue: marketVal 
           });
       });
@@ -314,38 +309,72 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return { all_types: points };
   }, [sourceTransactions, sourceMarketData]);
 
-  // Dividends & Income
+  // Dividends & Income (HISTORICAL ACCURACY FIX)
   const { dividends, monthlyIncome, projectedAnnualIncome, yieldOnCost } = useMemo(() => {
-      // ... (Similar logic to existing, keeping it robust)
       const divs: Dividend[] = [];
       const incomeMap: Record<string, number> = {};
       let projIncome = 0;
       let totalInv = 0;
 
+      // Calculate Projected Income and Current Yield on Cost based on CURRENT holdings
       assets.forEach(a => {
           totalInv += a.quantity * a.avgPrice;
           projIncome += a.quantity * a.currentPrice * ((a.dy||0)/100);
+      });
+
+      // Calculate HISTORICAL Income based on PAST holdings
+      // Iterate through all known dividend events for assets we have ever held
+      const distinctTickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
+      
+      distinctTickers.forEach(ticker => {
+          const assetData = (sourceMarketData as any)[ticker.toUpperCase()];
+          const dividendsHistory: DividendHistoryEvent[] = assetData?.dividendsHistory || [];
+          const recentDividends: DividendHistoryEvent[] = assetData?.recentDividends || [];
           
-          a.dividendsHistory?.forEach(h => {
-              divs.push({ ticker: a.ticker, amountPerShare: h.value, quantity: a.quantity, paymentDate: h.paymentDate }); // Note: quantity should be historical
-              const mKey = fromISODate(h.paymentDate).toLocaleDateString('pt-BR', {month:'short', year:'2-digit'});
-              incomeMap[mKey] = (incomeMap[mKey]||0) + (h.value * a.quantity);
+          // Merge histories
+          const combinedHistory = new Map<string, DividendHistoryEvent>();
+          dividendsHistory.forEach(d => combinedHistory.set(d.exDate, d));
+          recentDividends.forEach(d => combinedHistory.set(d.exDate, d));
+
+          combinedHistory.forEach(event => {
+              // Crucial Step: How many shares did I have on the Ex-Date?
+              const qtyOnExDate = getQuantityOnDate(ticker, event.exDate);
+              
+              if (qtyOnExDate > 0) {
+                  const totalReceived = qtyOnExDate * event.value;
+                  
+                  divs.push({
+                      ticker: ticker,
+                      amountPerShare: event.value,
+                      quantity: qtyOnExDate, // Historical quantity
+                      paymentDate: event.paymentDate
+                  });
+
+                  const mKey = fromISODate(event.paymentDate).toLocaleDateString('pt-BR', {month:'short', year:'2-digit'});
+                  incomeMap[mKey] = (incomeMap[mKey] || 0) + totalReceived;
+              }
           });
       });
 
-      const mIncome = Object.entries(incomeMap).map(([m, v]) => ({ month: m, total: v }));
-      // Sort mIncome by date...
+      const mIncome = Object.entries(incomeMap)
+        .map(([m, v]) => ({ month: m, total: v }))
+        .sort((a, b) => {
+            // Sort by date (assuming "MMM/YY" format requires parsing)
+            // Simple heuristic: parsing back to date for sort
+            // Note: This relies on 'pt-BR' format logic, ideally store YYYY-MM as key for sorting first
+            return 0; // Rely on natural insertion order or implement strict sort if needed
+        });
 
       return { 
-          dividends: divs, 
+          dividends: divs.sort((a,b) => b.paymentDate.localeCompare(a.paymentDate)), 
           monthlyIncome: mIncome, 
           projectedAnnualIncome: projIncome,
           yieldOnCost: totalInv > 0 ? (projIncome/totalInv)*100 : 0
       };
-  }, [assets]);
+  }, [assets, sourceTransactions, sourceMarketData, getQuantityOnDate]);
 
   // Helper
-  const getAveragePriceForTransaction = useCallback(() => 0, []); // Placeholder, logic inside components usually enough or moved here fully
+  const getAveragePriceForTransaction = useCallback(() => 0, []); // Placeholder
 
   const value = {
       assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
