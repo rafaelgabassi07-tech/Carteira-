@@ -39,16 +39,32 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
     const chartWidth = Math.max(0, width - padding.left - padding.right);
     const chartHeight = Math.max(0, height - padding.top - padding.bottom);
 
-    const maxValue = useMemo(() => {
-        const max = Math.max(...data.map(d => Math.max(d.marketValue, d.invested)), 0);
-        return max === 0 ? 1 : max * 1.1;
-    }, [data]);
+    const { min, max } = useMemo(() => {
+        const allValues = data.flatMap(d => [d.marketValue, d.invested]);
+        const maxVal = Math.max(...allValues, 0);
+        const minVal = Math.min(...allValues, maxVal); // Ensure min <= max
+        
+        // Dynamic scaling: If using line chart, zoom in to show oscillation.
+        // If bar chart, usually start at 0 is better, but user wants oscillation visibility.
+        // Let's use a "soft" minimum to accentuate curves.
+        const range = maxVal - minVal;
+        
+        // Add padding (10% top, 10% bottom relative to range)
+        // Avoid 0 if possible for line charts to show detail
+        let effectiveMin = minVal - (range * 0.1);
+        let effectiveMax = maxVal + (range * 0.1);
+        
+        if (effectiveMin < 0 || chartType === 'bar') effectiveMin = 0;
+        if (effectiveMax === 0) effectiveMax = 100; // fallback
+
+        return { min: effectiveMin, max: effectiveMax };
+    }, [data, chartType]);
 
     const yTicks = useMemo(() => {
         const numTicks = 4;
-        const step = maxValue / (numTicks - 1);
-        return Array.from({ length: numTicks }, (_, i) => i * step);
-    }, [maxValue]);
+        const step = (max - min) / (numTicks - 1);
+        return Array.from({ length: numTicks }, (_, i) => min + i * step);
+    }, [min, max]);
     
     // Bar logic
     const barSlotWidth = data.length > 0 ? chartWidth / data.length : 0;
@@ -61,7 +77,12 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
         return padding.left + index * barSlotWidth + (barSlotWidth - barWidth) / 2;
     };
     
-    const getY = (value: number) => (height - padding.bottom) - (value / maxValue) * chartHeight;
+    const getY = (value: number) => {
+        // Standard linear interpolation mapping value to pixel height
+        // y = height - padding.bottom - ((value - min) / (max - min)) * chartHeight
+        const percent = (value - min) / (max - min);
+        return (height - padding.bottom) - (percent * chartHeight);
+    };
 
     const handleMouseMove = (event: { clientX: number, clientY: number }) => {
         if (!svgRef.current || data.length === 0) return;
@@ -199,21 +220,30 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                     data.map((d, i) => {
                         const x = getX(i);
                         const yBase = height - padding.bottom;
-                        const investedH = (d.invested / maxValue) * chartHeight;
-                        const marketH = (d.marketValue / maxValue) * chartHeight;
+                        // For bars in zoom mode, we must clamp to the visible area
+                        const investedY = getY(d.invested);
+                        const marketY = getY(d.marketValue);
+                        const baseLineY = getY(Math.max(0, min)); // Should visually be bottom if min > 0
+
+                        // Calculate heights relative to the visible floor (height - padding.bottom)
+                        // This logic gets complex with non-zero baselines for bars.
+                        // Simplified: if chartType == 'bar', we forced min=0 in the useMemo above.
+                        
+                        const investedH = (height - padding.bottom) - investedY;
+                        const marketH = (height - padding.bottom) - marketY;
                         const gain = d.marketValue - d.invested;
                         
                         return (
                             <g key={i} opacity={tooltip && tooltip.index !== i ? 0.4 : 1} className="transition-opacity duration-200">
                                 {/* Invested Bar (Background/Base) */}
-                                <rect x={x} y={yBase - investedH} width={barWidth} height={investedH} fill="var(--text-secondary)" fillOpacity="0.2" rx={2} />
+                                <rect x={x} y={investedY} width={barWidth} height={investedH} fill="var(--text-secondary)" fillOpacity="0.2" rx={2} />
                                 
                                 {/* Value Bar (Overlay) */}
                                 {gain >= 0 ? (
-                                    <rect x={x} y={yBase - marketH} width={barWidth} height={marketH} fill="var(--accent-color)" rx={2} />
+                                    <rect x={x} y={marketY} width={barWidth} height={marketH} fill="var(--accent-color)" rx={2} />
                                 ) : (
                                     // Loss: Draw market value in red/warning color
-                                    <rect x={x} y={yBase - marketH} width={barWidth} height={marketH} fill="var(--red-text)" opacity="0.8" rx={2} />
+                                    <rect x={x} y={marketY} width={barWidth} height={marketH} fill="var(--red-text)" opacity="0.8" rx={2} />
                                 )}
                             </g>
                         );

@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, DividendHistoryEvent, AppStats, SegmentEvolutionData, PortfolioEvolutionPoint } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
-import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, getClosestPrice, fromISODate, CacheManager } from '../utils';
+import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, fromISODate, CacheManager } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME } from '../constants';
 
 // ... (Keep interfaces mostly the same)
@@ -341,22 +341,23 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [assets, sourceTransactions, sourceMarketData, getQuantityOnDate]);
 
 
-  // --- Portfolio Evolution Calculation (Strictly Market Value vs Invested - Last 30 Days) ---
+  // --- Portfolio Evolution Calculation (Optimized for Daily Oscillation) ---
   const portfolioEvolution = useMemo((): SegmentEvolutionData => {
       const points: PortfolioEvolutionPoint[] = [];
       const today = new Date();
+      const todayISODate = today.toISOString().split('T')[0];
       
       // Generate dates for the last 30 days (Daily)
-      const checkDates: Date[] = [];
+      const checkDates: string[] = [];
       for(let i=29; i>=0; i--) { // 0 to 29 = 30 days
           const d = new Date();
           d.setDate(today.getDate() - i);
-          checkDates.push(d);
+          checkDates.push(d.toISOString().split('T')[0]);
       }
-      const uniqueDates = Array.from(new Set(checkDates.map(d => d.toISOString().split('T')[0]))).sort();
+      
       const sortedTx = [...sourceTransactions].sort((a,b) => a.date.localeCompare(b.date));
 
-      uniqueDates.forEach(dateStr => {
+      checkDates.forEach(dateStr => {
           let invested = 0;
           const holdings: Record<string, { qty: number, avgPrice: number }> = {};
 
@@ -380,17 +381,34 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
           }
 
-          // 2. Calculate Market Value (with Fallback)
+          // 2. Calculate Market Value with "Last Known Price" Logic
           let marketVal = 0;
           Object.keys(holdings).forEach(t => {
               if(holdings[t].qty > 0.00001) {
                   const assetData = (sourceMarketData as any)[t.toUpperCase()];
+                  const history = assetData?.priceHistory || [];
                   
-                  // PRIORIDADE: 1. Histórico exato | 2. Preço Atual (Marcação a Mercado) | 3. Preço Médio (Último Recurso)
-                  // Isso garante oscilação mesmo sem histórico diário perfeito.
-                  const historicalPrice = getClosestPrice(assetData?.priceHistory || [], dateStr);
-                  const price = historicalPrice || assetData?.currentPrice || holdings[t].avgPrice || 0;
+                  // Find the most recent price on or before this date
+                  // This logic carries over Friday's price to Sat/Sun
+                  let price = 0;
                   
+                  // Optimization: Use reverse find or just simple filter+pop since history is small
+                  const relevantPriceObj = history
+                    .filter((h: any) => h.date <= dateStr)
+                    .pop();
+
+                  if (relevantPriceObj) {
+                      price = relevantPriceObj.price;
+                  } else {
+                      // If no history exists before this date (e.g. recently added asset), use avgPrice as fallback
+                      price = holdings[t].avgPrice;
+                  }
+
+                  // Override: If it's TODAY, try to use real-time currentPrice if available
+                  if (dateStr === todayISODate && assetData?.currentPrice > 0) {
+                      price = assetData.currentPrice;
+                  }
+
                   marketVal += holdings[t].qty * price;
               }
           });
@@ -401,7 +419,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               month: dateObj.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'}),
               invested: Math.max(0, invested), 
               marketValue: marketVal,
-              cumulativeDividends: 0 // Disabled as per user request
+              cumulativeDividends: 0
           });
       });
 
