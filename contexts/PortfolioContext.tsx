@@ -254,10 +254,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [sourceTransactions]);
 
   // --- Dividends & Income (Pre-calculation for Evolution) ---
-  const { dividends, monthlyIncome, projectedAnnualIncome, yieldOnCost, dividendEvents } = useMemo(() => {
+  const { dividends, monthlyIncome, projectedAnnualIncome, yieldOnCost } = useMemo(() => {
       const divs: Dividend[] = [];
       const incomeMap: Record<string, number> = {};
-      const allDividendEvents: { date: string, amount: number }[] = [];
       let projIncome = 0;
       let totalInv = 0;
 
@@ -292,7 +291,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   const dateObj = fromISODate(event.paymentDate);
                   const sortKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
                   incomeMap[sortKey] = (incomeMap[sortKey] || 0) + totalReceived;
-                  allDividendEvents.push({ date: event.paymentDate, amount: totalReceived });
               }
           });
       });
@@ -310,13 +308,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           dividends: divs.sort((a,b) => b.paymentDate.localeCompare(a.paymentDate)), 
           monthlyIncome: mIncome, 
           projectedAnnualIncome: projIncome,
-          yieldOnCost: totalInv > 0 ? (projIncome/totalInv)*100 : 0,
-          dividendEvents: allDividendEvents.sort((a,b) => a.date.localeCompare(b.date))
+          yieldOnCost: totalInv > 0 ? (projIncome/totalInv)*100 : 0
       };
   }, [assets, sourceTransactions, sourceMarketData, getQuantityOnDate]);
 
 
-  // --- Portfolio Evolution Calculation (Includes Capital Gain + Accumulated Dividends) ---
+  // --- Portfolio Evolution Calculation (Strictly Market Value vs Invested) ---
   const portfolioEvolution = useMemo((): SegmentEvolutionData => {
       const points: PortfolioEvolutionPoint[] = [];
       const today = new Date();
@@ -367,21 +364,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
           });
 
-          // 3. Calculate Cumulative Dividends
-          const accumDividends = dividendEvents
-            .filter(d => d.date <= dateStr)
-            .reduce((sum, d) => sum + d.amount, 0);
-
           points.push({ 
               month: new Date(dateStr).toLocaleDateString('pt-BR', {month:'short', year:'2-digit'}),
               invested: Math.max(0, invested), 
               marketValue: marketVal,
-              cumulativeDividends: accumDividends
+              cumulativeDividends: 0 // Disabled as per user request
           });
       });
 
       return { all_types: points };
-  }, [sourceTransactions, sourceMarketData, dividendEvents]);
+  }, [sourceTransactions, sourceMarketData]);
 
 
   // Helper

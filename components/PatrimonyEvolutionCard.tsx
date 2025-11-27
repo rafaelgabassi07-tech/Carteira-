@@ -10,21 +10,19 @@ type Period = '6m' | '1y' | 'all';
 
 const PatrimonyEvolutionCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
-    const { portfolioEvolution, assets, dividends, privacyMode } = usePortfolio();
+    const { portfolioEvolution, assets, privacyMode } = usePortfolio();
     const [period, setPeriod] = useState<Period>('1y');
 
-    // Calculate Current Metrics from live assets + cumulative dividends
+    // Calculate Current Metrics (Pure Capital Gain Focus)
     const currentMetrics = useMemo(() => {
         const totalInvested = assets.reduce((acc, a) => acc + (a.quantity * a.avgPrice), 0);
         const currentPatrimony = assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice), 0);
-        const totalDividends = dividends.reduce((acc, d) => acc + (d.amountPerShare * d.quantity), 0);
         
         const variation = currentPatrimony - totalInvested;
-        const totalReturn = variation + totalDividends;
-        const profitability = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
+        const variationPercent = totalInvested > 0 ? (variation / totalInvested) * 100 : 0;
         
-        return { totalInvested, currentPatrimony, totalReturn, profitability, totalDividends };
-    }, [assets, dividends]);
+        return { totalInvested, currentPatrimony, variation, variationPercent };
+    }, [assets]);
 
     const filteredData = useMemo(() => {
         const data = portfolioEvolution.all_types || [];
@@ -59,13 +57,13 @@ const PatrimonyEvolutionCard: React.FC = () => {
                         </div>
                         
                         <div>
-                            <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider">Rentabilidade Total</p>
+                            <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider">Ganho de Capital</p>
                             <div className="flex items-baseline gap-2">
-                                <p className={`text-lg font-bold ${currentMetrics.totalReturn >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                                    {currentMetrics.totalReturn >= 0 ? '+' : ''}<CountUp end={currentMetrics.totalReturn} formatter={formatCurrency} />
+                                <p className={`text-lg font-bold ${currentMetrics.variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                                    {currentMetrics.variation >= 0 ? '+' : ''}<CountUp end={currentMetrics.variation} formatter={formatCurrency} />
                                 </p>
-                                <span className={`text-sm font-semibold ${currentMetrics.profitability >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'} bg-[var(--bg-primary)] px-1.5 rounded border border-[var(--border-color)]`}>
-                                    {currentMetrics.profitability >= 0 ? '+' : ''}{currentMetrics.profitability.toFixed(2)}%
+                                <span className={`text-sm font-semibold ${currentMetrics.variationPercent >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'} bg-[var(--bg-primary)] px-1.5 rounded border border-[var(--border-color)]`}>
+                                    {currentMetrics.variationPercent >= 0 ? '+' : ''}{currentMetrics.variationPercent.toFixed(2)}%
                                 </span>
                             </div>
                         </div>
