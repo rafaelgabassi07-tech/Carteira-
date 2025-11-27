@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { View } from '../App';
 import WalletIcon from './icons/WalletIcon';
@@ -50,7 +51,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
   };
 
   return (
-    <div className="bottom-nav fixed bottom-0 left-0 right-0 h-16 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] max-w-md mx-auto z-40">
+    <div className="bottom-nav fixed bottom-0 left-0 right-0 h-16 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] max-w-md mx-auto z-40 lg:hidden">
       <div className="flex justify-around items-center h-full">
         {navItems.map((item) => (
           <NavItem

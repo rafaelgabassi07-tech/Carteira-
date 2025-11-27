@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
+import Sidebar from './components/Sidebar';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
@@ -33,13 +35,10 @@ const App: React.FC = () => {
   const [transactionFilter, setTransactionFilter] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [settingsStartScreen, setSettingsStartScreen] = useState<MenuScreen>('main');
-  const [isInitialized, setIsInitialized] = useState(false);
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
   
-  const [isMarketOpen, setIsMarketOpen] = useState(false);
-
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
     const newToast: ToastMessage = { id: Date.now(), message, type };
     setToast(newToast);
@@ -50,6 +49,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
+      // Check specifically for mobile landscape (width > height but still small screen)
       const isLandscape = window.innerWidth > window.innerHeight && window.innerWidth < 1024;
       setIsMobileLandscape(isLandscape);
     };
@@ -154,11 +154,15 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className={`h-screen w-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col md:flex-row overflow-hidden ${isMobileLandscape ? 'mobile-landscape-layout' : ''}`}>
+      <div className="flex h-screen w-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
         <OfflineBanner />
         
+        {/* Desktop Sidebar (Visible only on LG+) */}
+        <Sidebar activeView={activeView} setActiveView={handleSetView} />
+
+        {/* Mobile Landscape Sidebar (Visible only on landscape mobile/tablet) */}
         {isMobileLandscape && (
-            <div className="mobile-landscape-sidebar h-full overflow-y-auto bg-[var(--bg-secondary)] border-r border-[var(--border-color)]">
+            <div className="mobile-landscape-sidebar h-full overflow-y-auto bg-[var(--bg-secondary)] border-r border-[var(--border-color)] flex-shrink-0 w-64">
                  <div className="p-4">
                     <MainMenu 
                         setScreen={(s: MenuScreen) => {
@@ -167,19 +171,23 @@ const App: React.FC = () => {
                         }} 
                         addToast={addToast} 
                         activeScreen={activeView === 'settings' ? settingsStartScreen : undefined}
-                        onShowUpdateModal={() => { /* Not implemented in landscape sidebar */ }}
+                        onShowUpdateModal={() => {}}
                     />
                 </div>
             </div>
         )}
         
-        <main id="main-content" className="flex-1 flex flex-col h-full overflow-y-auto relative no-scrollbar">
+        {/* Main Content Area */}
+        <main id="main-content" className="flex-1 flex flex-col h-full overflow-hidden relative w-full">
           <Suspense fallback={<LoadingSpinner />}>
-            {renderView()}
+            <div className="h-full overflow-y-auto no-scrollbar lg:p-6 lg:max-w-6xl lg:mx-auto lg:w-full">
+                {renderView()}
+            </div>
           </Suspense>
         </main>
         
-        <div className={`w-full max-w-md mx-auto z-40 ${isMobileLandscape ? 'mobile-landscape-bottom-nav' : ''}`}>
+        {/* Mobile Bottom Nav (Hidden on LG+) */}
+        <div className={`w-full max-w-md mx-auto z-40 ${isMobileLandscape ? 'hidden' : ''}`}>
            <BottomNav activeView={activeView} setActiveView={handleSetView} />
         </div>
 
