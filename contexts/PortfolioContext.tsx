@@ -357,9 +357,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           Object.keys(holdings).forEach(t => {
               if(holdings[t].qty > 0.00001) {
                   const assetData = (sourceMarketData as any)[t.toUpperCase()];
-                  // Fallback Logic: If no history price, use Avg Price (Invested) so chart doesn't drop to 0
+                  
+                  // PRIORIDADE: 1. Histórico exato | 2. Preço Atual (Marcação a Mercado) | 3. Preço Médio (Último Recurso)
+                  // Isso garante oscilação mesmo sem histórico diário perfeito.
                   const historicalPrice = getClosestPrice(assetData?.priceHistory || [], dateStr);
-                  const price = historicalPrice || holdings[t].avgPrice || 0;
+                  const price = historicalPrice || assetData?.currentPrice || holdings[t].avgPrice || 0;
                   
                   marketVal += holdings[t].qty * price;
               }
