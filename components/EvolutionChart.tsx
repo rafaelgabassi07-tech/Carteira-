@@ -108,6 +108,8 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
         return `${getX(0)},${height - padding.bottom} ${line} ${getX(data.length - 1)},${height - padding.bottom}`;
     };
 
+    const totalReturn = tooltip ? (tooltip.point.marketValue - tooltip.point.invested) + tooltip.point.cumulativeDividends : 0;
+
     return (
         <div ref={containerRef} className="relative w-full h-full">
             <svg 
@@ -203,12 +205,16 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                         
                         return (
                             <g key={i} opacity={tooltip && tooltip.index !== i ? 0.4 : 1} className="transition-opacity duration-200">
-                                <rect x={x} y={yBase - investedH} width={barWidth} height={investedH} fill="var(--accent-color)" fillOpacity="0.3" rx={2} />
-                                {gain > 0 && (
-                                    <rect x={x} y={yBase - marketH} width={barWidth} height={marketH - investedH} fill="var(--accent-color)" rx={2} />
-                                )}
-                                {gain < 0 && (
-                                    <rect x={x} y={yBase - investedH} width={barWidth} height={investedH - marketH} fill="var(--red-text)" opacity="0.5" rx={2} />
+                                {/* Invested Bar (Background/Base) */}
+                                <rect x={x} y={yBase - investedH} width={barWidth} height={investedH} fill="var(--text-secondary)" fillOpacity="0.2" rx={2} />
+                                
+                                {/* Value Bar (Overlay) */}
+                                {gain >= 0 ? (
+                                    // Profit: Draw accent part on top of invested height? No, just show full market height for comparison
+                                    <rect x={x} y={yBase - marketH} width={barWidth} height={marketH} fill="var(--accent-color)" rx={2} />
+                                ) : (
+                                    // Loss: Draw market value in red/warning color
+                                    <rect x={x} y={yBase - marketH} width={barWidth} height={marketH} fill="var(--red-text)" opacity="0.8" rx={2} />
                                 )}
                             </g>
                         );
@@ -238,14 +244,21 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                         <span className="text-[var(--text-secondary)]">{t('invested_amount')}</span>
                         <span className="font-bold text-sm ml-auto text-[var(--text-secondary)]">{formatCurrency(tooltip.point.invested)}</span>
                     </div>
+
+                    {tooltip.point.cumulativeDividends > 0 && (
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-[var(--green-text)] opacity-80" />
+                            <span className="text-[var(--text-secondary)]">Proventos Acum.</span>
+                            <span className="font-bold text-sm ml-auto text-[var(--green-text)]">{formatCurrency(tooltip.point.cumulativeDividends)}</span>
+                        </div>
+                    )}
                     
                     <div className="border-t border-[var(--border-color)] my-2 opacity-50"></div>
                     
                     <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${tooltip.point.marketValue >= tooltip.point.invested ? 'bg-[var(--green-text)]' : 'bg-[var(--red-text)]'}`} />
-                        <span className="text-[var(--text-secondary)]">{t('result')}</span>
-                        <span className={`font-bold text-sm ml-auto ${tooltip.point.marketValue >= tooltip.point.invested ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                            {formatCurrency(tooltip.point.marketValue - tooltip.point.invested)}
+                        <span className="text-[var(--text-secondary)] font-bold">Retorno Total</span>
+                        <span className={`font-bold text-sm ml-auto ${totalReturn >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                            {formatCurrency(totalReturn)}
                         </span>
                     </div>
                     <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)]"></div>

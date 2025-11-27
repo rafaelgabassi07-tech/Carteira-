@@ -10,18 +10,21 @@ type Period = '6m' | '1y' | 'all';
 
 const PatrimonyEvolutionCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
-    const { portfolioEvolution, assets, privacyMode } = usePortfolio();
+    const { portfolioEvolution, assets, dividends, privacyMode } = usePortfolio();
     const [period, setPeriod] = useState<Period>('1y');
 
-    // Calculate Current Metrics from live assets
+    // Calculate Current Metrics from live assets + cumulative dividends
     const currentMetrics = useMemo(() => {
         const totalInvested = assets.reduce((acc, a) => acc + (a.quantity * a.avgPrice), 0);
         const currentPatrimony = assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice), 0);
-        const result = currentPatrimony - totalInvested;
-        const profitability = totalInvested > 0 ? (result / totalInvested) * 100 : 0;
+        const totalDividends = dividends.reduce((acc, d) => acc + (d.amountPerShare * d.quantity), 0);
         
-        return { totalInvested, currentPatrimony, result, profitability };
-    }, [assets]);
+        const variation = currentPatrimony - totalInvested;
+        const totalReturn = variation + totalDividends;
+        const profitability = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
+        
+        return { totalInvested, currentPatrimony, totalReturn, profitability, totalDividends };
+    }, [assets, dividends]);
 
     const filteredData = useMemo(() => {
         const data = portfolioEvolution.all_types || [];
@@ -56,10 +59,10 @@ const PatrimonyEvolutionCard: React.FC = () => {
                         </div>
                         
                         <div>
-                            <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider">{t('profitability')}</p>
+                            <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider">Rentabilidade Total</p>
                             <div className="flex items-baseline gap-2">
-                                <p className={`text-lg font-bold ${currentMetrics.result >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                                    {currentMetrics.result >= 0 ? '+' : ''}<CountUp end={currentMetrics.result} formatter={formatCurrency} />
+                                <p className={`text-lg font-bold ${currentMetrics.totalReturn >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                                    {currentMetrics.totalReturn >= 0 ? '+' : ''}<CountUp end={currentMetrics.totalReturn} formatter={formatCurrency} />
                                 </p>
                                 <span className={`text-sm font-semibold ${currentMetrics.profitability >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'} bg-[var(--bg-primary)] px-1.5 rounded border border-[var(--border-color)]`}>
                                     {currentMetrics.profitability >= 0 ? '+' : ''}{currentMetrics.profitability.toFixed(2)}%
@@ -91,11 +94,11 @@ const PatrimonyEvolutionCard: React.FC = () => {
             {/* Legend */}
             <div className="flex justify-center gap-4 mt-4 text-xs font-medium text-[var(--text-secondary)]">
                 <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-1 rounded-full bg-[var(--accent-color)]"></div>
+                    <div className="w-3 h-3 rounded bg-[var(--accent-color)]"></div>
                     {t('patrimony')}
                 </div>
                 <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-1 rounded-full border border-[var(--text-secondary)] border-dashed"></div>
+                    <div className="w-3 h-3 rounded bg-[var(--text-secondary)] opacity-30"></div>
                     {t('invested_amount')}
                 </div>
             </div>

@@ -186,6 +186,7 @@ export interface PortfolioEvolutionPoint {
     month: string;
     invested: number;
     marketValue: number;
+    cumulativeDividends: number;
 }
 
 export type SegmentEvolutionData = Record<string, PortfolioEvolutionPoint[]>;
