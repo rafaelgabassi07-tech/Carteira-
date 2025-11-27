@@ -63,6 +63,10 @@ const App: React.FC = () => {
   }, [swRegistration, addToast, t]);
 
   const showUpdateToast = useCallback((reg: ServiceWorkerRegistration) => {
+      // Check if we haven't already shown the toast for this registration to avoid spam
+      if (swRegistration === reg) return;
+      
+      console.log("Patch available via SW waiting state.");
       setSwRegistration(reg);
       addToast(
           t('new_version_available'), 
@@ -71,9 +75,9 @@ const App: React.FC = () => {
               label: t('download_update'), 
               onClick: () => applyUpdate(reg) 
           }, 
-          0 // Infinite duration
+          0 // Infinite duration until clicked
       );
-  }, [addToast, t, applyUpdate]);
+  }, [addToast, t, applyUpdate, swRegistration]);
 
   useEffect(() => {
       // 1. Event Listener (updates arriving while app is open)
@@ -83,16 +87,33 @@ const App: React.FC = () => {
       };
       window.addEventListener('sw-update-available', handleSWUpdate);
 
-      // 2. Initial Check (updates downloaded before app loaded)
-      if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistration().then(reg => {
-              if (reg && reg.waiting) {
-                  showUpdateToast(reg);
-              }
-          });
-      }
+      // 2. Continuous Polling for Waiting Workers
+      // This ensures that if the update downloaded in the background while the app was idle,
+      // we still catch it and show the button.
+      const checkForUpdates = () => {
+          if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistration()
+                .then(reg => {
+                    if (reg && reg.waiting) {
+                        showUpdateToast(reg);
+                    }
+                })
+                .catch(err => {
+                    console.debug("SW check skipped (env restricted):", err);
+                });
+          }
+      };
 
-      return () => window.removeEventListener('sw-update-available', handleSWUpdate);
+      // Check immediately
+      checkForUpdates();
+
+      // Check every 5 seconds
+      const intervalId = setInterval(checkForUpdates, 5000);
+
+      return () => {
+          window.removeEventListener('sw-update-available', handleSWUpdate);
+          clearInterval(intervalId);
+      };
   }, [showUpdateToast]);
 
 
