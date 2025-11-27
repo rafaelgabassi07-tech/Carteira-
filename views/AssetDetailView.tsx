@@ -5,7 +5,7 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import AnalysisIcon from '../components/icons/AnalysisIcon';
-import AssetCalendar from '../components/AssetCalendar';
+import DividendChart from '../components/DividendChart';
 import { vibrate } from '../utils';
 
 interface AssetDetailViewProps {
@@ -52,7 +52,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const [activeTab, setActiveTab] = useState('summary');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showAllHistory, setShowAllHistory] = useState(false);
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
     
     const asset = getAssetByTicker(ticker);
 
@@ -96,26 +96,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const displayedDividends = useMemo(() => {
         return showAllHistory ? assetDividends : assetDividends.slice(0, 3);
     }, [assetDividends, showAllHistory]);
-
-    // Calendar Events
-    const calendarEvents = useMemo(() => {
-        const events: { date: string, type: 'payment' | 'ex' }[] = [];
-        assetDividends.forEach(d => {
-            events.push({ date: d.paymentDate, type: 'payment' });
-        });
-        // Add ex-dates from history if available
-        asset?.dividendsHistory?.forEach(h => {
-            if(h.exDate) events.push({ date: h.exDate, type: 'ex' });
-        });
-        return events;
-    }, [assetDividends, asset?.dividendsHistory]);
-
-    const selectedDateData = useMemo(() => {
-        if (!selectedDate) return null;
-        const dividend = assetDividends.find(d => d.paymentDate === selectedDate);
-        const history = asset?.dividendsHistory?.find(h => h.paymentDate === selectedDate);
-        return { dividend, history };
-    }, [selectedDate, assetDividends, asset?.dividendsHistory]);
 
 
     // Only show error/not found if we aren't refreshing AND have no asset data
@@ -289,47 +269,10 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 )}
                 {activeTab === 'dividends' && (
                     <div className="space-y-4 animate-fade-in pb-4">
-                        {assetDividends.length > 0 ? (
+                        {asset?.dividendsHistory && asset.dividendsHistory.length > 0 ? (
                             <>
-                                {/* Calendar */}
-                                <AssetCalendar 
-                                    events={calendarEvents} 
-                                    onDateSelect={setSelectedDate} 
-                                    selectedDate={selectedDate} 
-                                />
-
-                                {/* Selected Date Details */}
-                                {selectedDate && selectedDateData && (selectedDateData.dividend || selectedDateData.history) && (
-                                    <div className="bg-[var(--bg-primary)] border border-[var(--accent-color)] rounded-2xl p-4 animate-scale-in">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="text-xs font-bold text-[var(--accent-color)] uppercase tracking-wider">
-                                                {new Date(selectedDate).toLocaleDateString(locale, { dateStyle: 'full' })}
-                                            </span>
-                                            {selectedDateData.dividend ? (
-                                                <span className="bg-[var(--green-text)]/10 text-[var(--green-text)] px-2 py-0.5 rounded text-[10px] font-bold border border-[var(--green-text)]/30">PAGAMENTO</span>
-                                            ) : (
-                                                <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-500/30">DATA COM</span>
-                                            )}
-                                        </div>
-                                        
-                                        <div className="flex justify-between items-end">
-                                            <div>
-                                                <p className="text-[var(--text-secondary)] text-xs">Valor por cota</p>
-                                                <p className="text-lg font-bold text-[var(--text-primary)]">
-                                                    {formatCurrency(selectedDateData.dividend?.amountPerShare || selectedDateData.history?.value || 0)}
-                                                </p>
-                                            </div>
-                                            {selectedDateData.dividend && (
-                                                <div className="text-right">
-                                                    <p className="text-[var(--text-secondary)] text-xs">Total Recebido</p>
-                                                    <p className="text-lg font-bold text-[var(--green-text)]">
-                                                        {formatCurrency(selectedDateData.dividend.amountPerShare * selectedDateData.dividend.quantity)}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Interactive Chart */}
+                                <DividendChart data={asset.dividendsHistory} />
 
                                 {/* Total Received Card */}
                                 <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
@@ -357,9 +300,9 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                         return (
                                             <div 
                                                 key={`${div.paymentDate}-${index}`} 
-                                                className={`p-4 flex justify-between items-center animate-fade-in-up ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedDate === div.paymentDate ? 'bg-[var(--bg-tertiary-hover)]' : ''}`}
+                                                className={`p-4 flex justify-between items-center animate-fade-in-up ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedHistoryItem === div.paymentDate ? 'bg-[var(--bg-tertiary-hover)]' : ''}`}
                                                 style={{ animationDelay: `${index * 50}ms`}}
-                                                onClick={() => { setSelectedDate(div.paymentDate); vibrate(); }}
+                                                onClick={() => { setSelectedHistoryItem(div.paymentDate); vibrate(); }}
                                             >
                                                 <div>
                                                     <p className="font-bold text-sm text-[var(--text-primary)] mb-0.5">

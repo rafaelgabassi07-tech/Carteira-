@@ -63,6 +63,7 @@ export const ptBR = {
     full_history: 'Histórico Completo',
     view_full_history: 'Ver histórico completo',
     show_less: 'Mostrar menos',
+    dividend_history_chart: 'Evolução de Proventos',
 
     // Transactions View
     edit_transaction: 'Editar Transação',
