@@ -85,7 +85,7 @@ const PatrimonyEvolutionCard: React.FC = () => {
             
             {/* Chart Area */}
             <div className={`h-64 w-full ${privacyMode ? 'opacity-30 blur-sm' : ''}`}>
-                <EvolutionChart data={filteredData} chartType="line" />
+                <EvolutionChart data={filteredData} chartType="bar" />
             </div>
             
             {/* Legend */}
