@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
@@ -52,30 +53,47 @@ const App: React.FC = () => {
   }, []);
 
   // --- SW Update Logic ---
-  const applyUpdate = useCallback(() => {
-      if (swRegistration && swRegistration.waiting) {
+  const applyUpdate = useCallback((reg?: ServiceWorkerRegistration) => {
+      const registration = reg || swRegistration;
+      if (registration && registration.waiting) {
           addToast(t('installing_update'), 'info');
-          swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
           setSwRegistration(null);
       }
   }, [swRegistration, addToast, t]);
 
+  const showUpdateToast = useCallback((reg: ServiceWorkerRegistration) => {
+      setSwRegistration(reg);
+      addToast(
+          t('new_version_available'), 
+          'info', 
+          { 
+              label: t('download_update'), 
+              onClick: () => applyUpdate(reg) 
+          }, 
+          0 // Infinite duration
+      );
+  }, [addToast, t, applyUpdate]);
+
   useEffect(() => {
+      // 1. Event Listener (updates arriving while app is open)
       const handleSWUpdate = (e: Event) => {
           const detail = (e as CustomEvent).detail as ServiceWorkerRegistration;
-          setSwRegistration(detail);
-          // Show persistent toast
-          addToast(
-              t('new_version_available'), 
-              'info', 
-              { label: t('download_update'), onClick: applyUpdate }, 
-              0 // Infinite duration
-          );
+          showUpdateToast(detail);
       };
-
       window.addEventListener('sw-update-available', handleSWUpdate);
+
+      // 2. Initial Check (updates downloaded before app loaded)
+      if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistration().then(reg => {
+              if (reg && reg.waiting) {
+                  showUpdateToast(reg);
+              }
+          });
+      }
+
       return () => window.removeEventListener('sw-update-available', handleSWUpdate);
-  }, [addToast, applyUpdate, t]);
+  }, [showUpdateToast]);
 
 
   // Responsive & Theme Handlers
@@ -159,7 +177,7 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'carteira': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
       case 'noticias': return <NewsView addToast={addToast} />;
-      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} onUpdateApp={applyUpdate} updateAvailable={!!swRegistration} />;
+      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} onUpdateApp={() => applyUpdate()} updateAvailable={!!swRegistration} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
       case 'analise': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;

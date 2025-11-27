@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import PageHeader from '../PageHeader';
 import PrivacyIcon from '../icons/PrivacyIcon';
@@ -17,7 +18,7 @@ const AboutApp: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     <img src="https://cdn-icons-png.flaticon.com/512/5556/5556468.png" alt="App Logo" className="w-20 h-20 mb-4" />
                     <h1 className="text-2xl font-bold">Invest Portfolio</h1>
                     <p className="text-[var(--text-secondary)]">{t('about_app_desc')}</p>
-                    <p className="text-xs text-gray-500 mt-2">{t('version')} 1.6.4</p>
+                    <p className="text-xs text-gray-500 mt-2">{t('version')} 1.6.5</p>
                 </div>
 
                 <div className="space-y-2">
