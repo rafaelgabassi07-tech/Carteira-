@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
@@ -307,25 +308,24 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
     
     const formattedQueries = queries.map(q => `{"ticker": "${q.ticker}", "date": "${q.date}"}`).join(', ');
 
-    // Prompt aprimorado para usar fontes específicas (Investidor10, StatusInvest)
-    // e distinguir preço de fechamento de outros valores
+    // Prompt aprimorado com regras estritas de fonte e validação de valor
     const prompt = `
       You are a precise financial data assistant.
-      Task: Find the EXACT historical closing price (cotação de fechamento) for the following Brazilian assets on the specific dates.
+      Task: Find the EXACT historical closing price (Cotação de Fechamento) for Brazilian FIIs/Stocks on specific dates.
 
       Input JSON List: [${formattedQueries}]
 
-      SEARCH INSTRUCTIONS:
-      1. USE GOOGLE SEARCH.
-      2. **PRIORITIZE DATA FROM: "Investidor 10" (investidor10.com.br) or "StatusInvest" (statusinvest.com.br).**
-      3. Perform specific searches like: "Cotação fechamento [TICKER] dia [DATE] investidor 10".
-      4. If the specific date was a weekend or holiday, find the closing price of the **nearest previous business day**.
+      SEARCH RULES:
+      1. **MANDATORY SOURCE**: Search specifically on "investidor10.com.br" or "statusinvest.com.br".
+      2. Search Query Example: "Cotação fechamento ${queries[0].ticker} dia ${queries[0].date} Investidor10".
+      3. If the exact date is a weekend/holiday, use the previous business day's closing price.
 
-      VALIDATION RULES:
-      - The value MUST be the Stock/Fund Price (e.g., ~10.50, ~120.00).
-      - DO NOT return the dividend value (e.g., 0.10) or the daily variation percentage.
-      - DO NOT return 0 unless the asset did not exist.
-
+      VALIDATION RULES (CRITICAL):
+      - The returned value MUST be the SHARE PRICE (e.g., R$ 9.50, R$ 120.00).
+      - **DO NOT return the dividend value** (e.g., 0.10, 0.85).
+      - **DO NOT return the daily variation** (e.g., 0.50%, -1.20).
+      - **Sanity Check**: If the found value is < 2.00 (and it's not a penny stock like OIBR3), it is likely a dividend or error. discard it or search again for "Price".
+      
       OUTPUT FORMAT:
       - Return ONLY a single valid JSON object.
       - Keys: The composite string 'TICKER_YYYY-MM-DD' exactly as requested.
@@ -353,11 +353,18 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
         if (data && typeof data === 'object' && !Array.isArray(data)) {
             const cleanData: Record<string, number> = {};
             Object.keys(data).forEach(key => {
-                if (typeof data[key] === 'number') {
-                    if (data[key] > 0) cleanData[key] = data[key];
-                } else if (typeof data[key] === 'string') {
-                    const num = parseFloat(data[key].replace(',', '.'));
-                    if (!isNaN(num) && num > 0) cleanData[key] = num;
+                let val = data[key];
+                if (typeof val === 'string') {
+                    val = parseFloat(val.replace(',', '.'));
+                }
+                
+                // Additional sanity check on client side
+                if (typeof val === 'number' && !isNaN(val) && val > 0) {
+                    // Basic filter for typical dividend confusion (most FIIs are > 5 BRL)
+                    // If user has a split stock, this might be false positive, but safe for now to avoid 0.10 price
+                    if (val > 0.5) { 
+                        cleanData[key] = val;
+                    }
                 }
             });
             return { data: cleanData, stats };

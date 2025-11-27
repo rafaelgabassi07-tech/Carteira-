@@ -504,8 +504,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const liveData = (sourceMarketData as Record<string, any>)[ticker.toUpperCase()] || {};
             const cacheKey = `${ticker}_${endOfMonthISO}`;
             
+            // 1. Tenta pegar do histórico OFICIAL da Brapi
             let historicalPrice = getClosestPrice(liveData.priceHistory || [], endOfMonthISO);
             
+            // 2. Se não achar, tenta do cache persistente do Gemini
             if (historicalPrice === null) {
                 historicalPrice = historicalPriceCache[cacheKey] || null;
             }
@@ -513,8 +515,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (historicalPrice !== null) {
                 lastKnownPrices[ticker] = historicalPrice;
             } else if (lastKnownPrices[ticker]) {
+                // 3. Fallback para o último preço conhecido se o mês atual não tiver dado ainda
                 historicalPrice = lastKnownPrices[ticker];
             } else {
+                // 4. Se nunca viu o preço, agenda busca no Gemini e usa o preço médio como placeholder temporário
                 missingPrices.push({ ticker, date: endOfMonthISO });
                 historicalPrice = (holdings.quantity > 0 ? holdings.totalCost / holdings.quantity : 0);
             }

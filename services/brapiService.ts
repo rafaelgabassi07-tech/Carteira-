@@ -1,3 +1,4 @@
+
 import type { AppPreferences, DividendHistoryEvent } from '../types';
 
 interface BrapiHistoricalData {
@@ -91,9 +92,10 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
             }
         };
         
-        success = await fetchData('1y');
+        // Tenta buscar 5 anos primeiro para garantir cobertura máxima de evolução
+        success = await fetchData('5y');
+        if (!success) { await delay(200); success = await fetchData('1y'); }
         if (!success) { await delay(200); success = await fetchData('3mo'); }
-        if (!success) { await delay(200); success = await fetchData('5d'); }
         
         // Fallback for current price only
         if (!success) {
