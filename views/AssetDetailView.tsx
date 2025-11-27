@@ -89,13 +89,42 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         return dividends.filter(d => d.ticker === asset?.ticker).sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
     }, [dividends, asset?.ticker]);
 
+    const displayedDividends = useMemo(() => {
+        return showAllHistory ? assetDividends : assetDividends.slice(0, 3);
+    }, [assetDividends, showAllHistory]);
+
+    // --- Dividends Metrics Calculation ---
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(currentYear - 1);
+
     const totalDividends = useMemo(() => {
         return assetDividends.reduce((acc, div) => acc + (div.amountPerShare * div.quantity), 0);
     }, [assetDividends]);
 
-    const displayedDividends = useMemo(() => {
-        return showAllHistory ? assetDividends : assetDividends.slice(0, 3);
-    }, [assetDividends, showAllHistory]);
+    const totalYTD = useMemo(() => {
+        return assetDividends
+            .filter(d => new Date(d.paymentDate).getFullYear() === currentYear)
+            .reduce((acc, div) => acc + (div.amountPerShare * div.quantity), 0);
+    }, [assetDividends, currentYear]);
+
+    const totalL12M = useMemo(() => {
+        return assetDividends
+            .filter(d => new Date(d.paymentDate) >= oneYearAgo)
+            .reduce((acc, div) => acc + (div.amountPerShare * div.quantity), 0);
+    }, [assetDividends, oneYearAgo]);
+
+    const averageMonthly = totalL12M / 12;
+
+    // Real Yield: Sum of per-share amounts L12M / Current Price
+    const dyReal = useMemo(() => {
+        if (!asset || asset.currentPrice <= 0) return 0;
+        const sumPerShareL12M = assetDividends
+            .filter(d => new Date(d.paymentDate) >= oneYearAgo)
+            .reduce((acc, div) => acc + div.amountPerShare, 0); // Note: Logic might need to check unique ex-dates for precise per-share sum if multiple payments per month
+        return (sumPerShareL12M / asset.currentPrice) * 100;
+    }, [asset, assetDividends, oneYearAgo]);
 
 
     // Only show error/not found if we aren't refreshing AND have no asset data
@@ -274,12 +303,30 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                 {/* Interactive Chart */}
                                 <DividendChart data={asset.dividendsHistory} />
 
-                                {/* Total Received Card */}
-                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                                    <div className="flex justify-between items-center">
-                                        <p className="font-bold text-[var(--text-secondary)] uppercase text-xs tracking-wider">{t('total_dividends_received')}</p>
-                                        <p className="font-bold text-2xl text-[var(--green-text)]">{formatCurrency(totalDividends)}</p>
+                                {/* Detailed Summary Grid */}
+                                <div className="grid grid-cols-2 gap-3 animate-fade-in-up">
+                                    <div className="col-span-2 bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] flex justify-between items-center shadow-sm">
+                                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('total_accumulated')}</span>
+                                        <span className="text-xl font-bold text-[var(--green-text)]">{formatCurrency(totalDividends)}</span>
                                     </div>
+                                    
+                                    <MetricItem 
+                                        label={t('total_year', { year: currentYear })}
+                                        value={formatCurrency(totalYTD)}
+                                        className="bg-[var(--bg-secondary)]"
+                                    />
+                                    <MetricItem 
+                                        label={t('monthly_average_12m')}
+                                        value={formatCurrency(averageMonthly)}
+                                        className="bg-[var(--bg-secondary)]"
+                                    />
+                                    <MetricItem 
+                                        label={t('real_yield_12m')}
+                                        value={dyReal.toFixed(2)}
+                                        subValue="%"
+                                        highlight={dyReal > 10 ? 'green' : 'neutral'}
+                                        className="bg-[var(--bg-secondary)] col-span-2"
+                                    />
                                 </div>
 
                                 {/* Recent / List Header */}

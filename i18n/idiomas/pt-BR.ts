@@ -64,6 +64,10 @@ export const ptBR = {
     view_full_history: 'Ver histórico completo',
     show_less: 'Mostrar menos',
     dividend_history_chart: 'Evolução de Proventos',
+    total_accumulated: 'Total Acumulado',
+    total_year: 'Total {{year}}',
+    monthly_average_12m: 'Média Mensal (12m)',
+    real_yield_12m: 'Yield Real (12m)',
 
     // Transactions View
     edit_transaction: 'Editar Transação',
