@@ -82,6 +82,11 @@ export interface ToastMessage {
   id: number;
   message: string;
   type: 'success' | 'error' | 'info';
+  action?: {
+      label: string;
+      onClick: () => void;
+  };
+  duration?: number; // 0 = infinite
 }
 
 export type NotificationType = 'dividend' | 'price' | 'news';

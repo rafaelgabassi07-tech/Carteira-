@@ -38,7 +38,7 @@ const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: strin
 );
 
 
-const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdateModal: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; activeScreen?: MenuScreen; }> = ({ setScreen, onShowUpdateModal, addToast, activeScreen }) => {
+const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdateModal: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; activeScreen?: MenuScreen; updateAvailable?: boolean; }> = ({ setScreen, onShowUpdateModal, addToast, activeScreen, updateAvailable }) => {
     const { t } = useI18n();
     const { userProfile, resetApp } = usePortfolio();
 
@@ -136,9 +136,13 @@ const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdate
             </div>
 
              <div className="p-2 space-y-2">
-                <button onClick={onShowUpdateModal} className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-3 rounded-lg hover:bg-[var(--bg-tertiary-hover)] transition-colors">
+                <button 
+                    onClick={onShowUpdateModal} 
+                    className={`w-full flex items-center justify-center gap-2 text-center text-xs font-bold p-3 rounded-lg transition-colors ${updateAvailable ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                >
                     <UpdateIcon className="w-4 h-4" />
                     {t('check_for_update')}
+                    {updateAvailable && <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse ml-1"></span>}
                 </button>
                 <button onClick={resetApp} className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold text-red-500/80 hover:text-red-500 p-3 rounded-lg hover:bg-red-500/10 transition-colors">
                     <LogoutIcon className="w-4 h-4" />

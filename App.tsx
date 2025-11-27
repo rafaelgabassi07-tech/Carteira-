@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
@@ -12,6 +11,7 @@ import { useI18n } from './contexts/I18nContext';
 import { isLowEndDevice } from './utils';
 import type { MenuScreen } from './views/SettingsView';
 import MainMenu from './components/settings/MainMenu';
+import DownloadIcon from './components/icons/DownloadIcon';
 
 // Lazy Load Views
 const PortfolioView = React.lazy(() => import('./views/PortfolioView'));
@@ -38,13 +38,45 @@ const App: React.FC = () => {
   const lastVisibleTimestamp = useRef(Date.now());
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
   
-  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
-    const newToast: ToastMessage = { id: Date.now(), message, type };
+  // SW Update State
+  const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  
+  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
+    const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
     setToast(newToast);
-    setTimeout(() => {
-      setToast(t => (t?.id === newToast.id ? null : t));
-    }, 3000);
+    if (duration > 0) {
+        setTimeout(() => {
+            setToast(t => (t?.id === newToast.id ? null : t));
+        }, duration);
+    }
   }, []);
+
+  // --- SW Update Logic ---
+  const applyUpdate = useCallback(() => {
+      if (swRegistration && swRegistration.waiting) {
+          addToast(t('installing_update'), 'info');
+          swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          setSwRegistration(null);
+      }
+  }, [swRegistration, addToast, t]);
+
+  useEffect(() => {
+      const handleSWUpdate = (e: Event) => {
+          const detail = (e as CustomEvent).detail as ServiceWorkerRegistration;
+          setSwRegistration(detail);
+          // Show persistent toast
+          addToast(
+              t('new_version_available'), 
+              'info', 
+              { label: t('download_update'), onClick: applyUpdate }, 
+              0 // Infinite duration
+          );
+      };
+
+      window.addEventListener('sw-update-available', handleSWUpdate);
+      return () => window.removeEventListener('sw-update-available', handleSWUpdate);
+  }, [addToast, applyUpdate, t]);
+
 
   // Responsive & Theme Handlers
   useEffect(() => {
@@ -127,7 +159,7 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'carteira': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
       case 'noticias': return <NewsView addToast={addToast} />;
-      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
+      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} onUpdateApp={applyUpdate} updateAvailable={!!swRegistration} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
       case 'analise': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
@@ -140,7 +172,6 @@ const App: React.FC = () => {
       return <Suspense fallback={<LoadingSpinner />}><PinLockScreen onUnlock={() => setIsLocked(false)} correctPin={preferences.appPin!} allowBiometrics={!!localStorage.getItem('biometric-credential-id')} /></Suspense>;
   }
 
-  // CSS Grid Layout ensures Desktop Sidebar is respected properly
   return (
     <ErrorBoundary>
       <div className="h-screen w-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden grid grid-cols-1 lg:grid-cols-[var(--sidebar-width)_1fr] transition-all duration-300">
@@ -156,7 +187,7 @@ const App: React.FC = () => {
         {isMobileLandscape && (
             <div className="fixed left-0 top-0 bottom-0 w-64 z-30 bg-[var(--bg-secondary)] border-r border-[var(--border-color)] overflow-y-auto">
                  <div className="p-4">
-                    <MainMenu setScreen={(s) => { setActiveView('settings'); setSettingsStartScreen(s); }} addToast={addToast} onShowUpdateModal={() => {}} />
+                    <MainMenu setScreen={(s) => { setActiveView('settings'); setSettingsStartScreen(s); }} addToast={addToast} onShowUpdateModal={() => {}} updateAvailable={!!swRegistration} />
                 </div>
             </div>
         )}
@@ -177,7 +208,7 @@ const App: React.FC = () => {
            <BottomNav activeView={activeView} setActiveView={handleSetView} />
         </div>
 
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
       </div>
     </ErrorBoundary>
   );

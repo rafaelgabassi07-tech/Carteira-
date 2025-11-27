@@ -1,4 +1,4 @@
-const CACHE_NAME = 'invest-portfolio-cache-v1.6.2';
+const CACHE_NAME = 'invest-portfolio-cache-v1.6.3';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -23,11 +23,16 @@ self.addEventListener('fetch', event => {
         if (response) {
           return response;
         }
-        // Stale-while-revalidate strategy for other requests could be implemented here
         return fetch(event.request);
-      }
-    )
+      })
   );
+});
+
+// Listener para ativar a atualização apenas quando o usuário solicitar
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', event => {

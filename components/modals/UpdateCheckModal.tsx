@@ -4,6 +4,7 @@ import { useI18n } from '../../contexts/I18nContext';
 import { vibrate } from '../../utils';
 import RocketIcon from '../icons/RocketIcon';
 import MessageSquareIcon from '../icons/MessageSquareIcon';
+import DownloadIcon from '../icons/DownloadIcon';
 
 // --- Icons ---
 const CheckCircleIcon = ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
@@ -70,43 +71,37 @@ const ChangelogCard: React.FC<{
 };
 
 // --- Main Modal Component ---
-const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const UpdateCheckModal: React.FC<{ onClose: () => void; updateAvailable?: boolean; onUpdate?: () => void }> = ({ onClose, updateAvailable, onUpdate }) => {
     const { t } = useI18n();
-    const [checking, setChecking] = useState(true);
+    const [checking, setChecking] = useState(!updateAvailable);
 
     useEffect(() => {
-        const timer = setTimeout(() => setChecking(false), 1200);
-        return () => clearTimeout(timer);
-    }, []);
+        if (!updateAvailable) {
+            const timer = setTimeout(() => setChecking(false), 1200);
+            return () => clearTimeout(timer);
+        } else {
+            setChecking(false);
+        }
+    }, [updateAvailable]);
 
     const changelogData = [
         {
-            version: 'changelog_version_title_1_6_0',
+            version: 'changelog_version_title_1_6_3',
             isLatest: true,
             devNote: { title: 'dev_note_title', content: 'dev_note_content' },
+            sections: [
+                { titleKey: 'changelog_news_title_1_6_3', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_3' },
+            ]
+        },
+        {
+            version: 'changelog_version_title_1_6_0',
+            isLatest: false,
             sections: [
                 { titleKey: 'changelog_news_title_1_6_0', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_6_0' },
                 { titleKey: 'changelog_improvements_title_1_6_0', color: 'text-purple-400', icon: <WrenchIcon className="w-5 h-5"/>, itemsKey: 'changelog_improvements_items_1_6_0' },
                 { titleKey: 'changelog_fixes_title_1_6_0', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_fixes_items_1_6_0' }
             ]
-        },
-        {
-            version: 'changelog_version_title_1_5_0',
-            isLatest: false,
-            sections: [
-                { titleKey: 'changelog_news_title_1_5_0', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_5_0' },
-                { titleKey: 'changelog_improvements_title_1_5_0', color: 'text-purple-400', icon: <WrenchIcon className="w-5 h-5"/>, itemsKey: 'changelog_improvements_items_1_5_0' },
-                { titleKey: 'changelog_fixes_title_1_5_0', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_fixes_items_1_5_0' }
-            ]
-        },
-        {
-            version: 'changelog_version_title_1_4_3',
-            isLatest: false,
-            sections: [
-                { titleKey: 'changelog_news_title_1_4_3', color: 'text-sky-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_4_3' },
-                { titleKey: 'changelog_fixes_title_1_4_3', color: 'text-emerald-400', icon: <BugIcon className="w-5 h-5"/>, itemsKey: 'changelog_fixes_items_1_4_3' }
-            ]
-        },
+        }
     ];
 
     return (
@@ -124,14 +119,26 @@ const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     </div>
                 ) : (
                     <>
-                        <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-6 border border-[var(--border-color)] flex items-center gap-3 animate-fade-in-up">
-                            <div className="w-12 h-12 flex-shrink-0 bg-[var(--accent-color)]/10 rounded-full flex items-center justify-center text-[var(--accent-color)]">
-                                <CheckCircleIcon className="w-7 h-7" />
+                        <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-6 border border-[var(--border-color)] flex flex-col md:flex-row md:items-center gap-4 animate-fade-in-up">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-12 h-12 flex-shrink-0 ${updateAvailable ? 'bg-amber-500/10 text-amber-500' : 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'} rounded-full flex items-center justify-center`}>
+                                    {updateAvailable ? <DownloadIcon className="w-6 h-6" /> : <CheckCircleIcon className="w-7 h-7" />}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg">{updateAvailable ? t('new_version_available') : t('you_are_up_to_date')}</h3>
+                                    <p className="text-xs text-[var(--text-secondary)]">{t('version')} {updateAvailable ? '1.6.3' : '1.6.3'} • {t('channel_stable')}</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="font-bold text-lg">{t('you_are_up_to_date')}</h3>
-                                <p className="text-xs text-[var(--text-secondary)]">{t('version')} 1.6.0 • {t('channel_stable')}</p>
-                            </div>
+                            
+                            {updateAvailable && onUpdate && (
+                                <button 
+                                    onClick={() => { vibrate(); onUpdate(); }}
+                                    className="w-full md:w-auto ml-auto bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <DownloadIcon className="w-4 h-4" />
+                                    {t('update_available_action')}
+                                </button>
+                            )}
                         </div>
 
                         <div className="flex-1 overflow-y-auto pr-1 no-scrollbar pb-safe space-y-3">

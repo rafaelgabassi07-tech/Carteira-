@@ -180,6 +180,34 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
   }, [isRefreshing, lastSync, sourceTransactions, preferences, setMarketData, setLastSync, logApiUsage]);
 
+  // --- Auto Refresh Logic (Market Hours) ---
+  useEffect(() => {
+      const checkAndRefresh = () => {
+          const now = new Date();
+          const day = now.getDay(); // 0 = Sun, 6 = Sat
+          const hour = now.getHours();
+          
+          // B3 Market Hours: Mon-Fri (1-5), approx 10:00 to 18:00
+          const isWeekDay = day >= 1 && day <= 5;
+          const isMarketHours = hour >= 10 && hour < 18;
+          
+          const isVisible = document.visibilityState === 'visible';
+          const isOnline = navigator.onLine;
+
+          if (isWeekDay && isMarketHours && isVisible && isOnline) {
+              // Trigger silent refresh
+              refreshMarketData(true, true);
+          }
+      };
+
+      // Check every 10 minutes (600,000 ms)
+      const intervalId = setInterval(checkAndRefresh, 10 * 60 * 1000);
+
+      // Clean up interval on unmount
+      return () => clearInterval(intervalId);
+  }, [refreshMarketData]);
+
+
   const refreshSingleAsset = useCallback(async (ticker: string, force = false) => {
       if(!ticker) return;
       const now = Date.now();
