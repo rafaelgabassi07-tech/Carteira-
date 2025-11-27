@@ -22,16 +22,17 @@ const NavItem: React.FC<{
 }> = ({ label, icon, isActive, onClick }) => {
   const activeClass = isActive ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)] opacity-70';
   
-  // New Flexbox Layout to prevent overlap
   return (
     <button
       onClick={onClick}
-      className={`bottom-nav-item flex flex-col items-center justify-end w-full h-full pt-2 pb-1 transform transition-all duration-200 active:scale-95 ${activeClass}`}
+      className={`relative flex items-center justify-center w-full h-full transition-colors duration-200 group active:scale-95 focus:outline-none ${activeClass}`}
     >
-      <div className={`transition-transform duration-200 ease-in-out ${isActive ? '-translate-y-1' : 'translate-y-2'}`}>
+      <div className={`transition-transform duration-300 ease-in-out ${isActive ? '-translate-y-2' : 'translate-y-0'}`}>
         {React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6' })}
       </div>
-      <span className={`text-[10px] font-medium tracking-wide transition-all duration-200 ease-in-out mt-1 ${isActive ? 'opacity-100' : 'opacity-0 h-0'}`}>
+      <span 
+        className={`absolute bottom-1 text-[10px] font-bold tracking-wide transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0'}`}
+      >
           {label}
       </span>
     </button>
