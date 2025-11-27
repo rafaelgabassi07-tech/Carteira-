@@ -313,16 +313,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [assets, sourceTransactions, sourceMarketData, getQuantityOnDate]);
 
 
-  // --- Portfolio Evolution Calculation (Strictly Market Value vs Invested) ---
+  // --- Portfolio Evolution Calculation (Strictly Market Value vs Invested - Last 30 Days) ---
   const portfolioEvolution = useMemo((): SegmentEvolutionData => {
       const points: PortfolioEvolutionPoint[] = [];
       const today = new Date();
       
-      // Generate dates for the last 12 months
+      // Generate dates for the last 30 days (Daily)
       const checkDates: Date[] = [];
-      for(let i=12; i>=0; i--) {
-          const d = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
-          checkDates.push(d > today ? today : d);
+      for(let i=29; i>=0; i--) { // 0 to 29 = 30 days
+          const d = new Date();
+          d.setDate(today.getDate() - i);
+          checkDates.push(d);
       }
       const uniqueDates = Array.from(new Set(checkDates.map(d => d.toISOString().split('T')[0]))).sort();
       const sortedTx = [...sourceTransactions].sort((a,b) => a.date.localeCompare(b.date));
@@ -364,8 +365,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
           });
 
+          // Use specific date object for formatting to avoid timezone shifts
+          const dateObj = new Date(dateStr + 'T12:00:00');
           points.push({ 
-              month: new Date(dateStr).toLocaleDateString('pt-BR', {month:'short', year:'2-digit'}),
+              month: dateObj.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'}),
               invested: Math.max(0, invested), 
               marketValue: marketVal,
               cumulativeDividends: 0 // Disabled as per user request

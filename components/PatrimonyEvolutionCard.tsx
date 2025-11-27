@@ -6,12 +6,12 @@ import EvolutionChart from './EvolutionChart';
 import CountUp from './CountUp';
 import TrendingUpIcon from './icons/TrendingUpIcon';
 
-type Period = '6m' | '1y' | 'all';
+type Period = '7d' | '15d' | '30d';
 
 const PatrimonyEvolutionCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
     const { portfolioEvolution, assets, privacyMode } = usePortfolio();
-    const [period, setPeriod] = useState<Period>('1y');
+    const [period, setPeriod] = useState<Period>('30d');
 
     // Calculate Current Metrics (Pure Capital Gain Focus)
     const currentMetrics = useMemo(() => {
@@ -28,13 +28,13 @@ const PatrimonyEvolutionCard: React.FC = () => {
         const data = portfolioEvolution.all_types || [];
         if (data.length === 0) return [];
         
-        const totalMonths = data.length;
-        let sliceCount = totalMonths;
+        const totalDays = data.length;
+        let sliceCount = totalDays;
         
-        if (period === '6m') sliceCount = 6;
-        if (period === '1y') sliceCount = 12;
+        if (period === '7d') sliceCount = 7;
+        if (period === '15d') sliceCount = 15;
         
-        return data.slice(Math.max(totalMonths - sliceCount, 0));
+        return data.slice(Math.max(totalDays - sliceCount, 0));
     }, [portfolioEvolution, period]);
 
     return (
@@ -72,13 +72,13 @@ const PatrimonyEvolutionCard: React.FC = () => {
 
                 {/* Period Filter */}
                 <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)] self-end md:self-center shrink-0">
-                    {(['6m', '1y', 'all'] as Period[]).map((p) => (
+                    {(['7d', '15d', '30d'] as Period[]).map((p) => (
                         <button
                             key={p}
                             onClick={() => setPeriod(p)}
                             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${period === p ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                         >
-                            {p === 'all' ? 'Máx' : p === '6m' ? '6M' : '1A'}
+                            {p.toUpperCase()}
                         </button>
                     ))}
                 </div>
