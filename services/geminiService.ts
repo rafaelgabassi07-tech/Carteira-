@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
 function getGeminiApiKey(prefs: AppPreferences): string {
@@ -40,6 +40,8 @@ function getDomain(url: string): string {
         if (domain.includes('fiis.com.br')) return 'FIIs.com.br';
         if (domain.includes('moneytimes')) return 'Money Times';
         if (domain.includes('finance.yahoo')) return 'Yahoo Finance';
+        if (domain.includes('investidor10')) return 'Investidor 10';
+        if (domain.includes('statusinvest')) return 'StatusInvest';
         
         // Fix for Vertex AI / Google Grounding internal links
         if (domain.includes('vertexaisearch') || domain.includes('google.com')) return 'Google News';
@@ -228,7 +230,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       Para cada ticker, busque e retorne:
       1. "nextPaymentDate": A data de pagamento do PRÓXIMO dividendo (formato "YYYY-MM-DD"). Use null se não anunciado.
       2. "lastDividend": O valor do ÚLTIMO dividendo PAGO por cota. Use null se não encontrar.
-      3. "recentDividends": Um array com os 3 ÚLTIMOS anúncios de proventos. Ex: [{ "exDate": "...", "paymentDate": "...", "value": 0.10 }].
+      3. "recentDividends": Um array com os 3 ÚLTIMOS anúncios de proventos encontrados. Busque por "Histórico de dividendos [TICKER] StatusInvest" ou "Investidor10". Ex: [{ "exDate": "...", "paymentDate": "...", "value": 0.10 }].
       4. "assetType": A CLASSIFICAÇÃO MACRO do ativo. 
          - Regras de Classificação RIGOROSAS:
          - Se for um FII de Galpões, Shoppings, Lajes, Renda Urbana, Híbrido de Imóveis ou Varejo -> Classifique como "Tijolo". (Ex: GARE11, HGLG11, VISC11, HGRU11, ALZR11 são "Tijolo").
@@ -305,15 +307,29 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
     
     const formattedQueries = queries.map(q => `{"ticker": "${q.ticker}", "date": "${q.date}"}`).join(', ');
 
+    // Prompt aprimorado para usar fontes específicas (Investidor10, StatusInvest)
+    // e distinguir preço de fechamento de outros valores
     const prompt = `
-      You are a financial data API. For each ticker and date object in this JSON list: [${formattedQueries}], find the **closing price (cotação de fechamento)** on that specific date. 
-      
-      IMPORTANT:
-      1. Use Google Search to find the exact historical close price.
-      2. If the date was a weekend or holiday, find the closing price of the **nearest previous trading day**.
-      3. Return ONLY a single valid JSON object.
-      4. The keys of the JSON object MUST be the composite string 'TICKER_YYYY-MM-DD' exactly as requested.
-      5. The value MUST be a number.
+      You are a precise financial data assistant.
+      Task: Find the EXACT historical closing price (cotação de fechamento) for the following Brazilian assets on the specific dates.
+
+      Input JSON List: [${formattedQueries}]
+
+      SEARCH INSTRUCTIONS:
+      1. USE GOOGLE SEARCH.
+      2. **PRIORITIZE DATA FROM: "Investidor 10" (investidor10.com.br) or "StatusInvest" (statusinvest.com.br).**
+      3. Perform specific searches like: "Cotação fechamento [TICKER] dia [DATE] investidor 10".
+      4. If the specific date was a weekend or holiday, find the closing price of the **nearest previous business day**.
+
+      VALIDATION RULES:
+      - The value MUST be the Stock/Fund Price (e.g., ~10.50, ~120.00).
+      - DO NOT return the dividend value (e.g., 0.10) or the daily variation percentage.
+      - DO NOT return 0 unless the asset did not exist.
+
+      OUTPUT FORMAT:
+      - Return ONLY a single valid JSON object.
+      - Keys: The composite string 'TICKER_YYYY-MM-DD' exactly as requested.
+      - Values: Number (The closing price).
     `;
     const bytesSent = new Blob([prompt]).size;
 
@@ -323,7 +339,7 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                temperature: 0,
+                temperature: 0, // Temperature 0 for maximum determinism
             }
         });
 
