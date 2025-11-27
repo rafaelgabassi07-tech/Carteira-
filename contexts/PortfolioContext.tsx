@@ -4,7 +4,7 @@ import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Di
 import { fetchAdvancedAssetData, fetchHistoricalPrices } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { usePersistentState, CacheManager, fromISODate, calculatePortfolioMetrics, getClosestPrice, applyThemeToDocument } from '../utils';
-import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS } from '../constants';
+import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME } from '../constants';
 
 // --- Types ---
 interface PortfolioContextType {
@@ -34,7 +34,7 @@ interface PortfolioContextType {
   updateUserProfile: (profile: Partial<UserProfile>) => void;
   refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
   refreshAllData: () => Promise<void>;
-  refreshSingleAsset: (ticker: string) => Promise<void>;
+  refreshSingleAsset: (ticker: string, force?: boolean) => Promise<void>;
   getAssetByTicker: (ticker: string) => Asset | undefined;
   getAveragePriceForTransaction: (transaction: Transaction) => number;
   setDemoMode: (enabled: boolean) => void;
@@ -168,6 +168,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const refreshMarketData = useCallback(async (force = false, silent = false) => {
     if (isRefreshing) return;
+    // Global throttle for bulk update
     if (!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return;
 
     const uniqueTickers = Array.from(new Set(sourceTransactions.map((t: Transaction) => t.ticker))) as string[];
@@ -177,6 +178,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setMarketDataError(null);
     
     let hasError = false;
+    const now = Date.now();
     
     try {
         const [brapiResult, geminiResult] = await Promise.allSettled([
@@ -190,7 +192,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (brapiResult.status === 'fulfilled') {
                 logApiUsage('brapi', { requests: uniqueTickers.length, bytesReceived: brapiResult.value.stats.bytesReceived });
                 Object.keys(brapiResult.value.quotes).forEach(ticker => {
-                    updated[ticker] = { ...(updated[ticker] || {}), ...brapiResult.value.quotes[ticker] };
+                    updated[ticker] = { 
+                        ...(updated[ticker] || {}), 
+                        ...brapiResult.value.quotes[ticker],
+                        lastUpdated: now 
+                    };
                 });
             } else {
                 console.error("Brapi Error:", brapiResult.reason);
@@ -201,7 +207,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (geminiResult.status === 'fulfilled') {
                  logApiUsage('gemini', { requests: 1, ...geminiResult.value.stats });
                  Object.keys(geminiResult.value.data).forEach(ticker => {
-                    updated[ticker] = { ...(updated[ticker] || {}), ...geminiResult.value.data[ticker] };
+                    updated[ticker] = { 
+                        ...(updated[ticker] || {}), 
+                        ...geminiResult.value.data[ticker],
+                        lastUpdated: now
+                    };
                 });
             } else {
                 console.error("Gemini Error:", geminiResult.reason);
@@ -210,7 +220,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return updated;
         });
 
-        if (!hasError) setLastSync(Date.now());
+        if (!hasError) setLastSync(now);
 
     } catch (error: any) {
         console.error("Market data refresh critical failure:", error);
@@ -245,8 +255,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [isRefreshing, refreshMarketData, setLastSync, setHistoricalPriceCache]);
 
-  const refreshSingleAsset = useCallback(async (ticker: string) => {
+  const refreshSingleAsset = useCallback(async (ticker: string, force = false) => {
     if (!ticker) return;
+    
+    // Stale-While-Revalidate Logic
+    const currentData = marketData[ticker.toUpperCase()];
+    const now = Date.now();
+    const isStale = !currentData || !currentData.lastUpdated || (now - currentData.lastUpdated > STALE_TIME.PRICES);
+
+    // If data is fresh and not forced, skip API call
+    if (!force && !isStale) {
+        return;
+    }
+
     try {
         const { quotes, stats: brapiStats } = await fetchBrapiQuotes(preferences, [ticker]);
         logApiUsage('brapi', { requests: 1, bytesReceived: brapiStats.bytesReceived });
@@ -256,10 +277,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         setMarketData(prev => {
             const updated = { ...prev };
-            updated[ticker] = { 
-                ...(prev[ticker] || {}), 
-                ...quotes[ticker], 
-                ...advancedData[ticker] 
+            updated[ticker.toUpperCase()] = { 
+                ...(prev[ticker.toUpperCase()] || {}), 
+                ...(quotes[ticker.toUpperCase()] || {}), 
+                ...(advancedData[ticker.toUpperCase()] || {}),
+                lastUpdated: now
             };
             return updated;
         });
@@ -267,7 +289,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setMarketDataError(error.message);
         throw error;
     }
-  }, [preferences, setMarketData, logApiUsage]);
+  }, [preferences, setMarketData, logApiUsage, marketData]);
 
   const assets = useMemo((): Asset[] => {
     const portfolioMetrics = calculatePortfolioMetrics(sourceTransactions);

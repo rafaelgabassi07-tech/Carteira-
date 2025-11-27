@@ -123,7 +123,7 @@ const NewsCardSkeleton: React.FC = () => (
 
 const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
-  const { assets, preferences } = usePortfolio();
+  const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -197,9 +197,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           sources: currentSource
       };
 
-      const articles = await fetchMarketNews(preferences, filter);
-      setNews(articles);
-      if(articles.length > 0) CacheManager.set(filterKey, articles);
+      const { data: articles, stats } = await fetchMarketNews(preferences, filter);
+      if (stats && stats.bytesReceived > 0) {
+        logApiUsage('gemini', { requests: 1, ...stats });
+      }
+
+      setNews(articles || []);
+      if(articles && articles.length > 0) CacheManager.set(filterKey, articles);
 
     } catch (err: any) {
       setError(err.message || t('unknown_error'));
@@ -207,7 +211,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setLoading(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, addToast, preferences]);
+  }, [t, assetTickers, addToast, preferences, logApiUsage]);
   
   // Create a debounced version of the load function for text inputs
   const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);

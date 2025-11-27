@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Type } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
@@ -89,12 +87,28 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       searchQuery = `Destaques Mercado FIIs IFIX notícias ${timeTerm}`;
   }
 
+  // Prompt otimizado para garantir que o modelo use o Grounding
   const prompt = `
     Você é um agregador de notícias de Fundos Imobiliários (FIIs).
-    Pesquise no Google sobre: "${searchQuery}".
-    Retorne 10 notícias REAIS e RECENTES (${timeTerm}).
-    NÃO INVENTE notícias. Use os dados do Grounding.
-    Retorne um array de objetos JSON com as seguintes chaves: "title", "source", "date" (YYYY-MM-DD), "summary" (1 frase), "url", "sentiment" ("Positive", "Neutral", "Negative").
+    Use a ferramenta Google Search para encontrar notícias REAIS sobre: "${searchQuery}".
+    
+    OBJETIVO: Retornar uma lista de notícias com URLs válidas encontradas na pesquisa.
+    
+    Formato de Resposta (JSON Array):
+    [
+      {
+        "title": "Título da notícia",
+        "source": "Fonte (ex: InfoMoney)",
+        "date": "YYYY-MM-DD",
+        "summary": "Resumo curto de 1 frase",
+        "url": "A URL EXATA do resultado da pesquisa",
+        "sentiment": "Positive" | "Neutral" | "Negative"
+      }
+    ]
+    
+    IMPORTANTE:
+    1. Use APENAS links retornados pela ferramenta de busca. Não invente URLs.
+    2. Se a notícia for muito antiga (mais de 30 dias), ignore.
   `;
   const bytesSent = new Blob([prompt]).size;
 
@@ -108,78 +122,81 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         }
       });
       
+      // Extração Crítica: Usar os metadados do Google Search Grounding
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const textResponse = response.text || "[]";
       const bytesReceived = new Blob([textResponse]).size;
       const stats = { bytesSent, bytesReceived };
       
       let articles: NewsArticle[] = [];
+      
+      // Tentar fazer o parse do JSON que o modelo gerou
       try {
         const jsonMatch = textResponse.match(/```(json)?([\s\S]*?)```/);
         const parsableText = jsonMatch ? jsonMatch[2] : textResponse;
-        articles = JSON.parse(parsableText);
+        const parsed = JSON.parse(parsableText);
+        if (Array.isArray(parsed)) articles = parsed;
       } catch (e) {
-          console.error("Failed to parse JSON from Gemini:", textResponse, e);
-          articles = [];
+          console.warn("JSON parse failed, falling back to grounding chunks strategy.");
       }
 
-      // --- PIPELINE DE RECUPERAÇÃO E CORREÇÃO (FAIL-SAFE) ---
-      if (articles.length === 0 && groundingChunks.length > 0) {
-          console.log("Usando Fallback de Grounding Chunks");
-          const uniqueLinks = new Set();
-          articles = groundingChunks
-            .filter(c => c.web?.title && c.web?.uri)
-            .map(c => {
-                const url = c.web!.uri!;
-                if (uniqueLinks.has(url)) return null;
-                uniqueLinks.add(url);
-                
-                let title = c.web!.title!;
-                const separatorIndex = title.lastIndexOf(' - ');
-                if (separatorIndex > 10) title = title.substring(0, separatorIndex);
+      // --- ESTRATÉGIA HÍBRIDA DE VALIDAÇÃO DE LINKS ---
+      // O modelo pode alucinar URLs no JSON. Vamos corrigir isso cruzando com os Grounding Chunks.
+      
+      const validatedArticles: NewsArticle[] = [];
+      const usedUrls = new Set<string>();
 
-                if (title.includes('http') || title.includes('.com')) return null;
-
-                return {
-                    title: title,
-                    source: getDomain(url),
-                    url: url,
-                    date: new Date().toISOString(),
-                    summary: "Toque para ler a matéria completa na fonte original.",
-                    category: filter.category || 'FIIs',
-                    sentiment: 'Neutral' as const,
-                };
-            })
-            .filter((item): item is NewsArticle => item !== null);
-      }
-      else if (articles.length > 0) {
-          articles = articles.map(article => {
-              const matchedChunk = groundingChunks.find(c => 
-                  c.web?.uri === article.url || 
+      // 1. Prioridade: Artigos gerados pelo modelo que possuem correspondência nos Chunks
+      if (articles.length > 0 && groundingChunks.length > 0) {
+          articles.forEach(article => {
+              // Tenta encontrar um chunk que tenha a mesma URL ou Título similar
+              const match = groundingChunks.find(c => 
+                  (c.web?.uri === article.url) || 
                   (c.web?.title && article.title && c.web.title.includes(article.title.substring(0, 15)))
               );
 
-              const realUrl = matchedChunk?.web?.uri || article.url;
-              const cleanSource = getDomain(realUrl || '');
-              
-              if (article.title && (article.title.includes(cleanSource) || article.title.includes('.com'))) {
-                  if (matchedChunk?.web?.title) {
-                      article.title = matchedChunk.web.title;
+              if (match && match.web?.uri) {
+                  if (!usedUrls.has(match.web.uri)) {
+                      usedUrls.add(match.web.uri);
+                      validatedArticles.push({
+                          ...article,
+                          url: match.web.uri, // Força o uso da URL real do Google
+                          source: getDomain(match.web.uri),
+                          title: match.web.title || article.title // Prefere o título real se disponível
+                      });
                   }
               }
-
-              return {
-                  ...article,
-                  url: realUrl,
-                  source: article.source || cleanSource,
-                  date: article.date || new Date().toISOString(),
-                  sentiment: article.sentiment || 'Neutral',
-                  summary: article.summary || "Acesse para ler os detalhes."
-              };
           });
       }
 
-      return { data: articles.slice(0, 15), stats };
+      // 2. Fallback: Se a validação falhou ou retornou poucos itens, preencher com os Chunks brutos
+      // Isso garante que SEMPRE teremos links funcionais, mesmo se o modelo errar o JSON.
+      if (validatedArticles.length < 5 && groundingChunks.length > 0) {
+          groundingChunks.forEach(chunk => {
+              if (chunk.web?.uri && chunk.web?.title && !usedUrls.has(chunk.web.uri)) {
+                  // Filtra links irrelevantes ou genéricos
+                  if (chunk.web.title.includes('http') || chunk.web.title.includes('.com')) return;
+                  
+                  usedUrls.add(chunk.web.uri);
+                  validatedArticles.push({
+                      title: chunk.web.title,
+                      source: getDomain(chunk.web.uri),
+                      url: chunk.web.uri,
+                      date: new Date().toISOString(), // Data aproximada
+                      summary: "Toque para ler a matéria completa na fonte original.",
+                      category: filter.category || 'FIIs',
+                      sentiment: 'Neutral',
+                  });
+              }
+          });
+      }
+
+      // Se ainda assim não tivermos nada (mas o JSON inicial era válido), usa o JSON (risco de link quebrado, mas melhor que nada)
+      if (validatedArticles.length === 0 && articles.length > 0) {
+          return { data: articles.slice(0, 15), stats };
+      }
+
+      return { data: validatedArticles.slice(0, 15), stats };
 
   } catch (error) {
       console.error("Erro busca notícias:", error);

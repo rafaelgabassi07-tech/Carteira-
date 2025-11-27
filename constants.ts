@@ -1,13 +1,21 @@
+
 import type { Asset, UserProfile, Transaction, Dividend, CalendarEvent, MonthlyIncome, DividendHistoryEvent, AppTheme, AppFont } from './types';
 
 // --- Cache Time-To-Live (TTLs) em Milissegundos ---
+// Cache Persistence (Quanto tempo fica no disco)
 const INFINITE_TTL = 100 * 365 * 24 * 60 * 60 * 1000;
 
 export const CACHE_TTL = {
     PRICES: INFINITE_TTL,
-    NEWS: INFINITE_TTL,
+    NEWS: 24 * 60 * 60 * 1000, // 24 horas para notícias no disco
     DIVIDENDS: INFINITE_TTL,
     CALENDAR: INFINITE_TTL,
+};
+
+// Stale Time (Quanto tempo consideramos os dados "frescos" antes de pedir novos)
+export const STALE_TIME = {
+    PRICES: 5 * 60 * 1000, // 5 Minutos
+    MARKET_DATA: 10 * 60 * 1000, // 10 Minutos para dados fundamentais
 };
 
 // --- FONTS ---
