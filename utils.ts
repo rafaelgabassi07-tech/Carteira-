@@ -1,3 +1,4 @@
+
 import { useState, useEffect, Dispatch, SetStateAction, useRef } from 'react';
 import type { Transaction, AppTheme } from './types';
 
@@ -180,9 +181,6 @@ export const urlSafeDecode = (encoded: string): string => {
     }
 };
 
-// --- FIX START ---
-// Added bufferEncode and bufferDecode for handling WebAuthn (biometrics) ArrayBuffer data.
-// This resolves import errors in PinLockScreen.tsx and SecuritySettings.tsx.
 // --- WebAuthn Buffer Encoding/Decoding for Biometrics ---
 export const bufferEncode = (buffer: ArrayBuffer): string => {
     const bytes = new Uint8Array(buffer);
@@ -203,7 +201,6 @@ export const bufferDecode = (base64: string): Uint8Array => {
     }
     return bytes;
 };
-// --- FIX END ---
 
 // --- Sistema de Cache ---
 interface CacheItem<T> {

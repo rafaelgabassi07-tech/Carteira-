@@ -12,6 +12,7 @@ import CountUp from '../components/CountUp';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import AssetListItem from '../components/AssetListItem';
 import Toast from '../components/Toast';
+import WalletIcon from '../components/icons/WalletIcon';
 
 // --- Local Components for Public View ---
 
@@ -119,6 +120,7 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
             }
             if (geminiRes.status === 'fulfilled') {
                 Object.entries(geminiRes.value.data).forEach(([tkr, data]) => {
+                    // Fix: Cast data to object to avoid "Spread types may only be created from object types"
                     newMarketData[tkr] = { ...(newMarketData[tkr] || {}), ...(data as object) };
                 });
             }
@@ -223,20 +225,26 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
     }
 
     return (
-        <div className="h-screen w-screen overflow-y-auto custom-scrollbar p-4 pb-8">
-            <header className="max-w-7xl mx-auto flex justify-between items-center py-3 px-4">
-                 <div>
-                    <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">{t('public_view_title')}</h1>
-                    <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('public_view_header')}</p>
+        <div className="h-screen w-screen overflow-y-auto custom-scrollbar p-4 pb-8 bg-[var(--bg-primary)]">
+            <header className="max-w-7xl mx-auto flex justify-between items-center py-4 px-4 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] mb-6 shadow-sm">
+                 <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-[var(--accent-color)] to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-[var(--accent-color)]/20">
+                        <WalletIcon className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="font-black text-xl text-[var(--text-primary)] tracking-tight leading-none">Invest</h1>
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mt-0.5">{t('public_view_header')}</p>
+                    </div>
                 </div>
                 <button 
                     onClick={refreshMarketData} 
                     disabled={isRefreshing}
-                    className="p-2 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)]"
+                    className="p-2 rounded-full bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-tertiary-hover)] transition-all active:scale-95 border border-[var(--border-color)]"
                 >
                     <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
             </header>
+            
             <main className="max-w-7xl mx-auto">
                 <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
                     <PublicPortfolioSummary 
