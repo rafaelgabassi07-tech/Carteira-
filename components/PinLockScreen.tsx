@@ -21,12 +21,22 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
 
         setIsBiometricScanning(true);
         try {
+            // Decodifica o ID salvo. Se falhar (corrompido), aborta silenciosamente.
+            let decodedId: Uint8Array;
+            try {
+                decodedId = bufferDecode(credentialId);
+            } catch (e) {
+                console.error("ID de credencial inválido:", e);
+                return;
+            }
+
             const credential = await navigator.credentials.get({
                 publicKey: {
-                    challenge: new Uint8Array(16), // Challenge should be random
+                    // Challenge deve ser aleatório para segurança e compatibilidade
+                    challenge: crypto.getRandomValues(new Uint8Array(32)),
                     allowCredentials: [{
                         type: 'public-key',
-                        id: bufferDecode(credentialId),
+                        id: decodedId,
                     }],
                     userVerification: 'required',
                 }
@@ -38,7 +48,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
             }
         } catch (err) {
             console.error("Biometric auth failed:", err);
-            // Fallback to PIN, no error toast needed
+            // Fallback to PIN
         } finally {
             setIsBiometricScanning(false);
         }

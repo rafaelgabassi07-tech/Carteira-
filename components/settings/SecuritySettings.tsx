@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
@@ -102,9 +103,14 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
 
                 const credential = await navigator.credentials.create({
                     publicKey: {
-                        challenge: new Uint8Array(16), // In a real app, this should be a random challenge from a server
+                        // Use crypto.getRandomValues for security
+                        challenge: crypto.getRandomValues(new Uint8Array(32)),
                         rp: { name: "Invest Portfolio" },
-                        user: { id: new Uint8Array(16), name: "user@invest.app", displayName: "User" },
+                        user: { 
+                            id: crypto.getRandomValues(new Uint8Array(16)), 
+                            name: "user@invest.app", 
+                            displayName: "User" 
+                        },
                         pubKeyCredParams: [{ type: "public-key", alg: -7 }], // ES256
                         authenticatorSelection: {
                             authenticatorAttachment: "platform",
