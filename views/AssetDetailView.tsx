@@ -145,6 +145,146 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const variation = currentValue - totalInvested;
     const variationPercent = totalInvested > 0 ? (variation / totalInvested) * 100 : 0;
 
+    const renderTabContent = () => {
+        switch (activeTab) {
+            case 'summary':
+                return (
+                    <div className="space-y-4">
+                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{t('current_position')}</p>
+                                    <p className="text-3xl font-bold text-[var(--text-primary)]">{formatCurrency(currentValue)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{t('result')}</p>
+                                    <div className={`text-lg font-bold flex items-center justify-end gap-1 ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                                        {variation >= 0 ? '+' : ''}{formatCurrency(variation)}
+                                    </div>
+                                    <span className={`text-xs font-semibold ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                                        ({variationPercent.toFixed(2)}%)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
+                             <div className="flex items-center gap-2 mb-4">
+                                <div className="p-2 bg-[var(--accent-color)]/10 rounded-lg text-[var(--accent-color)]">
+                                    <AnalysisIcon className="w-5 h-5" />
+                                </div>
+                                <h3 className="font-bold text-lg">{t('key_indicators')}</h3>
+                             </div>
+                             
+                             {!asset ? <IndicatorSkeleton /> : (
+                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    <MetricItem label={t('quantity')} value={asset.quantity} />
+                                    <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} />
+                                    <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} />
+                                    <MetricItem label="Total Investido" value={formatCurrency(asset.quantity * asset.avgPrice)} className="sm:col-span-1" />
+                                    <MetricItem label="Saldo Atual" value={formatCurrency(asset.quantity * asset.currentPrice)} highlight={variation >= 0 ? 'green' : 'red'} />
+                                    <MetricItem label={t('result')} value={formatCurrency(variation)} subValue={`(${variationPercent.toFixed(2)}%)`} highlight={variation >= 0 ? 'green' : 'red'} />
+                                    <div className="col-span-2 sm:col-span-3 mt-4 mb-1 flex items-center gap-2">
+                                        <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
+                                        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('nav_analysis')} & {t('data')}</span>
+                                        <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
+                                    </div>
+                                    <MetricItem label={t('dy_12m')} value={asset.dy?.toFixed(2) ?? '-'} subValue="%" highlight={asset.dy && asset.dy > 10 ? 'green' : undefined} />
+                                    <MetricItem label={t('yield_on_cost')} value={asset.yieldOnCost?.toFixed(2) ?? '-'} subValue="%" highlight={asset.yieldOnCost && asset.yieldOnCost > 8 ? 'green' : undefined} />
+                                    <MetricItem label={t('pvp')} value={asset.pvp?.toFixed(2) ?? '-'} highlight={asset.pvp && asset.pvp < 1.0 ? 'green' : (asset.pvp && asset.pvp > 1.2 ? 'red' : 'neutral')} />
+                                    <MetricItem label={t('vacancy')} value={asset.vacancyRate?.toFixed(1) ?? '0'} subValue="%" />
+                                    <MetricItem label={t('shareholders')} value={asset.shareholders ? (asset.shareholders/1000).toFixed(1) + 'k' : '-'} />
+                                    <MetricItem label={t('daily_liquidity')} value={asset.liquidity ? (asset.liquidity/1000000).toFixed(1) + 'M' : '-'} />
+                                </div>
+                             )}
+                        </div>
+                        <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3.5 rounded-xl shadow-lg shadow-[var(--accent-color)]/20 hover:shadow-[var(--accent-color)]/40 active:scale-[0.98] transition-all">
+                            {t('view_transactions')}
+                        </button>
+                    </div>
+                );
+            case 'history':
+                return (
+                    <div className="space-y-3 pb-4">
+                        {assetTransactions.length > 0 ? assetTransactions.map((tx, index) => (
+                            <div key={tx.id} className="bg-[var(--bg-secondary)] p-4 rounded-xl text-sm border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${index * 50}ms`}}>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className={`font-bold text-base mb-0.5 ${tx.type === 'Compra' ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{t(tx.type === 'Compra' ? 'buy' : 'sell')}</p>
+                                        <p className="text-xs text-[var(--text-secondary)] font-medium">{new Date(tx.date).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-bold text-[var(--text-primary)]">{formatCurrency(tx.quantity * tx.price)}</p>
+                                        <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{`${tx.quantity} × ${formatCurrency(tx.price)}`}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )) : <p className="text-sm text-center text-[var(--text-secondary)] py-12">{t('no_transactions_for_asset')}</p>}
+                    </div>
+                );
+            case 'dividends':
+                 return (
+                    <div className="space-y-4 pb-4">
+                        {asset?.dividendsHistory && asset.dividendsHistory.length > 0 ? (
+                            <>
+                                <DividendChart data={asset.dividendsHistory} />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="col-span-2 bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] flex justify-between items-center shadow-sm">
+                                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('total_accumulated')}</span>
+                                        <span className="text-xl font-bold text-[var(--green-text)]">{formatCurrency(totalDividends)}</span>
+                                    </div>
+                                    <MetricItem label={t('total_year', { year: currentYear })} value={formatCurrency(totalYTD)} className="bg-[var(--bg-secondary)]" />
+                                    <MetricItem label={t('monthly_average_12m')} value={formatCurrency(averageMonthly)} className="bg-[var(--bg-secondary)]" />
+                                    <MetricItem label={t('real_yield_12m')} value={dyReal.toFixed(2)} subValue="%" highlight={dyReal > 10 ? 'green' : 'neutral'} className="bg-[var(--bg-secondary)] col-span-2" />
+                                </div>
+                                <h3 className="font-bold text-sm text-[var(--text-secondary)] mt-2 px-1 uppercase tracking-wider">
+                                    {showAllHistory ? t('full_history') : t('recent_dividends')}
+                                </h3>
+                                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
+                                    {displayedDividends.map((div, index) => {
+                                        const historyItem = asset?.dividendsHistory?.find(h => h.paymentDate === div.paymentDate && Math.abs(h.value - div.amountPerShare) < 0.001);
+                                        const exDate = historyItem?.exDate;
+                                        return (
+                                            <div 
+                                                key={`${div.paymentDate}-${index}`} 
+                                                className={`p-4 flex justify-between items-center ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedHistoryItem === div.paymentDate ? 'bg-[var(--bg-tertiary-hover)]' : ''}`}
+                                                onClick={() => { setSelectedHistoryItem(div.paymentDate); vibrate(); }}
+                                            >
+                                                <div>
+                                                    <p className="font-bold text-sm text-[var(--text-primary)] mb-0.5">{new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        {exDate && (<span className="text-[10px] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">Com: {new Date(exDate).toLocaleDateString(locale, { day:'2-digit', month:'2-digit', timeZone: 'UTC' })}</span>)}
+                                                        {!exDate && <span className="text-[10px] text-[var(--text-secondary)]">{t('payment_date')}</span>}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.amountPerShare * div.quantity)}</p>
+                                                    <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">{div.quantity} × {formatCurrency(div.amountPerShare)}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                {!showAllHistory && assetDividends.length > 3 && (
+                                    <button onClick={() => { vibrate(); setShowAllHistory(true); }} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-secondary)] rounded-xl border border-dashed border-[var(--border-color)] transition-all">
+                                        {t('view_full_history')} ({assetDividends.length})
+                                    </button>
+                                )}
+                                {showAllHistory && (<button onClick={() => { vibrate(); setShowAllHistory(false); }} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">{t('show_less')}</button>)}
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-12 text-[var(--text-secondary)]">
+                                <div className="w-12 h-12 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-3 border border-[var(--border-color)] opacity-50"><span className="text-xl font-bold">$</span></div>
+                                <p className="text-sm font-medium">{t('no_dividends_for_asset')}</p>
+                            </div>
+                        )}
+                    </div>
+                );
+            default: return null;
+        }
+    }
+
+
     return (
         <div className="p-4 pb-20 landscape-pb-6">
             <div className="max-w-4xl mx-auto">
@@ -177,7 +317,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     >
                         {t('history')}
                     </button>
-                    <button
+                     <button
                         onClick={() => setActiveTab('dividends')}
                         className={`pb-2 px-4 text-sm font-bold transition-colors ${activeTab === 'dividends' ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
@@ -185,224 +325,9 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     </button>
                 </div>
                 
-                {activeTab === 'summary' && (
-                    <div className="space-y-4 animate-fade-in">
-                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{t('current_position')}</p>
-                                    <p className="text-3xl font-bold text-[var(--text-primary)]">{formatCurrency(currentValue)}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{t('result')}</p>
-                                    <div className={`text-lg font-bold flex items-center justify-end gap-1 ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                                        {variation >= 0 ? '+' : ''}{formatCurrency(variation)}
-                                    </div>
-                                    <span className={`text-xs font-semibold ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                                        ({variationPercent.toFixed(2)}%)
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up">
-                             <div className="flex items-center gap-2 mb-4">
-                                <div className="p-2 bg-[var(--accent-color)]/10 rounded-lg text-[var(--accent-color)]">
-                                    <AnalysisIcon className="w-5 h-5" />
-                                </div>
-                                <h3 className="font-bold text-lg">{t('key_indicators')}</h3>
-                             </div>
-                             
-                             {/* Stale-While-Revalidate: Show Skeleton ONLY if no asset data exists. Otherwise show stale data. */}
-                             {!asset ? <IndicatorSkeleton /> : (
-                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <MetricItem label={t('quantity')} value={asset.quantity} className="animate-fade-in-up" style={{animationDelay: '0ms'}}/>
-                                    <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} className="animate-fade-in-up" style={{animationDelay: '50ms'}}/>
-                                    <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} className="animate-fade-in-up" style={{animationDelay: '100ms'}}/>
-                                    
-                                    <MetricItem 
-                                        label="Total Investido" 
-                                        value={formatCurrency(asset.quantity * asset.avgPrice)} 
-                                        className="sm:col-span-1 animate-fade-in-up" style={{animationDelay: '150ms'}}
-                                    />
-                                    <MetricItem 
-                                        label="Saldo Atual" 
-                                        value={formatCurrency(asset.quantity * asset.currentPrice)} 
-                                        highlight={variation >= 0 ? 'green' : 'red'}
-                                        className="animate-fade-in-up" style={{animationDelay: '200ms'}}
-                                    />
-                                     <MetricItem 
-                                        label={t('result')} 
-                                        value={formatCurrency(variation)} 
-                                        subValue={`(${variationPercent.toFixed(2)}%)`}
-                                        highlight={variation >= 0 ? 'green' : 'red'}
-                                        className="animate-fade-in-up" style={{animationDelay: '250ms'}}
-                                    />
-
-                                    {/* Analysis Section Header */}
-                                    <div className="col-span-2 sm:col-span-3 mt-4 mb-1 flex items-center gap-2">
-                                        <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
-                                        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('nav_analysis')} & {t('data')}</span>
-                                        <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
-                                    </div>
-
-                                    <MetricItem 
-                                        label={t('dy_12m')} 
-                                        value={asset.dy?.toFixed(2) ?? '-'} 
-                                        subValue="%" 
-                                        highlight={asset.dy && asset.dy > 10 ? 'green' : undefined}
-                                        className="animate-fade-in-up" style={{animationDelay: '300ms'}}
-                                    />
-                                    <MetricItem 
-                                        label={t('yield_on_cost')} 
-                                        value={asset.yieldOnCost?.toFixed(2) ?? '-'} 
-                                        subValue="%" 
-                                        highlight={asset.yieldOnCost && asset.yieldOnCost > 8 ? 'green' : undefined}
-                                        className="animate-fade-in-up" style={{animationDelay: '350ms'}}
-                                    />
-                                    <MetricItem 
-                                        label={t('pvp')} 
-                                        value={asset.pvp?.toFixed(2) ?? '-'} 
-                                        highlight={asset.pvp && asset.pvp < 1.0 ? 'green' : (asset.pvp && asset.pvp > 1.2 ? 'red' : 'neutral')}
-                                        className="animate-fade-in-up" style={{animationDelay: '400ms'}}
-                                    />
-                                     <MetricItem label={t('vacancy')} value={asset.vacancyRate?.toFixed(1) ?? '0'} subValue="%" className="animate-fade-in-up" style={{animationDelay: '450ms'}}/>
-                                     <MetricItem label={t('shareholders')} value={asset.shareholders ? (asset.shareholders/1000).toFixed(1) + 'k' : '-'} className="animate-fade-in-up" style={{animationDelay: '500ms'}}/>
-                                     <MetricItem label={t('daily_liquidity')} value={asset.liquidity ? (asset.liquidity/1000000).toFixed(1) + 'M' : '-'} className="animate-fade-in-up" style={{animationDelay: '550ms'}}/>
-                                </div>
-                             )}
-                        </div>
-
-                        <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3.5 rounded-xl shadow-lg shadow-[var(--accent-color)]/20 hover:shadow-[var(--accent-color)]/40 active:scale-[0.98] transition-all">
-                            {t('view_transactions')}
-                        </button>
-                    </div>
-                )}
-                {activeTab === 'history' && (
-                    <div className="space-y-3 animate-fade-in pb-4">
-                        {assetTransactions.length > 0 ? assetTransactions.map((tx, index) => (
-                            <div key={tx.id} className="bg-[var(--bg-secondary)] p-4 rounded-xl text-sm border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${index * 50}ms`}}>
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className={`font-bold text-base mb-0.5 ${tx.type === 'Compra' ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{t(tx.type === 'Compra' ? 'buy' : 'sell')}</p>
-                                        <p className="text-xs text-[var(--text-secondary)] font-medium">{new Date(tx.date).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-[var(--text-primary)]">{formatCurrency(tx.quantity * tx.price)}</p>
-                                        <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{`${tx.quantity} × ${formatCurrency(tx.price)}`}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )) : <p className="text-sm text-center text-[var(--text-secondary)] py-12">{t('no_transactions_for_asset')}</p>}
-                    </div>
-                )}
-                {activeTab === 'dividends' && (
-                    <div className="space-y-4 animate-fade-in pb-4">
-                        {asset?.dividendsHistory && asset.dividendsHistory.length > 0 ? (
-                            <>
-                                {/* Interactive Chart */}
-                                <DividendChart data={asset.dividendsHistory} />
-
-                                {/* Detailed Summary Grid */}
-                                <div className="grid grid-cols-2 gap-3 animate-fade-in-up">
-                                    <div className="col-span-2 bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] flex justify-between items-center shadow-sm">
-                                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('total_accumulated')}</span>
-                                        <span className="text-xl font-bold text-[var(--green-text)]">{formatCurrency(totalDividends)}</span>
-                                    </div>
-                                    
-                                    <MetricItem 
-                                        label={t('total_year', { year: currentYear })}
-                                        value={formatCurrency(totalYTD)}
-                                        className="bg-[var(--bg-secondary)]"
-                                    />
-                                    <MetricItem 
-                                        label={t('monthly_average_12m')}
-                                        value={formatCurrency(averageMonthly)}
-                                        className="bg-[var(--bg-secondary)]"
-                                    />
-                                    <MetricItem 
-                                        label={t('real_yield_12m')}
-                                        value={dyReal.toFixed(2)}
-                                        subValue="%"
-                                        highlight={dyReal > 10 ? 'green' : 'neutral'}
-                                        className="bg-[var(--bg-secondary)] col-span-2"
-                                    />
-                                </div>
-
-                                {/* Recent / List Header */}
-                                <h3 className="font-bold text-sm text-[var(--text-secondary)] mt-2 px-1 uppercase tracking-wider">
-                                    {showAllHistory ? t('full_history') : t('recent_dividends')}
-                                </h3>
-
-                                {/* Detailed List */}
-                                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
-                                    {displayedDividends.map((div, index) => {
-                                        // Try to find exact history match for Ex-Date
-                                        const historyItem = asset?.dividendsHistory?.find(h => 
-                                            h.paymentDate === div.paymentDate && 
-                                            Math.abs(h.value - div.amountPerShare) < 0.001
-                                        );
-                                        const exDate = historyItem?.exDate;
-
-                                        return (
-                                            <div 
-                                                key={`${div.paymentDate}-${index}`} 
-                                                className={`p-4 flex justify-between items-center animate-fade-in-up ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedHistoryItem === div.paymentDate ? 'bg-[var(--bg-tertiary-hover)]' : ''}`}
-                                                style={{ animationDelay: `${index * 50}ms`}}
-                                                onClick={() => { setSelectedHistoryItem(div.paymentDate); vibrate(); }}
-                                            >
-                                                <div>
-                                                    <p className="font-bold text-sm text-[var(--text-primary)] mb-0.5">
-                                                        {new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC' })}
-                                                    </p>
-                                                    <div className="flex items-center gap-2">
-                                                        {exDate && (
-                                                            <span className="text-[10px] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">
-                                                                Com: {new Date(exDate).toLocaleDateString(locale, { day:'2-digit', month:'2-digit', timeZone: 'UTC' })}
-                                                            </span>
-                                                        )}
-                                                        {!exDate && <span className="text-[10px] text-[var(--text-secondary)]">{t('payment_date')}</span>}
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.amountPerShare * div.quantity)}</p>
-                                                    <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">
-                                                        {div.quantity} × {formatCurrency(div.amountPerShare)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Show All Button */}
-                                {!showAllHistory && assetDividends.length > 3 && (
-                                    <button 
-                                        onClick={() => { vibrate(); setShowAllHistory(true); }} 
-                                        className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-secondary)] rounded-xl border border-dashed border-[var(--border-color)] transition-all"
-                                    >
-                                        {t('view_full_history')} ({assetDividends.length})
-                                    </button>
-                                )}
-                                {showAllHistory && (
-                                     <button 
-                                        onClick={() => { vibrate(); setShowAllHistory(false); }} 
-                                        className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
-                                    >
-                                        {t('show_less')}
-                                    </button>
-                                )}
-                            </>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-12 text-[var(--text-secondary)]">
-                                <div className="w-12 h-12 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-3 border border-[var(--border-color)] opacity-50">
-                                    <span className="text-xl font-bold">$</span>
-                                </div>
-                                <p className="text-sm font-medium">{t('no_dividends_for_asset')}</p>
-                            </div>
-                        )}
-                    </div>
-                )}
+                <div key={activeTab} className="animate-fade-in">
+                    {renderTabContent()}
+                </div>
             </div>
         </div>
     );

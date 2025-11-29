@@ -154,7 +154,6 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                                 rx="2"
                                 className="transition-all duration-300 animate-grow-up"
                                 style={{ 
-                                    transformOrigin: `center ${height - padding.bottom}px`,
                                     animationDelay: `${Math.min(i * 50, 1000)}ms`,
                                     opacity: isHovered ? 1 : 0.7
                                 }}

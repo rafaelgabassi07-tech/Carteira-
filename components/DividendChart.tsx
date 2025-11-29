@@ -129,7 +129,7 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                         <button
                             key={p}
                             onClick={(e) => { e.stopPropagation(); handlePeriodChange(p); }}
-                            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${period === p ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all active:scale-95 ${period === p ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                         >
                             {p === 'all' ? 'Máx' : p.toUpperCase()}
                         </button>
@@ -215,8 +215,9 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                                         height={Math.max(barHeight, 0)}
                                         fill="var(--accent-color)"
                                         rx={Math.min(barWidth/2, 4)}
-                                        className="transition-all duration-300"
+                                        className="transition-all duration-300 animate-grow-up"
                                         style={{ 
+                                            animationDelay: `${Math.min(i * 30, 500)}ms`,
                                             opacity: isHovered ? 1 : 0.7
                                         }}
                                     />

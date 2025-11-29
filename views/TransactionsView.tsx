@@ -345,7 +345,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                          <select 
                             value={dateRange} 
                             onChange={(e) => { setDateRange(e.target.value as any); vibrate(); }}
-                            className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs font-bold focus:outline-none"
+                            className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs font-bold focus:outline-none transition-transform active:scale-95"
                         >
                             <option value="all">Todos os Periodos</option>
                             <option value="30">30 Dias</option>
@@ -357,7 +357,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                             <button
                                 key={f}
                                 onClick={() => { setFilter(f); vibrate(); }}
-                                className={`flex-shrink-0 py-1.5 px-4 text-xs font-bold rounded-lg transition-all duration-200 ${
+                                className={`flex-shrink-0 py-1.5 px-4 text-xs font-bold rounded-lg transition-all duration-200 active:scale-95 ${
                                     filter === f
                                         ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-md'
                                         : 'bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-secondary)]'
