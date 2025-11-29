@@ -161,6 +161,50 @@ export const fromISODate = (dateString: string): Date => {
     return new Date(year, month - 1, day, 12, 0, 0);
 };
 
+// --- URL-safe Base64 encoding/decoding for public sharing
+export const urlSafeEncode = (data: string): string => {
+    try {
+        return btoa(encodeURIComponent(data));
+    } catch (e) {
+        console.error("Encoding failed", e);
+        return '';
+    }
+};
+
+export const urlSafeDecode = (encoded: string): string => {
+    try {
+        return decodeURIComponent(atob(encoded));
+    } catch (e) {
+        console.error("Decoding failed", e);
+        return '';
+    }
+};
+
+// --- FIX START ---
+// Added bufferEncode and bufferDecode for handling WebAuthn (biometrics) ArrayBuffer data.
+// This resolves import errors in PinLockScreen.tsx and SecuritySettings.tsx.
+// --- WebAuthn Buffer Encoding/Decoding for Biometrics ---
+export const bufferEncode = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+};
+
+export const bufferDecode = (base64: string): Uint8Array => {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+};
+// --- FIX END ---
+
 // --- Sistema de Cache ---
 interface CacheItem<T> {
     data: T;
@@ -280,21 +324,3 @@ export const getClosestPrice = (history: { date: string; price: number }[], targ
     }
     return closestPrice;
 };
-
-export function bufferEncode(value: ArrayBuffer): string {
-    return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(value))))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
-}
-
-export function bufferDecode(value: string): ArrayBuffer {
-    const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = base64.length % 4;
-    const padded = pad ? base64.padEnd(base64.length + (4 - pad), '=') : base64;
-    const raw = atob(padded);
-    const buffer = new ArrayBuffer(raw.length);
-    const arr = new Uint8Array(buffer);
-    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-    return buffer;
-}

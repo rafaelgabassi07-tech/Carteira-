@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import type { ToastMessage } from '../types';
 import type { View } from '../App';
@@ -11,6 +10,7 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 import BarChart from '../components/BarChart';
+import ShareModal from '../components/modals/ShareModal';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -101,7 +101,8 @@ const Header: React.FC<{
     onShare: () => void;
     onRefresh: () => void;
     isRefreshing: boolean;
-}> = ({ setActiveView, onShare, onRefresh, isRefreshing }) => {
+    unreadNotificationsCount: number;
+}> = ({ setActiveView, onShare, onRefresh, isRefreshing, unreadNotificationsCount }) => {
     const { t } = useI18n();
     const { privacyMode, togglePrivacyMode } = usePortfolio();
 
@@ -109,7 +110,7 @@ const Header: React.FC<{
         <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300">
             <div className="flex flex-col">
                 <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">Invest</h1>
-                <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
+                <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('nav_portfolio')}</p>
             </div>
             <div className="flex items-center space-x-2">
                 <button 
@@ -128,6 +129,11 @@ const Header: React.FC<{
                 </button>
                 <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
                     <BellIcon className="w-5 h-5" />
+                    {unreadNotificationsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 rounded-full min-w-[16px] h-4 flex items-center justify-center border-2 border-[var(--bg-secondary)]">
+                            {unreadNotificationsCount}
+                        </span>
+                    )}
                 </button>
             </div>
         </header>
@@ -213,15 +219,16 @@ const PortfolioSummary: React.FC = () => {
 
 interface PortfolioViewProps {
     setActiveView: (view: View) => void;
-    setTransactionFilter: (ticker: string) => void;
     onSelectAsset: (ticker: string) => void;
     addToast: (message: string, type?: ToastMessage['type']) => void;
+    unreadNotificationsCount: number;
 }
 
-const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
+const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast, unreadNotificationsCount }) => {
     const { t, formatCurrency } = useI18n();
     const { assets, refreshMarketData, isRefreshing: isContextRefreshing } = usePortfolio();
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     
     const isRefreshing = isContextRefreshing || isPullRefreshing;
 
@@ -269,22 +276,8 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
         }
     };
 
-    const handleShare = async () => {
-        const totalValue = assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0);
-        const shareData = {
-            title: t('share_portfolio_title'),
-            text: t('share_portfolio_text', { value: formatCurrency(totalValue) }),
-            url: window.location.origin,
-        };
-        try {
-            if (navigator.share) await navigator.share(shareData);
-            else {
-                await navigator.clipboard.writeText(shareData.text);
-                addToast('Copiado para área de transferência!', 'success');
-            }
-        } catch (err) {
-            // User cancelled
-        }
+    const handleShare = () => {
+        setIsShareModalOpen(true);
     };
     
     return (
@@ -306,7 +299,13 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             </div>
 
             <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
+                <Header 
+                    setActiveView={setActiveView} 
+                    onShare={handleShare} 
+                    onRefresh={handleRefreshPrices} 
+                    isRefreshing={isRefreshing}
+                    unreadNotificationsCount={unreadNotificationsCount}
+                />
                 
                 {assets.length > 0 ? (
                     <>
@@ -330,6 +329,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                     </div>
                 )}
             </div>
+            {isShareModalOpen && <ShareModal onClose={() => setIsShareModalOpen(false)} addToast={addToast} />}
         </div>
     );
 };

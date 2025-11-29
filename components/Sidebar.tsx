@@ -5,7 +5,6 @@ import WalletIcon from './icons/WalletIcon';
 import TransactionIcon from './icons/TransactionIcon';
 import NewsIcon from './icons/NewsIcon';
 import SettingsIcon from './icons/SettingsIcon';
-import BellIcon from './icons/BellIcon';
 import UserIcon from './icons/UserIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -14,7 +13,6 @@ import { vibrate } from '../utils';
 interface SidebarProps {
   activeView: View;
   setActiveView: (view: View) => void;
-  unreadNotifications: number;
 }
 
 const SidebarItem: React.FC<{
@@ -23,8 +21,7 @@ const SidebarItem: React.FC<{
   icon: React.ReactNode;
   isActive: boolean;
   onClick: () => void;
-  badge?: number;
-}> = ({ label, icon, isActive, onClick, badge }) => {
+}> = ({ label, icon, isActive, onClick }) => {
   const activeClass = isActive 
     ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)] border-r-[3px] border-[var(--accent-color)]' 
     : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] border-r-[3px] border-transparent opacity-80 hover:opacity-100';
@@ -38,16 +35,11 @@ const SidebarItem: React.FC<{
         {React.cloneElement(icon as React.ReactElement, { className: 'w-5 h-5' })}
       </div>
       <span className="font-semibold text-sm tracking-wide">{label}</span>
-      {badge && badge > 0 && (
-          <span className="absolute right-4 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-              {badge}
-          </span>
-      )}
     </button>
   );
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, unreadNotifications }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
   const { t } = useI18n();
   const { userProfile } = usePortfolio();
 
@@ -82,7 +74,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, unreadNoti
         <div className="px-6 py-2 mt-6">
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-50 mb-2">Conta</p>
         </div>
-        <SidebarItem label={t('notifications')} view="notificacoes" icon={<BellIcon />} isActive={activeView === 'notificacoes'} onClick={() => handleNavClick('notificacoes')} badge={unreadNotifications} />
         <SidebarItem label={t('nav_settings')} view="settings" icon={<SettingsIcon />} isActive={activeView === 'settings'} onClick={() => handleNavClick('settings')} />
       </nav>
 

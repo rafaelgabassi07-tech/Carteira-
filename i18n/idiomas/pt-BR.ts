@@ -33,6 +33,16 @@ export const ptBR = {
     portfolio_empty_subtitle: 'Adicione sua primeira transação para começar a acompanhar seus investimentos.',
     share_portfolio_title: 'Minha Carteira Invest',
     share_portfolio_text: 'Meu patrimônio em FIIs: {{value}}',
+    share_modal_title: 'Compartilhar Carteira',
+    share_snapshot_title: 'Snapshot de Texto',
+    share_snapshot_desc: 'Copia um resumo do valor atual da sua carteira.',
+    share_snapshot_action: 'Copiar Texto',
+    share_public_link_title: 'Link Público da Carteira',
+    share_public_link_desc: 'Gere um link para visualização em tempo real (somente leitura). Seus dados são codificados no link e não ficam em servidor.',
+    share_public_link_enable: 'Ativar link público',
+    share_public_link_copy: 'Copiar Link',
+    public_view_title: 'Visualização Pública',
+    public_view_header: 'Carteira Compartilhada',
     
     // Asset Detail
     asset_not_found: 'Ativo não encontrado',

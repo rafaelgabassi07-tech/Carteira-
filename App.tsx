@@ -5,10 +5,10 @@ import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import LoadingSpinner from './components/LoadingSpinner';
-import type { ToastMessage } from './types';
+import type { ToastMessage, MinimalTransaction } from './types';
 import { usePortfolio } from './contexts/PortfolioContext';
 import { useI18n } from './contexts/I18nContext';
-import { isLowEndDevice } from './utils';
+import { isLowEndDevice, urlSafeDecode } from './utils';
 import type { MenuScreen } from './views/SettingsView';
 import MainMenu from './components/settings/MainMenu';
 
@@ -21,6 +21,8 @@ const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
 const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
+const PublicPortfolioView = React.lazy(() => import('./views/PublicPortfolioView'));
+
 
 export type View = 'dashboard' | 'carteira' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail';
 
@@ -36,6 +38,7 @@ const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
+  const [publicViewData, setPublicViewData] = useState<MinimalTransaction[] | null>(null);
   
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
     const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
@@ -45,6 +48,32 @@ const App: React.FC = () => {
             setToast(t => (t?.id === newToast.id ? null : t));
         }, duration);
     }
+  }, []);
+
+  // Public View Router
+  useEffect(() => {
+    const handleHashChange = () => {
+        const hash = window.location.hash;
+        if (hash.startsWith('#view=')) {
+            try {
+                const encodedData = hash.substring(6);
+                const decodedJson = urlSafeDecode(encodedData);
+                const transactions = JSON.parse(decodedJson);
+                if (Array.isArray(transactions)) {
+                    setPublicViewData(transactions);
+                }
+            } catch (error) {
+                console.error("Failed to parse public portfolio link:", error);
+                window.location.hash = '';
+                setPublicViewData(null);
+            }
+        } else {
+            setPublicViewData(null);
+        }
+    };
+    handleHashChange(); // Check on initial load
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   // Responsive & Theme Handlers
@@ -125,16 +154,24 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case 'dashboard': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
+      case 'dashboard': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
       case 'noticias': return <NewsView addToast={addToast} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
       case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
-      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
-      default: return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
+      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
+      default: return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
     }
   };
+
+  if (publicViewData) {
+      return (
+          <Suspense fallback={<LoadingSpinner />}>
+              <PublicPortfolioView initialTransactions={publicViewData} />
+          </Suspense>
+      );
+  }
 
   if (isLocked) {
       return <Suspense fallback={<LoadingSpinner />}><PinLockScreen onUnlock={() => setIsLocked(false)} correctPin={preferences.appPin!} allowBiometrics={!!localStorage.getItem('biometric-credential-id')} /></Suspense>;
@@ -148,7 +185,7 @@ const App: React.FC = () => {
         
         {/* Desktop Sidebar */}
         <div className="hidden lg:block h-full border-r border-[var(--border-color)] bg-[var(--bg-secondary)] z-20">
-            <Sidebar activeView={activeView} setActiveView={handleSetView} unreadNotifications={unreadNotificationsCount} />
+            <Sidebar activeView={activeView} setActiveView={handleSetView} />
         </div>
 
         {/* Mobile Landscape Sidebar (Conditional) */}
@@ -173,7 +210,7 @@ const App: React.FC = () => {
         
         {/* Mobile Bottom Nav (Hidden on LG) */}
         <div className={`lg:hidden z-40 ${isMobileLandscape ? 'hidden' : ''}`}>
-           <BottomNav activeView={activeView} setActiveView={handleSetView} unreadNotifications={unreadNotificationsCount} />
+           <BottomNav activeView={activeView} setActiveView={handleSetView} />
         </div>
 
         {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
