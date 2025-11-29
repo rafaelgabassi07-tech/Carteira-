@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
@@ -23,13 +22,13 @@ const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
 
-export type View = 'carteira' | 'transacoes' | 'analise' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail';
+export type View = 'dashboard' | 'carteira' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail';
 
 const App: React.FC = () => {
-  const { assets, preferences, marketDataError, setTheme } = usePortfolio();
+  const { assets, preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
   const { t } = useI18n();
-  const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'carteira');
-  const [previousView, setPreviousView] = useState<View>('carteira');
+  const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'dashboard');
+  const [previousView, setPreviousView] = useState<View>('dashboard');
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [transactionFilter, setTransactionFilter] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
@@ -126,12 +125,12 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case 'carteira': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
+      case 'dashboard': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
       case 'noticias': return <NewsView addToast={addToast} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
-      case 'analise': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
+      case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
       case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
       default: return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} setTransactionFilter={setTransactionFilter} />;
     }
@@ -149,14 +148,14 @@ const App: React.FC = () => {
         
         {/* Desktop Sidebar */}
         <div className="hidden lg:block h-full border-r border-[var(--border-color)] bg-[var(--bg-secondary)] z-20">
-            <Sidebar activeView={activeView} setActiveView={handleSetView} />
+            <Sidebar activeView={activeView} setActiveView={handleSetView} unreadNotifications={unreadNotificationsCount} />
         </div>
 
         {/* Mobile Landscape Sidebar (Conditional) */}
         {isMobileLandscape && (
             <div className="fixed left-0 top-0 bottom-0 w-64 z-30 bg-[var(--bg-secondary)] border-r border-[var(--border-color)] overflow-y-auto">
                  <div className="p-4">
-                    <MainMenu setScreen={(s) => { setActiveView('settings'); setSettingsStartScreen(s); }} addToast={addToast} onShowUpdateModal={() => {}} />
+                    <MainMenu setScreen={(s) => { setActiveView('settings'); setSettingsStartScreen(s); }} addToast={addToast} />
                 </div>
             </div>
         )}
@@ -174,7 +173,7 @@ const App: React.FC = () => {
         
         {/* Mobile Bottom Nav (Hidden on LG) */}
         <div className={`lg:hidden z-40 ${isMobileLandscape ? 'hidden' : ''}`}>
-           <BottomNav activeView={activeView} setActiveView={handleSetView} />
+           <BottomNav activeView={activeView} setActiveView={handleSetView} unreadNotifications={unreadNotificationsCount} />
         </div>
 
         {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}

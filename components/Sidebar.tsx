@@ -14,6 +14,7 @@ import { vibrate } from '../utils';
 interface SidebarProps {
   activeView: View;
   setActiveView: (view: View) => void;
+  unreadNotifications: number;
 }
 
 const SidebarItem: React.FC<{
@@ -46,7 +47,7 @@ const SidebarItem: React.FC<{
   );
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, unreadNotifications }) => {
   const { t } = useI18n();
   const { userProfile } = usePortfolio();
 
@@ -73,15 +74,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
         <div className="px-6 py-2">
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-50 mb-2">Menu Principal</p>
         </div>
-        <SidebarItem label={t('nav_portfolio')} view="carteira" icon={<LayoutGridIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
-        <SidebarItem label={t('nav_analysis')} view="analise" icon={<WalletIcon />} isActive={activeView === 'analise'} onClick={() => handleNavClick('analise')} />
+        <SidebarItem label={t('nav_portfolio')} view="dashboard" icon={<LayoutGridIcon />} isActive={activeView === 'dashboard'} onClick={() => handleNavClick('dashboard')} />
+        <SidebarItem label={t('nav_analysis')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
         <SidebarItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
         <SidebarItem label={t('nav_news')} view="noticias" icon={<NewsIcon />} isActive={activeView === 'noticias'} onClick={() => handleNavClick('noticias')} />
         
         <div className="px-6 py-2 mt-6">
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-50 mb-2">Conta</p>
         </div>
-        <SidebarItem label={t('notifications')} view="notificacoes" icon={<BellIcon />} isActive={activeView === 'notificacoes'} onClick={() => handleNavClick('notificacoes')} />
+        <SidebarItem label={t('notifications')} view="notificacoes" icon={<BellIcon />} isActive={activeView === 'notificacoes'} onClick={() => handleNavClick('notificacoes')} badge={unreadNotifications} />
         <SidebarItem label={t('nav_settings')} view="settings" icon={<SettingsIcon />} isActive={activeView === 'settings'} onClick={() => handleNavClick('settings')} />
       </nav>
 

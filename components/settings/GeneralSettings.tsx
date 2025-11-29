@@ -3,14 +3,15 @@ import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
+import type { AppPreferences } from '../../types';
 
 const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const { t } = useI18n();
     const { preferences, updatePreferences } = usePortfolio();
     
-    const startScreens = [
-        { id: 'carteira', label: t('nav_portfolio') },
-        { id: 'analise', label: t('nav_analysis') },
+    const startScreens: { id: AppPreferences['startScreen'], label: string }[] = [
+        { id: 'dashboard', label: t('nav_portfolio') }, // "Dashboard"
+        { id: 'carteira', label: t('nav_analysis') }, // "Carteira"
         { id: 'noticias', label: t('nav_news') },
     ];
 
@@ -24,7 +25,7 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                         {startScreens.map(screen => (
                             <button 
                                 key={screen.id} 
-                                onClick={() => updatePreferences({ startScreen: screen.id as any })} 
+                                onClick={() => updatePreferences({ startScreen: screen.id })} 
                                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${preferences.startScreen === screen.id ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
                             >
                                 {screen.label}

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, DividendHistoryEvent, AppStats, SegmentEvolutionData, PortfolioEvolutionPoint } from '../types';
+import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, DividendHistoryEvent, AppStats, SegmentEvolutionData, PortfolioEvolutionPoint, AppNotification } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
+import { generateNotifications } from '../services/dynamicDataService';
 import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, fromISODate, CacheManager, getTodayISODate, toISODate } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME } from '../constants';
 
@@ -22,6 +23,8 @@ interface PortfolioContextType {
   userProfile: UserProfile;
   apiStats: AppStats;
   portfolioEvolution: SegmentEvolutionData;
+  notifications: AppNotification[];
+  unreadNotificationsCount: number;
   // Actions
   addTransaction: (t: Transaction) => void;
   updateTransaction: (t: Transaction) => void;
@@ -44,6 +47,7 @@ interface PortfolioContextType {
   clearCache: (key?: string) => void;
   logApiUsage: (api: 'gemini'|'brapi', stats: any) => void;
   resetApiStats: () => void;
+  markNotificationsAsRead: () => void;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -52,7 +56,7 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(undefin
 const DEFAULT_PREFERENCES: AppPreferences = {
     accentColor: 'blue', systemTheme: 'system', visualStyle: 'premium', fontSize: 'medium', compactMode: false,
     currentThemeId: 'default-dark', currentFontId: 'inter', showCurrencySymbol: true, reduceMotion: false, animationSpeed: 'normal',
-    startScreen: 'carteira', hapticFeedback: true, vibrationIntensity: 'medium', hideCents: false, privacyOnStart: false, appPin: null,
+    startScreen: 'dashboard', hapticFeedback: true, vibrationIntensity: 'medium', hideCents: false, privacyOnStart: false, appPin: null,
     defaultBrokerage: 0, csvSeparator: ',', decimalPrecision: 2, defaultSort: 'valueDesc', dateFormat: 'dd/mm/yyyy',
     priceAlertThreshold: 5, globalIncomeGoal: 1000, segmentGoals: {}, dndEnabled: false, dndStart: '22:00', dndEnd: '07:00',
     notificationChannels: { push: true, email: false }, geminiApiKey: null, brapiToken: null, autoBackup: false, betaFeatures: false, devMode: false
@@ -72,6 +76,23 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
   const [apiStats, setApiStats] = usePersistentState<AppStats>('api_stats', { gemini: {requests:0, bytesSent:0, bytesReceived:0}, brapi: {requests:0, bytesSent:0, bytesReceived:0} });
+  const [notifications, setNotifications] = usePersistentState<AppNotification[]>('app-notifications', []);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  // --- One-time Preference Migration ---
+  useEffect(() => {
+    const startScreen = preferences.startScreen;
+    if (startScreen === 'carteira' as any || startScreen === 'analise' as any) {
+      // @ts-ignore
+      const newScreen = startScreen === 'carteira' ? 'dashboard' : 'carteira';
+      updatePreferences({ startScreen: newScreen });
+      console.log(`Migrated startScreen from '${startScreen}' to '${newScreen}'`);
+    }
+  }, []); // Runs only once
+
+  useEffect(() => {
+      setUnreadNotificationsCount(notifications.filter(n => !n.read).length);
+  }, [notifications]);
 
   const sourceTransactions = isDemoMode ? DEMO_TRANSACTIONS : transactions;
   const sourceMarketData = isDemoMode ? DEMO_MARKET_DATA : marketData;
@@ -169,6 +190,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } else if (key) CacheManager.clear(key);
   }, [setMarketData, setLastSync]);
 
+  const markNotificationsAsRead = useCallback(() => {
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadNotificationsCount(0);
+  }, [setNotifications]);
+
   // Market Data Refresh
   const refreshMarketData = useCallback(async (force = false, silent = false) => {
       if(isRefreshing) return;
@@ -199,9 +225,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
 
               if(geminiRes.status === 'fulfilled') {
-                  // Explicit cast to handle tuple vs array inference in Promise.allSettled
                   const res = geminiRes.value as { data: any; stats: { bytesSent: number; bytesReceived: number } };
-                  logApiUsage('gemini', { requests: 1, ...res.stats });
+                  logApiUsage('gemini', { requests: 1, ...res.stats as any });
                   Object.entries(res.data).forEach(([tkr, data]) => {
                       next[tkr] = { ...(next[tkr] || {}), ...(data as object), lastUpdated: Date.now() };
                   });
@@ -223,7 +248,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const day = now.getDay(); // 0 = Sun, 6 = Sat
           const hour = now.getHours();
           
-          // B3 Market Hours: Mon-Fri (1-5), approx 10:00 to 18:00
           const isWeekDay = day >= 1 && day <= 5;
           const isMarketHours = hour >= 10 && hour < 18;
           
@@ -231,15 +255,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const isOnline = navigator.onLine;
 
           if (isWeekDay && isMarketHours && isVisible && isOnline) {
-              // Trigger silent refresh
               refreshMarketData(true, true);
           }
       };
-
-      // Check every 10 minutes (600,000 ms)
       const intervalId = setInterval(checkAndRefresh, 10 * 60 * 1000);
-
-      // Clean up interval on unmount
       return () => clearInterval(intervalId);
   }, [refreshMarketData]);
 
@@ -247,8 +266,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await refreshMarketData(true);
   }, [refreshMarketData]);
 
-  // --- Calculated Values (Assets, Evolution, Income) ---
-  
   const assets = useMemo(() => {
       const metrics = calculatePortfolioMetrics(sourceTransactions);
       return Object.keys(metrics).map(ticker => {
@@ -257,33 +274,23 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const avgPrice = m.quantity > 0 ? m.totalCost / m.quantity : 0;
           const curPrice = data.currentPrice || avgPrice;
           
-          // Combined Dividends
           const histMap = new Map<string, DividendHistoryEvent>();
           (data.dividendsHistory || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d));
-          (data.recentDividends || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d)); // Gemini overrides if same date
+          (data.recentDividends || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d)); // Gemini overrides
           
           return {
-              ticker,
-              quantity: m.quantity,
-              avgPrice,
-              currentPrice: curPrice,
+              ticker, quantity: m.quantity, avgPrice, currentPrice: curPrice,
               priceHistory: data.priceHistory || [],
               dividendsHistory: Array.from(histMap.values()).sort((a,b) => b.exDate.localeCompare(a.exDate)),
-              dy: data.dy,
-              pvp: data.pvp,
-              segment: data.assetType || data.sector || 'Outros',
-              administrator: data.administrator,
-              vacancyRate: data.vacancyRate,
-              liquidity: data.dailyLiquidity,
-              shareholders: data.shareholders,
-              yieldOnCost: avgPrice > 0 ? ((curPrice * ((data.dy||0)/100))/avgPrice)*100 : 0,
-              nextPaymentDate: data.nextPaymentDate,
-              lastDividend: data.lastDividend
+              dy: data.dy, pvp: data.pvp, segment: data.assetType || data.sector || 'Outros',
+              administrator: data.administrator, vacancyRate: data.vacancyRate, liquidity: data.dailyLiquidity,
+              shareholders: data.shareholders, yieldOnCost: avgPrice > 0 ? ((curPrice * ((data.dy||0)/100))/avgPrice)*100 : 0,
+              nextPaymentDate: data.nextPaymentDate, lastDividend: data.lastDividend
           };
       }).filter(a => a.quantity > 0.000001);
   }, [sourceTransactions, sourceMarketData]);
 
-  // --- Daily Snapshot Logic ---
+  // --- Daily Snapshot & Notification Generation ---
   const currentPatrimony = useMemo(() => {
     return assets.reduce((acc, a) => acc + a.quantity * a.currentPrice, 0);
   }, [assets]);
@@ -293,20 +300,30 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const todayStr = getTodayISODate();
       const key = `${SNAPSHOT_PREFIX}${todayStr}`;
       localStorage.setItem(key, JSON.stringify({ value: currentPatrimony, ts: Date.now() }));
+      
+      const newNotifications = generateNotifications(assets, currentPatrimony);
+      if (newNotifications.length > 0) {
+        setNotifications(prev => {
+          const existingIds = new Set(prev.map(n => n.id));
+          const trulyNew = newNotifications.filter(n => !existingIds.has(n.id));
+          if (trulyNew.length > 0) {
+            setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
+            return [...trulyNew, ...prev];
+          }
+          return prev;
+        });
+      }
     }
-  }, [currentPatrimony, isDemoMode]);
+  }, [currentPatrimony, isDemoMode, assets, setNotifications]);
 
-  // Helper: Get Asset
+
   const getAssetByTicker = useCallback((t: string) => assets.find(a => a.ticker === t), [assets]);
-
-  // Helper: Get Quantity on specific date
   const getQuantityOnDate = useCallback((ticker: string, date: string) => {
       return sourceTransactions
           .filter(t => t.ticker === ticker && t.date <= date)
           .reduce((acc, t) => t.type === 'Compra' ? acc + t.quantity : acc - t.quantity, 0);
   }, [sourceTransactions]);
 
-  // --- Dividends & Income (Pre-calculation for Evolution) ---
   const { dividends, monthlyIncome, projectedAnnualIncome, yieldOnCost } = useMemo(() => {
       const divs: Dividend[] = [];
       const incomeMap: Record<string, number> = {};
@@ -316,31 +333,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       assets.forEach(a => {
           totalInv += a.quantity * a.avgPrice;
           projIncome += a.quantity * a.currentPrice * ((a.dy||0)/100);
-      });
-
-      const distinctTickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
-      
-      distinctTickers.forEach(ticker => {
-          const assetData = (sourceMarketData as any)[ticker.toUpperCase()];
-          const dividendsHistory: DividendHistoryEvent[] = assetData?.dividendsHistory || [];
-          const recentDividends: DividendHistoryEvent[] = assetData?.recentDividends || [];
           
-          const combinedHistory = new Map<string, DividendHistoryEvent>();
-          dividendsHistory.forEach(d => combinedHistory.set(d.exDate, d));
-          recentDividends.forEach(d => combinedHistory.set(d.exDate, d));
-
-          combinedHistory.forEach(event => {
-              const qtyOnExDate = getQuantityOnDate(ticker, event.exDate);
+          (a.dividendsHistory || []).forEach(event => {
+              const qtyOnExDate = getQuantityOnDate(a.ticker, event.exDate);
               if (qtyOnExDate > 0) {
                   const totalReceived = qtyOnExDate * event.value;
-                  
-                  divs.push({
-                      ticker: ticker,
-                      amountPerShare: event.value,
-                      quantity: qtyOnExDate,
-                      paymentDate: event.paymentDate
-                  });
-
+                  divs.push({ ticker: a.ticker, amountPerShare: event.value, quantity: qtyOnExDate, paymentDate: event.paymentDate });
                   const dateObj = fromISODate(event.paymentDate);
                   const sortKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
                   incomeMap[sortKey] = (incomeMap[sortKey] || 0) + totalReceived;
@@ -359,14 +357,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return { 
           dividends: divs.sort((a,b) => b.paymentDate.localeCompare(a.paymentDate)), 
-          monthlyIncome: mIncome, 
-          projectedAnnualIncome: projIncome,
+          monthlyIncome: mIncome, projectedAnnualIncome: projIncome,
           yieldOnCost: totalInv > 0 ? (projIncome/totalInv)*100 : 0
       };
-  }, [assets, sourceTransactions, sourceMarketData, getQuantityOnDate]);
+  }, [assets, getQuantityOnDate]);
 
 
-  // --- Portfolio Evolution from Daily Snapshots ---
   const portfolioEvolution = useMemo((): SegmentEvolutionData => {
     const points: PortfolioEvolutionPoint[] = [];
     const today = new Date();
@@ -378,71 +374,45 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         date.setDate(today.getDate() - i);
         const dateStr = toISODate(date);
 
-        // 1. Calculate Invested Capital for this date
         let invested = 0;
         for (const tx of sortedTx) {
             if (tx.date > dateStr) break;
-            if (tx.type === 'Compra') {
-                invested += (tx.quantity * tx.price) + (tx.costs || 0);
-            } else {
-                // This is a simplification; accurate cost basis reduction is complex
-                const currentAvgCost = invested / sortedTx.filter(t => t.date < tx.date && t.ticker === tx.ticker).reduce((q, t) => q + (t.type === 'Compra' ? t.quantity : -t.quantity), 0);
-                if (isFinite(currentAvgCost)) {
-                    invested -= tx.quantity * currentAvgCost;
-                }
-            }
+            if (tx.type === 'Compra') invested += (tx.quantity * tx.price) + (tx.costs || 0);
         }
 
-        // 2. Calculate Market Value from Snapshots
         let marketValue = 0;
-        if (i === 0) { // Today always uses live data
-            marketValue = currentPatrimony;
-        } else {
-            const key = `${SNAPSHOT_PREFIX}${dateStr}`;
+        if (i === 0) { marketValue = currentPatrimony; } 
+        else {
             try {
-                const snapshotStr = localStorage.getItem(key);
+                const snapshotStr = localStorage.getItem(`${SNAPSHOT_PREFIX}${dateStr}`);
                 if (snapshotStr) {
-                    const snapshot = JSON.parse(snapshotStr);
-                    marketValue = snapshot.value;
+                    marketValue = JSON.parse(snapshotStr).value;
                     lastKnownMarketValue = marketValue;
-                } else {
-                    // Carry forward last known value for weekends/holidays
-                    marketValue = lastKnownMarketValue || 0; 
-                }
-            } catch {
-                marketValue = lastKnownMarketValue || 0;
-            }
+                } else { marketValue = lastKnownMarketValue || 0; }
+            } catch { marketValue = lastKnownMarketValue || 0; }
         }
         
-        // If it's the very first point and we have no history, start from invested
-        if (i === 29 && marketValue === 0) {
-            marketValue = invested;
-            lastKnownMarketValue = invested;
-        }
-
+        if (i === 29 && marketValue === 0) { marketValue = invested; lastKnownMarketValue = invested; }
 
         points.push({
             month: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-            invested: Math.max(0, invested),
-            marketValue: marketValue,
-            cumulativeDividends: 0
+            invested: Math.max(0, invested), marketValue, cumulativeDividends: 0
         });
     }
-
     return { all_types: points };
   }, [sourceTransactions, currentPatrimony]);
 
 
-  // Helper
-  const getAveragePriceForTransaction = useCallback(() => 0, []); // Placeholder
+  const getAveragePriceForTransaction = useCallback(() => 0, []);
 
   const value = {
       assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
       yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, portfolioEvolution,
+      notifications, unreadNotificationsCount,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
-      setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats
+      setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead
   };
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;

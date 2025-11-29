@@ -89,7 +89,18 @@ export interface ToastMessage {
   duration?: number; // 0 = infinite
 }
 
-export type NotificationType = 'dividend' | 'price' | 'news';
+export type NotificationType = 'milestone' | 'dividend_confirmed' | 'price_alert' | 'generic';
+
+export interface AppNotification {
+    id: number;
+    type: NotificationType;
+    title: string;
+    description: string;
+    date: string;
+    read: boolean;
+    relatedTicker?: string;
+}
+
 
 export type Locale = 'pt-BR';
 
@@ -151,7 +162,7 @@ export interface AppPreferences {
   animationSpeed: 'slow' | 'normal' | 'fast' | 'instant';
 
   // General
-  startScreen: 'carteira' | 'analise' | 'noticias';
+  startScreen: 'dashboard' | 'carteira' | 'noticias';
   hapticFeedback: boolean;
   vibrationIntensity: 'light' | 'medium' | 'heavy';
   hideCents: boolean;

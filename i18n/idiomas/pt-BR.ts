@@ -136,6 +136,7 @@ export const ptBR = {
     clear_all: 'Limpar tudo',
     no_notifications_title: 'Tudo limpo por aqui',
     no_notifications_subtitle: 'Você não tem novas notificações no momento.',
+    mark_all_as_read: 'Marcar todas como lidas',
 
     // Analysis View
     monthly_income: 'Renda Mensal',
