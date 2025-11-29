@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Asset, Transaction, MinimalTransaction, AppPreferences, MonthlyIncome } from '../types';
-import { calculatePortfolioMetrics, fromISODate, toISODate } from '../utils';
+import { calculatePortfolioMetrics, fromISODate } from '../utils';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { useI18n } from '../contexts/I18nContext';
@@ -9,6 +9,9 @@ import PortfolioPieChart from '../components/PortfolioPieChart';
 import BarChart from '../components/BarChart';
 import CountUp from '../components/CountUp';
 import RefreshIcon from '../components/icons/RefreshIcon';
+import AssetListItem from '../components/AssetListItem';
+
+// --- Local Components for Public View ---
 
 const Metric: React.FC<{ label: string; children: React.ReactNode; }> = ({ label, children }) => (
     <div>
@@ -17,19 +20,14 @@ const Metric: React.FC<{ label: string; children: React.ReactNode; }> = ({ label
     </div>
 );
 
-const PublicPortfolioSummary: React.FC<{ assets: Asset[] }> = ({ assets }) => {
-    const { t, formatCurrency, locale } = useI18n();
-    
-    const { totalInvested, currentValue, yieldOnCost, projectedAnnualIncome } = useMemo(() => {
-        let totalInv = 0, currentVal = 0, projIncome = 0;
-        assets.forEach(asset => {
-            totalInv += asset.quantity * asset.avgPrice;
-            currentVal += asset.quantity * asset.currentPrice;
-            projIncome += asset.quantity * asset.currentPrice * ((asset.dy || 0) / 100);
-        });
-        const yoc = totalInv > 0 ? (projIncome / totalInv) * 100 : 0;
-        return { totalInvested: totalInv, currentValue: currentVal, yieldOnCost: yoc, projectedAnnualIncome: projIncome };
-    }, [assets]);
+const PublicPortfolioSummary: React.FC<{ 
+    assets: Asset[]; 
+    totalInvested: number;
+    currentValue: number;
+    yieldOnCost: number;
+    projectedAnnualIncome: number;
+}> = ({ assets, totalInvested, currentValue, yieldOnCost, projectedAnnualIncome }) => {
+    const { t, formatCurrency } = useI18n();
     
     const unrealizedGain = currentValue - totalInvested;
     const unrealizedGainPercent = totalInvested > 0 ? (unrealizedGain / totalInvested) * 100 : 0;
@@ -57,6 +55,16 @@ const PublicPortfolioSummary: React.FC<{ assets: Asset[] }> = ({ assets }) => {
         </div>
     );
 };
+
+const DashboardCard: React.FC<{ title: string; children: React.ReactNode; delay?: number; className?: string }> = ({ title, children, delay = 0, className = '' }) => (
+    <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up ${className}`} style={{ animationDelay: `${delay}ms` }}>
+        <h3 className="font-bold text-lg text-[var(--text-primary)] mb-4">{title}</h3>
+        {children}
+    </div>
+);
+
+
+// --- Main Public View Component ---
 
 interface PublicPortfolioViewProps {
     initialTransactions: MinimalTransaction[];
@@ -86,7 +94,6 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
             return;
         }
 
-        // Use public fallback API keys
         const publicPrefs = { geminiApiKey: null, brapiToken: null } as AppPreferences;
 
         try {
@@ -104,10 +111,7 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
             }
             if (geminiRes.status === 'fulfilled') {
                 Object.entries(geminiRes.value.data).forEach(([tkr, data]) => {
-// --- FIX START ---
-// Cast `data` to `object` before spreading to resolve "Spread types may only be created from object types" error.
                     newMarketData[tkr] = { ...(newMarketData[tkr] || {}), ...(data as object) };
-// --- FIX END ---
                 });
             }
 
@@ -116,14 +120,15 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
                 const m = metrics[ticker];
                 const data = newMarketData[ticker.toUpperCase()] || {};
                 const avgPrice = m.quantity > 0 ? m.totalCost / m.quantity : 0;
+                const curPrice = data.currentPrice || avgPrice;
                 return {
-                    ticker, quantity: m.quantity, avgPrice, currentPrice: data.currentPrice || avgPrice,
+                    ticker, quantity: m.quantity, avgPrice, currentPrice: curPrice,
                     priceHistory: data.priceHistory || [],
                     dividendsHistory: data.dividendsHistory || [],
                     dy: data.dy, pvp: data.pvp, segment: data.assetType || data.sector || 'Outros',
                     administrator: data.administrator, vacancyRate: data.vacancyRate,
                     liquidity: data.dailyLiquidity, shareholders: data.shareholders,
-                    yieldOnCost: avgPrice > 0 ? (( (data.currentPrice || avgPrice) * ((data.dy||0)/100))/avgPrice)*100 : 0,
+                    yieldOnCost: avgPrice > 0 ? (((curPrice * ((data.dy||0)/100))/avgPrice)*100) : 0,
                 };
             }).filter(a => a.quantity > 0.000001);
             
@@ -139,6 +144,70 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
     useEffect(() => {
         refreshMarketData();
     }, [refreshMarketData]);
+
+    // Replicated Logic from PortfolioContext
+    const getQuantityOnDate = useCallback((ticker: string, date: string) => {
+      return transactions
+          .filter(t => t.ticker === ticker && t.date <= date)
+          .reduce((acc, t) => t.type === 'Compra' ? acc + t.quantity : acc - t.quantity, 0);
+    }, [transactions]);
+
+    const { monthlyIncome, projectedAnnualIncome, yieldOnCost, totalInvested, currentValue } = useMemo(() => {
+      const incomeMap: Record<string, number> = {};
+      let projIncome = 0;
+      let totalInv = 0;
+      let currentVal = 0;
+
+      assets.forEach(a => {
+          totalInv += a.quantity * a.avgPrice;
+          currentVal += a.quantity * a.currentPrice;
+          projIncome += a.quantity * a.currentPrice * ((a.dy || 0) / 100);
+          
+          (a.dividendsHistory || []).forEach(event => {
+              const qtyOnExDate = getQuantityOnDate(a.ticker, event.exDate);
+              if (qtyOnExDate > 0) {
+                  const totalReceived = qtyOnExDate * event.value;
+                  const dateObj = fromISODate(event.paymentDate);
+                  const sortKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                  incomeMap[sortKey] = (incomeMap[sortKey] || 0) + totalReceived;
+              }
+          });
+      });
+
+      const mIncome = Object.entries(incomeMap)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([key, total]) => {
+            const [year, month] = key.split('-').map(Number);
+            const date = new Date(year, month - 1, 1);
+            const label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+            return { month: label, total };
+        });
+
+      return { 
+          monthlyIncome: mIncome,
+          projectedAnnualIncome: projIncome,
+          yieldOnCost: totalInv > 0 ? (projIncome / totalInv) * 100 : 0,
+          totalInvested: totalInv,
+          currentValue: currentVal,
+      };
+    }, [assets, getQuantityOnDate]);
+
+    const diversificationData = useMemo(() => {
+        const segments: Record<string, number> = {};
+        let totalValue = 0;
+        assets.forEach(a => {
+            const val = a.quantity * a.currentPrice;
+            const seg = a.segment || t('outros');
+            segments[seg] = (segments[seg] || 0) + val;
+            totalValue += val;
+        });
+        
+        return Object.entries(segments).map(([name, value]) => ({
+            name,
+            value,
+            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
+        })).sort((a, b) => b.value - a.value);
+    }, [assets, t]);
 
     if (isRefreshing && assets.length === 0) {
         return <LoadingSpinner />;
@@ -159,11 +228,45 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
                     <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
             </header>
-            <div className="max-w-7xl mx-auto">
+            <main className="max-w-7xl mx-auto">
                 <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
-                    <PublicPortfolioSummary assets={assets} />
+                    <PublicPortfolioSummary 
+                        assets={assets}
+                        totalInvested={totalInvested}
+                        currentValue={currentValue}
+                        yieldOnCost={yieldOnCost}
+                        projectedAnnualIncome={projectedAnnualIncome}
+                    />
                 </div>
-            </div>
+
+                <div className="px-4 mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <DashboardCard title={t('monthly_income')} delay={100}>
+                        <div className="h-48 w-full">
+                           <BarChart data={monthlyIncome} />
+                        </div>
+                    </DashboardCard>
+                    <DashboardCard title={t('diversification')} delay={200}>
+                        <PortfolioPieChart data={diversificationData} goals={{}} />
+                    </DashboardCard>
+                </div>
+
+                <div className="px-4 mt-8">
+                    <h3 className="font-bold text-lg mb-3 px-1">{t('my_assets')}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {assets.map((asset, index) => (
+                            <AssetListItem 
+                                key={asset.ticker}
+                                asset={asset}
+                                totalValue={currentValue}
+                                onClick={() => {}} 
+                                style={{ animationDelay: `${index * 50}ms` }}
+                                privacyMode={false}
+                                hideCents={false}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </main>
         </div>
     );
 };
