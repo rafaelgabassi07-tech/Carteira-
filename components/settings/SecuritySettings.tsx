@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
 import type { ToastMessage } from '../../types';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
-import { usePersistentState, vibrate } from '../../utils';
+import { usePersistentState, vibrate, bufferEncode } from '../../utils';
 import PinLockScreen from '../PinLockScreen';
 
 const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => void; }> = ({ onPinSet, onCancel }) => {
@@ -101,31 +100,40 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
                     return;
                 }
 
-                // Simply verify the user presence to enable.
+                // Create a new credential (registration)
                 const credential = await navigator.credentials.create({
                     publicKey: {
                         challenge: crypto.getRandomValues(new Uint8Array(32)),
-                        rp: { name: "Invest" },
+                        rp: { name: "FII Master", id: window.location.hostname },
                         user: { 
                             id: crypto.getRandomValues(new Uint8Array(16)), 
-                            name: "user@invest.app", 
+                            name: "user@fiimaster.app", 
                             displayName: "User" 
                         },
-                        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+                        pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
                         timeout: 60000,
+                        authenticatorSelection: {
+                            authenticatorAttachment: 'platform', // Force built-in (TouchID/FaceID)
+                            userVerification: 'required'
+                        }
                     }
-                });
+                }) as PublicKeyCredential;
                 
                 if (credential) {
+                    // Important: Save the Credential ID to allow future logins
+                    const rawId = bufferEncode(credential.rawId);
+                    localStorage.setItem('biometric-credential-id', rawId);
+                    
                     setBiometricsEnabled(true);
                     addToast(t('toast_biometric_enabled'), 'success');
                 }
             } catch (err) {
                  console.error("Biometric registration failed:", err);
-                 addToast('Falha ao registrar biometria.', 'error');
+                 addToast('Falha ao registrar biometria. Tente novamente.', 'error');
             }
         } else {
             setBiometricsEnabled(false);
+            localStorage.removeItem('biometric-credential-id'); // Clean up
             addToast(t('toast_biometric_disabled'), 'info');
         }
     };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { vibrate } from '../utils';
+import { vibrate, bufferDecode } from '../utils';
 import FingerprintIcon from './icons/FingerprintIcon';
 
 interface PinLockScreenProps {
@@ -13,33 +13,36 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
     const [error, setError] = useState(false);
     const [isBiometricScanning, setIsBiometricScanning] = useState(false);
 
-    // This simplified biometric auth just asks the OS to verify the user.
+    // Corrigido: Usar navigator.credentials.get para autenticação (Login)
+    // Isso evita que o navegador pergunte se deseja criar uma nova chave.
     const handleBiometricAuth = async () => {
         const isBioEnabled = localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics;
-        if (!isBioEnabled) return;
+        const storedCredentialId = localStorage.getItem('biometric-credential-id');
+        
+        if (!isBioEnabled || !storedCredentialId) return;
 
         setIsBiometricScanning(true);
         try {
-            await navigator.credentials.create({
+            const credential = await navigator.credentials.get({
                 publicKey: {
                     challenge: crypto.getRandomValues(new Uint8Array(32)),
-                    rp: { name: "FII Master Unlock" },
-                    user: { 
-                        id: crypto.getRandomValues(new Uint8Array(16)), 
-                        name: "auth@fiimaster", 
-                        displayName: "Unlock" 
-                    },
-                    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+                    rpId: window.location.hostname,
+                    allowCredentials: [{
+                        type: 'public-key',
+                        id: bufferDecode(storedCredentialId),
+                        transports: ['internal'] // Prioriza TouchID/FaceID
+                    }],
+                    userVerification: 'required',
                     timeout: 60000,
                 }
             });
 
-            vibrate(20);
-            onUnlock();
+            if (credential) {
+                vibrate(20);
+                onUnlock();
+            }
         } catch (err) {
             console.error("Biometric auth failed or cancelled:", err);
-            // Fallback to PIN, optional: clear corrupted flag if needed
-            // if (err.name !== 'NotAllowedError') localStorage.removeItem('biometrics-enabled');
         } finally {
             setIsBiometricScanning(false);
         }
@@ -48,7 +51,9 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
     useEffect(() => {
         const isBioEnabled = localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics;
         if (isBioEnabled) {
-            handleBiometricAuth();
+            // Pequeno delay para garantir que o componente montou antes de chamar a biometria
+            const timer = setTimeout(() => handleBiometricAuth(), 500);
+            return () => clearTimeout(timer);
         }
     }, [allowBiometrics]);
 
@@ -104,7 +109,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
             <div className="flex flex-col items-center w-full max-w-sm md:bg-[var(--bg-secondary)] md:border md:border-[var(--border-color)] md:shadow-2xl md:rounded-3xl md:p-10 transition-all duration-300">
                 
                 <div className="mb-8 flex flex-col items-center">
-                    <img src="/logo.png" alt="FII Master" className="w-16 h-16 rounded-2xl mb-4 shadow-lg border border-[var(--border-color)] object-contain bg-[var(--bg-secondary)]" />
+                    <img src="/logo.svg" alt="FII Master" className="w-16 h-16 rounded-2xl mb-4 shadow-lg border border-[var(--border-color)] object-contain bg-[var(--bg-secondary)]" />
                     <h2 className="text-xl font-bold text-[var(--text-primary)]">FII Master</h2>
                     <p className="text-[var(--text-secondary)] text-sm mt-1">Digite seu PIN para acessar</p>
                 </div>
@@ -127,7 +132,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
                     ))}
                     
                     {(localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics) ? (
-                        <button onClick={handleBiometricAuth} className={`w-16 h-16 md:w-14 md:h-14 rounded-full flex items-center justify-center text-[var(--accent-color)] hover:bg-[var(--bg-tertiary-hover)] transition-all active:scale-95 relative focus:outline-none ${isBiometricScanning ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}>
+                        <button onClick={() => handleBiometricAuth()} className={`w-16 h-16 md:w-14 md:h-14 rounded-full flex items-center justify-center text-[var(--accent-color)] hover:bg-[var(--bg-tertiary-hover)] transition-all active:scale-95 relative focus:outline-none ${isBiometricScanning ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}>
                             {isBiometricScanning && <div className="absolute inset-0 rounded-full animate-ping bg-[var(--accent-color)]/20"></div>}
                             <FingerprintIcon className="w-8 h-8" />
                         </button>
