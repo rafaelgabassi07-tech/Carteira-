@@ -214,11 +214,93 @@ export async function fetchHistoricalPrices(prefs: AppPreferences, queries: { ti
     }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: any, stats: { bytesSent: number, bytesReceived: number } }> {
-    // ... (Existing logic, ensuring robust asset type classification)
-    // Placeholder for the existing function
-    return { data: {}, stats: { bytesSent:0, bytesReceived:0 } };
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { dy?: number; pvp?: number; assetType?: string; administrator?: string; }>, stats: { bytesSent: number, bytesReceived: number } }> {
+    const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
+    if (tickers.length === 0) return emptyReturn;
+
+    let apiKey: string;
+    try {
+        apiKey = getGeminiApiKey(prefs);
+    } catch (error: any) {
+        console.warn("Advanced data fetch skipped:", error.message);
+        return emptyReturn;
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const tickersString = tickers.join(', ');
+
+    const prompt = `
+      TASK: For the following Brazilian Real Estate Investment Trusts (FIIs) tickers: ${tickersString}, provide key financial indicators.
+      
+      SOURCES: Prioritize "StatusInvest", "FundsExplorer", "Investidor10".
+      
+      STRICT RULES:
+      1. Return ONLY a valid JSON object. No markdown, no extra text.
+      2. The JSON object keys MUST be the uppercase tickers.
+      3. The values for each ticker MUST be an object containing:
+         - "dy": The Dividend Yield of the last 12 months as a number (e.g., 11.5 for 11.5%).
+         - "pvp": The P/VP (Price to Book Value) as a number (e.g., 1.05).
+         - "assetType": The macro category of the FII. MUST be one of: "Tijolo", "Papel", "Fiagro", "FOF", "Infra", "Híbrido", "Outros". Correctly classify hybrid funds like GARE11 as "Tijolo".
+         - "administrator": The name of the administrator (e.g., "BTG Pactual").
+      4. If a value is not found, omit the key or set it to null. DO NOT invent data.
+      
+      EXAMPLE OUTPUT for tickers "MXRF11, HGLG11":
+      {
+        "MXRF11": {
+          "dy": 12.1,
+          "pvp": 1.03,
+          "assetType": "Papel",
+          "administrator": "BTG Pactual"
+        },
+        "HGLG11": {
+          "dy": 8.5,
+          "pvp": 1.01,
+          "assetType": "Tijolo",
+          "administrator": "Credit Suisse"
+        }
+      }
+    `;
+
+    const bytesSent = new Blob([prompt]).size;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                temperature: 0,
+            }
+        });
+
+        const textResponse = response.text || "{}";
+        const bytesReceived = new Blob([textResponse]).size;
+
+        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+        const data = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+
+        // Sanitize data
+        const sanitizedData: Record<string, any> = {};
+        for (const ticker in data) {
+            if (Object.prototype.hasOwnProperty.call(data, ticker)) {
+                const assetData = data[ticker];
+                sanitizedData[ticker] = {
+                    dy: typeof assetData.dy === 'number' ? assetData.dy : undefined,
+                    pvp: typeof assetData.pvp === 'number' ? assetData.pvp : undefined,
+                    assetType: typeof assetData.assetType === 'string' ? assetData.assetType : undefined,
+                    administrator: typeof assetData.administrator === 'string' ? assetData.administrator : undefined,
+                };
+            }
+        }
+
+        return { data: sanitizedData, stats: { bytesSent, bytesReceived } };
+
+    } catch (error) {
+        console.error("Gemini Advanced Data Error:", error);
+        return emptyReturn;
+    }
 }
+
 
 export async function validateGeminiKey(key: string): Promise<boolean> {
     if (!key) return false;
