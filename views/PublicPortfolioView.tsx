@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import type { Asset, Transaction, MinimalTransaction, AppPreferences, MonthlyIncome } from '../types';
+import type { Asset, Transaction, MinimalTransaction, AppPreferences, MonthlyIncome, ToastMessage } from '../types';
 import { calculatePortfolioMetrics, fromISODate } from '../utils';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { fetchAdvancedAssetData } from '../services/geminiService';
@@ -10,6 +11,7 @@ import BarChart from '../components/BarChart';
 import CountUp from '../components/CountUp';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import AssetListItem from '../components/AssetListItem';
+import Toast from '../components/Toast';
 
 // --- Local Components for Public View ---
 
@@ -74,6 +76,12 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
     const { t } = useI18n();
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isRefreshing, setIsRefreshing] = useState(true);
+    const [toast, setToast] = useState<ToastMessage | null>(null);
+
+    const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
+        const newToast: ToastMessage = { id: Date.now(), message, type, duration: 3000 };
+        setToast(newToast);
+    }, []);
 
     const transactions: Transaction[] = useMemo(() => {
         return initialTransactions.map((tx, i) => ({
@@ -133,13 +141,14 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
             }).filter(a => a.quantity > 0.000001);
             
             setAssets(newAssets);
-
+            addToast(t('toast_update_success'), 'success');
         } catch (e) {
             console.error("Failed to fetch public market data", e);
+            addToast(t('toast_update_failed'), 'error');
         } finally {
             setIsRefreshing(false);
         }
-    }, [transactions]);
+    }, [transactions, t, addToast]);
 
     useEffect(() => {
         refreshMarketData();
@@ -267,6 +276,7 @@ const PublicPortfolioView: React.FC<PublicPortfolioViewProps> = ({ initialTransa
                     </div>
                 </div>
             </main>
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </div>
     );
 };
