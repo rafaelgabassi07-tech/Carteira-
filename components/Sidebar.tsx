@@ -52,9 +52,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
     <div className="flex flex-col h-full w-full">
       {/* Header / Logo */}
       <div className="p-8 flex items-center gap-4 mb-2">
-        <img src="/logo.png" alt="Invest" className="w-10 h-10 rounded-xl shadow-lg shadow-[var(--accent-color)]/20 object-contain bg-[var(--bg-secondary)]" />
+        <img src="/logo.png" alt="FII Master" className="w-10 h-10 rounded-xl shadow-lg shadow-[var(--accent-color)]/20 object-contain bg-[var(--bg-secondary)]" />
         <div>
-            <h1 className="font-black text-xl text-[var(--text-primary)] tracking-tight leading-none">Invest</h1>
+            <h1 className="font-black text-xl text-[var(--text-primary)] tracking-tight leading-none">FII Master</h1>
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mt-0.5">Portfolio</p>
         </div>
       </div>
@@ -87,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-[var(--text-primary)] truncate">{userProfile.name || 'Investidor'}</p>
-                <p className="text-[10px] text-[var(--text-secondary)] truncate">{userProfile.email || 'usuario@invest.app'}</p>
+                <p className="text-[10px] text-[var(--text-secondary)] truncate">{userProfile.email || 'usuario@fiimaster.app'}</p>
             </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 {
-  "name": "Invest",
-  "short_name": "Invest",
+  "name": "FII Master",
+  "short_name": "FII Master",
   "description": "Gerencie sua carteira de Fundos Imobiliários com inteligência.",
   "start_url": "/",
   "display": "standalone",

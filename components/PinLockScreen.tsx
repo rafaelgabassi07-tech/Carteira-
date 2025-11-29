@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { vibrate } from '../utils';
 import FingerprintIcon from './icons/FingerprintIcon';
@@ -24,10 +23,10 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
             await navigator.credentials.create({
                 publicKey: {
                     challenge: crypto.getRandomValues(new Uint8Array(32)),
-                    rp: { name: "Invest Unlock" },
+                    rp: { name: "FII Master Unlock" },
                     user: { 
                         id: crypto.getRandomValues(new Uint8Array(16)), 
-                        name: "auth@invest", 
+                        name: "auth@fiimaster", 
                         displayName: "Unlock" 
                     },
                     pubKeyCredParams: [{ type: "public-key", alg: -7 }],
@@ -105,8 +104,8 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
             <div className="flex flex-col items-center w-full max-w-sm md:bg-[var(--bg-secondary)] md:border md:border-[var(--border-color)] md:shadow-2xl md:rounded-3xl md:p-10 transition-all duration-300">
                 
                 <div className="mb-8 flex flex-col items-center">
-                    <img src="/logo.png" alt="Invest" className="w-16 h-16 rounded-2xl mb-4 shadow-lg border border-[var(--border-color)] object-contain bg-[var(--bg-secondary)]" />
-                    <h2 className="text-xl font-bold text-[var(--text-primary)]">Invest</h2>
+                    <img src="/logo.png" alt="FII Master" className="w-16 h-16 rounded-2xl mb-4 shadow-lg border border-[var(--border-color)] object-contain bg-[var(--bg-secondary)]" />
+                    <h2 className="text-xl font-bold text-[var(--text-primary)]">FII Master</h2>
                     <p className="text-[var(--text-secondary)] text-sm mt-1">Digite seu PIN para acessar</p>
                 </div>
 

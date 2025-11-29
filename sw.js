@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v1.7.1';
+const CACHE_NAME = 'invest-portfolio-cache-v1.7.0';
 const urlsToCache = [
   '/',
   '/index.html',

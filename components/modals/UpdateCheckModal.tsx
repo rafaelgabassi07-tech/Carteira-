@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useI18n } from '../../contexts/I18nContext';
@@ -84,15 +83,8 @@ const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     const changelogData = [
         {
-            version: 'changelog_version_title_1_7_1',
-            isLatest: true,
-            sections: [
-                { titleKey: 'changelog_news_title_1_7_1', color: 'text-[var(--accent-color)]', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_7_1' },
-            ]
-        },
-        {
             version: 'changelog_version_title_1_7_0',
-            isLatest: false,
+            isLatest: true,
             sections: [
                 { titleKey: 'changelog_news_title_1_7_0', color: 'text-emerald-400', icon: <RocketIcon className="w-5 h-5"/>, itemsKey: 'changelog_news_items_1_7_0' },
             ]
@@ -128,7 +120,7 @@ const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-lg">{t('you_are_up_to_date')}</h3>
-                                    <p className="text-xs text-[var(--text-secondary)]">{t('version')} 1.7.1 • {t('channel_stable')}</p>
+                                    <p className="text-xs text-[var(--text-secondary)]">{t('version')} 1.7.0 • {t('channel_stable')}</p>
                                 </div>
                             </div>
                         </div>
