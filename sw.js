@@ -1,10 +1,10 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v1.7.0';
+const CACHE_NAME = 'invest-portfolio-cache-v1.7.1';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://cdn-icons-png.flaticon.com/512/5556/5556468.png'
+  '/logo.png'
 ];
 
 self.addEventListener('install', event => {

@@ -52,9 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
     <div className="flex flex-col h-full w-full">
       {/* Header / Logo */}
       <div className="p-8 flex items-center gap-4 mb-2">
-        <div className="w-10 h-10 bg-gradient-to-br from-[var(--accent-color)] to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-[var(--accent-color)]/20">
-            <WalletIcon className="w-5 h-5 text-white" />
-        </div>
+        <img src="/logo.png" alt="Invest" className="w-10 h-10 rounded-xl shadow-lg shadow-[var(--accent-color)]/20 object-contain bg-[var(--bg-secondary)]" />
         <div>
             <h1 className="font-black text-xl text-[var(--text-primary)] tracking-tight leading-none">Invest</h1>
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mt-0.5">Portfolio</p>

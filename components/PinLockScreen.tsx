@@ -15,26 +15,16 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
     const [isBiometricScanning, setIsBiometricScanning] = useState(false);
 
     // This simplified biometric auth just asks the OS to verify the user.
-    // It does not check against a stored key ID, making it more robust against browser updates/clears.
     const handleBiometricAuth = async () => {
-        // Double check local flag
         const isBioEnabled = localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics;
         if (!isBioEnabled) return;
 
         setIsBiometricScanning(true);
         try {
-            // We use 'navigator.credentials.get' with an empty allowList (if supported) 
-            // or simply ask for a new assertion to prove presence.
-            // Note: strict WebAuthn usually requires an allowed credential ID.
-            // If the user hasn't registered a key in THIS specific browser instance recently, this might fail.
-            // BUT, creating a new credential also triggers the OS prompt (TouchID/FaceID) and verifies the user.
-            
-            // Try to create a dummy credential to trigger the OS User Verification prompt
-            // This effectively acts as "Unlock with FaceID" without needing persistent key management
             await navigator.credentials.create({
                 publicKey: {
                     challenge: crypto.getRandomValues(new Uint8Array(32)),
-                    rp: { name: "Invest Portfolio Unlock" },
+                    rp: { name: "Invest Unlock" },
                     user: { 
                         id: crypto.getRandomValues(new Uint8Array(16)), 
                         name: "auth@invest", 
@@ -45,19 +35,18 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
                 }
             });
 
-            // If we get here, the OS verified the user successfully
             vibrate(20);
             onUnlock();
         } catch (err) {
             console.error("Biometric auth failed or cancelled:", err);
-            // Fallback to PIN
+            // Fallback to PIN, optional: clear corrupted flag if needed
+            // if (err.name !== 'NotAllowedError') localStorage.removeItem('biometrics-enabled');
         } finally {
             setIsBiometricScanning(false);
         }
     };
 
     useEffect(() => {
-        // Auto-trigger biometrics on mount if enabled in settings
         const isBioEnabled = localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics;
         if (isBioEnabled) {
             handleBiometricAuth();
@@ -93,15 +82,12 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
     // Add Keyboard Support
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignore if biometric modal is active or modifiers are pressed
             if (isBiometricScanning || e.ctrlKey || e.metaKey || e.altKey) return;
 
-            // Numbers (Main row and Numpad)
             if (/^\d$/.test(e.key)) {
                 e.preventDefault();
                 handleDigit(e.key);
             }
-            // Backspace / Delete
             else if (e.key === 'Backspace' || e.key === 'Delete') {
                 e.preventDefault();
                 handleDelete();
@@ -110,19 +96,17 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [pin, isBiometricScanning, correctPin]); // Re-bind to access current state closure
+    }, [pin, isBiometricScanning, correctPin]);
 
     return (
         <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 animate-fade-in cursor-default user-select-none">
             
-            {/* Container Card - Transparent on Mobile, Card on Desktop */}
+            {/* Container Card */}
             <div className="flex flex-col items-center w-full max-w-sm md:bg-[var(--bg-secondary)] md:border md:border-[var(--border-color)] md:shadow-2xl md:rounded-3xl md:p-10 transition-all duration-300">
                 
                 <div className="mb-8 flex flex-col items-center">
-                    <div className="w-14 h-14 md:w-16 md:h-16 bg-[var(--bg-secondary)] md:bg-[var(--bg-primary)] rounded-2xl flex items-center justify-center mb-4 shadow-lg border border-[var(--border-color)]">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent-color)]"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    </div>
-                    <h2 className="text-xl font-bold text-[var(--text-primary)]">Invest Portfolio</h2>
+                    <img src="/logo.png" alt="Invest" className="w-16 h-16 rounded-2xl mb-4 shadow-lg border border-[var(--border-color)] object-contain bg-[var(--bg-secondary)]" />
+                    <h2 className="text-xl font-bold text-[var(--text-primary)]">Invest</h2>
                     <p className="text-[var(--text-secondary)] text-sm mt-1">Digite seu PIN para acessar</p>
                 </div>
 

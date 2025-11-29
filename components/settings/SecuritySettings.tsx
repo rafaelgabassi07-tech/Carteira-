@@ -102,12 +102,10 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
                 }
 
                 // Simply verify the user presence to enable.
-                // We don't store the credential ID to avoid browser complexity/bugs.
-                // We trust the platform's authentication on unlock.
                 const credential = await navigator.credentials.create({
                     publicKey: {
                         challenge: crypto.getRandomValues(new Uint8Array(32)),
-                        rp: { name: "Invest Portfolio" },
+                        rp: { name: "Invest" },
                         user: { 
                             id: crypto.getRandomValues(new Uint8Array(16)), 
                             name: "user@invest.app", 
