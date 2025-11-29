@@ -52,8 +52,8 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
     <div className="fixed bottom-0 left-0 right-0 h-[68px] bg-[var(--bg-secondary)]/90 backdrop-blur-lg border-t border-[var(--border-color)] z-[100] lg:hidden pb-safe">
       <div className="flex justify-around items-stretch h-full px-2">
         <NavItem label={t('nav_portfolio')} view="carteira" icon={<LayoutGridIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
-        <NavItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
         <NavItem label={t('nav_analysis')} view="analise" icon={<WalletIcon />} isActive={activeView === 'analise'} onClick={() => handleNavClick('analise')} />
+        <NavItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
         <NavItem label={t('nav_news')} view="noticias" icon={<NewsIcon />} isActive={activeView === 'noticias'} onClick={() => handleNavClick('noticias')} />
         <NavItem label={t('nav_settings')} view="settings" icon={<SettingsIcon />} isActive={activeView === 'settings'} onClick={() => handleNavClick('settings')} />
       </div>

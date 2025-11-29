@@ -1,4 +1,3 @@
-
 export const ptBR = {
     // App / Navigation
     main_portfolio: 'Dashboard',
@@ -253,7 +252,9 @@ export const ptBR = {
     reset_stats: 'Zerar Estatísticas',
     requests: 'Requisições',
     data_transferred: 'Dados Transferidos',
+    sent: 'Enviados',
     received: 'Recebidos',
+    total_data: 'Total',
     confirm_reset_stats: 'Tem certeza que deseja zerar as estatísticas?',
     hide_cents: 'Ocultar Centavos',
     show_currency: 'Mostrar Moeda',

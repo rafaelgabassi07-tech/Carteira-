@@ -11,7 +11,7 @@ type Period = '7d' | '15d' | '30d';
 const PatrimonyEvolutionCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
     const { portfolioEvolution, assets, privacyMode } = usePortfolio();
-    const [period, setPeriod] = useState<Period>('30d');
+    const [period, setPeriod] = useState<Period>('7d');
 
     // Calculate Current Metrics (Pure Capital Gain Focus)
     const currentMetrics = useMemo(() => {

@@ -17,6 +17,14 @@ const formatBytes = (bytes: number, decimals = 2) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+const MetricCard: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
+    <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-[var(--border-color)] text-center">
+        <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider">{label}</p>
+        <p className="font-mono font-bold text-sm mt-1">{value}</p>
+    </div>
+);
+
+
 const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ onBack, addToast }) => {
     const { t } = useI18n();
     const { preferences, updatePreferences, apiStats, resetApiStats } = usePortfolio();
@@ -118,29 +126,19 @@ const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: 
                     {/* Gemini Stats */}
                     <div>
                         <p className="font-bold text-sm mb-2">Gemini API (Google)</p>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="bg-[var(--bg-primary)] p-2 rounded-lg border border-[var(--border-color)]">
-                                <p className="text-xs text-[var(--text-secondary)]">{t('requests')}</p>
-                                <p className="font-mono font-bold">{apiStats.gemini.requests}</p>
-                            </div>
-                            <div className="bg-[var(--bg-primary)] p-2 rounded-lg border border-[var(--border-color)]">
-                                <p className="text-xs text-[var(--text-secondary)]">{t('data_transferred')}</p>
-                                <p className="font-mono font-bold">{formatBytes(apiStats.gemini.bytesSent + apiStats.gemini.bytesReceived)}</p>
-                            </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                           <MetricCard label={t('requests')} value={apiStats.gemini.requests} />
+                           <MetricCard label={t('sent')} value={formatBytes(apiStats.gemini.bytesSent)} />
+                           <MetricCard label={t('received')} value={formatBytes(apiStats.gemini.bytesReceived)} />
+                           <MetricCard label={t('total_data')} value={formatBytes(apiStats.gemini.bytesSent + apiStats.gemini.bytesReceived)} />
                         </div>
                     </div>
                      {/* Brapi Stats */}
                     <div>
                         <p className="font-bold text-sm mb-2">Brapi API</p>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="bg-[var(--bg-primary)] p-2 rounded-lg border border-[var(--border-color)]">
-                                <p className="text-xs text-[var(--text-secondary)]">{t('requests')}</p>
-                                <p className="font-mono font-bold">{apiStats.brapi.requests}</p>
-                            </div>
-                            <div className="bg-[var(--bg-primary)] p-2 rounded-lg border border-[var(--border-color)]">
-                                <p className="text-xs text-[var(--text-secondary)]">{t('received')}</p>
-                                <p className="font-mono font-bold">{formatBytes(apiStats.brapi.bytesReceived)}</p>
-                            </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                           <MetricCard label={t('requests')} value={apiStats.brapi.requests} />
+                           <MetricCard label={t('received')} value={formatBytes(apiStats.brapi.bytesReceived)} />
                         </div>
                     </div>
                 </div>

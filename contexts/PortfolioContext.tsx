@@ -100,8 +100,43 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       document.documentElement.style.setProperty('--font-family', font.family);
   }, [preferences.currentFontId]);
 
+  // Market Data Refresh for a single asset
+  const refreshSingleAsset = useCallback(async (ticker: string, force = false) => {
+      if(!ticker) return;
+      const now = Date.now();
+      const current = marketData[ticker.toUpperCase()];
+      
+      if(!force && current && current.lastUpdated && (now - current.lastUpdated < STALE_TIME.PRICES)) return;
+
+      try {
+          const { quotes } = await fetchBrapiQuotes(preferences, [ticker]);
+          const { data } = await fetchAdvancedAssetData(preferences, [ticker]);
+          
+          setMarketData(prev => ({
+              ...prev,
+              [ticker.toUpperCase()]: {
+                  ...(prev[ticker.toUpperCase()] || {}),
+                  ...(quotes[ticker.toUpperCase()] || {}),
+                  ...(data[ticker.toUpperCase()] || {}),
+                  lastUpdated: now
+              }
+          }));
+      } catch (e) { console.error(e); }
+  }, [marketData, preferences, setMarketData]);
+  
   // Basic Actions
-  const addTransaction = useCallback((t: Transaction) => setTransactions(p => [...p, t]), [setTransactions]);
+  const addTransaction = useCallback((t: Transaction) => {
+    const existingTickers = new Set(sourceTransactions.map(tx => tx.ticker.toUpperCase()));
+    const isNewAsset = !existingTickers.has(t.ticker.toUpperCase());
+    
+    setTransactions(p => [...p, t]);
+
+    if (isNewAsset) {
+      console.log(`New asset detected: ${t.ticker}. Fetching market data...`);
+      refreshSingleAsset(t.ticker, true);
+    }
+  }, [setTransactions, sourceTransactions, refreshSingleAsset]);
+
   const updateTransaction = useCallback((t: Transaction) => setTransactions(p => p.map(tr => tr.id === t.id ? t : tr)), [setTransactions]);
   const deleteTransaction = useCallback((id: string) => setTransactions(p => p.filter(t => t.id !== id)), [setTransactions]);
   
@@ -207,30 +242,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Clean up interval on unmount
       return () => clearInterval(intervalId);
   }, [refreshMarketData]);
-
-
-  const refreshSingleAsset = useCallback(async (ticker: string, force = false) => {
-      if(!ticker) return;
-      const now = Date.now();
-      const current = marketData[ticker.toUpperCase()];
-      
-      if(!force && current && current.lastUpdated && (now - current.lastUpdated < STALE_TIME.PRICES)) return;
-
-      try {
-          const { quotes } = await fetchBrapiQuotes(preferences, [ticker]);
-          const { data } = await fetchAdvancedAssetData(preferences, [ticker]);
-          
-          setMarketData(prev => ({
-              ...prev,
-              [ticker.toUpperCase()]: {
-                  ...(prev[ticker.toUpperCase()] || {}),
-                  ...(quotes[ticker.toUpperCase()] || {}),
-                  ...(data[ticker.toUpperCase()] || {}),
-                  lastUpdated: now
-              }
-          }));
-      } catch (e) { console.error(e); }
-  }, [marketData, preferences, setMarketData]);
 
   const refreshAllData = useCallback(async () => {
       await refreshMarketData(true);
