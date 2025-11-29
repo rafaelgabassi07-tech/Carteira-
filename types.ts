@@ -1,3 +1,4 @@
+
 export interface DividendHistoryEvent {
   exDate: string;
   paymentDate: string;
@@ -59,20 +60,12 @@ export interface Transaction {
     notes?: string;
 }
 
-// Minimal transaction for URL sharing
-export interface MinimalTransaction {
-  t: string; // ticker
-  q: number; // quantity
-  p: number; // price
-  d: string; // date
-  y: 'C' | 'V'; // type (Compra/Venda)
-}
-
 export interface Dividend {
     ticker: string;
     amountPerShare: number;
     quantity: number;
     paymentDate: string;
+    
 }
 
 export interface MonthlyIncome {

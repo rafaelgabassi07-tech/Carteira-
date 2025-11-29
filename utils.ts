@@ -162,25 +162,6 @@ export const fromISODate = (dateString: string): Date => {
     return new Date(year, month - 1, day, 12, 0, 0);
 };
 
-// --- URL-safe Base64 encoding/decoding for public sharing
-export const urlSafeEncode = (data: string): string => {
-    try {
-        return btoa(encodeURIComponent(data));
-    } catch (e) {
-        console.error("Encoding failed", e);
-        return '';
-    }
-};
-
-export const urlSafeDecode = (encoded: string): string => {
-    try {
-        return decodeURIComponent(atob(encoded));
-    } catch (e) {
-        console.error("Decoding failed", e);
-        return '';
-    }
-};
-
 // --- WebAuthn Buffer Encoding/Decoding for Biometrics ---
 export const bufferEncode = (buffer: ArrayBuffer): string => {
     const bytes = new Uint8Array(buffer);

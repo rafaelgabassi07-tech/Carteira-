@@ -5,7 +5,7 @@ import ToggleSwitch from '../ToggleSwitch';
 import type { ToastMessage } from '../../types';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
-import { usePersistentState, vibrate, bufferEncode } from '../../utils';
+import { usePersistentState, vibrate } from '../../utils';
 import PinLockScreen from '../PinLockScreen';
 
 const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => void; }> = ({ onPinSet, onCancel }) => {
@@ -89,7 +89,7 @@ const PinSetScreen: React.FC<{ onPinSet: (pin: string) => void; onCancel: () => 
 const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ onBack, addToast }) => {
     const { t } = useI18n();
     const { preferences, updatePreferences } = usePortfolio();
-    const [biometricsEnabled, setBiometricsEnabled] = usePersistentState('security-biometrics', false);
+    const [biometricsEnabled, setBiometricsEnabled] = usePersistentState('biometrics-enabled', false);
     const [showPinModal, setShowPinModal] = useState(false);
 
     const handleBiometricsToggle = async (enabled: boolean) => {
@@ -101,9 +101,11 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
                     return;
                 }
 
+                // Simply verify the user presence to enable.
+                // We don't store the credential ID to avoid browser complexity/bugs.
+                // We trust the platform's authentication on unlock.
                 const credential = await navigator.credentials.create({
                     publicKey: {
-                        // Use crypto.getRandomValues for security
                         challenge: crypto.getRandomValues(new Uint8Array(32)),
                         rp: { name: "Invest Portfolio" },
                         user: { 
@@ -111,17 +113,12 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
                             name: "user@invest.app", 
                             displayName: "User" 
                         },
-                        pubKeyCredParams: [{ type: "public-key", alg: -7 }], // ES256
-                        authenticatorSelection: {
-                            authenticatorAttachment: "platform",
-                            userVerification: "required",
-                        },
+                        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
                         timeout: 60000,
                     }
                 });
                 
                 if (credential) {
-                    localStorage.setItem('biometric-credential-id', bufferEncode((credential as any).rawId));
                     setBiometricsEnabled(true);
                     addToast(t('toast_biometric_enabled'), 'success');
                 }
@@ -130,7 +127,6 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
                  addToast('Falha ao registrar biometria.', 'error');
             }
         } else {
-            localStorage.removeItem('biometric-credential-id');
             setBiometricsEnabled(false);
             addToast(t('toast_biometric_disabled'), 'info');
         }

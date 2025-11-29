@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
@@ -5,10 +6,10 @@ import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import LoadingSpinner from './components/LoadingSpinner';
-import type { ToastMessage, MinimalTransaction } from './types';
+import type { ToastMessage } from './types';
 import { usePortfolio } from './contexts/PortfolioContext';
 import { useI18n } from './contexts/I18nContext';
-import { isLowEndDevice, urlSafeDecode } from './utils';
+import { isLowEndDevice } from './utils';
 import type { MenuScreen } from './views/SettingsView';
 import MainMenu from './components/settings/MainMenu';
 
@@ -21,7 +22,6 @@ const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
 const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
-const PublicPortfolioView = React.lazy(() => import('./views/PublicPortfolioView'));
 
 
 export type View = 'dashboard' | 'carteira' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail';
@@ -38,7 +38,6 @@ const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
-  const [publicViewData, setPublicViewData] = useState<MinimalTransaction[] | null>(null);
   
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
     const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
@@ -48,32 +47,6 @@ const App: React.FC = () => {
             setToast(t => (t?.id === newToast.id ? null : t));
         }, duration);
     }
-  }, []);
-
-  // Public View Router
-  useEffect(() => {
-    const handleHashChange = () => {
-        const hash = window.location.hash;
-        if (hash.startsWith('#view=')) {
-            try {
-                const encodedData = hash.substring(6);
-                const decodedJson = urlSafeDecode(encodedData);
-                const transactions = JSON.parse(decodedJson);
-                if (Array.isArray(transactions)) {
-                    setPublicViewData(transactions);
-                }
-            } catch (error) {
-                console.error("Failed to parse public portfolio link:", error);
-                window.location.hash = '';
-                setPublicViewData(null);
-            }
-        } else {
-            setPublicViewData(null);
-        }
-    };
-    handleHashChange(); // Check on initial load
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   // Responsive & Theme Handlers
@@ -164,14 +137,6 @@ const App: React.FC = () => {
       default: return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
     }
   };
-
-  if (publicViewData) {
-      return (
-          <Suspense fallback={<LoadingSpinner />}>
-              <PublicPortfolioView initialTransactions={publicViewData} />
-          </Suspense>
-      );
-  }
 
   if (isLocked) {
       return <Suspense fallback={<LoadingSpinner />}><PinLockScreen onUnlock={() => setIsLocked(false)} correctPin={preferences.appPin!} allowBiometrics={!!localStorage.getItem('biometric-credential-id')} /></Suspense>;

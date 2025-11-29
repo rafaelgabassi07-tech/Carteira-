@@ -1,9 +1,10 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, DividendHistoryEvent, AppStats, SegmentEvolutionData, PortfolioEvolutionPoint, AppNotification, MinimalTransaction } from '../types';
+import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, DividendHistoryEvent, AppStats, SegmentEvolutionData, PortfolioEvolutionPoint, AppNotification } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { generateNotifications } from '../services/dynamicDataService';
-import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, fromISODate, CacheManager, getTodayISODate, toISODate, urlSafeEncode } from '../utils';
+import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, fromISODate, CacheManager, getTodayISODate, toISODate } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME } from '../constants';
 
 // ... (Keep interfaces mostly the same)
@@ -48,7 +49,6 @@ interface PortfolioContextType {
   logApiUsage: (api: 'gemini'|'brapi', stats: any) => void;
   resetApiStats: () => void;
   markNotificationsAsRead: () => void;
-  generatePublicLink: () => string;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -195,23 +195,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadNotificationsCount(0);
   }, [setNotifications]);
-
-  const generatePublicLink = useCallback(() => {
-    if (sourceTransactions.length === 0) return '';
-
-    const minimalTxs: MinimalTransaction[] = sourceTransactions.map(tx => ({
-        t: tx.ticker,
-        q: tx.quantity,
-        p: tx.price,
-        d: tx.date,
-        y: tx.type === 'Compra' ? 'C' : 'V'
-    }));
-
-    const jsonString = JSON.stringify(minimalTxs);
-    const encoded = urlSafeEncode(jsonString);
-
-    return `${window.location.origin}${window.location.pathname}#view=${encoded}`;
-  }, [sourceTransactions]);
 
   // Market Data Refresh
   const refreshMarketData = useCallback(async (force = false, silent = false) => {
@@ -430,8 +413,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
-      setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
-      generatePublicLink
+      setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead
   };
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;
