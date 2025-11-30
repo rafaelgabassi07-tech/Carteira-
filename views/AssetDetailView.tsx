@@ -48,7 +48,7 @@ const MetricItem: React.FC<{ label: string; value: string | number; subValue?: s
 
 const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onViewTransactions }) => {
     const { t, formatCurrency, locale } = useI18n();
-    const { getAssetByTicker, transactions, dividends, refreshSingleAsset } = usePortfolio();
+    const { getAssetByTicker, transactions, refreshSingleAsset } = usePortfolio();
     const [activeTab, setActiveTab] = useState('summary');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showAllHistory, setShowAllHistory] = useState(false);
@@ -69,29 +69,46 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         }
     }, [ticker, refreshSingleAsset, isRefreshing]);
 
+    // Only load if not already refreshing (controlled by component state)
     useEffect(() => {
-        const initialLoad = async () => {
+        if (!asset) {
              setIsRefreshing(true);
-             try {
-                await refreshSingleAsset(ticker, false); // Standard refresh (respects stale time)
-             } finally {
-                setIsRefreshing(false);
-             }
-        };
-        initialLoad();
-    }, [ticker, refreshSingleAsset]);
+             refreshSingleAsset(ticker, false).finally(() => setIsRefreshing(false));
+        }
+    }, [ticker, asset, refreshSingleAsset]);
 
     const assetTransactions = useMemo(() => {
         return transactions.filter(tx => tx.ticker === asset?.ticker).sort((a, b) => b.date.localeCompare(a.date));
     }, [transactions, asset?.ticker]);
 
-    const assetDividends = useMemo(() => {
-        return dividends.filter(d => d.ticker === asset?.ticker).sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
-    }, [dividends, asset?.ticker]);
+    // Calculate REAL dividends received by user based on history and holdings
+    const userDividendHistory = useMemo(() => {
+        if (!asset || !asset.dividendsHistory) return [];
+        
+        // Ensure transactions are sorted date ASC for replay
+        const txs = transactions.filter(t => t.ticker === asset.ticker).sort((a,b) => a.date.localeCompare(b.date));
+        
+        return asset.dividendsHistory.map(div => {
+            // Calculate holding on ex-date
+            let qty = 0;
+            for(const tx of txs) {
+                if (tx.date > div.exDate) break; // Transaction happened after ex-date
+                if (tx.type === 'Compra') qty += tx.quantity;
+                else qty -= tx.quantity;
+            }
+            const userQty = Math.max(0, qty);
+            
+            return {
+                ...div,
+                userQuantity: userQty,
+                totalReceived: userQty * div.value
+            };
+        }).filter(d => d.value > 0).sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
+    }, [asset, transactions]);
 
     const displayedDividends = useMemo(() => {
-        return showAllHistory ? assetDividends : assetDividends.slice(0, 3);
-    }, [assetDividends, showAllHistory]);
+        return showAllHistory ? userDividendHistory : userDividendHistory.slice(0, 3);
+    }, [userDividendHistory, showAllHistory]);
 
     // --- Dividends Metrics Calculation ---
     const today = new Date();
@@ -100,34 +117,33 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     oneYearAgo.setFullYear(currentYear - 1);
 
     const totalDividends = useMemo(() => {
-        return assetDividends.reduce((acc, div) => acc + (div.amountPerShare * div.quantity), 0);
-    }, [assetDividends]);
+        return userDividendHistory.reduce((acc, div) => acc + div.totalReceived, 0);
+    }, [userDividendHistory]);
 
     const totalYTD = useMemo(() => {
-        return assetDividends
+        return userDividendHistory
             .filter(d => new Date(d.paymentDate).getFullYear() === currentYear)
-            .reduce((acc, div) => acc + (div.amountPerShare * div.quantity), 0);
-    }, [assetDividends, currentYear]);
+            .reduce((acc, div) => acc + div.totalReceived, 0);
+    }, [userDividendHistory, currentYear]);
 
     const totalL12M = useMemo(() => {
-        return assetDividends
+        return userDividendHistory
             .filter(d => new Date(d.paymentDate) >= oneYearAgo)
-            .reduce((acc, div) => acc + (div.amountPerShare * div.quantity), 0);
-    }, [assetDividends, oneYearAgo]);
+            .reduce((acc, div) => acc + div.totalReceived, 0);
+    }, [userDividendHistory, oneYearAgo]);
 
     const averageMonthly = totalL12M / 12;
 
     // Real Yield: Sum of per-share amounts L12M / Current Price
     const dyReal = useMemo(() => {
         if (!asset || asset.currentPrice <= 0) return 0;
-        const sumPerShareL12M = assetDividends
+        const sumPerShareL12M = (asset.dividendsHistory || [])
             .filter(d => new Date(d.paymentDate) >= oneYearAgo)
-            .reduce((acc, div) => acc + div.amountPerShare, 0); // Note: Logic might need to check unique ex-dates for precise per-share sum if multiple payments per month
+            .reduce((acc, div) => acc + div.value, 0);
         return (sumPerShareL12M / asset.currentPrice) * 100;
-    }, [asset, assetDividends, oneYearAgo]);
+    }, [asset, oneYearAgo]);
 
 
-    // Only show error/not found if we aren't refreshing AND have no asset data
     if (!asset && !isRefreshing) {
         return (
             <div className="p-4">
@@ -242,8 +258,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                 </h3>
                                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
                                     {displayedDividends.map((div, index) => {
-                                        const historyItem = asset?.dividendsHistory?.find(h => h.paymentDate === div.paymentDate && Math.abs(h.value - div.amountPerShare) < 0.001);
-                                        const exDate = historyItem?.exDate;
                                         return (
                                             <div 
                                                 key={`${div.paymentDate}-${index}`} 
@@ -253,21 +267,20 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                                 <div>
                                                     <p className="font-bold text-sm text-[var(--text-primary)] mb-0.5">{new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC' })}</p>
                                                     <div className="flex items-center gap-2">
-                                                        {exDate && (<span className="text-[10px] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">Com: {new Date(exDate).toLocaleDateString(locale, { day:'2-digit', month:'2-digit', timeZone: 'UTC' })}</span>)}
-                                                        {!exDate && <span className="text-[10px] text-[var(--text-secondary)]">{t('payment_date')}</span>}
+                                                        <span className="text-[10px] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">Com: {new Date(div.exDate).toLocaleDateString(locale, { day:'2-digit', month:'2-digit', timeZone: 'UTC' })}</span>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.amountPerShare * div.quantity)}</p>
-                                                    <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">{div.quantity} × {formatCurrency(div.amountPerShare)}</p>
+                                                    <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.value * div.userQuantity)}</p>
+                                                    <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">{div.userQuantity} × {formatCurrency(div.value)}</p>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                                {!showAllHistory && assetDividends.length > 3 && (
+                                {!showAllHistory && userDividendHistory.length > 3 && (
                                     <button onClick={() => { vibrate(); setShowAllHistory(true); }} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-secondary)] rounded-xl border border-dashed border-[var(--border-color)] transition-all">
-                                        {t('view_full_history')} ({assetDividends.length})
+                                        {t('view_full_history')} ({userDividendHistory.length})
                                     </button>
                                 )}
                                 {showAllHistory && (<button onClick={() => { vibrate(); setShowAllHistory(false); }} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">{t('show_less')}</button>)}

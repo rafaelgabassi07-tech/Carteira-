@@ -93,7 +93,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // @ts-ignore
       const newScreen = startScreen === 'carteira' ? 'dashboard' : 'carteira';
       updatePreferences({ startScreen: newScreen });
-      console.log(`Migrated startScreen from '${startScreen}' to '${newScreen}'`);
     }
   }, []); // Runs only once
 
@@ -312,7 +311,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           
           const histMap = new Map<string, DividendHistoryEvent>();
           (data.dividendsHistory || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d));
-          // If gemini fetched recent dividends, merge them
           
           return {
               ticker, quantity: m.quantity, avgPrice, currentPrice: curPrice,
@@ -332,8 +330,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const incompleteAssets = assets.filter(a => a.segment === 'Outros' || a.priceHistory.length === 0);
       if (incompleteAssets.length > 0 && navigator.onLine) {
           console.log("Auto-Repair: Fetching missing data for", incompleteAssets.length, "assets");
-          // Debounce this heavily or run once per session logic could be applied here
-          // For now, simple check with a delay to avoid conflict with initial load
           const timer = setTimeout(() => {
               refreshMarketData(true, true, false); // Force FULL refresh silently
           }, 5000);
@@ -348,7 +344,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     if (isDemoMode) {
-        setMonthlyIncome(MOCK_USER_PROFILE ? DEMO_MARKET_DATA as any : []); // Simplified fallback
+        setMonthlyIncome(MOCK_USER_PROFILE ? DEMO_MARKET_DATA as any : []); 
         return;
     }
 
@@ -398,7 +394,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [currentPatrimony, isDemoMode, assets, sourceTransactions, sourceMarketData, setNotifications]); // Re-run when data changes
+  }, [currentPatrimony, isDemoMode, assets, sourceTransactions, sourceMarketData, setNotifications]); 
 
   const getAssetByTicker = useCallback((ticker: string) => {
       return assets.find(a => a.ticker === ticker);
@@ -419,7 +415,37 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice * ((a.dy || 0) / 100)), 0);
   }, [assets]);
 
-  const getAveragePriceForTransaction = useCallback(() => 0, []);
+  // Calculate Average Price BEFORE the transaction date (for realizing gains)
+  const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
+      if (targetTx.type !== 'Venda') return 0;
+
+      // Filter transactions for this ticker strictly before the target sale date
+      // Or if same date, by ID/creation order if we had it, but simplified by date
+      const tickerTxs = sourceTransactions
+          .filter(t => t.ticker === targetTx.ticker && t.date <= targetTx.date && t.id !== targetTx.id)
+          .sort((a, b) => a.date.localeCompare(b.date));
+
+      let totalQty = 0;
+      let totalCost = 0;
+
+      for (const tx of tickerTxs) {
+          if (tx.type === 'Compra') {
+              const cost = (tx.quantity * tx.price) + (tx.costs || 0);
+              totalCost += cost;
+              totalQty += tx.quantity;
+          } else if (tx.type === 'Venda') {
+              // Selling reduces quantity and proportionally reduces cost basis
+              const sellQty = Math.min(tx.quantity, totalQty);
+              if (totalQty > 0) {
+                  const avgPrice = totalCost / totalQty;
+                  totalCost -= sellQty * avgPrice;
+                  totalQty -= sellQty;
+              }
+          }
+      }
+
+      return totalQty > 0 ? totalCost / totalQty : 0;
+  }, [sourceTransactions]);
 
   // OTIMIZAÇÃO: Memoize o objeto value para prevenir re-renders desnecessários
   const value = useMemo(() => ({
