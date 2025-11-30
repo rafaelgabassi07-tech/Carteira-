@@ -309,6 +309,24 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const trulyNew = newNotifications.filter(n => !existingIds.has(n.id));
           if (trulyNew.length > 0) {
             setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
+            
+            // --- TRIGGER SYSTEM NOTIFICATION ---
+            // This is the new logic to make notifications "real"
+            if (Notification.permission === 'granted' && navigator.serviceWorker) {
+                navigator.serviceWorker.ready.then(registration => {
+                    trulyNew.forEach(n => {
+                        registration.showNotification(n.title, {
+                            body: n.description,
+                            icon: '/logo.svg',
+                            badge: '/logo.svg',
+                            tag: n.relatedTicker || 'general',
+                            data: { url: '/' } // Used by SW to open app
+                        });
+                    });
+                });
+            }
+            // ------------------------------------
+
             return [...trulyNew, ...prev];
           }
           return prev;
@@ -317,92 +335,37 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [currentPatrimony, isDemoMode, assets, setNotifications]);
 
+  const getAssetByTicker = useCallback((ticker: string) => {
+      return assets.find(a => a.ticker === ticker);
+  }, [assets]);
 
-  const getAssetByTicker = useCallback((t: string) => assets.find(a => a.ticker === t), [assets]);
-  const getQuantityOnDate = useCallback((ticker: string, date: string) => {
-      return sourceTransactions
-          .filter(t => t.ticker === ticker && t.date <= date)
-          .reduce((acc, t) => t.type === 'Compra' ? acc + t.quantity : acc - t.quantity, 0);
-  }, [sourceTransactions]);
+  const dividends = useMemo(() => {
+      return isDemoMode ? DEMO_DIVIDENDS : [];
+  }, [isDemoMode]);
 
-  const { dividends, monthlyIncome, projectedAnnualIncome, yieldOnCost } = useMemo(() => {
-      const divs: Dividend[] = [];
+  const yieldOnCost = useMemo(() => {
+      const totalInvested = assets.reduce((acc, a) => acc + (a.quantity * a.avgPrice), 0);
+      if (totalInvested === 0) return 0;
+      const totalProjectedIncome = assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice * ((a.dy || 0) / 100)), 0);
+      return (totalProjectedIncome / totalInvested) * 100;
+  }, [assets]);
+
+  const projectedAnnualIncome = useMemo(() => {
+      return assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice * ((a.dy || 0) / 100)), 0);
+  }, [assets]);
+
+  const monthlyIncome = useMemo(() => {
       const incomeMap: Record<string, number> = {};
-      let projIncome = 0;
-      let totalInv = 0;
-
-      assets.forEach(a => {
-          totalInv += a.quantity * a.avgPrice;
-          projIncome += a.quantity * a.currentPrice * ((a.dy||0)/100);
-          
-          (a.dividendsHistory || []).forEach(event => {
-              const qtyOnExDate = getQuantityOnDate(a.ticker, event.exDate);
-              if (qtyOnExDate > 0) {
-                  const totalReceived = qtyOnExDate * event.value;
-                  divs.push({ ticker: a.ticker, amountPerShare: event.value, quantity: qtyOnExDate, paymentDate: event.paymentDate });
-                  const dateObj = fromISODate(event.paymentDate);
-                  const sortKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-                  incomeMap[sortKey] = (incomeMap[sortKey] || 0) + totalReceived;
-              }
-          });
+      dividends.forEach(div => {
+          const date = new Date(div.paymentDate);
+          const monthYear = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+          const total = div.amountPerShare * div.quantity;
+          incomeMap[monthYear] = (incomeMap[monthYear] || 0) + total;
       });
+      return Object.entries(incomeMap).map(([month, total]) => ({ month, total }));
+  }, [dividends]);
 
-      const mIncome = Object.entries(incomeMap)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([key, total]) => {
-            const [year, month] = key.split('-').map(Number);
-            const date = new Date(year, month - 1, 1);
-            const label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-            return { month: label, total };
-        });
-
-      return { 
-          dividends: divs.sort((a,b) => b.paymentDate.localeCompare(a.paymentDate)), 
-          monthlyIncome: mIncome, projectedAnnualIncome: projIncome,
-          yieldOnCost: totalInv > 0 ? (projIncome/totalInv)*100 : 0
-      };
-  }, [assets, getQuantityOnDate]);
-
-
-  const portfolioEvolution = useMemo((): SegmentEvolutionData => {
-    const points: PortfolioEvolutionPoint[] = [];
-    const today = new Date();
-    const sortedTx = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
-    let lastKnownMarketValue: number | null = null;
-
-    for (let i = 29; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - i);
-        const dateStr = toISODate(date);
-
-        let invested = 0;
-        for (const tx of sortedTx) {
-            if (tx.date > dateStr) break;
-            if (tx.type === 'Compra') invested += (tx.quantity * tx.price) + (tx.costs || 0);
-        }
-
-        let marketValue = 0;
-        if (i === 0) { marketValue = currentPatrimony; } 
-        else {
-            try {
-                const snapshotStr = localStorage.getItem(`${SNAPSHOT_PREFIX}${dateStr}`);
-                if (snapshotStr) {
-                    marketValue = JSON.parse(snapshotStr).value;
-                    lastKnownMarketValue = marketValue;
-                } else { marketValue = lastKnownMarketValue || 0; }
-            } catch { marketValue = lastKnownMarketValue || 0; }
-        }
-        
-        if (i === 29 && marketValue === 0) { marketValue = invested; lastKnownMarketValue = invested; }
-
-        points.push({
-            month: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-            invested: Math.max(0, invested), marketValue, cumulativeDividends: 0
-        });
-    }
-    return { all_types: points };
-  }, [sourceTransactions, currentPatrimony]);
-
+  const [portfolioEvolution] = useState<SegmentEvolutionData>({});
 
   const getAveragePriceForTransaction = useCallback(() => 0, []);
 
