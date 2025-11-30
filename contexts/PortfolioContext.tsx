@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, DividendHistoryEvent, AppStats, SegmentEvolutionData, PortfolioEvolutionPoint, AppNotification } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
@@ -36,7 +35,7 @@ interface PortfolioContextType {
   setTheme: (id: string) => void;
   setFont: (id: string) => void;
   updateUserProfile: (p: Partial<UserProfile>) => void;
-  refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
+  refreshMarketData: (force?: boolean, silent?: boolean, lite?: boolean) => Promise<void>;
   refreshAllData: () => Promise<void>;
   refreshSingleAsset: (ticker: string, force?: boolean) => Promise<void>;
   getAssetByTicker: (ticker: string) => Asset | undefined;
@@ -133,7 +132,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if(!force && current && current.lastUpdated && (now - current.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
-          const { quotes } = await fetchBrapiQuotes(preferences, [ticker]);
+          // Single asset refresh always fetches full data (lite=false)
+          const { quotes } = await fetchBrapiQuotes(preferences, [ticker], false);
           const { data } = await fetchAdvancedAssetData(preferences, [ticker]);
           
           setMarketData(prev => ({
@@ -208,7 +208,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [setNotifications]);
 
   // Market Data Refresh
-  const refreshMarketData = useCallback(async (force = false, silent = false) => {
+  const refreshMarketData = useCallback(async (force = false, silent = false, lite = false) => {
       if(isRefreshing) return;
       if(!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return; // Throttle
 
@@ -219,11 +219,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
-          // Parallel fetch
-          const [brapiRes, geminiRes] = await Promise.allSettled([
-              fetchBrapiQuotes(preferences, tickers),
-              fetchAdvancedAssetData(preferences, tickers)
-          ]);
+          // Parallel fetch. If lite mode (auto-refresh), we don't fetch advanced asset data (indicators)
+          // to save tokens and bandwidth, assuming fundamentals don't change every 10 mins.
+          const promises: Promise<any>[] = [fetchBrapiQuotes(preferences, tickers, lite)];
+          
+          if (!lite) {
+              promises.push(fetchAdvancedAssetData(preferences, tickers));
+          }
+
+          const results = await Promise.allSettled(promises);
+          const brapiRes = results[0];
+          const geminiRes = results[1]; // might be undefined in lite mode
 
           setMarketData(prev => {
               const next = { ...prev };
@@ -232,11 +238,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   const res = brapiRes.value;
                   logApiUsage('brapi', { requests: tickers.length, bytesReceived: res.stats.bytesReceived });
                   Object.entries(res.quotes).forEach(([tkr, data]) => {
-                      next[tkr] = { ...(next[tkr] || {}), ...data, lastUpdated: Date.now() };
+                      // Important: Merge carefully. If lite mode, data won't have priceHistory/dividendsHistory.
+                      // We must preserve existing history if the new data is missing it.
+                      next[tkr] = { 
+                          ...(next[tkr] || {}), 
+                          ...(data as object), 
+                          lastUpdated: Date.now() 
+                      };
                   });
               }
 
-              if(geminiRes.status === 'fulfilled') {
+              if(geminiRes && geminiRes.status === 'fulfilled') {
                   const res = geminiRes.value as { data: any; stats: { bytesSent: number; bytesReceived: number } };
                   logApiUsage('gemini', { requests: 1, ...res.stats as any });
                   Object.entries(res.data).forEach(([tkr, data]) => {
@@ -268,7 +280,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const isOnline = navigator.onLine;
 
           if (isWeekDay && isMarketHours && isOnline) {
-              refreshMarketData(true, true);
+              // Use LITE mode for auto-refresh to save bandwidth
+              refreshMarketData(true, true, true);
           }
       };
       const intervalId = setInterval(checkAndRefresh, 10 * 60 * 1000);
@@ -276,7 +289,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [refreshMarketData]);
 
   const refreshAllData = useCallback(async () => {
-      await refreshMarketData(true);
+      await refreshMarketData(true, false, false); // Full refresh manually
   }, [refreshMarketData]);
 
   const assets = useMemo(() => {

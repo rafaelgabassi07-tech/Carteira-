@@ -13,7 +13,7 @@ interface AssetListItemProps {
     hideCents: boolean;
 }
 
-const AssetListItem = React.memo<AssetListItemProps>(({ asset, totalValue, onClick, style, privacyMode, hideCents }) => {
+const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValue, onClick, style, privacyMode, hideCents }) => {
     const { t, formatCurrency } = useI18n();
     const currentValue = asset.quantity * asset.currentPrice;
     const totalInvested = asset.quantity * asset.avgPrice;
@@ -55,6 +55,23 @@ const AssetListItem = React.memo<AssetListItemProps>(({ asset, totalValue, onCli
             </div>
         </div>
     );
-});
+};
 
-export default AssetListItem;
+// Custom comparison for performance optimization
+const arePropsEqual = (prevProps: AssetListItemProps, nextProps: AssetListItemProps) => {
+    // Only re-render if visual data changes
+    return (
+        prevProps.totalValue === nextProps.totalValue &&
+        prevProps.privacyMode === nextProps.privacyMode &&
+        prevProps.hideCents === nextProps.hideCents &&
+        prevProps.asset.ticker === nextProps.asset.ticker &&
+        prevProps.asset.quantity === nextProps.asset.quantity &&
+        // Use epsilon for float comparison safety
+        Math.abs(prevProps.asset.currentPrice - nextProps.asset.currentPrice) < 0.0001 &&
+        Math.abs(prevProps.asset.avgPrice - nextProps.asset.avgPrice) < 0.0001 &&
+        // Style might change for animation delays
+        JSON.stringify(prevProps.style) === JSON.stringify(nextProps.style)
+    );
+};
+
+export default React.memo(AssetListItemComponent, arePropsEqual);

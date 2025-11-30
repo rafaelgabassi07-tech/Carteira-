@@ -30,10 +30,8 @@ function getBrapiToken(prefs: AppPreferences): string {
     throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado.");
 }
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[]): Promise<{
-    quotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[], dividendsHistory: DividendHistoryEvent[] }>,
+export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[], lite = false): Promise<{
+    quotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[], dividendsHistory?: DividendHistoryEvent[] }>,
     stats: { bytesReceived: number }
 }> {
     const emptyReturn = { quotes: {}, stats: { bytesReceived: 0 } };
@@ -42,7 +40,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     }
 
     const token = getBrapiToken(prefs);
-    const allQuotes: Record<string, { currentPrice: number; priceHistory: { date: string; price: number }[], dividendsHistory: DividendHistoryEvent[] }> = {};
+    const allQuotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[], dividendsHistory?: DividendHistoryEvent[] }> = {};
     const failedTickers: string[] = [];
     let totalBytesReceived = 0;
 
@@ -52,12 +50,14 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
         let success = false;
         let resultData: any = null;
 
-        // Try ranges
-        const ranges = ['5y', '1y', '3mo'];
+        // Optimized ranges: If lite, just get 1d. If full, try deep history.
+        const ranges = lite ? ['1d'] : ['5y', '1y', '3mo'];
         
         for (const range of ranges) {
             try {
-                const response = await fetch(`${urlBase}?range=${range}&dividends=true&token=${token}`);
+                // If lite, we don't need dividend data, saving processing time and bandwidth
+                const dividendsParam = lite ? 'false' : 'true';
+                const response = await fetch(`${urlBase}?range=${range}&dividends=${dividendsParam}&token=${token}`);
                 const text = await response.text();
                 totalBytesReceived += new Blob([text]).size;
 
@@ -97,24 +97,29 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
         if (success && resultData) {
             let dividendsHistory: DividendHistoryEvent[] = [];
-            
-            if (resultData.dividendData?.historicalDataPrice) {
-                dividendsHistory = resultData.dividendData.historicalDataPrice.map((item: any) => ({
-                    exDate: new Date(item.date * 1000).toISOString().split('T')[0],
-                    paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
-                    value: item.dividends?.[0]?.value || 0
-                })).filter((d: any) => d.value > 0);
-            }
+            let finalHistory: { date: string; price: number }[] = [];
 
-            const rawHistory = resultData.historicalDataPrice || [];
-            let finalHistory = rawHistory.map((item: any) => ({
-                date: new Date(item.date * 1000).toISOString().split('T')[0],
-                price: item.close,
-            })).sort((a: any, b: any) => a.date.localeCompare(b.date));
+            // Only process history and dividends if NOT in lite mode
+            if (!lite) {
+                if (resultData.dividendData?.historicalDataPrice) {
+                    dividendsHistory = resultData.dividendData.historicalDataPrice.map((item: any) => ({
+                        exDate: new Date(item.date * 1000).toISOString().split('T')[0],
+                        paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
+                        value: item.dividends?.[0]?.value || 0
+                    })).filter((d: any) => d.value > 0);
+                }
+
+                const rawHistory = resultData.historicalDataPrice || [];
+                finalHistory = rawHistory.map((item: any) => ({
+                    date: new Date(item.date * 1000).toISOString().split('T')[0],
+                    price: item.close,
+                })).sort((a: any, b: any) => a.date.localeCompare(b.date));
+            }
 
             const currentPrice = resultData.regularMarketPrice || 0;
 
-            if (currentPrice > 0) {
+            // Update current day in history if needed (only for full mode)
+            if (!lite && currentPrice > 0) {
                 const todayISO = new Date().toISOString().split('T')[0];
                 const lastHistoryDate = finalHistory.length > 0 ? finalHistory[finalHistory.length - 1].date : '';
                 if (lastHistoryDate !== todayISO) {
@@ -124,8 +129,8 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
 
             allQuotes[ticker.toUpperCase()] = {
                 currentPrice: currentPrice,
-                priceHistory: finalHistory,
-                dividendsHistory
+                // Only return complex arrays if not lite, otherwise undefined to merge carefully in context
+                ...(lite ? {} : { priceHistory: finalHistory, dividendsHistory })
             };
         } else {
             failedTickers.push(ticker);
