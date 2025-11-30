@@ -49,6 +49,8 @@ interface PortfolioContextType {
   logApiUsage: (api: 'gemini'|'brapi', stats: any) => void;
   resetApiStats: () => void;
   markNotificationsAsRead: () => void;
+  deleteNotification: (id: number) => void;
+  clearAllNotifications: () => void;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -196,6 +198,15 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUnreadNotificationsCount(0);
   }, [setNotifications]);
 
+  const deleteNotification = useCallback((id: number) => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+  }, [setNotifications]);
+
+  const clearAllNotifications = useCallback(() => {
+      setNotifications([]);
+      setUnreadNotificationsCount(0);
+  }, [setNotifications]);
+
   // Market Data Refresh
   const refreshMarketData = useCallback(async (force = false, silent = false) => {
       if(isRefreshing) return;
@@ -311,7 +322,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
             
             // --- TRIGGER SYSTEM NOTIFICATION ---
-            // This is the new logic to make notifications "real"
             if (Notification.permission === 'granted' && navigator.serviceWorker) {
                 navigator.serviceWorker.ready.then(registration => {
                     trulyNew.forEach(n => {
@@ -320,7 +330,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                             icon: '/logo.svg',
                             badge: '/logo.svg',
                             tag: n.relatedTicker || 'general',
-                            data: { url: '/' } // Used by SW to open app
+                            data: { url: '/' }
                         });
                     });
                 });
@@ -376,7 +386,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
-      setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead
+      setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
+      deleteNotification, clearAllNotifications
   };
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;

@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
+
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { View, } from '../App';
 import type { AppNotification, NotificationType } from '../types';
 import type { MenuScreen } from './SettingsView';
@@ -24,17 +25,102 @@ const NotificationIcon: React.FC<{ type: NotificationType }> = ({ type }) => {
     }
 };
 
+const SwipeableNotificationItem: React.FC<{ 
+    notification: AppNotification; 
+    onDelete: (id: number) => void;
+    onClick: (n: AppNotification) => void;
+}> = ({ notification, onDelete, onClick }) => {
+    const [offsetX, setOffsetX] = useState(0);
+    const [isSwiping, setIsSwiping] = useState(false);
+    const startX = useRef(0);
+    
+    // Reset position if notification changes (unlikely key-prop handles it, but safe)
+    useEffect(() => { setOffsetX(0); }, [notification.id]);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        startX.current = e.touches[0].clientX;
+        setIsSwiping(true);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isSwiping) return;
+        const currentX = e.touches[0].clientX;
+        const diff = currentX - startX.current;
+        
+        // Allow swiping left (negative diff)
+        if (diff < 0) {
+            // Prevent scrolling vertical if dragging horizontal
+            if (Math.abs(diff) > 10 && e.cancelable) e.preventDefault();
+            // Cap at -100px
+            setOffsetX(Math.max(diff, -100));
+        }
+    };
+
+    const handleTouchEnd = () => {
+        setIsSwiping(false);
+        if (offsetX < -70) {
+            // Swiped far enough - trigger delete
+            setOffsetX(-500); // Animate out screen
+            setTimeout(() => onDelete(notification.id), 200); // Wait for anim
+        } else {
+            // Snap back
+            setOffsetX(0);
+        }
+    };
+
+    return (
+        <div className="relative overflow-hidden rounded-xl mb-3">
+            {/* Background Action (Delete) */}
+            <div className="absolute inset-0 bg-red-500 rounded-xl flex items-center justify-end pr-5">
+                <TrashIcon className="w-6 h-6 text-white" />
+            </div>
+
+            {/* Foreground Content */}
+            <div 
+                className={`relative bg-[var(--bg-secondary)] p-4 flex items-start space-x-4 border border-[var(--border-color)] transition-transform duration-200 ease-out active:scale-[0.98] ${notification.read ? 'opacity-60' : 'shadow-sm border-l-4 border-l-[var(--accent-color)]'}`}
+                style={{ 
+                    transform: `translateX(${offsetX}px)`,
+                    // Disable transition during drag for responsiveness
+                    transition: isSwiping ? 'none' : 'transform 0.2s ease-out'
+                }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onClick={() => {
+                    if (offsetX === 0) {
+                        vibrate();
+                        onClick(notification);
+                    }
+                }}
+            >
+                <NotificationIcon type={notification.type} />
+                <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold truncate ${notification.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{notification.title}</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">{notification.description}</p>
+                    <div className="flex justify-between items-center mt-2">
+                        <p className="text-[10px] text-[var(--text-secondary)] opacity-70">{new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        {notification.relatedTicker && (
+                            <div className="flex items-center text-[var(--accent-color)] text-[10px] font-bold gap-0.5">
+                                VER ATIVO <ChevronRightIcon className="w-4 h-4" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelectAsset: (ticker: string) => void; onOpenSettings: (screen: MenuScreen) => void; }> = ({ setActiveView, onSelectAsset, onOpenSettings }) => {
     const { t } = useI18n();
-    const { notifications, markNotificationsAsRead, unreadNotificationsCount } = usePortfolio();
+    const { notifications, markNotificationsAsRead, unreadNotificationsCount, deleteNotification, clearAllNotifications } = usePortfolio();
     
-    // Mark as read when the view is opened
     useEffect(() => {
         const timer = setTimeout(() => {
             if (unreadNotificationsCount > 0) {
                 markNotificationsAsRead();
             }
-        }, 1000); // Small delay to allow animation in
+        }, 1000); 
         return () => clearTimeout(timer);
     }, [unreadNotificationsCount, markNotificationsAsRead]);
     
@@ -42,16 +128,14 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
 
     const handleNotificationClick = (notification: AppNotification) => {
         if (notification.relatedTicker) {
-            vibrate();
             onSelectAsset(notification.relatedTicker);
         }
     };
     
-    const clearAll = () => {
+    const handleClearAll = () => {
         vibrate();
         if (window.confirm(t('clear_all') + '?')) {
-            // In a real app, you would call a context function like `clearAllNotifications()`
-            // For now, we simulate by doing nothing, as the state is in context
+            clearAllNotifications();
         }
     };
 
@@ -96,9 +180,9 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                     <button onClick={goToSettings} className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors" aria-label="Configurações">
                         <SettingsIcon className="w-5 h-5" />
                     </button>
-                    {unreadNotificationsCount > 0 && (
-                        <button onClick={markNotificationsAsRead} className="text-xs bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold px-3 py-1.5 rounded-lg flex items-center whitespace-nowrap">
-                            {t('mark_all_as_read')}
+                    {notifications.length > 0 && (
+                        <button onClick={handleClearAll} className="text-xs bg-red-500/10 text-red-500 font-bold px-3 py-1.5 rounded-lg flex items-center whitespace-nowrap active:scale-95 transition-transform border border-red-500/20 hover:bg-red-500 hover:text-white">
+                            {t('clear_all')}
                         </button>
                     )}
                  </div>
@@ -118,28 +202,14 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                         groupedNotifications[groupKey].length > 0 && (
                             <div key={groupKey}>
                                 <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)] py-1 z-10">{groupTitles[groupKey]}</h2>
-                                <div className="space-y-3">
-                                    {groupedNotifications[groupKey].map((notification, index) => (
-                                        <div 
-                                            key={notification.id} 
-                                            onClick={() => handleNotificationClick(notification)}
-                                            className={`relative overflow-hidden bg-[var(--bg-secondary)] p-4 rounded-xl flex items-start space-x-4 cursor-pointer transition-all border border-[var(--border-color)] active:scale-[0.98] animate-fade-in-up group hover:border-[var(--accent-color)]/30 ${notification.read ? 'opacity-60' : 'shadow-sm border-l-4 border-l-[var(--accent-color)]'}`}
-                                            style={{ animationDelay: `${index * 50}ms` }}
-                                        >
-                                            <NotificationIcon type={notification.type} />
-                                            <div className="flex-1 min-w-0">
-                                                <p className={`text-sm font-bold truncate ${notification.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{notification.title}</p>
-                                                <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">{notification.description}</p>
-                                                <div className="flex justify-between items-center mt-2">
-                                                    <p className="text-[10px] text-[var(--text-secondary)] opacity-70">{new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                                                    {notification.relatedTicker && (
-                                                        <div className="flex items-center text-[var(--accent-color)] text-[10px] font-bold gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            VER ATIVO <ChevronRightIcon className="w-4 h-4" />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
+                                <div className="space-y-1">
+                                    {groupedNotifications[groupKey].map((notification) => (
+                                        <SwipeableNotificationItem 
+                                            key={notification.id}
+                                            notification={notification}
+                                            onClick={handleNotificationClick}
+                                            onDelete={deleteNotification}
+                                        />
                                     ))}
                                 </div>
                             </div>
