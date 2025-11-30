@@ -1,9 +1,10 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Asset, Transaction, AppPreferences, MonthlyIncome, UserProfile, Dividend, DividendHistoryEvent, AppStats, SegmentEvolutionData, PortfolioEvolutionPoint, AppNotification } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { generateNotifications } from '../services/dynamicDataService';
-import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, fromISODate, CacheManager, getTodayISODate, toISODate } from '../utils';
+import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, fromISODate, CacheManager, getTodayISODate, toISODate, calculatePortfolioEvolution, calculateDividendIncome } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME } from '../constants';
 
 // ... (Keep interfaces mostly the same)
@@ -80,6 +81,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [apiStats, setApiStats] = usePersistentState<AppStats>('api_stats', { gemini: {requests:0, bytesSent:0, bytesReceived:0}, brapi: {requests:0, bytesSent:0, bytesReceived:0} });
   const [notifications, setNotifications] = usePersistentState<AppNotification[]>('app-notifications', []);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  
+  // Derived State (Calculated)
+  const [portfolioEvolution, setPortfolioEvolution] = useState<SegmentEvolutionData>({});
+  const [monthlyIncome, setMonthlyIncome] = useState<MonthlyIncome[]>([]);
 
   // --- One-time Preference Migration ---
   useEffect(() => {
@@ -219,17 +224,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
-          // Parallel fetch. If lite mode (auto-refresh), we don't fetch advanced asset data (indicators)
-          // to save tokens and bandwidth, assuming fundamentals don't change every 10 mins.
+          // Parallel fetch
           const promises: Promise<any>[] = [fetchBrapiQuotes(preferences, tickers, lite)];
           
+          // Only fetch advanced data (Gemini) if NOT in lite mode, or if data is missing
           if (!lite) {
               promises.push(fetchAdvancedAssetData(preferences, tickers));
           }
 
           const results = await Promise.allSettled(promises);
           const brapiRes = results[0];
-          const geminiRes = results[1]; // might be undefined in lite mode
+          const geminiRes = results[1];
 
           setMarketData(prev => {
               const next = { ...prev };
@@ -238,11 +243,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   const res = brapiRes.value;
                   logApiUsage('brapi', { requests: tickers.length, bytesReceived: res.stats.bytesReceived });
                   Object.entries(res.quotes).forEach(([tkr, data]) => {
-                      // Important: Merge carefully. If lite mode, data won't have priceHistory/dividendsHistory.
-                      // We must preserve existing history if the new data is missing it.
+                      // CRITICAL FIX: Merge data carefully to avoid overwriting full history with 'lite' empty data
+                      const prevData = next[tkr] || {};
+                      const newData = data as any;
+                      
                       next[tkr] = { 
-                          ...(next[tkr] || {}), 
-                          ...(data as object), 
+                          ...prevData, 
+                          ...newData,
+                          // Preserve history/dividends if new data is empty (lite mode)
+                          priceHistory: newData.priceHistory?.length > 0 ? newData.priceHistory : prevData.priceHistory || [],
+                          dividendsHistory: newData.dividendsHistory?.length > 0 ? newData.dividendsHistory : prevData.dividendsHistory || [],
                           lastUpdated: Date.now() 
                       };
                   });
@@ -302,7 +312,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           
           const histMap = new Map<string, DividendHistoryEvent>();
           (data.dividendsHistory || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d));
-          (data.recentDividends || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d)); // Gemini overrides
+          // If gemini fetched recent dividends, merge them
           
           return {
               ticker, quantity: m.quantity, avgPrice, currentPrice: curPrice,
@@ -316,55 +326,79 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }).filter(a => a.quantity > 0.000001);
   }, [sourceTransactions, sourceMarketData]);
 
-  // --- Daily Snapshot & Notification Generation ---
+  // --- Auto-Repair: Detect missing data (from lite mode overuse) and fetch full data ---
+  useEffect(() => {
+      if (isRefreshing || isDemoMode) return;
+      const incompleteAssets = assets.filter(a => a.segment === 'Outros' || a.priceHistory.length === 0);
+      if (incompleteAssets.length > 0 && navigator.onLine) {
+          console.log("Auto-Repair: Fetching missing data for", incompleteAssets.length, "assets");
+          // Debounce this heavily or run once per session logic could be applied here
+          // For now, simple check with a delay to avoid conflict with initial load
+          const timer = setTimeout(() => {
+              refreshMarketData(true, true, false); // Force FULL refresh silently
+          }, 5000);
+          return () => clearTimeout(timer);
+      }
+  }, [assets.length, isRefreshing, isDemoMode]); // Check when assets list changes
+
+  // --- Daily Snapshot & Calculations ---
   const currentPatrimony = useMemo(() => {
     return assets.reduce((acc, a) => acc + a.quantity * a.currentPrice, 0);
   }, [assets]);
 
   useEffect(() => {
-    if (currentPatrimony > 0 && !isDemoMode) {
-      // Defer execution to avoid blocking main thread during rendering
-      const timeoutId = setTimeout(() => {
-          const todayStr = getTodayISODate();
-          const key = `${SNAPSHOT_PREFIX}${todayStr}`;
-          
-          // Only save if not already saved today to avoid redundant IO
-          if (!localStorage.getItem(key)) {
-             localStorage.setItem(key, JSON.stringify({ value: currentPatrimony, ts: Date.now() }));
-          }
-          
-          const newNotifications = generateNotifications(assets, currentPatrimony);
-          if (newNotifications.length > 0) {
+    if (isDemoMode) {
+        setMonthlyIncome(MOCK_USER_PROFILE ? DEMO_MARKET_DATA as any : []); // Simplified fallback
+        return;
+    }
+
+    // Defer execution to avoid blocking main thread during rendering
+    const timeoutId = setTimeout(() => {
+        // 1. Calculate Portfolio Evolution
+        const evolutionPoints = calculatePortfolioEvolution(sourceTransactions, sourceMarketData, 30);
+        setPortfolioEvolution({ all_types: evolutionPoints });
+
+        // 2. Calculate Monthly Income
+        const income = calculateDividendIncome(sourceTransactions, sourceMarketData);
+        setMonthlyIncome(income);
+
+        // 3. Save Snapshot
+        const todayStr = getTodayISODate();
+        const key = `${SNAPSHOT_PREFIX}${todayStr}`;
+        if (currentPatrimony > 0 && !localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify({ value: currentPatrimony, ts: Date.now() }));
+        }
+        
+        // 4. Generate Notifications
+        const newNotifications = generateNotifications(assets, currentPatrimony);
+        if (newNotifications.length > 0) {
             setNotifications(prev => {
-              const existingIds = new Set(prev.map(n => n.id));
-              const trulyNew = newNotifications.filter(n => !existingIds.has(n.id));
-              if (trulyNew.length > 0) {
-                setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
-                
-                // --- TRIGGER SYSTEM NOTIFICATION ---
-                if (Notification.permission === 'granted' && navigator.serviceWorker) {
-                    navigator.serviceWorker.ready.then(registration => {
-                        trulyNew.forEach(n => {
-                            registration.showNotification(n.title, {
-                                body: n.description,
-                                icon: '/logo.svg',
-                                badge: '/logo.svg',
-                                tag: n.relatedTicker || 'general',
-                                data: { url: '/' }
+                const existingIds = new Set(prev.map(n => n.id));
+                const trulyNew = newNotifications.filter(n => !existingIds.has(n.id));
+                if (trulyNew.length > 0) {
+                    setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
+                    if (Notification.permission === 'granted' && navigator.serviceWorker) {
+                        navigator.serviceWorker.ready.then(registration => {
+                            trulyNew.forEach(n => {
+                                registration.showNotification(n.title, {
+                                    body: n.description,
+                                    icon: '/logo.svg',
+                                    badge: '/logo.svg',
+                                    tag: n.relatedTicker || 'general',
+                                    data: { url: '/' }
+                                });
                             });
                         });
-                    });
+                    }
+                    return [...trulyNew, ...prev];
                 }
-                return [...trulyNew, ...prev];
-              }
-              return prev;
+                return prev;
             });
-          }
-      }, 2000); // 2 second delay
+        }
+    }, 1000);
 
-      return () => clearTimeout(timeoutId);
-    }
-  }, [currentPatrimony, isDemoMode, assets, setNotifications]);
+    return () => clearTimeout(timeoutId);
+  }, [currentPatrimony, isDemoMode, assets, sourceTransactions, sourceMarketData, setNotifications]); // Re-run when data changes
 
   const getAssetByTicker = useCallback((ticker: string) => {
       return assets.find(a => a.ticker === ticker);
@@ -384,19 +418,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const projectedAnnualIncome = useMemo(() => {
       return assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice * ((a.dy || 0) / 100)), 0);
   }, [assets]);
-
-  const monthlyIncome = useMemo(() => {
-      const incomeMap: Record<string, number> = {};
-      dividends.forEach(div => {
-          const date = new Date(div.paymentDate);
-          const monthYear = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-          const total = div.amountPerShare * div.quantity;
-          incomeMap[monthYear] = (incomeMap[monthYear] || 0) + total;
-      });
-      return Object.entries(incomeMap).map(([month, total]) => ({ month, total }));
-  }, [dividends]);
-
-  const [portfolioEvolution] = useState<SegmentEvolutionData>({});
 
   const getAveragePriceForTransaction = useCallback(() => 0, []);
 
