@@ -396,65 +396,88 @@ export const calculatePortfolioEvolution = (
 };
 
 /**
- * Calculates Monthly Income by merging manual dividends and API dividend history
+ * Calculates Monthly Income by merging manual dividends and API dividend history.
+ * FIXED: Uses stable ISO keys (YYYY-MM) for grouping to avoid browser locale issues.
+ * FIXED: Handles ticker case sensitivity.
  */
 export const calculateDividendIncome = (
     transactions: Transaction[],
     marketData: Record<string, any>,
     manualDividends: any[] = [] // Future use
 ): MonthlyIncome[] => {
-    const incomeMap: Record<string, number> = {};
+    const incomeMap: Record<string, number> = {}; // Key: "YYYY-MM"
     const holdingsAtDateCache: Record<string, Record<string, number>> = {}; // Date -> Ticker -> Qty
+
+    // 1. Normalize transactions ticker casing once for performance
+    const normalizedTransactions = transactions.map(t => ({
+        ...t,
+        ticker: t.ticker.toUpperCase().trim()
+    }));
 
     // Helper to get holdings at a specific date
     const getHoldingsAtDate = (date: string, ticker: string): number => {
-        if (holdingsAtDateCache[date] && holdingsAtDateCache[date][ticker] !== undefined) {
-            return holdingsAtDateCache[date][ticker];
+        const normalizedTicker = ticker.toUpperCase().trim();
+        
+        if (holdingsAtDateCache[date] && holdingsAtDateCache[date][normalizedTicker] !== undefined) {
+            return holdingsAtDateCache[date][normalizedTicker];
         }
 
         let qty = 0;
-        for (const tx of transactions) {
-            if (tx.ticker !== ticker) continue;
-            if (tx.date > date) continue; // Transaction happened after ex-date
+        for (const tx of normalizedTransactions) {
+            if (tx.ticker !== normalizedTicker) continue;
+            // Transaction happened AFTER ex-date? Don't count it.
+            if (tx.date > date) continue; 
             
             if (tx.type === 'Compra') qty += tx.quantity;
             else qty -= tx.quantity;
         }
         
         if (!holdingsAtDateCache[date]) holdingsAtDateCache[date] = {};
-        holdingsAtDateCache[date][ticker] = Math.max(0, qty);
+        holdingsAtDateCache[date][normalizedTicker] = Math.max(0, qty);
         return Math.max(0, qty);
     };
 
-    // Iterate over all assets in market data
+    // 2. Iterate over all assets in market data
     Object.entries(marketData).forEach(([ticker, data]) => {
         const history = data.dividendsHistory || [];
+        const normalizedTicker = ticker.toUpperCase().trim();
+
         history.forEach((div: any) => {
             // Check if user held the asset on Ex-Date
-            const qtyOwned = getHoldingsAtDate(div.exDate, ticker);
+            const qtyOwned = getHoldingsAtDate(div.exDate, normalizedTicker);
+            
             if (qtyOwned > 0) {
                 const payDate = new Date(div.paymentDate);
-                const monthKey = payDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+                // Use stable sorting key: YYYY-MM
+                const year = payDate.getFullYear();
+                // Ensure month is 2 digits (01, 02, etc)
+                const month = String(payDate.getMonth() + 1).padStart(2, '0');
+                const sortKey = `${year}-${month}`;
+                
                 const total = qtyOwned * div.value;
                 
-                incomeMap[monthKey] = (incomeMap[monthKey] || 0) + total;
+                incomeMap[sortKey] = (incomeMap[sortKey] || 0) + total;
             }
         });
     });
 
-    // Merge manual dividends (if any) - assuming manual dividends are already total amounts
-    // (This part would need adjustment based on how manual dividends are stored in context)
-
-    // Convert map to array and sort
+    // 3. Convert map to sorted array and format display label consistently
     return Object.entries(incomeMap)
-        .map(([month, total]) => ({ month, total }))
-        .sort((a, b) => {
-            const [mA, yA] = a.month.split('/');
-            const [mB, yB] = b.month.split('/');
-            // Basic sort logic for 'nov/23' format
-            const dateA = new Date(`20${yA}-${mA}-01`); 
-            const dateB = new Date(`20${yB}-${mB}-01`);
-            return dateA.getTime() - dateB.getTime();
+        .sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) // Sort by YYYY-MM string
+        .map(([key, total]) => {
+            const [year, month] = key.split('-');
+            
+            // Manual formatting to ensure "mmm/yy" consistency across browsers
+            // e.g., "11" -> "nov"
+            const monthNames = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+            const monthIndex = parseInt(month) - 1;
+            const monthName = monthNames[monthIndex] || month;
+            const shortYear = year.slice(2);
+            
+            return {
+                month: `${monthName}/${shortYear}`, 
+                total
+            };
         })
         .slice(-12); // Last 12 months
 };
