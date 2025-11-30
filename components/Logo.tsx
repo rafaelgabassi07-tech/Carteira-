@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 interface LogoProps {
   className?: string;
 }
 
 const Logo: React.FC<LogoProps> = ({ className }) => {
+  // Gera um ID único para este componente para evitar conflitos de gradiente
+  // quando múltiplos logos são renderizados na tela (ex: Sidebar + Modal)
+  const uniqueId = useId();
+  const gradientId = `logo-grad-${uniqueId.replace(/:/g, '')}`; 
+
   return (
     <svg 
       xmlns="http://www.w3.org/2000/svg" 
@@ -14,14 +19,14 @@ const Logo: React.FC<LogoProps> = ({ className }) => {
       aria-label="FII Master Logo"
     >
       <defs>
-        <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" style={{ stopColor: '#38bdf8', stopOpacity: 1 }} />
           <stop offset="100%" style={{ stopColor: '#3b82f6', stopOpacity: 1 }} />
         </linearGradient>
       </defs>
       <rect width="512" height="512" rx="120" fill="#18181b"/>
-      <rect x="144" y="144" width="224" height="224" rx="32" stroke="url(#logo-grad)" strokeWidth="32" fill="none" />
-      <path d="M192 288V256M256 288V224M320 288V192" stroke="url(#logo-grad)" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="144" y="144" width="224" height="224" rx="32" stroke={`url(#${gradientId})`} strokeWidth="32" fill="none" />
+      <path d="M192 288V256M256 288V224M320 288V192" stroke={`url(#${gradientId})`} strokeWidth="32" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 };
