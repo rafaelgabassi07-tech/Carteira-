@@ -45,24 +45,14 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 
     const prompt = `
-      ATUE COMO UM JORNALISTA FINANCEIRO SÊNIOR.
-      TAREFA: Busque as notícias mais recentes e impactantes ${searchContext}.
+      ROLE: Senior Financial Journalist.
+      TASK: Search for recent and impactful news ${searchContext}.
+      RULES:
+      1. Use googleSearch to find REAL facts from the last 3 days.
+      2. Return EXACTLY 6 items.
+      3. OUTPUT: JSON Array ONLY. No markdown.
       
-      REGRAS OBRIGATÓRIAS:
-      1. Use a ferramenta Google Search para encontrar fatos reais e recentes (últimos dias).
-      2. Retorne EXATAMENTE 6 notícias relevantes.
-      3. O formato de saída deve ser APENAS um JSON Array válido. SEM markdown, SEM texto antes ou depois.
-      
-      FORMATO JSON:
-      [
-        {
-          "title": "Manchete clara e informativa",
-          "summary": "Resumo curto do fato (max 150 caracteres)",
-          "source": "Nome do Veículo (ex: InfoMoney, Valor)",
-          "date": "YYYY-MM-DD",
-          "sentiment": "Positive" | "Neutral" | "Negative"
-        }
-      ]
+      JSON Structure: [{"title":"","summary":"","source":"","date":"YYYY-MM-DD","sentiment":"Positive"|"Neutral"|"Negative"}]
     `;
 
     const bytesSent = new Blob([prompt]).size;
@@ -231,35 +221,17 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const tickersString = tickers.join(', ');
 
     const prompt = `
-      TASK: For the following Brazilian Real Estate Investment Trusts (FIIs) tickers: ${tickersString}, provide key financial indicators.
+      TASK: Financial indicators for Brazilian FIIs: ${tickersString}.
+      SOURCES: "StatusInvest", "FundsExplorer".
+      OUTPUT: JSON Object ONLY. Keys=Ticker. No markdown.
       
-      SOURCES: Prioritize "StatusInvest", "FundsExplorer", "Investidor10".
+      Fields required per ticker:
+      - "dy": Dividend Yield 12m (number)
+      - "pvp": P/VP (number)
+      - "assetType": "Tijolo"|"Papel"|"Fiagro"|"FOF"|"Infra"|"Híbrido"
+      - "administrator": string
       
-      STRICT RULES:
-      1. Return ONLY a valid JSON object. No markdown, no extra text.
-      2. The JSON object keys MUST be the uppercase tickers.
-      3. The values for each ticker MUST be an object containing:
-         - "dy": The Dividend Yield of the last 12 months as a number (e.g., 11.5 for 11.5%).
-         - "pvp": The P/VP (Price to Book Value) as a number (e.g., 1.05).
-         - "assetType": The macro category of the FII. MUST be one of: "Tijolo", "Papel", "Fiagro", "FOF", "Infra", "Híbrido", "Outros". Correctly classify hybrid funds like GARE11 as "Tijolo".
-         - "administrator": The name of the administrator (e.g., "BTG Pactual").
-      4. If a value is not found, omit the key or set it to null. DO NOT invent data.
-      
-      EXAMPLE OUTPUT for tickers "MXRF11, HGLG11":
-      {
-        "MXRF11": {
-          "dy": 12.1,
-          "pvp": 1.03,
-          "assetType": "Papel",
-          "administrator": "BTG Pactual"
-        },
-        "HGLG11": {
-          "dy": 8.5,
-          "pvp": 1.01,
-          "assetType": "Tijolo",
-          "administrator": "Credit Suisse"
-        }
-      }
+      Example: {"MXRF11": {"dy": 12.1, "pvp": 1.03, "assetType": "Papel", "administrator": "BTG"}}
     `;
 
     const bytesSent = new Blob([prompt]).size;

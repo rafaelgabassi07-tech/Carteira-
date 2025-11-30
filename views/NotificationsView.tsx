@@ -68,19 +68,27 @@ const SwipeableNotificationItem: React.FC<{
         }
     };
 
+    // Opacity logic: Only show the red background when actually swiping
+    const deleteOpacity = Math.min(Math.abs(offsetX) / 50, 1);
+
     return (
-        <div className="relative overflow-hidden rounded-xl mb-3">
+        <div className="relative overflow-hidden rounded-2xl mb-3 h-auto min-h-[90px]">
             {/* Background Action (Delete) */}
-            <div className="absolute inset-0 bg-red-500 rounded-xl flex items-center justify-end pr-5">
-                <TrashIcon className="w-6 h-6 text-white" />
+            <div 
+                className="absolute inset-0 bg-red-500 rounded-2xl flex items-center justify-end pr-5 transition-opacity duration-200"
+                style={{ opacity: deleteOpacity }}
+            >
+                <div className="flex items-center gap-2 text-white font-bold text-xs">
+                    <span>EXCLUIR</span>
+                    <TrashIcon className="w-5 h-5" />
+                </div>
             </div>
 
             {/* Foreground Content */}
             <div 
-                className={`relative bg-[var(--bg-secondary)] p-4 flex items-start space-x-4 border border-[var(--border-color)] transition-transform duration-200 ease-out active:scale-[0.98] ${notification.read ? 'opacity-60' : 'shadow-sm border-l-4 border-l-[var(--accent-color)]'}`}
+                className={`relative bg-[var(--bg-secondary)] p-4 flex items-start space-x-4 border border-[var(--border-color)] transition-transform duration-200 ease-out active:scale-[0.99] rounded-2xl w-full z-10 ${notification.read ? 'opacity-60' : 'shadow-sm'}`}
                 style={{ 
                     transform: `translateX(${offsetX}px)`,
-                    // Disable transition during drag for responsiveness
                     transition: isSwiping ? 'none' : 'transform 0.2s ease-out'
                 }}
                 onTouchStart={handleTouchStart}
@@ -93,18 +101,31 @@ const SwipeableNotificationItem: React.FC<{
                     }
                 }}
             >
-                <NotificationIcon type={notification.type} />
+                <div className="relative">
+                    <NotificationIcon type={notification.type} />
+                    {!notification.read && (
+                        <div className="absolute top-0 right-0 w-3 h-3 bg-[var(--accent-color)] rounded-full border-2 border-[var(--bg-secondary)] animate-pulse"></div>
+                    )}
+                </div>
+                
                 <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-1">
+                        <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--bg-primary)] px-2 py-0.5 rounded-full border border-[var(--border-color)] uppercase tracking-wider">
+                            {notification.type.replace('_', ' ')}
+                        </span>
+                        <p className="text-[10px] text-[var(--text-secondary)] opacity-70">{new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                    </div>
+                    
                     <p className={`text-sm font-bold truncate ${notification.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{notification.title}</p>
                     <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">{notification.description}</p>
-                    <div className="flex justify-between items-center mt-2">
-                        <p className="text-[10px] text-[var(--text-secondary)] opacity-70">{new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                        {notification.relatedTicker && (
-                            <div className="flex items-center text-[var(--accent-color)] text-[10px] font-bold gap-0.5">
-                                VER ATIVO <ChevronRightIcon className="w-4 h-4" />
+                    
+                    {notification.relatedTicker && (
+                        <div className="flex justify-end mt-2">
+                            <div className="flex items-center text-[var(--accent-color)] text-[10px] font-bold gap-0.5 bg-[var(--accent-color)]/5 px-2 py-1 rounded-md">
+                                VER ATIVO <ChevronRightIcon className="w-3 h-3" />
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -176,15 +197,15 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                     </button>
                     <h1 className="text-2xl font-bold">{t('notifications')}</h1>
                  </div>
-                 <div className="flex space-x-2">
-                    <button onClick={goToSettings} className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors" aria-label="Configurações">
-                        <SettingsIcon className="w-5 h-5" />
-                    </button>
+                 <div className="flex space-x-2 items-center">
                     {notifications.length > 0 && (
-                        <button onClick={handleClearAll} className="text-xs bg-red-500/10 text-red-500 font-bold px-3 py-1.5 rounded-lg flex items-center whitespace-nowrap active:scale-95 transition-transform border border-red-500/20 hover:bg-red-500 hover:text-white">
+                        <button onClick={handleClearAll} className="text-xs font-bold text-red-500 hover:text-red-400 px-3 py-1.5 rounded-lg active:scale-95 transition-transform">
                             {t('clear_all')}
                         </button>
                     )}
+                    <button onClick={goToSettings} className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors" aria-label="Configurações">
+                        <SettingsIcon className="w-5 h-5" />
+                    </button>
                  </div>
             </div>
 
@@ -201,7 +222,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                     {(Object.keys(groupedNotifications) as Array<keyof typeof groupedNotifications>).map(groupKey => 
                         groupedNotifications[groupKey].length > 0 && (
                             <div key={groupKey}>
-                                <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)] py-1 z-10">{groupTitles[groupKey]}</h2>
+                                <h2 className="text-[10px] font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)] py-1 z-10">{groupTitles[groupKey]}</h2>
                                 <div className="space-y-1">
                                     {groupedNotifications[groupKey].map((notification) => (
                                         <SwipeableNotificationItem 

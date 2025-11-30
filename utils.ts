@@ -249,46 +249,58 @@ const EPSILON = 0.000001; // For floating point comparisons
 
 export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<string, { quantity: number; totalCost: number }> => {
     const metrics: Record<string, { quantity: number; totalCost: number }> = {};
-    const tickers = [...new Set(transactions.map(t => t.ticker))];
 
-    tickers.forEach(ticker => {
-        let quantity = 0;
-        let totalCost = 0;
-
-        transactions
-            .filter(t => t.ticker === ticker)
-            .sort((a, b) => {
-                if (a.date !== b.date) return a.date.localeCompare(b.date);
-                if (a.type === 'Compra' && b.type === 'Venda') return -1;
-                if (a.type === 'Venda' && b.type === 'Compra') return 1;
-                return 0;
-            })
-            .forEach(tx => {
-                if (tx.type === 'Compra') {
-                    const cost = (tx.quantity * tx.price) + (tx.costs || 0);
-                    totalCost += cost;
-                    quantity += tx.quantity;
-                } else if (tx.type === 'Venda') {
-                    const sellQuantity = Math.min(tx.quantity, quantity);
-                    if (quantity > EPSILON) {
-                        const avgPrice = totalCost / quantity;
-                        const costReduction = sellQuantity * avgPrice;
-                        totalCost -= costReduction;
-                        quantity -= sellQuantity;
-                    }
-                }
-                if (quantity < EPSILON) {
-                    quantity = 0;
-                    totalCost = 0;
-                }
-            });
-        
-        if (quantity > EPSILON) {
-            metrics[ticker] = { quantity, totalCost };
-        }
+    // Sort transactions by date (Oldest first) to calculate average price correctly
+    const sortedTransactions = [...transactions].sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        // If dates are equal, process Buy before Sell
+        if (a.type === 'Compra' && b.type === 'Venda') return -1;
+        if (a.type === 'Venda' && b.type === 'Compra') return 1;
+        return 0;
     });
 
-    return metrics;
+    for (const tx of sortedTransactions) {
+        const ticker = tx.ticker;
+        
+        if (!metrics[ticker]) {
+            metrics[ticker] = { quantity: 0, totalCost: 0 };
+        }
+        
+        const position = metrics[ticker];
+
+        if (tx.type === 'Compra') {
+            const cost = (tx.quantity * tx.price) + (tx.costs || 0);
+            position.totalCost += cost;
+            position.quantity += tx.quantity;
+        } else if (tx.type === 'Venda') {
+            // Sell reduces quantity and totalCost proportionally based on average price
+            const sellQuantity = Math.min(tx.quantity, position.quantity);
+            
+            if (position.quantity > EPSILON) {
+                const avgPrice = position.totalCost / position.quantity;
+                const costReduction = sellQuantity * avgPrice;
+                
+                position.totalCost -= costReduction;
+                position.quantity -= sellQuantity;
+            }
+        }
+
+        // Cleanup precision errors
+        if (position.quantity < EPSILON) {
+            position.quantity = 0;
+            position.totalCost = 0;
+        }
+    }
+
+    // Filter out closed positions
+    const activeMetrics: Record<string, { quantity: number; totalCost: number }> = {};
+    for (const [ticker, data] of Object.entries(metrics)) {
+        if (data.quantity > EPSILON) {
+            activeMetrics[ticker] = data;
+        }
+    }
+
+    return activeMetrics;
 };
 
 export const getClosestPrice = (history: { date: string; price: number }[], targetDate: string): number | null => {

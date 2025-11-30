@@ -379,7 +379,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const getAveragePriceForTransaction = useCallback(() => 0, []);
 
-  const value = {
+  // OTIMIZAÇÃO: Memoize o objeto value para prevenir re-renders desnecessários
+  const value = useMemo(() => ({
       assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
       yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, portfolioEvolution,
       notifications, unreadNotificationsCount,
@@ -388,7 +389,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
       setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
       deleteNotification, clearAllNotifications
-  };
+  }), [
+      assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
+      yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, portfolioEvolution,
+      notifications, unreadNotificationsCount,
+      addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
+      updatePreferences, setTheme, setFont, updateUserProfile,
+      refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
+      setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
+      deleteNotification, clearAllNotifications
+  ]);
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;
 };

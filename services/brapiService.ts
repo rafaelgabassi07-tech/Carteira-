@@ -19,12 +19,6 @@ interface BrapiQuote {
     };
 }
 
-interface BrapiResponse {
-    results: BrapiQuote[];
-    error?: boolean;
-    message?: string;
-}
-
 function getBrapiToken(prefs: AppPreferences): string {
     if (prefs.brapiToken && prefs.brapiToken.trim() !== '') {
         return prefs.brapiToken;
@@ -52,55 +46,40 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
     const failedTickers: string[] = [];
     let totalBytesReceived = 0;
 
-    for (const ticker of tickers) {
-        let success = false;
-        let historyData: any[] = [];
-        let dividendsHistory: DividendHistoryEvent[] = [];
-        let currentPrice = 0;
+    // Function to process a single ticker
+    const processTicker = async (ticker: string) => {
         const urlBase = `https://brapi.dev/api/quote/${ticker}`;
+        let success = false;
+        let resultData: any = null;
+
+        // Try ranges
+        const ranges = ['5y', '1y', '3mo'];
         
-        const fetchData = async (range: string): Promise<boolean> => {
+        for (const range of ranges) {
             try {
                 const response = await fetch(`${urlBase}?range=${range}&dividends=true&token=${token}`);
                 const text = await response.text();
                 totalBytesReceived += new Blob([text]).size;
 
                 if (response.status === 403 || response.status === 401) throw new Error("FORBIDDEN_TIER");
-                if (!response.ok) return false;
+                if (!response.ok) continue; // Try next range
                 
                 const data = JSON.parse(text);
                 const result = data.results?.[0];
 
                 if (result) {
-                    currentPrice = result.regularMarketPrice;
-                    historyData = result.historicalDataPrice || [];
-                    if (result.dividendData?.historicalDataPrice) {
-                        dividendsHistory = result.dividendData.historicalDataPrice.map((item: any) => ({
-                            exDate: new Date(item.date * 1000).toISOString().split('T')[0],
-                            paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
-                            value: item.dividends?.[0]?.value || 0
-                        })).filter(d => d.value > 0);
-                    }
-                    return true;
+                    resultData = result;
+                    success = true;
+                    break; // Exit range loop
                 }
-                return false;
             } catch (e: any) {
-                if (e.message !== "FORBIDDEN_TIER") {
-                    console.warn(`Failed to fetch ${range} for ${ticker}:`, e.message);
-                }
-                return false;
+                if (e.message === "FORBIDDEN_TIER") break; // Stop trying ranges
             }
-        };
-        
-        // Tenta buscar 5 anos primeiro para garantir cobertura máxima de evolução
-        success = await fetchData('5y');
-        if (!success) { await delay(200); success = await fetchData('1y'); }
-        if (!success) { await delay(200); success = await fetchData('3mo'); }
-        
+        }
+
         // Fallback for current price only
         if (!success) {
             try {
-                await delay(200);
                 const response = await fetch(`${urlBase}?token=${token}`);
                 const text = await response.text();
                 totalBytesReceived += new Blob([text]).size;
@@ -108,19 +87,32 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                     const data = JSON.parse(text);
                     const result = data.results?.[0];
                     if (result) {
-                        currentPrice = result.regularMarketPrice;
-                        historyData = [];
+                        resultData = result;
+                        resultData.historicalDataPrice = [];
                         success = true;
                     }
                 }
             } catch (e) { console.error(`Failed fallback for ${ticker}`, e); }
         }
 
-        if (success) {
-             let finalHistory = historyData.map((item: any) => ({
+        if (success && resultData) {
+            let dividendsHistory: DividendHistoryEvent[] = [];
+            
+            if (resultData.dividendData?.historicalDataPrice) {
+                dividendsHistory = resultData.dividendData.historicalDataPrice.map((item: any) => ({
+                    exDate: new Date(item.date * 1000).toISOString().split('T')[0],
+                    paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
+                    value: item.dividends?.[0]?.value || 0
+                })).filter((d: any) => d.value > 0);
+            }
+
+            const rawHistory = resultData.historicalDataPrice || [];
+            let finalHistory = rawHistory.map((item: any) => ({
                 date: new Date(item.date * 1000).toISOString().split('T')[0],
                 price: item.close,
             })).sort((a: any, b: any) => a.date.localeCompare(b.date));
+
+            const currentPrice = resultData.regularMarketPrice || 0;
 
             if (currentPrice > 0) {
                 const todayISO = new Date().toISOString().split('T')[0];
@@ -130,18 +122,21 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[])
                 }
             }
 
-             allQuotes[ticker.toUpperCase()] = {
-                currentPrice: currentPrice || 0,
+            allQuotes[ticker.toUpperCase()] = {
+                currentPrice: currentPrice,
                 priceHistory: finalHistory,
                 dividendsHistory
             };
         } else {
-             failedTickers.push(ticker);
+            failedTickers.push(ticker);
         }
-    }
+    };
+
+    // Execute all requests in parallel
+    await Promise.all(tickers.map(ticker => processTicker(ticker)));
 
     if (failedTickers.length === tickers.length && failedTickers.length > 0) {
-        throw new Error(`Falha ao atualizar ativos: ${failedTickers.slice(0,3).join(', ')}... Verifique conexão.`);
+        throw new Error(`Falha ao atualizar ativos. Verifique conexão.`);
     }
 
     return { quotes: allQuotes, stats: { bytesReceived: totalBytesReceived } };
