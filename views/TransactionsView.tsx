@@ -8,14 +8,9 @@ import TrashIcon from '../components/icons/TrashIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate, getTodayISODate } from '../utils';
+import VirtualList from '../components/VirtualList';
 
-interface TransactionsViewProps {
-    initialFilter: string | null;
-    clearFilter: () => void;
-    addToast: (message: string, type?: ToastMessage['type']) => void;
-}
-
-// ... TransactionModal Component (Mantido igual, omitido para brevidade) ...
+// ... TransactionModal code remains the same ...
 const TransactionModal: React.FC<{ 
     onClose: () => void; 
     onSave: (tx: Omit<Transaction, 'id'> & { id?: string }) => void; 
@@ -168,11 +163,13 @@ const TransactionModal: React.FC<{
     );
 };
 
+// ... TransactionItem (React.memo) code remains the same ...
 const TransactionItem = React.memo<{ 
     transaction: Transaction, 
     onEdit: (tx: Transaction) => void, 
-    onDelete: (id: string) => void
-}>(({ transaction, onEdit, onDelete }) => {
+    onDelete: (id: string) => void, 
+    style?: React.CSSProperties 
+}>(({ transaction, onEdit, onDelete, style }) => {
     const { t, locale, formatCurrency } = useI18n();
     const { getAveragePriceForTransaction } = usePortfolio();
     const isBuy = transaction.type === 'Compra';
@@ -193,10 +190,10 @@ const TransactionItem = React.memo<{
     }
 
     return (
-        <div onClick={() => { onEdit(transaction); vibrate(); }} className="transaction-item bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-0.5 group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full flex flex-col justify-center">
-            <div className="flex items-center justify-between pr-8">
+        <div onClick={() => { onEdit(transaction); vibrate(); }} style={style} className="bg-[var(--bg-secondary)] p-4 rounded-xl cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-0.5 relative group border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full mx-1">
+            <div className="flex items-center justify-between pr-10">
                 <div className="flex items-center space-x-3">
-                    <div className={`transaction-icon w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0 ${isBuy ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm ${isBuy ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
                         {isBuy ? t('buy_short') : t('sell_short')}
                     </div>
                     <div>
@@ -216,25 +213,44 @@ const TransactionItem = React.memo<{
                 </div>
             </div>
             
-             <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            {realizedGain !== null && (
+                <div className={`mt-3 pt-2 border-t border-[var(--border-color)] text-xs flex justify-between items-center pr-10`}>
+                    <span className="text-[var(--text-secondary)] font-medium">{t('realized_gain_loss')}:</span>
+                    <span className={`font-bold ${realizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                        {formatCurrency(realizedGain)}
+                    </span>
+                </div>
+            )}
+            
+             <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1">
                 <button 
                     onClick={(e) => { e.stopPropagation(); onEdit(transaction); vibrate(); }}
-                    className="p-1.5 text-gray-400 hover:text-[var(--accent-color)] hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
+                    className="p-2 text-gray-400 hover:text-[var(--accent-color)] hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
                     aria-label={t('edit_transaction')}
                 >
-                    <EditIcon className="w-5 h-5" />
+                    <EditIcon className="w-4 h-4" />
                 </button>
                 <button 
                     onClick={handleDelete}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
                     aria-label={t('delete')}
                 >
-                    <TrashIcon className="w-5 h-5" />
+                    <TrashIcon className="w-4 h-4" />
                 </button>
             </div>
         </div>
     );
 });
+
+type FlatItem = 
+    | { type: 'header', date: string, id: string }
+    | { type: 'transaction', data: Transaction };
+
+interface TransactionsViewProps {
+    initialFilter: string | null;
+    clearFilter: () => void;
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+}
 
 const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clearFilter, addToast }) => {
     const { t, locale, formatCurrency } = useI18n();
@@ -278,17 +294,6 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         });
     }, [filter, transactions, searchQuery, dateRange]);
 
-    const groupedTransactions = useMemo(() => {
-        const sorted = [...filteredTransactions].sort((a, b) => b.date.localeCompare(a.date));
-        return sorted.reduce<Record<string, Transaction[]>>((acc, tx) => {
-            const date = new Date(tx.date);
-            const monthYear = date.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
-            if (!acc[monthYear]) acc[monthYear] = [];
-            acc[monthYear].push(tx);
-            return acc;
-        }, {});
-    }, [filteredTransactions, locale]);
-
     const summary = useMemo(() => {
         const result = filteredTransactions.reduce((acc, tx) => {
             const value = tx.quantity * tx.price + (tx.costs || 0);
@@ -301,6 +306,25 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         }, { buys: 0, sells: 0 });
         return { ...result, net: result.buys - result.sells };
     }, [filteredTransactions]);
+
+    // Flatten transactions for VirtualList
+    const flatList = useMemo(() => {
+        const sorted = [...filteredTransactions].sort((a, b) => b.date.localeCompare(a.date));
+        const items: FlatItem[] = [];
+        let currentMonth = '';
+
+        sorted.forEach(tx => {
+            const date = new Date(tx.date);
+            const monthYear = date.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+            
+            if (monthYear !== currentMonth) {
+                currentMonth = monthYear;
+                items.push({ type: 'header', date: monthYear, id: `header-${monthYear}` });
+            }
+            items.push({ type: 'transaction', data: tx });
+        });
+        return items;
+    }, [filteredTransactions, locale]);
     
     const handleSaveTransaction = (tx: Omit<Transaction, 'id'> & { id?: string }) => {
         if (tx.id) {
@@ -325,12 +349,13 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
              handleDeleteTransaction(txId);
         }
     };
-    
+
     return (
         <div className="p-4 pb-24 md:pb-6 h-full flex flex-col landscape-pb-6" id="transactions-view">
             <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
                 <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_transactions')}</h1>
                 
+                {/* Filters */}
                 <div className="mb-4 space-y-3 flex-shrink-0">
                     <input 
                         type="text" 
@@ -386,23 +411,31 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                     </div>
                 )}
 
-                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                    {Object.keys(groupedTransactions).length > 0 ? (
-                        Object.entries(groupedTransactions).map(([monthYear, txs]) => (
-                            <div key={monthYear} className="mb-6 animate-fade-in-up">
-                                <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-widest px-1 sticky top-0 z-10 bg-[var(--bg-primary)]/90 backdrop-blur-sm py-2 -mx-4 px-4">{monthYear}</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 landscape-grid-cols-2">
-                                    {(txs as Transaction[]).map((tx, index) => (
-                                        <TransactionItem 
-                                            key={tx.id} 
-                                            transaction={tx} 
-                                            onEdit={setEditingTx} 
-                                            onDelete={handleConfirmDelete}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        ))
+                <div className="flex-1 min-h-0">
+                    {flatList.length > 0 ? (
+                        <VirtualList 
+                            items={flatList}
+                            getItemHeight={(item: FlatItem) => item.type === 'header' ? 40 : 100}
+                            renderItem={(item: FlatItem) => {
+                                if (item.type === 'header') {
+                                    return (
+                                        <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-widest px-1 py-2 sticky top-0 z-10 bg-[var(--bg-primary)]/90 backdrop-blur-sm">
+                                            {item.date}
+                                        </h2>
+                                    );
+                                } else {
+                                    return (
+                                        <div className="pb-3">
+                                            <TransactionItem 
+                                                transaction={item.data}
+                                                onEdit={setEditingTx}
+                                                onDelete={handleConfirmDelete}
+                                            />
+                                        </div>
+                                    );
+                                }
+                            }}
+                        />
                     ) : (
                         <div className="text-center text-[var(--text-secondary)] py-20 animate-fade-in h-full flex flex-col justify-center items-center">
                             <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--border-color)]">

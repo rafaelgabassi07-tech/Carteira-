@@ -1,9 +1,10 @@
-import React, { useRef, useState, useLayoutEffect, useMemo, useEffect } from 'react';
+
+import React, { useRef, useState, useLayoutEffect, useMemo } from 'react';
 
 interface VirtualListProps<T> {
   items: T[];
   renderItem: (item: T, index: number) => React.ReactNode;
-  getItemHeight: (index: number) => number; // Agora aceita uma função para altura variável
+  getItemHeight: (item: T, index: number) => number;
   containerHeight?: string | number;
   overscan?: number;
   className?: string;
@@ -14,7 +15,6 @@ function VirtualList<T>({ items, renderItem, getItemHeight, containerHeight = '1
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
 
-  // Observa o tamanho do container
   useLayoutEffect(() => {
     if (containerRef.current) {
       setViewportHeight(containerRef.current.clientHeight);
@@ -33,41 +33,41 @@ function VirtualList<T>({ items, renderItem, getItemHeight, containerHeight = '1
     setScrollTop(e.currentTarget.scrollTop);
   };
 
-  // Calcula as posições (offsets) de todos os itens
-  // Isso é necessário para alturas variáveis
   const { offsets, totalHeight } = useMemo(() => {
       const offsets = new Array(items.length);
       let total = 0;
       for (let i = 0; i < items.length; i++) {
           offsets[i] = total;
-          total += getItemHeight(i);
+          total += getItemHeight(items[i], i);
       }
       return { offsets, totalHeight: total };
   }, [items, getItemHeight]);
 
-  // Encontra o índice inicial e final visível usando busca binária ou linear simples
-  // Como a lista é ordenada por offset, podemos otimizar, mas linear é ok para milhares de itens
   const startIndex = useMemo(() => {
       let start = 0;
-      // Encontra o primeiro item que está visível (offset + height > scrollTop)
-      while (start < items.length && offsets[start + 1] <= scrollTop) {
-          start++;
+      let low = 0;
+      let high = offsets.length - 1;
+
+      while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          if (offsets[mid] < scrollTop) {
+              start = mid;
+              low = mid + 1;
+          } else {
+              high = mid - 1;
+          }
       }
       return Math.max(0, start - overscan);
-  }, [offsets, scrollTop, overscan, items.length]);
+  }, [offsets, scrollTop, overscan]);
 
-  // Calcula o índice final baseado na altura da viewport
   const endIndex = useMemo(() => {
       let end = startIndex;
-      let currentOffset = offsets[startIndex];
-      const targetOffset = scrollTop + viewportHeight;
-      
-      while (end < items.length && currentOffset < targetOffset) {
-          currentOffset += getItemHeight(end);
+      const targetLimit = scrollTop + viewportHeight;
+      while(end < items.length && offsets[end] < targetLimit) {
           end++;
       }
       return Math.min(items.length, end + overscan);
-  }, [startIndex, offsets, getItemHeight, scrollTop, viewportHeight, items.length, overscan]);
+  }, [startIndex, offsets, scrollTop, viewportHeight, items.length, overscan]);
 
   const visibleItems = useMemo(() => {
       const visible = [];
@@ -86,7 +86,7 @@ function VirtualList<T>({ items, renderItem, getItemHeight, containerHeight = '1
         ref={containerRef} 
         onScroll={onScroll} 
         className={`overflow-y-auto custom-scrollbar ${className}`}
-        style={{ height: containerHeight, position: 'relative' }}
+        style={{ height: containerHeight, position: 'relative', willChange: 'transform' }}
     >
       <div style={{ height: totalHeight, width: '100%' }}>
         {visibleItems.map(({ item, index, offset }) => (
@@ -98,7 +98,7 @@ function VirtualList<T>({ items, renderItem, getItemHeight, containerHeight = '1
                     left: 0, 
                     width: '100%', 
                     transform: `translateY(${offset}px)`,
-                    height: getItemHeight(index)
+                    height: getItemHeight(item, index)
                 }}
              >
                  {renderItem(item, index)}

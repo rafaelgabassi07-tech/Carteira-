@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -10,7 +11,7 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
+const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = React.memo(({ sentiment }) => {
     const { t } = useI18n();
     const sentimentMap = {
         Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
@@ -24,14 +25,14 @@ const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sen
             {sentimentData.text}
         </span>
     );
-};
+});
 
-const NewsCard: React.FC<{ 
+const NewsCard = React.memo<{ 
   article: NewsArticle;
   isFavorited: boolean;
   onToggleFavorite: () => void;
   addToast: (message: string, type?: ToastMessage['type']) => void;
-}> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
+}>(({ article, isFavorited, onToggleFavorite, addToast }) => {
   const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -62,13 +63,26 @@ const NewsCard: React.FC<{
 
   return (
     <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col">
-      <div className="p-4 flex-1 flex flex-col">
+      {article.imageUrl && (
+          <div className="h-32 w-full overflow-hidden relative">
+              <img 
+                src={article.imageUrl} 
+                alt={article.title} 
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)] to-transparent opacity-60"></div>
+          </div>
+      )}
+      
+      <div className="p-4 flex-1 flex flex-col relative">
         <div className="flex justify-between items-start">
             <div>
               <p className="text-xs text-[var(--accent-color)] font-semibold mb-1">{article.source}</p>
               <h3 className="text-sm font-bold mr-16 leading-tight">{article.title}</h3>
             </div>
-             <div className="absolute top-2 right-1 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-lg p-0.5">
+             <div className="absolute top-4 right-4 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/90 backdrop-blur-sm rounded-lg p-0.5 border border-[var(--border-color)]">
                <button
                   onClick={handleShare}
                   className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
@@ -103,7 +117,7 @@ const NewsCard: React.FC<{
       </div>
     </div>
   );
-};
+});
 
 const NewsCardSkeleton: React.FC = () => (
     <div className="bg-[var(--bg-secondary)] p-4 rounded-lg animate-pulse border border-[var(--border-color)]">
@@ -152,7 +166,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     localStorage.setItem('news-favorites', JSON.stringify(Array.from(favorites)));
   }, [favorites]);
 
-  const handleToggleFavorite = (articleTitle: string) => {
+  const handleToggleFavorite = useCallback((articleTitle: string) => {
     setFavorites(prevFavorites => {
       const newFavorites = new Set(prevFavorites);
       if (newFavorites.has(articleTitle)) {
@@ -162,7 +176,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       }
       return newFavorites;
     });
-  };
+  }, []);
 
   const clearFavorites = () => {
       if (window.confirm(t('clear_cache_confirm'))) {
@@ -210,7 +224,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setLoading(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, preferences, logApiUsage]);
+  }, [t, assetTickers, addToast, preferences, logApiUsage]);
   
   // Create a debounced version of the load function for text inputs
   const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);

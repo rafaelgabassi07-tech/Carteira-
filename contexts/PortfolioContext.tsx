@@ -256,6 +256,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // --- Auto Refresh Logic (Market Hours) ---
   useEffect(() => {
       const checkAndRefresh = () => {
+          if (document.hidden) return; // Pausa se a aba estiver em segundo plano
+
           const now = new Date();
           const day = now.getDay(); // 0 = Sun, 6 = Sat
           const hour = now.getHours();
@@ -263,10 +265,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const isWeekDay = day >= 1 && day <= 5;
           const isMarketHours = hour >= 10 && hour < 18;
           
-          const isVisible = document.visibilityState === 'visible';
           const isOnline = navigator.onLine;
 
-          if (isWeekDay && isMarketHours && isVisible && isOnline) {
+          if (isWeekDay && isMarketHours && isOnline) {
               refreshMarketData(true, true);
           }
       };
@@ -309,39 +310,46 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     if (currentPatrimony > 0 && !isDemoMode) {
-      const todayStr = getTodayISODate();
-      const key = `${SNAPSHOT_PREFIX}${todayStr}`;
-      localStorage.setItem(key, JSON.stringify({ value: currentPatrimony, ts: Date.now() }));
-      
-      const newNotifications = generateNotifications(assets, currentPatrimony);
-      if (newNotifications.length > 0) {
-        setNotifications(prev => {
-          const existingIds = new Set(prev.map(n => n.id));
-          const trulyNew = newNotifications.filter(n => !existingIds.has(n.id));
-          if (trulyNew.length > 0) {
-            setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
-            
-            // --- TRIGGER SYSTEM NOTIFICATION ---
-            if (Notification.permission === 'granted' && navigator.serviceWorker) {
-                navigator.serviceWorker.ready.then(registration => {
-                    trulyNew.forEach(n => {
-                        registration.showNotification(n.title, {
-                            body: n.description,
-                            icon: '/logo.svg',
-                            badge: '/logo.svg',
-                            tag: n.relatedTicker || 'general',
-                            data: { url: '/' }
+      // Defer execution to avoid blocking main thread during rendering
+      const timeoutId = setTimeout(() => {
+          const todayStr = getTodayISODate();
+          const key = `${SNAPSHOT_PREFIX}${todayStr}`;
+          
+          // Only save if not already saved today to avoid redundant IO
+          if (!localStorage.getItem(key)) {
+             localStorage.setItem(key, JSON.stringify({ value: currentPatrimony, ts: Date.now() }));
+          }
+          
+          const newNotifications = generateNotifications(assets, currentPatrimony);
+          if (newNotifications.length > 0) {
+            setNotifications(prev => {
+              const existingIds = new Set(prev.map(n => n.id));
+              const trulyNew = newNotifications.filter(n => !existingIds.has(n.id));
+              if (trulyNew.length > 0) {
+                setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
+                
+                // --- TRIGGER SYSTEM NOTIFICATION ---
+                if (Notification.permission === 'granted' && navigator.serviceWorker) {
+                    navigator.serviceWorker.ready.then(registration => {
+                        trulyNew.forEach(n => {
+                            registration.showNotification(n.title, {
+                                body: n.description,
+                                icon: '/logo.svg',
+                                badge: '/logo.svg',
+                                tag: n.relatedTicker || 'general',
+                                data: { url: '/' }
+                            });
                         });
                     });
-                });
-            }
-            // ------------------------------------
-
-            return [...trulyNew, ...prev];
+                }
+                return [...trulyNew, ...prev];
+              }
+              return prev;
+            });
           }
-          return prev;
-        });
-      }
+      }, 2000); // 2 second delay
+
+      return () => clearTimeout(timeoutId);
     }
   }, [currentPatrimony, isDemoMode, assets, setNotifications]);
 
