@@ -4,6 +4,7 @@ import PrivacyIcon from '../icons/PrivacyIcon';
 import TermsIcon from '../icons/TermsIcon';
 import Modal from '../modals/Modal';
 import { useI18n } from '../../contexts/I18nContext';
+import Logo from '../Logo';
 
 const AboutApp: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const { t } = useI18n();
@@ -14,7 +15,7 @@ const AboutApp: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
             <PageHeader title={t('about_app')} onBack={onBack} />
             <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)]">
                 <div className="flex flex-col items-center text-center my-8">
-                    <img src="/logo.svg" alt="App Logo" className="w-20 h-20 mb-4 rounded-2xl shadow-lg border border-[var(--border-color)] object-contain bg-[var(--bg-primary)]" />
+                    <Logo className="w-20 h-20 mb-4 rounded-2xl shadow-xl shadow-[var(--accent-color)]/20" />
                     <h1 className="text-2xl font-bold">FII Master</h1>
                     <p className="text-[var(--text-secondary)]">{t('about_app_desc')}</p>
                     <p className="text-xs text-gray-500 mt-2">{t('version')} 1.7.0</p>

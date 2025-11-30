@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { vibrate, bufferDecode } from '../utils';
 import FingerprintIcon from './icons/FingerprintIcon';
+import Logo from './Logo';
 
 interface PinLockScreenProps {
     onUnlock: () => void;
@@ -109,7 +110,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
             <div className="flex flex-col items-center w-full max-w-sm md:bg-[var(--bg-secondary)] md:border md:border-[var(--border-color)] md:shadow-2xl md:rounded-3xl md:p-10 transition-all duration-300">
                 
                 <div className="mb-8 flex flex-col items-center">
-                    <img src="/logo.svg" alt="FII Master" className="w-16 h-16 rounded-2xl mb-4 shadow-lg border border-[var(--border-color)] object-contain bg-[var(--bg-secondary)]" />
+                    <Logo className="w-16 h-16 rounded-2xl mb-4 shadow-lg shadow-[var(--accent-color)]/10" />
                     <h2 className="text-xl font-bold text-[var(--text-primary)]">FII Master</h2>
                     <p className="text-[var(--text-secondary)] text-sm mt-1">Digite seu PIN para acessar</p>
                 </div>
