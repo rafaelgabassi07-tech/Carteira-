@@ -74,6 +74,7 @@ export const ptBR = {
     real_yield_12m: 'Yield Real (12m)',
 
     // Transactions View
+    edit: 'Editar',
     edit_transaction: 'Editar Transação',
     add_transaction: 'Adicionar Transação',
     type: 'Tipo',

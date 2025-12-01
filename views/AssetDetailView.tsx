@@ -53,7 +53,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showAllHistory, setShowAllHistory] = useState(false);
     const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
-    const hasLoadedRef = useRef(false);
+    const lastFetchedTicker = useRef('');
     
     const asset = getAssetByTicker(ticker);
 
@@ -70,14 +70,15 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         }
     }, [ticker, refreshSingleAsset, isRefreshing]);
 
-    // Initial load control to prevent loops
+    // Initial and ticker-change load control.
     useEffect(() => {
-        if (!asset && !hasLoadedRef.current) {
-             hasLoadedRef.current = true;
-             setIsRefreshing(true);
-             refreshSingleAsset(ticker, false).finally(() => setIsRefreshing(false));
+        // Run if the ticker is new and we're not already loading
+        if (ticker !== lastFetchedTicker.current && !isRefreshing) {
+            lastFetchedTicker.current = ticker;
+            setIsRefreshing(true);
+            refreshSingleAsset(ticker, true).finally(() => setIsRefreshing(false));
         }
-    }, [ticker, asset, refreshSingleAsset]);
+    }, [ticker, refreshSingleAsset, isRefreshing]);
 
     const assetTransactions = useMemo(() => {
         return transactions.filter(tx => tx.ticker === asset?.ticker).sort((a, b) => b.date.localeCompare(a.date));

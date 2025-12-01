@@ -67,6 +67,7 @@ export interface Dividend {
     paymentDate: string;
 }
 
+// FIX: Added missing MonthlyIncome interface.
 export interface MonthlyIncome {
     month: string;
     total: number;
