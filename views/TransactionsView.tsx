@@ -170,16 +170,8 @@ const TransactionItem = React.memo<{
     style?: React.CSSProperties 
 }>(({ transaction, onEdit, onDelete, style }) => {
     const { t, locale, formatCurrency } = useI18n();
-    const { getAveragePriceForTransaction } = usePortfolio();
     const [menuOpen, setMenuOpen] = useState(false);
     const isBuy = transaction.type === 'Compra';
-
-    const realizedGain = useMemo(() => {
-        if (isBuy) return null;
-        const avgPriceBeforeSale = getAveragePriceForTransaction(transaction);
-        if (avgPriceBeforeSale === 0) return 0;
-        return (transaction.price - avgPriceBeforeSale) * transaction.quantity - (transaction.costs || 0);
-    }, [transaction, isBuy, getAveragePriceForTransaction]);
     
     const totalValue = transaction.quantity * transaction.price + (isBuy ? (transaction.costs || 0) : -(transaction.costs || 0));
 
@@ -202,58 +194,50 @@ const TransactionItem = React.memo<{
     };
 
     return (
-        <div style={style} className="bg-[var(--bg-secondary)] p-4 rounded-2xl animate-fade-in-up relative border border-[var(--border-color)] transform duration-200 shadow-sm h-full">
-            <div className="flex items-start justify-between">
+        <div style={style} className="bg-[var(--bg-secondary)] p-4 rounded-2xl animate-fade-in-up relative border border-[var(--border-color)] shadow-sm h-full">
+            <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm ${isBuy ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-inner ${isBuy ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
                         {isBuy ? t('buy_short') : t('sell_short')}
                     </div>
                     <div>
-                        <p className="font-bold text-[var(--text-primary)]">{transaction.ticker}</p>
-                        <p className="text-[10px] text-[var(--text-secondary)] font-medium">
+                        <p className="font-bold text-base text-[var(--text-primary)] leading-tight">{transaction.ticker}</p>
+                        <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">
                             {new Date(transaction.date).toLocaleDateString(locale, { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: '2-digit' })}
                         </p>
                     </div>
                 </div>
-                <div className="text-right flex-shrink-0 pl-4">
-                    <p className={`font-bold text-lg ${isBuy ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]'}`}>
-                        {formatCurrency(totalValue)}
-                    </p>
-                    <p className="text-xs text-[var(--text-secondary)]">
-                       {transaction.quantity} x {formatCurrency(transaction.price)}
-                    </p>
+                <div className="flex items-center gap-2">
+                    <div className="text-right flex-shrink-0">
+                        <p className="font-bold text-base text-[var(--text-primary)]">
+                            {formatCurrency(totalValue)}
+                        </p>
+                         <p className="text-[10px] text-[var(--text-secondary)] font-mono">
+                           {transaction.quantity} @ {formatCurrency(transaction.price)}
+                        </p>
+                    </div>
+                     <div className="relative">
+                        <button 
+                            onClick={handleMenuClick}
+                            className="p-2 text-gray-400 hover:text-[var(--accent-color)] hover:bg-[var(--bg-primary)] rounded-full transition-colors z-10 relative active:scale-95"
+                        >
+                            <MoreVerticalIcon className="w-5 h-5" />
+                        </button>
+                        {menuOpen && (
+                            <>
+                                <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
+                                <div className="absolute right-0 mt-1 w-36 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg shadow-2xl z-20 overflow-hidden animate-scale-in origin-top-right">
+                                    <button onClick={handleEdit} className="w-full text-left px-3 py-2.5 text-sm transition-colors flex items-center gap-2 hover:bg-[var(--bg-tertiary-hover)]">
+                                        <EditIcon className="w-4 h-4"/> {t('edit')}
+                                    </button>
+                                     <button onClick={handleDelete} className="w-full text-left px-3 py-2.5 text-sm transition-colors flex items-center gap-2 text-red-400 hover:bg-red-500/10">
+                                        <TrashIcon className="w-4 h-4"/> {t('delete')}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
-            </div>
-            
-            {realizedGain !== null && (
-                <div className={`mt-3 pt-2 border-t border-[var(--border-color)] text-xs flex justify-between items-center`}>
-                    <span className="text-[var(--text-secondary)] font-medium">{t('realized_gain_loss')}:</span>
-                    <span className={`font-bold ${realizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                        {formatCurrency(realizedGain)}
-                    </span>
-                </div>
-            )}
-            
-             <div className="absolute top-1 right-1">
-                <button 
-                    onClick={handleMenuClick}
-                    className="p-2 text-gray-400 hover:text-[var(--accent-color)] hover:bg-[var(--bg-primary)] rounded-full transition-colors z-10 relative"
-                >
-                    <MoreVerticalIcon className="w-5 h-5" />
-                </button>
-                {menuOpen && (
-                    <>
-                        <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
-                        <div className="absolute right-0 mt-1 w-32 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg shadow-2xl z-20 overflow-hidden animate-scale-in origin-top-right">
-                            <button onClick={handleEdit} className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 hover:bg-[var(--bg-tertiary-hover)]">
-                                <EditIcon className="w-4 h-4"/> {t('edit')}
-                            </button>
-                             <button onClick={handleDelete} className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 text-red-400 hover:bg-red-500/10">
-                                <TrashIcon className="w-4 h-4"/> {t('delete')}
-                            </button>
-                        </div>
-                    </>
-                )}
             </div>
         </div>
     );
@@ -266,10 +250,9 @@ interface TransactionsViewProps {
 }
 
 const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clearFilter, addToast }) => {
-    const { t, locale, formatCurrency } = useI18n();
+    const { t, locale } = useI18n();
     const { transactions, addTransaction, updateTransaction, deleteTransaction } = usePortfolio();
 
-    const [filter, setFilter] = useState<'todos' | 'Compra' | 'Venda'>('todos');
     const [searchQuery, setSearchQuery] = useState(initialFilter || '');
     const [dateRange, setDateRange] = useState<'all' | '30' | '90' | '365'>('all');
     const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -280,7 +263,6 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
             setTimeout(() => clearFilter(), 100);
         }
     }, [initialFilter, clearFilter]);
-
 
     const filteredTransactions = useMemo(() => {
         const now = new Date();
@@ -293,7 +275,6 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         }
 
         return transactions.filter(t => {
-            const matchesType = filter === 'todos' || t.type === filter;
             const matchesTicker = t.ticker.toLowerCase().includes(searchQuery.toLowerCase());
             let matchesDate = true;
             if (limitDate) {
@@ -301,29 +282,15 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                 txDate.setHours(12,0,0,0);
                 matchesDate = txDate >= limitDate;
             }
-            
-            return matchesType && matchesTicker && matchesDate;
+            return matchesTicker && matchesDate;
         });
-    }, [filter, transactions, searchQuery, dateRange]);
-
-    const summary = useMemo(() => {
-        const result = filteredTransactions.reduce((acc, tx) => {
-            const value = tx.quantity * tx.price + (tx.costs || 0);
-            if (tx.type === 'Compra') {
-                acc.buys += value;
-            } else {
-                acc.sells += value - (tx.costs || 0) * 2; 
-            }
-            return acc;
-        }, { buys: 0, sells: 0 });
-        return { ...result, net: result.buys - result.sells };
-    }, [filteredTransactions]);
+    }, [transactions, searchQuery, dateRange]);
 
     const groupedTransactions = useMemo(() => {
         const sorted = [...filteredTransactions].sort((a, b) => b.date.localeCompare(a.date));
         return sorted.reduce<Record<string, Transaction[]>>((acc, tx) => {
             const date = new Date(tx.date);
-            const monthYear = date.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+            const monthYear = date.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).toUpperCase();
             if (!acc[monthYear]) acc[monthYear] = [];
             acc[monthYear].push(tx);
             return acc;
@@ -335,7 +302,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
             updateTransaction(tx as Transaction);
             addToast(t('toast_transaction_updated'), 'success');
         } else {
-            addTransaction({ ...tx, id: String(Date.now()) });
+            addTransaction({ ...tx, id: String(Date.now()) + Math.random() });
             addToast(t('toast_transaction_added'), 'success');
         }
         setEditingTx(null);
@@ -367,7 +334,6 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                         className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
                         autoCapitalize="characters"
                     />
-                    
                      <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)]">
                          {(['all', '30', '90', '365'] as const).map(p => (
                             <button
@@ -383,29 +349,11 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-24 md:pb-6">
-                 {filteredTransactions.length > 0 && (
-                    <div className="px-0 pb-4">
-                        <div className="glass p-4 rounded-xl text-sm space-y-2 animate-scale-in">
-                            <div className="flex justify-between">
-                                <span className="text-[var(--text-secondary)] font-medium">{t('total_buys')}</span>
-                                <span className="font-bold text-[var(--green-text)]">{formatCurrency(summary.buys)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-[var(--text-secondary)] font-medium">{t('total_sells')}</span>
-                                <span className="font-bold text-[var(--red-text)]">{formatCurrency(summary.sells)}</span>
-                            </div>
-                            <div className="flex justify-between pt-2 border-t border-[var(--border-color)] mt-2">
-                                <span className="text-[var(--text-primary)] font-bold">{t('net_investment')}</span>
-                                <span className={`font-bold text-base ${summary.net >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{formatCurrency(summary.net)}</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
                 {Object.keys(groupedTransactions).length > 0 ? (
                     Object.entries(groupedTransactions).map(([monthYear, txs]) => (
                         <div key={monthYear} className="mb-6 animate-fade-in-up">
                             <h2 className="text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-widest px-1 sticky top-0 z-10 bg-[var(--bg-primary)]/90 backdrop-blur-sm py-2 -mx-4 px-4">{monthYear}</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 landscape-grid-cols-2">
+                            <div className="grid grid-cols-1 gap-3">
                                 {(txs as Transaction[]).map((tx, index) => (
                                     <TransactionItem 
                                         key={tx.id} 
