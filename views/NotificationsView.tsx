@@ -189,7 +189,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
     ];
 
     return (
-        <div className="p-4 h-full flex flex-col">
+        <div className="p-4 h-full flex flex-col overflow-x-hidden">
             <div className="flex items-center justify-between mb-4">
                  <div className="flex items-center">
                     <button onClick={() => setActiveView('dashboard')} className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-all duration-200 active:scale-95" aria-label={t('back')}>
@@ -218,7 +218,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
             </div>
 
             {notifications.length > 0 ? (
-                <div className="space-y-6 pb-24 md:pb-6 overflow-y-auto custom-scrollbar landscape-pb-6">
+                <div className="space-y-6 pb-24 md:pb-6 overflow-y-auto overflow-x-hidden custom-scrollbar landscape-pb-6">
                     {(Object.keys(groupedNotifications) as Array<keyof typeof groupedNotifications>).map(groupKey => 
                         groupedNotifications[groupKey].length > 0 && (
                             <div key={groupKey}>

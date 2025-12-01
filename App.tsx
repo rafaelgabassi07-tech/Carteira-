@@ -130,14 +130,14 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="h-screen w-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden flex flex-col transition-all duration-300">
+      <div className="h-[100dvh] w-full max-w-full bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-x-hidden flex flex-col transition-all duration-300">
         
         <OfflineBanner />
         
         {/* Main Content - Centered Mobile Layout */}
         <main className="flex-1 relative w-full overflow-hidden flex flex-col">
           <Suspense fallback={<LoadingSpinner />}>
-            <div className="h-full w-full overflow-y-auto custom-scrollbar">
+            <div className="h-full w-full overflow-y-auto overflow-x-hidden custom-scrollbar">
                 <div className="mx-auto w-full max-w-md h-full"> 
                     {renderView()}
                 </div>

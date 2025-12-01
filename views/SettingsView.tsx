@@ -23,9 +23,11 @@ export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'ba
 interface SettingsViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
     initialScreen?: MenuScreen;
+    onUpdateApp?: () => void;
+    updateAvailable?: boolean;
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = 'main' }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = 'main', onUpdateApp, updateAvailable }) => {
     const [screen, setScreen] = useState<MenuScreen>(initialScreen);
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const { t } = useI18n();
@@ -37,7 +39,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
     const renderScreen = () => {
         const onBack = () => setScreen('main');
         switch (screen) {
-            case 'main': return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
+            case 'main': return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} updateAvailable={updateAvailable} />;
             case 'profile': return <UserProfileDetail onBack={onBack} addToast={addToast} />;
             case 'security': return <SecuritySettings onBack={onBack} addToast={addToast} />;
             case 'notifications': return <NotificationSettings onBack={onBack} />;
@@ -49,14 +51,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
             case 'about': return <AboutApp onBack={onBack} />;
             case 'calculators': return <div className="-m-4 h-full"><CalculatorsView onBack={onBack} /></div>;
             case 'glossary': return <div className="-m-4 h-full"><GlossaryView onBack={onBack} /></div>;
-            default: return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} />;
+            default: return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} updateAvailable={updateAvailable} />;
         }
     };
     
     const animationClass = screen === 'main' ? 'animate-fade-in' : 'animate-slide-in-right';
 
     return (
-        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6">
+        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto overflow-x-hidden custom-scrollbar landscape-pb-6">
              <div className="max-w-2xl mx-auto">
                 {screen === 'main' && (
                     <h1 className="text-2xl font-bold mb-4 px-1 animate-fade-in">{t('nav_settings')}</h1>
@@ -68,6 +70,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
             {showUpdateModal && (
                 <UpdateCheckModal 
                     onClose={() => setShowUpdateModal(false)} 
+                    updateAvailable={updateAvailable}
+                    onUpdate={onUpdateApp}
                 />
             )}
             <style>{`

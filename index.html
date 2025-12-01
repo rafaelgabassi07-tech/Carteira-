@@ -109,13 +109,18 @@
       }
 
       /* --- GLOBAL RESET & BASE --- */
+      html, body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden; /* Critical for mobile-only feel */
+        height: 100%;
+        overscroll-behavior-y: none; /* Prevents bounce effect on body */
+      }
+
       body {
         font-family: var(--font-family);
         background-color: var(--bg-primary);
         color: var(--text-primary);
-        overflow: hidden; /* App-like behavior */
-        height: 100vh;
-        width: 100vw;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s ease;
