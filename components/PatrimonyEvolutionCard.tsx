@@ -6,12 +6,12 @@ import EvolutionChart from './EvolutionChart';
 import CountUp from './CountUp';
 import TrendingUpIcon from './icons/TrendingUpIcon';
 
-type Period = '30d' | '6m' | '1y' | 'all';
+type Period = '7d' | '30d' | '6m' | '1y' | 'all';
 
 const PatrimonyEvolutionCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
     const { portfolioEvolution, assets, privacyMode } = usePortfolio();
-    const [period, setPeriod] = useState<Period>('30d');
+    const [period, setPeriod] = useState<Period>('7d');
 
     // Calculate Current Metrics (Pure Capital Gain Focus)
     const currentMetrics = useMemo(() => {
@@ -31,7 +31,8 @@ const PatrimonyEvolutionCard: React.FC = () => {
         const now = new Date();
         let cutoffDate = new Date();
         
-        if (period === '30d') cutoffDate.setDate(now.getDate() - 30);
+        if (period === '7d') cutoffDate.setDate(now.getDate() - 7);
+        else if (period === '30d') cutoffDate.setDate(now.getDate() - 30);
         else if (period === '6m') cutoffDate.setMonth(now.getMonth() - 6);
         else if (period === '1y') cutoffDate.setFullYear(now.getFullYear() - 1);
         else return data; // 'all'
@@ -75,13 +76,13 @@ const PatrimonyEvolutionCard: React.FC = () => {
 
                 {/* Period Filter */}
                 <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)] self-end md:self-center shrink-0">
-                    {(['30d', '6m', '1y', 'all'] as Period[]).map((p) => (
+                    {(['7d', '30d', '6m', '1y', 'all'] as Period[]).map((p) => (
                         <button
                             key={p}
                             onClick={() => setPeriod(p)}
                             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${period === p ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                         >
-                            {p === 'all' ? t('since_beginning') : p === '30d' ? '30D' : p === '6m' ? t('analysis_period_6m') : t('analysis_period_12m')}
+                            {p === 'all' ? t('since_beginning') : p === '7d' ? '7D' : p === '30d' ? '30D' : p === '6m' ? t('analysis_period_6m') : t('analysis_period_12m')}
                         </button>
                     ))}
                 </div>
