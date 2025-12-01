@@ -114,7 +114,7 @@ const TransactionModal: React.FC<{
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('quantity')}</label>
-                        <input value={quantity} onChange={e => setQuantity(e.target.value)} type="number" inputMode="decimal" step="1" min="0.0001" required className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
+                        <input value={quantity} onChange={e => setQuantity(e.target.value)} type="number" inputMode="numeric" step="1" min="1" required className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
                         {errors.quantity && <p className="text-xs text-red-400 mt-1">{errors.quantity}</p>}
                     </div>
                     <div>
