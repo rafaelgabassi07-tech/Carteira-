@@ -10,7 +10,6 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate, getTodayISODate } from '../utils';
 import MoreVerticalIcon from '../components/icons/MoreVerticalIcon';
 
-// TransactionModal remains the same
 const TransactionModal: React.FC<{ 
     onClose: () => void; 
     onSave: (tx: Omit<Transaction, 'id'> & { id?: string }) => void; 
@@ -203,8 +202,8 @@ const TransactionItem = React.memo<{
     };
 
     return (
-        <div style={style} className="bg-[var(--bg-secondary)] p-4 rounded-2xl animate-fade-in-up relative border border-[var(--border-color)] active:scale-[0.98] transform duration-200 shadow-sm h-full">
-            <div className="flex items-center justify-between">
+        <div style={style} className="bg-[var(--bg-secondary)] p-4 rounded-2xl animate-fade-in-up relative border border-[var(--border-color)] transform duration-200 shadow-sm h-full">
+            <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm ${isBuy ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
                         {isBuy ? t('buy_short') : t('sell_short')}
@@ -216,7 +215,7 @@ const TransactionItem = React.memo<{
                         </p>
                     </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0 pl-4">
                     <p className={`font-bold text-lg ${isBuy ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]'}`}>
                         {formatCurrency(totalValue)}
                     </p>
@@ -299,7 +298,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
             let matchesDate = true;
             if (limitDate) {
                 const txDate = new Date(t.date);
-                txDate.setHours(12,0,0,0); // Avoid timezone issues by setting to midday
+                txDate.setHours(12,0,0,0);
                 matchesDate = txDate >= limitDate;
             }
             
@@ -382,27 +381,26 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                     </div>
                 </div>
             </div>
-
-            {filteredTransactions.length > 0 && (
-                <div className="px-4 pb-4 sticky top-0 z-20 bg-[var(--bg-primary)]">
-                    <div className="glass p-4 rounded-xl text-sm space-y-2 animate-scale-in">
-                        <div className="flex justify-between">
-                            <span className="text-[var(--text-secondary)] font-medium">{t('total_buys')}</span>
-                            <span className="font-bold text-[var(--green-text)]">{formatCurrency(summary.buys)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-[var(--text-secondary)] font-medium">{t('total_sells')}</span>
-                            <span className="font-bold text-[var(--red-text)]">{formatCurrency(summary.sells)}</span>
-                        </div>
-                        <div className="flex justify-between pt-2 border-t border-[var(--border-color)] mt-2">
-                            <span className="text-[var(--text-primary)] font-bold">{t('net_investment')}</span>
-                            <span className={`font-bold text-base ${summary.net >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{formatCurrency(summary.net)}</span>
-                        </div>
-                    </div>
-                </div>
-            )}
             
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-24 md:pb-6">
+                 {filteredTransactions.length > 0 && (
+                    <div className="px-0 pb-4">
+                        <div className="glass p-4 rounded-xl text-sm space-y-2 animate-scale-in">
+                            <div className="flex justify-between">
+                                <span className="text-[var(--text-secondary)] font-medium">{t('total_buys')}</span>
+                                <span className="font-bold text-[var(--green-text)]">{formatCurrency(summary.buys)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-[var(--text-secondary)] font-medium">{t('total_sells')}</span>
+                                <span className="font-bold text-[var(--red-text)]">{formatCurrency(summary.sells)}</span>
+                            </div>
+                            <div className="flex justify-between pt-2 border-t border-[var(--border-color)] mt-2">
+                                <span className="text-[var(--text-primary)] font-bold">{t('net_investment')}</span>
+                                <span className={`font-bold text-base ${summary.net >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>{formatCurrency(summary.net)}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {Object.keys(groupedTransactions).length > 0 ? (
                     Object.entries(groupedTransactions).map(([monthYear, txs]) => (
                         <div key={monthYear} className="mb-6 animate-fade-in-up">
