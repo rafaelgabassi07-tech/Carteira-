@@ -114,6 +114,23 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
         }
     };
     
+    // --- Dynamic Tooltip Positioning Logic ---
+    let tooltipTransform = 'translate(-50%, -100%)';
+    let arrowLeft = '50%';
+    
+    if (tooltip) {
+        const threshold = width * 0.25; // 25% boundary
+        if (tooltip.x < threshold) {
+            // Close to left edge: Shift box right, keep arrow left
+            tooltipTransform = 'translate(-15%, -100%)';
+            arrowLeft = '15%';
+        } else if (tooltip.x > width - threshold) {
+            // Close to right edge: Shift box left, keep arrow right
+            tooltipTransform = 'translate(-85%, -100%)';
+            arrowLeft = '85%';
+        }
+    }
+
     if (data.length === 0) {
         return (
             <div ref={containerRef} className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-xs">
@@ -222,13 +239,8 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                     // Bar Chart Implementation
                     data.map((d, i) => {
                         const x = getX(i);
-                        // For bars in zoom mode, we must clamp to the visible area
                         const investedY = getY(d.invested);
                         const marketY = getY(d.marketValue);
-
-                        // Calculate heights relative to the visible floor (height - padding.bottom)
-                        // This logic gets complex with non-zero baselines for bars.
-                        // Simplified: if chartType == 'bar', we forced min=0 in the useMemo above.
                         
                         const investedH = (height - padding.bottom) - investedY;
                         const marketH = (height - padding.bottom) - marketY;
@@ -254,11 +266,11 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
             
             {tooltip && (
                 <div 
-                    className="absolute bg-[var(--bg-secondary)] border border-[var(--border-color)] p-3 rounded-lg text-xs shadow-xl pointer-events-none transition-all z-10 whitespace-nowrap backdrop-blur-md"
+                    className="absolute bg-[var(--bg-secondary)] border border-[var(--border-color)] p-3 rounded-lg text-xs shadow-xl pointer-events-none transition-transform duration-100 z-10 whitespace-nowrap backdrop-blur-md"
                     style={{ 
                         left: tooltip.x, 
                         top: Math.min(tooltip.y, getY(tooltip.point.invested)) - 10, 
-                        transform: `translate(-50%, -100%)`
+                        transform: tooltipTransform
                     }}
                 >
                     <p className="text-center font-bold text-[var(--text-primary)] mb-2">{tooltip.point.month}</p>
@@ -283,7 +295,11 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                             {formatCurrency(variation)}
                         </span>
                     </div>
-                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)]"></div>
+                    {/* Dynamic Arrow */}
+                    <div 
+                        className="absolute top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)] transition-all duration-100"
+                        style={{ left: arrowLeft, transform: 'translateX(-50%)' }}
+                    ></div>
                 </div>
             )}
         </div>
