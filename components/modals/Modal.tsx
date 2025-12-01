@@ -29,11 +29,11 @@ const Modal: React.FC<ModalProps> = ({ title, onClose, children, type = 'slide-u
     const paddingClass = fullScreen ? 'p-5 pt-safe' : 'p-5';
 
     return (
-        <div className={`fixed inset-0 bg-black bg-opacity-75 flex justify-center z-50 ${positionClass}`}>
-            <div className={`bg-[var(--bg-secondary)] text-[var(--text-primary)] flex flex-col ${widthClass} ${roundedClass} ${paddingClass} ${animationClass} shadow-2xl`}>
+        <div className={`fixed inset-0 bg-black/75 flex justify-center z-50 backdrop-blur-sm transition-opacity ${positionClass}`}>
+            <div className={`bg-[var(--bg-secondary)] text-[var(--text-primary)] flex flex-col ${widthClass} ${roundedClass} ${paddingClass} ${animationClass} shadow-2xl will-change-transform`}>
                 <div className="flex justify-between items-center mb-4 flex-shrink-0">
                     <h2 className="text-xl font-bold">{title}</h2>
-                    <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-2 rounded-full hover:bg-[var(--bg-tertiary-hover)] transition-colors">
+                    <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-2 rounded-full hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-90">
                         <CloseIcon className="w-6 h-6" />
                     </button>
                 </div>
@@ -43,10 +43,10 @@ const Modal: React.FC<ModalProps> = ({ title, onClose, children, type = 'slide-u
             </div>
             <style>{`
                 @keyframes slide-up {
-                    from { transform: translateY(100%); }
-                    to { transform: translateY(0); }
+                    from { transform: translate3d(0, 100%, 0); }
+                    to { transform: translate3d(0, 0, 0); }
                 }
-                .animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
+                .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
             `}</style>
         </div>
     );

@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
-import Sidebar from './components/Sidebar';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
@@ -11,7 +10,6 @@ import { usePortfolio } from './contexts/PortfolioContext';
 import { useI18n } from './contexts/I18nContext';
 import { isLowEndDevice } from './utils';
 import type { MenuScreen } from './views/SettingsView';
-import MainMenu from './components/settings/MainMenu';
 
 // Lazy Load Views
 const PortfolioView = React.lazy(() => import('./views/PortfolioView'));
@@ -37,7 +35,6 @@ const App: React.FC = () => {
   const [settingsStartScreen, setSettingsStartScreen] = useState<MenuScreen>('main');
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
-  const [isMobileLandscape, setIsMobileLandscape] = useState(false);
   
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
     const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
@@ -47,17 +44,6 @@ const App: React.FC = () => {
             setToast(t => (t?.id === newToast.id ? null : t));
         }, duration);
     }
-  }, []);
-
-  // Responsive & Theme Handlers
-  useEffect(() => {
-    const handleResize = () => {
-      const isLandscape = window.innerWidth > window.innerHeight && window.innerWidth < 1024;
-      setIsMobileLandscape(isLandscape);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -127,14 +113,14 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case 'dashboard': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
+      case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
       case 'noticias': return <NewsView addToast={addToast} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
-      case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
-      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
-      default: return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
+      case 'carteira': return <AnalysisView addToast={addToast} />;
+      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
+      default: return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
     }
   };
 
@@ -144,37 +130,23 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="h-screen w-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden grid grid-cols-1 lg:grid-cols-[var(--sidebar-width)_1fr] transition-all duration-300">
+      <div className="h-screen w-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden flex flex-col transition-all duration-300">
         
         <OfflineBanner />
         
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block h-full border-r border-[var(--border-color)] bg-[var(--bg-secondary)] z-20">
-            <Sidebar activeView={activeView} setActiveView={handleSetView} />
-        </div>
-
-        {/* Mobile Landscape Sidebar (Conditional) */}
-        {isMobileLandscape && (
-            <div className="fixed left-0 top-0 bottom-0 w-64 z-30 bg-[var(--bg-secondary)] border-r border-[var(--border-color)] overflow-y-auto">
-                 <div className="p-4">
-                    <MainMenu setScreen={(s) => { setActiveView('settings'); setSettingsStartScreen(s); }} addToast={addToast} />
-                </div>
-            </div>
-        )}
-        
-        {/* Main Content */}
-        <main className={`relative h-full w-full overflow-hidden flex flex-col ${isMobileLandscape ? 'pl-64' : ''}`}>
+        {/* Main Content - Centered Mobile Layout */}
+        <main className="flex-1 relative w-full overflow-hidden flex flex-col">
           <Suspense fallback={<LoadingSpinner />}>
-            <div className="h-full w-full overflow-y-auto custom-scrollbar p-0 lg:p-8">
-                <div className="mx-auto w-full max-w-[1600px]">
+            <div className="h-full w-full overflow-y-auto custom-scrollbar">
+                <div className="mx-auto w-full max-w-md h-full"> 
                     {renderView()}
                 </div>
             </div>
           </Suspense>
         </main>
         
-        {/* Mobile Bottom Nav (Hidden on LG) */}
-        <div className={`lg:hidden z-40 ${isMobileLandscape ? 'hidden' : ''}`}>
+        {/* Mobile Bottom Nav (Always Visible) */}
+        <div className="z-40 w-full max-w-md mx-auto">
            <BottomNav activeView={activeView} setActiveView={handleSetView} />
         </div>
 

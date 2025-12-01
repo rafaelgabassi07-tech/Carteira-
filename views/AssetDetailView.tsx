@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
@@ -53,6 +53,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showAllHistory, setShowAllHistory] = useState(false);
     const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
+    const hasLoadedRef = useRef(false);
     
     const asset = getAssetByTicker(ticker);
 
@@ -69,9 +70,10 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         }
     }, [ticker, refreshSingleAsset, isRefreshing]);
 
-    // Only load if not already refreshing (controlled by component state)
+    // Initial load control to prevent loops
     useEffect(() => {
-        if (!asset) {
+        if (!asset && !hasLoadedRef.current) {
+             hasLoadedRef.current = true;
              setIsRefreshing(true);
              refreshSingleAsset(ticker, false).finally(() => setIsRefreshing(false));
         }

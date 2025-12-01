@@ -1,5 +1,5 @@
 
-import type { Asset, UserProfile, Transaction, Dividend, CalendarEvent, MonthlyIncome, DividendHistoryEvent, AppTheme, AppFont } from './types';
+import type { Asset, UserProfile, Transaction, Dividend, CalendarEvent, DividendHistoryEvent, AppTheme, AppFont } from './types';
 
 // --- Cache Time-To-Live (TTLs) em Milissegundos ---
 // Cache Persistence (Quanto tempo fica no disco)
@@ -536,8 +536,6 @@ export const MOCK_USER_PROFILE: UserProfile = {
 export const MOCK_TRANSACTIONS: Transaction[] = [];
 
 export const MOCK_DIVIDENDS: Dividend[] = [];
-
-export const MOCK_MONTHLY_INCOME: MonthlyIncome[] = [];
 
 export const MOCK_CALENDAR_EVENTS: CalendarEvent[] = [];
 

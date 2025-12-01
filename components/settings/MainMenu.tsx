@@ -27,7 +27,7 @@ const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: strin
         onClick={() => { onClick(); vibrate(); }}
         className={`menu-item flex items-center space-x-4 p-4 hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-200 cursor-pointer active:scale-[0.98] ${!isLast ? 'border-b border-[var(--border-color)]' : ''}`}
     >
-        <div className="menu-icon flex-shrink-0 w-12 h-12 flex items-center justify-center bg-[var(--bg-primary)] text-[var(--accent-color)] rounded-xl shadow-sm border border-[var(--border-color)]">
+        <div className="menu-icon flex-shrink-0 w-12 h-12 grid place-items-center bg-[var(--bg-primary)] text-[var(--accent-color)] rounded-xl shadow-sm border border-[var(--border-color)]">
             {icon}
         </div>
         <div className="flex-1 min-w-0">
@@ -39,7 +39,7 @@ const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: strin
 );
 
 
-const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdateModal: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ setScreen, onShowUpdateModal, addToast }) => {
+const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdateModal: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; updateAvailable?: boolean; }> = ({ setScreen, onShowUpdateModal, addToast, updateAvailable }) => {
     const { t } = useI18n();
     const { userProfile, resetApp } = usePortfolio();
 
@@ -139,9 +139,12 @@ const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdate
              <div className="p-2 space-y-2">
                 <button 
                     onClick={onShowUpdateModal} 
-                    className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold p-3 rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)]"
+                    className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold p-3 rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] relative"
                 >
-                    <UpdateIcon className="w-4 h-4" />
+                    <div className="relative">
+                        <UpdateIcon className="w-4 h-4" />
+                        {updateAvailable && <span className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--accent-color)] rounded-full animate-pulse"></span>}
+                    </div>
                     {t('check_for_update')}
                 </button>
                 <button onClick={resetApp} className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold text-red-500/80 hover:text-red-500 p-3 rounded-lg hover:bg-red-500/10 transition-colors">

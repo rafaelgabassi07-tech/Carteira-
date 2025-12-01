@@ -6,12 +6,12 @@ import EvolutionChart from './EvolutionChart';
 import CountUp from './CountUp';
 import TrendingUpIcon from './icons/TrendingUpIcon';
 
-type Period = '7d' | '15d' | '30d';
+type Period = '30d' | '6m' | '1y' | 'all';
 
 const PatrimonyEvolutionCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
     const { portfolioEvolution, assets, privacyMode } = usePortfolio();
-    const [period, setPeriod] = useState<Period>('7d');
+    const [period, setPeriod] = useState<Period>('30d');
 
     // Calculate Current Metrics (Pure Capital Gain Focus)
     const currentMetrics = useMemo(() => {
@@ -28,13 +28,16 @@ const PatrimonyEvolutionCard: React.FC = () => {
         const data = portfolioEvolution.all_types || [];
         if (data.length === 0) return [];
         
-        const totalDays = data.length;
-        let sliceCount = totalDays;
+        const now = new Date();
+        let cutoffDate = new Date();
         
-        if (period === '7d') sliceCount = 7;
-        if (period === '15d') sliceCount = 15;
-        
-        return data.slice(Math.max(totalDays - sliceCount, 0));
+        if (period === '30d') cutoffDate.setDate(now.getDate() - 30);
+        else if (period === '6m') cutoffDate.setMonth(now.getMonth() - 6);
+        else if (period === '1y') cutoffDate.setFullYear(now.getFullYear() - 1);
+        else return data; // 'all'
+
+        const cutoffStr = cutoffDate.toISOString().split('T')[0];
+        return data.filter(d => d.dateISO >= cutoffStr);
     }, [portfolioEvolution, period]);
 
     return (
@@ -72,13 +75,13 @@ const PatrimonyEvolutionCard: React.FC = () => {
 
                 {/* Period Filter */}
                 <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)] self-end md:self-center shrink-0">
-                    {(['7d', '15d', '30d'] as Period[]).map((p) => (
+                    {(['30d', '6m', '1y', 'all'] as Period[]).map((p) => (
                         <button
                             key={p}
                             onClick={() => setPeriod(p)}
                             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${period === p ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                         >
-                            {p.toUpperCase()}
+                            {p === 'all' ? t('since_beginning') : p === '30d' ? '30D' : p === '6m' ? t('analysis_period_6m') : t('analysis_period_12m')}
                         </button>
                     ))}
                 </div>

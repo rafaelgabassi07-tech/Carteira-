@@ -271,12 +271,12 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
 
     const filteredTransactions = useMemo(() => {
         const now = new Date();
+        now.setHours(0,0,0,0); // Normalize 'now' to start of day
         let limitDate: Date | null = null;
         
         if (dateRange !== 'all') {
-            limitDate = new Date();
-            limitDate.setDate(now.getDate() - parseInt(dateRange));
-            limitDate.setHours(0,0,0,0);
+            limitDate = new Date(now);
+            limitDate.setDate(limitDate.getDate() - parseInt(dateRange));
         }
 
         return transactions.filter(t => {
@@ -285,9 +285,16 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
             
             let matchesDate = true;
             if (limitDate) {
-                const txDate = new Date(t.date);
-                txDate.setHours(0,0,0,0);
-                matchesDate = txDate >= limitDate;
+                // Ensure date string (YYYY-MM-DD) is treated as UTC/Local midnight consistent
+                // Simply comparing strings works for ISO dates if we format limitDate correctly
+                const txDateStr = t.date; 
+                // Format limitDate to YYYY-MM-DD
+                const year = limitDate.getFullYear();
+                const month = String(limitDate.getMonth() + 1).padStart(2, '0');
+                const day = String(limitDate.getDate()).padStart(2, '0');
+                const limitDateStr = `${year}-${month}-${day}`;
+                
+                matchesDate = txDateStr >= limitDateStr;
             }
             
             return matchesType && matchesTicker && matchesDate;

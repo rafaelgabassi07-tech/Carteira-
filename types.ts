@@ -201,10 +201,18 @@ export interface AppPreferences {
 }
 
 export interface PortfolioEvolutionPoint {
-    month: string;
+    month: string; // Used as label (DD/MM)
+    dateISO: string; // YYYY-MM-DD for sorting
     invested: number;
     marketValue: number;
     cumulativeDividends: number;
+}
+
+export interface PortfolioSnapshot {
+    date: string;
+    marketValue: number;
+    investedValue: number;
+    timestamp: number;
 }
 
 export type SegmentEvolutionData = Record<string, PortfolioEvolutionPoint[]>;

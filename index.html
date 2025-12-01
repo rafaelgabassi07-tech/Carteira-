@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" data-theme="dark" data-style="premium">
   <head>
@@ -48,6 +49,7 @@
         --text-primary: #fafafa;
         --text-secondary: #a1a1aa;
         --border-color: #27272a;
+        --radius: 16px;
         
         /* Glass & Effects */
         --backdrop-blur: 0px;
@@ -64,7 +66,6 @@
         /* Layout */
         --safe-top: env(safe-area-inset-top, 0px);
         --safe-bottom: env(safe-area-inset-bottom, 0px);
-        --sidebar-width: 280px;
       }
 
       /* --- THEME CONFIGURATIONS --- */
@@ -175,17 +176,66 @@
       .pt-safe { padding-top: var(--safe-top); }
       .pb-safe { padding-bottom: var(--safe-bottom); }
       
-      /* Animations */
-      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      @keyframes scale-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
-      @keyframes grow-up { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-      
-      .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-      .animate-fade-in-up { animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      .animate-scale-in { animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      .animate-grow-up { animation: grow-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; transform-origin: bottom; }
+      /* --- OPTIMIZED ANIMATIONS --- */
+      /* Hardware accelerated easing curve (standard iOS/Material) */
+      :root {
+        --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      }
 
+      @keyframes fade-in { 
+        from { opacity: 0; } 
+        to { opacity: 1; } 
+      }
+      
+      @keyframes fade-in-up { 
+        from { opacity: 0; transform: translate3d(0, 15px, 0); } 
+        to { opacity: 1; transform: translate3d(0, 0, 0); } 
+      }
+      
+      @keyframes scale-in { 
+        from { opacity: 0; transform: scale3d(0.96, 0.96, 1); } 
+        to { opacity: 1; transform: scale3d(1, 1, 1); } 
+      }
+      
+      @keyframes grow-up { 
+        from { transform: scale3d(1, 0, 1); } 
+        to { transform: scale3d(1, 1, 1); } 
+      }
+      
+      /* Animation Classes with GPU Hints */
+      .animate-fade-in { 
+        animation: fade-in 0.3s ease-out forwards; 
+        will-change: opacity;
+      }
+      
+      .animate-fade-in-up { 
+        animation: fade-in-up 0.5s var(--ease-out-expo) forwards; 
+        will-change: transform, opacity;
+        backface-visibility: hidden;
+      }
+      
+      .animate-scale-in { 
+        animation: scale-in 0.4s var(--ease-out-expo) forwards; 
+        will-change: transform, opacity;
+        backface-visibility: hidden;
+      }
+      
+      .animate-grow-up { 
+        animation: grow-up 0.6s var(--ease-out-expo) forwards; 
+        transform-origin: bottom;
+        will-change: transform;
+      }
+
+      /* Reduce motion preference */
+      @media (prefers-reduced-motion: reduce) {
+        *, ::before, ::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
 
       /* Mobile Landscape Specifics */
       @media (max-width: 1023px) and (orientation: landscape) {

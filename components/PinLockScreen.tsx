@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { vibrate, bufferDecode } from '../utils';
 import FingerprintIcon from './icons/FingerprintIcon';
@@ -14,8 +15,6 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
     const [error, setError] = useState(false);
     const [isBiometricScanning, setIsBiometricScanning] = useState(false);
 
-    // Corrigido: Usar navigator.credentials.get para autenticação (Login)
-    // Isso evita que o navegador pergunte se deseja criar uma nova chave.
     const handleBiometricAuth = async () => {
         const isBioEnabled = localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics;
         const storedCredentialId = localStorage.getItem('biometric-credential-id');
@@ -31,7 +30,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
                     allowCredentials: [{
                         type: 'public-key',
                         id: bufferDecode(storedCredentialId),
-                        transports: ['internal'] // Prioriza TouchID/FaceID
+                        transports: ['internal']
                     }],
                     userVerification: 'required',
                     timeout: 60000,
@@ -52,7 +51,6 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
     useEffect(() => {
         const isBioEnabled = localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics;
         if (isBioEnabled) {
-            // Pequeno delay para garantir que o componente montou antes de chamar a biometria
             const timer = setTimeout(() => handleBiometricAuth(), 500);
             return () => clearTimeout(timer);
         }
@@ -72,7 +70,10 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
                 } else {
                     vibrate([50, 50, 50]);
                     setError(true);
-                    setTimeout(() => setPin(''), 500);
+                    setTimeout(() => {
+                        setPin('');
+                        setError(false);
+                    }, 500);
                 }
             }
         }
@@ -84,7 +85,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
         setError(false);
     };
 
-    // Add Keyboard Support
+    // Keyboard Support
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isBiometricScanning || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -104,65 +105,88 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
     }, [pin, isBiometricScanning, correctPin]);
 
     return (
-        <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 animate-fade-in cursor-default user-select-none">
+        <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] flex flex-col items-center justify-between p-6 animate-fade-in select-none overflow-hidden">
             
-            {/* Container Card */}
-            <div className="flex flex-col items-center w-full max-w-sm md:bg-[var(--bg-secondary)] md:border md:border-[var(--border-color)] md:shadow-2xl md:rounded-3xl md:p-10 transition-all duration-300">
-                
-                <div className="mb-8 flex flex-col items-center">
-                    <Logo className="w-16 h-16 rounded-2xl mb-4 shadow-lg shadow-[var(--accent-color)]/10" />
-                    <h2 className="text-xl font-bold text-[var(--text-primary)]">FII Master</h2>
-                    <p className="text-[var(--text-secondary)] text-sm mt-1">Digite seu PIN para acessar</p>
+            {/* Header Content */}
+            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-xs space-y-8">
+                <div className="flex flex-col items-center">
+                    <div className="mb-6 p-4 bg-[var(--bg-secondary)] rounded-3xl shadow-xl shadow-[var(--accent-color)]/5 border border-[var(--border-color)]">
+                        <Logo className="w-16 h-16" />
+                    </div>
+                    <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Bem-vindo de volta</h2>
+                    <p className="text-[var(--text-secondary)] text-sm mt-1 font-medium">Digite seu PIN para acessar</p>
                 </div>
 
-                <div className="flex space-x-4 mb-8">
+                {/* PIN Dots with Shake Animation */}
+                <div className={`flex space-x-6 ${error ? 'animate-shake' : ''}`}>
                     {[0, 1, 2, 3].map(i => (
-                        <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 ${pin.length > i ? (error ? 'bg-red-500 border-red-500' : 'bg-[var(--accent-color)] border-[var(--accent-color)]') : 'border-[var(--text-secondary)] opacity-50'}`} />
+                        <div 
+                            key={i} 
+                            className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
+                                pin.length > i 
+                                    ? (error ? 'bg-red-500 border-red-500 scale-110' : 'bg-[var(--accent-color)] border-[var(--accent-color)] scale-110') 
+                                    : 'border-[var(--border-color)] bg-[var(--bg-secondary)]'
+                            }`} 
+                        />
                     ))}
                 </div>
+            </div>
 
-                <div className="grid grid-cols-3 gap-6 md:gap-4">
+            {/* Keypad */}
+            <div className="w-full max-w-xs mb-8">
+                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
                         <button 
                             key={num} 
                             onClick={() => handleDigit(String(num))} 
-                            className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-[var(--bg-secondary)] md:bg-[var(--bg-primary)] text-2xl md:text-xl font-bold text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-95 border border-[var(--border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 flex items-center justify-center"
+                            className="w-20 h-20 rounded-full bg-[var(--bg-secondary)]/50 backdrop-blur-sm text-3xl font-medium text-[var(--text-primary)] transition-all active:scale-90 active:bg-[var(--bg-tertiary-hover)] focus:outline-none flex items-center justify-center mx-auto"
                         >
                             {num}
                         </button>
                     ))}
                     
-                    {(localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics) ? (
-                        <button onClick={() => handleBiometricAuth()} className={`w-16 h-16 md:w-14 md:h-14 rounded-full flex items-center justify-center text-[var(--accent-color)] hover:bg-[var(--bg-tertiary-hover)] transition-all active:scale-95 relative focus:outline-none ${isBiometricScanning ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}>
-                            {isBiometricScanning && <div className="absolute inset-0 rounded-full animate-ping bg-[var(--accent-color)]/20"></div>}
-                            <FingerprintIcon className="w-8 h-8" />
-                        </button>
-                    ) : (
-                        <div />
-                    )}
+                    {/* Biometric Button */}
+                    <div className="flex items-center justify-center">
+                        {(localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics) && (
+                            <button 
+                                onClick={() => handleBiometricAuth()} 
+                                className={`w-20 h-20 rounded-full flex items-center justify-center text-[var(--accent-color)] transition-all active:scale-90 active:bg-[var(--accent-color)]/10 focus:outline-none ${isBiometricScanning ? 'animate-pulse' : ''}`}
+                            >
+                                <FingerprintIcon className="w-9 h-9" />
+                            </button>
+                        )}
+                    </div>
                     
                     <button 
                         onClick={() => handleDigit('0')} 
-                        className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-[var(--bg-secondary)] md:bg-[var(--bg-primary)] text-2xl md:text-xl font-bold text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-tertiary-hover)] transition-colors active:scale-95 border border-[var(--border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 flex items-center justify-center"
+                        className="w-20 h-20 rounded-full bg-[var(--bg-secondary)]/50 backdrop-blur-sm text-3xl font-medium text-[var(--text-primary)] transition-all active:scale-90 active:bg-[var(--bg-tertiary-hover)] focus:outline-none flex items-center justify-center mx-auto"
                     >
                         0
                     </button>
                     
-                    <button 
-                        onClick={handleDelete} 
-                        className="w-16 h-16 md:w-14 md:h-14 rounded-full flex items-center justify-center text-[var(--text-primary)] hover:text-red-400 transition-colors active:scale-95 focus:outline-none"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
-                    </button>
-                </div>
-                
-                <div className="mt-8 flex items-center gap-2 text-[var(--text-secondary)] opacity-60">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden md:block"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.001"/><path d="M10 8h.001"/><path d="M14 8h.001"/><path d="M18 8h.001"/><path d="M6 12h.001"/><path d="M10 12h.001"/><path d="M14 12h.001"/><path d="M18 12h.001"/><path d="M7 16h10"/></svg>
-                    <p className="text-[10px] md:text-xs font-medium uppercase tracking-wide">
-                        {(localStorage.getItem('biometrics-enabled') === 'true' || allowBiometrics) ? "Biometria ou Teclado numérico" : "Use o teclado numérico"}
-                    </p>
+                    <div className="flex items-center justify-center">
+                        {pin.length > 0 && (
+                            <button 
+                                onClick={handleDelete} 
+                                className="w-20 h-20 rounded-full flex items-center justify-center text-[var(--text-primary)] hover:text-red-400 transition-all active:scale-90 focus:outline-none"
+                            >
+                                <span className="text-sm font-bold uppercase tracking-wider">Apagar</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
+
+            <style>{`
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+                    20%, 40%, 60%, 80% { transform: translateX(4px); }
+                }
+                .animate-shake {
+                    animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+                }
+            `}</style>
         </div>
     );
 };

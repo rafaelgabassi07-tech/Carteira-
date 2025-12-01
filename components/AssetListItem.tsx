@@ -27,7 +27,11 @@ const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValu
     }
 
     return (
-        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm h-full flex flex-col justify-between">
+        <div 
+            onClick={() => { onClick(); vibrate(); }} 
+            style={style} 
+            className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-colors duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm h-full flex flex-col justify-between will-change-transform"
+        >
             <div>
                 <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center space-x-3">
@@ -49,7 +53,7 @@ const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValu
             </div>
             <div className="mt-3 flex items-center gap-2">
                  <div className="flex-1 bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden">
-                     <div className="bg-[var(--accent-color)] h-full rounded-full transition-all duration-1000" style={{ width: `${allocation}%` }}></div>
+                     <div className="bg-[var(--accent-color)] h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${allocation}%` }}></div>
                 </div>
                 <span className="text-[10px] font-semibold text-[var(--text-secondary)] w-10 text-right">{allocation.toFixed(1)}%</span>
             </div>

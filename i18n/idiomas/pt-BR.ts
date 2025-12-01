@@ -144,8 +144,6 @@ export const ptBR = {
     mark_all_as_read: 'Marcar todas como lidas',
 
     // Analysis View
-    monthly_income: 'Renda Mensal',
-    avg_monthly_income_12m: 'Média Mensal (12m)',
     diversification: 'Alocação por Setor',
     evolution_of_patrimony: 'Evolução Patrimonial',
     net_worth: 'Patrimônio Líquido',
