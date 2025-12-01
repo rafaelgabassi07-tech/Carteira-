@@ -1,10 +1,10 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, DividendHistoryEvent, AppStats, SegmentEvolutionData, AppNotification, MonthlyIncome, PortfolioSnapshot } from '../types';
+import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, DividendHistoryEvent, AppStats, AppNotification, PortfolioEvolutionPoint, MonthlyIncome } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { generateNotifications } from '../services/dynamicDataService';
-import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, CacheManager, getTodayISODate, calculatePortfolioEvolution, calculateMonthlyDividends } from '../utils';
+import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, CacheManager, toISODate, calculatePortfolioEvolution } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME } from '../constants';
 
 interface PortfolioContextType {
@@ -17,13 +17,12 @@ interface PortfolioContextType {
   yieldOnCost: number;
   projectedAnnualIncome: number;
   monthlyIncome: MonthlyIncome[];
+  portfolioEvolution: Record<string, PortfolioEvolutionPoint[]>;
   lastSync: number | null;
   isRefreshing: boolean;
   marketDataError: string | null;
   userProfile: UserProfile;
   apiStats: AppStats;
-  portfolioEvolution: SegmentEvolutionData;
-  snapshots: Record<string, PortfolioSnapshot>;
   notifications: AppNotification[];
   unreadNotificationsCount: number;
   // Actions
@@ -74,7 +73,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [privacyMode, setPrivacyMode] = usePersistentState('privacy_mode', false);
   const [marketData, setMarketData] = usePersistentState<Record<string, any>>('market_data', {});
   const [lastSync, setLastSync] = usePersistentState<number | null>('last_sync', null);
-  const [snapshots, setSnapshots] = usePersistentState<Record<string, PortfolioSnapshot>>('portfolio_snapshots', {});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
   const [apiStats, setApiStats] = usePersistentState<AppStats>('api_stats', { gemini: {requests:0, bytesSent:0, bytesReceived:0}, brapi: {requests:0, bytesSent:0, bytesReceived:0} });
@@ -84,9 +82,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Use a ref to access current marketData inside useCallback without adding it to dependencies (avoids loops)
   const marketDataRef = useRef(marketData);
   useEffect(() => { marketDataRef.current = marketData; }, [marketData]);
-
-  // Derived State (Calculated)
-  const [portfolioEvolution, setPortfolioEvolution] = useState<SegmentEvolutionData>({});
 
   // --- One-time Preference Migration ---
   useEffect(() => {
@@ -175,8 +170,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const restoreData = useCallback((data: any) => {
       setTransactions(data.transactions || []);
       if(data.preferences) setPreferences(p => ({...p, ...data.preferences}));
-      if(data.snapshots) setSnapshots(data.snapshots);
-  }, [setTransactions, setPreferences, setSnapshots]);
+  }, [setTransactions, setPreferences]);
 
   const updatePreferences = useCallback((p: Partial<AppPreferences>) => setPreferences(prev => ({...prev, ...p})), [setPreferences]);
   const updateUserProfile = useCallback((p: Partial<UserProfile>) => setUserProfile(prev => ({...prev, ...p})), [setUserProfile]);
@@ -220,6 +214,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
+          // If lite mode (background update), only fetch prices. Skip heavy metadata.
           const promises: Promise<any>[] = [fetchBrapiQuotes(preferences, tickers, lite)];
           
           if (!lite) {
@@ -243,6 +238,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       next[tkr] = { 
                           ...prevData, 
                           ...newData,
+                          // Important: Don't overwrite complex history arrays with undefined if we are in lite mode
                           priceHistory: newData.priceHistory?.length > 0 ? newData.priceHistory : prevData.priceHistory || [],
                           dividendsHistory: newData.dividendsHistory?.length > 0 ? newData.dividendsHistory : prevData.dividendsHistory || [],
                           lastUpdated: Date.now() 
@@ -291,6 +287,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await refreshMarketData(true, false, false); 
   }, [refreshMarketData]);
 
+  // Memoized Asset Calculation - Core Performance Critical Path
   const assets = useMemo(() => {
       const metrics = calculatePortfolioMetrics(sourceTransactions);
       return Object.keys(metrics).map(ticker => {
@@ -316,6 +313,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
       if (isRefreshing || isDemoMode) return;
+      // Auto-repair missing fundamental data
       const incompleteAssets = assets.filter(a => a.segment === 'Outros' || a.priceHistory.length === 0);
       if (incompleteAssets.length > 0 && navigator.onLine) {
           const timer = setTimeout(() => {
@@ -329,41 +327,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return assets.reduce((acc, a) => acc + a.quantity * a.currentPrice, 0);
   }, [assets]);
 
-  // --- Snapshot & Evolution Effect ---
+  // --- Notification Generation ---
   useEffect(() => {
     if (isDemoMode) return;
 
     const timeoutId = setTimeout(() => {
-        // 1. Calculate Evolution based on persistent Snapshots + Reconstructed History
-        // We pass 365 days to get a good range, the UI will filter what it needs
-        const evolutionPoints = calculatePortfolioEvolution(sourceTransactions, sourceMarketData, 365, snapshots);
-        setPortfolioEvolution({ all_types: evolutionPoints });
-
-        // 2. Save Today's Snapshot (Persistent History)
-        // Only save if we have valid data and market is likely closed or it's a new day value
-        if (currentPatrimony > 0) {
-            const todayStr = getTodayISODate();
-            const totalInvested = assets.reduce((acc, a) => acc + (a.quantity * a.avgPrice), 0);
-            
-            setSnapshots(prev => {
-                // If value changed significantly or entry missing, update
-                const existing = prev[todayStr];
-                if (!existing || Math.abs(existing.marketValue - currentPatrimony) > 1) {
-                    return {
-                        ...prev,
-                        [todayStr]: {
-                            date: todayStr,
-                            marketValue: currentPatrimony,
-                            investedValue: totalInvested,
-                            timestamp: Date.now()
-                        }
-                    };
-                }
-                return prev;
-            });
-        }
-        
-        // 3. Notifications logic...
         const newNotifications = generateNotifications(assets, currentPatrimony);
         if (newNotifications.length > 0) {
             setNotifications(prev => {
@@ -392,7 +360,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [currentPatrimony, isDemoMode, assets, sourceTransactions, sourceMarketData, setNotifications, snapshots, setSnapshots]); 
+  }, [currentPatrimony, isDemoMode, assets, setNotifications]); 
 
   const getAssetByTicker = useCallback((ticker: string) => {
       return assets.find(a => a.ticker === ticker);
@@ -413,9 +381,68 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice * ((a.dy || 0) / 100)), 0);
   }, [assets]);
 
+  // Calculate Evolution (Now Optimized)
+  const portfolioEvolution = useMemo(() => {
+      return calculatePortfolioEvolution(sourceTransactions, sourceMarketData);
+  }, [sourceTransactions, sourceMarketData]);
+
+  // Calculate Monthly Income
   const monthlyIncome = useMemo(() => {
-      return calculateMonthlyDividends(assets, sourceTransactions);
-  }, [assets, sourceTransactions]);
+      if (isDemoMode) {
+          return [
+              { month: 'jan/23', total: 150.50 },
+              { month: 'fev/23', total: 165.20 },
+              { month: 'mar/23', total: 180.00 },
+              { month: 'abr/23', total: 175.50 },
+              { month: 'mai/23', total: 190.10 },
+              { month: 'jun/23', total: 210.00 },
+          ];
+      }
+
+      const income: Record<string, number> = {};
+      const sortedTxs = [...sourceTransactions].sort((a, b) => a.date.localeCompare(b.date));
+      
+      const assetTxs: Record<string, Transaction[]> = {};
+      sortedTxs.forEach(tx => {
+          const t = tx.ticker.toUpperCase();
+          if(!assetTxs[t]) assetTxs[t] = [];
+          assetTxs[t].push(tx);
+      });
+
+      assets.forEach(asset => {
+          const ticker = asset.ticker.toUpperCase();
+          const txs = assetTxs[ticker] || [];
+          if(txs.length === 0) return;
+          
+          (asset.dividendsHistory || []).forEach(div => {
+              if (!div.paymentDate || !div.exDate) return;
+              
+              let qty = 0;
+              for(const tx of txs) {
+                  if (tx.date > div.exDate) break; 
+                  if (tx.type === 'Compra') qty += tx.quantity;
+                  else qty -= tx.quantity;
+              }
+              const userQty = Math.max(0, qty);
+              
+              if (userQty > 0) {
+                  const key = div.paymentDate.substring(0, 7); // YYYY-MM
+                  income[key] = (income[key] || 0) + (userQty * div.value);
+              }
+          });
+      });
+      
+      const result = Object.entries(income)
+          .map(([dateStr, total]) => {
+              const [year, month] = dateStr.split('-').map(Number);
+              const dateObj = new Date(year, month - 1, 1);
+              const monthStr = dateObj.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+              return { month: monthStr, total, sortKey: dateStr };
+          })
+          .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+          
+      return result.slice(-12).map(({month, total}) => ({month, total}));
+  }, [assets, sourceTransactions, isDemoMode]);
 
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
       if (targetTx.type !== 'Venda') return 0;
@@ -447,8 +474,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const value = useMemo(() => ({
       assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-      yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, portfolioEvolution, snapshots,
-      notifications, unreadNotificationsCount,
+      yieldOnCost, projectedAnnualIncome, monthlyIncome, portfolioEvolution, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
@@ -456,8 +482,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       deleteNotification, clearAllNotifications
   }), [
       assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-      yieldOnCost, projectedAnnualIncome, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, portfolioEvolution, snapshots,
-      notifications, unreadNotificationsCount,
+      yieldOnCost, projectedAnnualIncome, monthlyIncome, portfolioEvolution, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,

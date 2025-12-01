@@ -4,8 +4,8 @@ import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import PatrimonyEvolutionCard from '../components/PatrimonyEvolutionCard';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import type { ToastMessage } from '../types';
 import { vibrate } from '../utils';
+import type { ToastMessage } from '../types';
 
 interface AnalysisViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
@@ -40,8 +40,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
                         <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
                     </button>
                 </div>
-                <div className="grid grid-cols-1 gap-6">
-                    <div className="col-span-1">
+                <div className="flex flex-col gap-6">
+                    <div className="w-full">
                         <PatrimonyEvolutionCard />
                     </div>
                 </div>

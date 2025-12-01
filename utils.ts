@@ -1,6 +1,6 @@
 
 import { useState, useEffect, Dispatch, SetStateAction, useRef } from 'react';
-import type { Transaction, AppTheme, PortfolioEvolutionPoint, MonthlyIncome, Asset, DividendHistoryEvent, PortfolioSnapshot } from './types';
+import type { Transaction, AppTheme, Asset, PortfolioEvolutionPoint } from './types';
 
 // --- Hook para estado persistente no localStorage com Debounce ---
 export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatch<SetStateAction<T>>] {
@@ -218,6 +218,7 @@ const EPSILON = 0.000001;
 export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<string, { quantity: number; totalCost: number }> => {
     const metrics: Record<string, { quantity: number; totalCost: number }> = {};
 
+    // Clone to avoid mutating original array if sort is in place (though toSorted is better, sticking to compatibility)
     const sortedTransactions = [...transactions].sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
         if (a.type === 'Compra' && b.type === 'Venda') return -1;
@@ -260,235 +261,96 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
     return activeMetrics;
 };
 
-// Helper to find closest price in history before or at target date
-export const getClosestPrice = (history: { date: string; price: number }[], targetDate: string): number | null => {
-    if (!history || history.length === 0) return null;
-    
-    // Sort just in case
-    // Note: Assuming history is usually sorted, but let's be safe or rely on caller
-    // Ideally do a reverse search since we want the latest price <= targetDate
-    
-    let bestPrice = null;
-    let bestDate = '';
+// --- Optimized Portfolio Evolution Calculation ---
+export const calculatePortfolioEvolution = (transactions: Transaction[], marketData: Record<string, any>): Record<string, PortfolioEvolutionPoint[]> => {
+    if (transactions.length === 0) return { all_types: [] };
 
-    for (const point of history) {
-        if (point.date <= targetDate) {
-            // Found a candidate, keep updating until we surpass targetDate
-            if (!bestDate || point.date > bestDate) {
-                bestDate = point.date;
-                bestPrice = point.price;
-            }
-        }
-    }
+    const sortedTxs = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+    const firstDate = new Date(sortedTxs[0].date);
+    const today = new Date();
     
-    // Fallback: If target date is BEFORE all history, use first available (not ideal but better than 0)
-    // Actually, strictly speaking, it should be the purchase price if no market data, 
-    // but here we just return what we found.
-    
-    return bestPrice;
-};
+    // Normalize time to midnight
+    const current = new Date(firstDate);
+    current.setHours(0,0,0,0);
+    today.setHours(0,0,0,0);
 
-/**
- * Calculates Portfolio Evolution (Market Value vs Invested) over time.
- * Uses a Hybrid approach: Persistent Snapshots + Historical Reconstruction.
- */
-export const calculatePortfolioEvolution = (
-    transactions: Transaction[], 
-    marketData: Record<string, any>,
-    days: number = 30,
-    snapshots: Record<string, PortfolioSnapshot> = {}
-): PortfolioEvolutionPoint[] => {
-    if (transactions.length === 0) return [];
+    const points: PortfolioEvolutionPoint[] = [];
+    const currentHoldings: Record<string, { quantity: number, totalCost: number }> = {};
+    const lastPrices: Record<string, number> = {};
+    
+    // Performance Optimization: Pre-process Market Data into Hash Maps
+    // Transforms O(Days * Tickers * History) into O(Days * Tickers)
+    const priceCache: Record<string, Map<string, number>> = {};
+    Object.keys(marketData).forEach(ticker => {
+        const history = marketData[ticker]?.priceHistory || [];
+        const map = new Map<string, number>();
+        history.forEach((h: any) => map.set(h.date, h.price));
+        priceCache[ticker] = map;
+    });
 
-    const now = new Date();
-    const dataPoints: PortfolioEvolutionPoint[] = [];
-    
-    // Sort transactions
-    const sortedTx = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
-    const firstTxDateStr = sortedTx[0].date;
-    const firstTxDate = fromISODate(firstTxDateStr);
-
-    // Determine Start Date
-    // If 'days' is huge (like 3650 for 'all'), clamp to first transaction
-    let startDate = new Date();
-    startDate.setDate(now.getDate() - days);
-    if (startDate < firstTxDate) startDate = firstTxDate;
-    
-    // Limit to reasonable past (e.g. 5 years) to avoid performance kill if user puts 1900 date
-    const minDate = new Date();
-    minDate.setFullYear(minDate.getFullYear() - 5);
-    if(startDate < minDate) startDate = minDate;
-
-    // Cache holding calculations to avoid O(N^2) loop
-    // We will iterate day by day.
-    
-    const dayCount = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    // Keep track of current holdings as we iterate through time
-    let currentHoldings: Record<string, { qty: number, avgPrice: number }> = {};
     let txIndex = 0;
+    let loops = 0;
 
-    // Last known prices for Carry Forward logic (missing weekends/holidays in API)
-    const lastKnownPrices: Record<string, number> = {};
+    // Iterate day by day from first transaction to today
+    while (current <= today && loops < 10000) {
+        loops++;
+        const dateISO = toISODate(current);
+        const monthStr = current.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
 
-    // 1. Advance holdings to start date (if needed)
-    const startDateStr = toISODate(startDate);
-    while(txIndex < sortedTx.length && sortedTx[txIndex].date < startDateStr) {
-        const tx = sortedTx[txIndex];
-        if (!currentHoldings[tx.ticker]) currentHoldings[tx.ticker] = { qty: 0, avgPrice: 0 };
-        const h = currentHoldings[tx.ticker];
-        
-        if (tx.type === 'Compra') {
-            const cost = tx.quantity * tx.price + (tx.costs || 0);
-            const totalCost = (h.qty * h.avgPrice) + cost;
-            h.qty += tx.quantity;
-            h.avgPrice = h.qty > 0 ? totalCost / h.qty : 0;
-        } else {
-            h.qty -= tx.quantity;
-            if (h.qty < EPSILON) { h.qty = 0; h.avgPrice = 0; }
-        }
-        txIndex++;
-    }
-
-    // 2. Iterate from Start Date to Today
-    for (let i = 0; i <= dayCount; i++) {
-        const currentDate = new Date(startDate.getTime());
-        currentDate.setDate(startDate.getDate() + i);
-        const dateStr = toISODate(currentDate);
-        
-        // A. Update holdings for this day
-        while(txIndex < sortedTx.length && sortedTx[txIndex].date === dateStr) {
-            const tx = sortedTx[txIndex];
-            if (!currentHoldings[tx.ticker]) currentHoldings[tx.ticker] = { qty: 0, avgPrice: 0 };
-            const h = currentHoldings[tx.ticker];
+        // Apply transactions happening on this day
+        while (txIndex < sortedTxs.length && sortedTxs[txIndex].date <= dateISO) {
+            const tx = sortedTxs[txIndex];
+            const tkr = tx.ticker.toUpperCase();
+            if (!currentHoldings[tkr]) currentHoldings[tkr] = { quantity: 0, totalCost: 0 };
             
             if (tx.type === 'Compra') {
-                const cost = tx.quantity * tx.price + (tx.costs || 0);
-                const totalCost = (h.qty * h.avgPrice) + cost;
-                h.qty += tx.quantity;
-                h.avgPrice = h.qty > 0 ? totalCost / h.qty : 0;
+                currentHoldings[tkr].quantity += tx.quantity;
+                currentHoldings[tkr].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
             } else {
-                h.qty -= tx.quantity;
-                if (h.qty < EPSILON) { h.qty = 0; h.avgPrice = 0; }
+                // Venda: reduce cost proportionally
+                const h = currentHoldings[tkr];
+                if (h.quantity > 0) {
+                    const avg = h.totalCost / h.quantity;
+                    h.quantity -= tx.quantity;
+                    h.totalCost -= tx.quantity * avg;
+                }
             }
             txIndex++;
         }
 
-        // B. Calculate Values
-        // Priority 1: Use Snapshot if available (It is the absolute truth for that day)
-        if (snapshots[dateStr]) {
-            const s = snapshots[dateStr];
-            dataPoints.push({
-                month: currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-                dateISO: dateStr,
-                invested: s.investedValue,
-                marketValue: s.marketValue,
-                cumulativeDividends: 0
-            });
-            continue; 
-        }
+        let invested = 0;
+        let marketValue = 0;
 
-        // Priority 2: Reconstruct using Holdings * Price History
-        let dailyInvested = 0;
-        let dailyMarketValue = 0;
-        
-        Object.keys(currentHoldings).forEach(ticker => {
-            const h = currentHoldings[ticker];
-            if (h.qty > EPSILON) {
-                dailyInvested += h.qty * h.avgPrice;
+        for (const tkr in currentHoldings) {
+            const h = currentHoldings[tkr];
+            if (h.quantity > EPSILON) {
+                invested += h.totalCost;
                 
-                const assetData = marketData[ticker.toUpperCase()];
-                let price = 0;
-
-                if (assetData && assetData.priceHistory) {
-                    // Try to find exact or closest previous price
-                    const histPrice = getClosestPrice(assetData.priceHistory, dateStr);
-                    if (histPrice) {
-                        price = histPrice;
-                        lastKnownPrices[ticker] = price; // Update cache
-                    } else if (lastKnownPrices[ticker]) {
-                        price = lastKnownPrices[ticker]; // Carry forward
-                    } else {
-                        // Fallback to average price if we have NO market data yet (e.g. IPO or API error)
-                        price = h.avgPrice; 
-                    }
-                } else if (assetData && assetData.currentPrice) {
-                     // If we only have current price (lite mode) and no history
-                     // Use current price for today, but for past... logic breaks without snapshots.
-                     // Fallback to Cost basis for past to avoid 0 graph.
-                     price = (dateStr === getTodayISODate()) ? assetData.currentPrice : h.avgPrice;
-                } else {
-                    price = h.avgPrice;
+                // Get price from O(1) cache
+                const cachedPrice = priceCache[tkr]?.get(dateISO);
+                
+                if (cachedPrice !== undefined) {
+                    lastPrices[tkr] = cachedPrice;
                 }
                 
-                dailyMarketValue += h.qty * price;
+                // Fallback to last known price (Carry Forward) or Avg Price if no history
+                const priceToUse = lastPrices[tkr] || (h.totalCost / h.quantity);
+                
+                marketValue += h.quantity * priceToUse;
             }
-        });
-        
-        // Skip days with 0 value if it looks like an error, unless user really has 0 invested
-        if (dailyInvested > 0 || i === dayCount) {
-             dataPoints.push({
-                month: currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-                dateISO: dateStr,
-                invested: dailyInvested,
-                marketValue: dailyMarketValue,
-                cumulativeDividends: 0
+        }
+
+        if (invested > 0) {
+            points.push({
+                dateISO,
+                month: monthStr,
+                invested,
+                marketValue
             });
         }
+
+        current.setDate(current.getDate() + 1);
     }
-    return dataPoints;
-};
 
-/**
- * Calculates Monthly Income based on assets dividend history and user holdings.
- * Centralized logic to keep Context clean.
- */
-export const calculateMonthlyDividends = (assets: Asset[], transactions: Transaction[]): MonthlyIncome[] => {
-    const incomeMap: Record<string, number> = {};
-    const normalizedTransactions = transactions.map(t => ({
-        ...t,
-        ticker: t.ticker.toUpperCase().trim()
-    })).sort((a, b) => a.date.localeCompare(b.date));
-    
-    assets.forEach(asset => {
-        if (!asset.dividendsHistory) return;
-        
-        asset.dividendsHistory.forEach((div: DividendHistoryEvent) => {
-            const divTicker = asset.ticker.toUpperCase().trim();
-            // How many did user have on exDate?
-            let qty = 0;
-            // Iterate all tx up to exDate
-            for(const tx of normalizedTransactions) {
-                if (tx.date > div.exDate) break; 
-                if (tx.ticker === divTicker) {
-                    if (tx.type === 'Compra') qty += tx.quantity;
-                    else qty -= tx.quantity;
-                }
-            }
-            
-            if (qty > 0) {
-                const payDate = new Date(div.paymentDate);
-                const year = payDate.getFullYear();
-                const month = String(payDate.getMonth() + 1).padStart(2, '0');
-                const sortKey = `${year}-${month}`; // 2023-11
-                
-                incomeMap[sortKey] = (incomeMap[sortKey] || 0) + (qty * div.value);
-            }
-        });
-    });
-
-    return Object.entries(incomeMap)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([key, value]) => {
-               const [y, m] = key.split('-');
-               const monthNames = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-               const monthName = monthNames[parseInt(m)-1];
-               const shortYear = y.slice(2);
-               
-               return {
-                  month: `${monthName}/${shortYear}`,
-                  total: value
-               };
-          })
-        .slice(-12); 
+    return { all_types: points };
 };

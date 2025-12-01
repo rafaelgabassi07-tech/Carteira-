@@ -28,7 +28,7 @@ export interface NewsArticle {
   source: string;
   title: string;
   summary: string;
-  impactAnalysis?: string; // Por que isso importa?
+  impactAnalysis?: string; 
   date: string;
   url?: string;
   imageUrl?: string;
@@ -65,7 +65,6 @@ export interface Dividend {
     amountPerShare: number;
     quantity: number;
     paymentDate: string;
-    
 }
 
 export interface MonthlyIncome {
@@ -78,6 +77,13 @@ export interface CalendarEvent {
     eventType: 'Confirmado' | 'Previsão' | 'Pago';
     date: string;
     projectedAmount?: number;
+}
+
+export interface PortfolioEvolutionPoint {
+    dateISO: string;
+    month: string;
+    invested: number;
+    marketValue: number;
 }
 
 export interface ToastMessage {
@@ -199,20 +205,3 @@ export interface AppPreferences {
   betaFeatures: boolean;
   devMode: boolean;
 }
-
-export interface PortfolioEvolutionPoint {
-    month: string; // Used as label (DD/MM)
-    dateISO: string; // YYYY-MM-DD for sorting
-    invested: number;
-    marketValue: number;
-    cumulativeDividends: number;
-}
-
-export interface PortfolioSnapshot {
-    date: string;
-    marketValue: number;
-    investedValue: number;
-    timestamp: number;
-}
-
-export type SegmentEvolutionData = Record<string, PortfolioEvolutionPoint[]>;
