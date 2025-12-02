@@ -17,6 +17,20 @@ function getBrapiToken(prefs: AppPreferences): string {
     throw new Error("Token da API Brapi (VITE_BRAPI_TOKEN) não configurado.");
 }
 
+// Helpers para gerenciar restrições da API localmente e evitar spam de 403
+const isTokenRestricted = () => {
+    try {
+        return localStorage.getItem('brapi_restricted') === 'true';
+    } catch { return false; }
+};
+
+const setTokenRestricted = () => {
+    try {
+        localStorage.setItem('brapi_restricted', 'true');
+        console.warn("Brapi API: Token identificado como restrito/gratuito. Ativando modo Lite para evitar erros 403.");
+    } catch {}
+};
+
 export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[], lite = false): Promise<{
     quotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[], dividendsHistory?: DividendHistoryEvent[] }>,
     stats: { bytesReceived: number }
@@ -31,24 +45,33 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
     const failedTickers: string[] = [];
     let totalBytesReceived = 0;
 
+    // Se já sabemos que o token é restrito, forçamos o modo Lite
+    const forceLite = lite || isTokenRestricted();
+
     // Function to process a single ticker
     const processTicker = async (ticker: string) => {
         const urlBase = `https://brapi.dev/api/quote/${ticker}`;
         let success = false;
         let resultData: any = null;
 
-        // Optimized ranges: If lite, just get 1d. If full, try deep history.
-        const ranges = lite ? ['1d'] : ['1y', '3mo'];
+        // Se forçado Lite, pulamos tentativas complexas e vamos direto pro fallback/basic
+        const ranges = forceLite ? [] : ['1y', '3mo'];
         
         for (const range of ranges) {
             try {
                 // If lite, we don't need dividend data, saving processing time and bandwidth
-                const dividendsParam = lite ? 'false' : 'true';
+                const dividendsParam = 'true';
                 const response = await fetch(`${urlBase}?range=${range}&dividends=${dividendsParam}&token=${token}`);
+                
+                // Se recebermos 403, marcamos como restrito para o futuro e paramos de tentar endpoints complexos
+                if (response.status === 403 || response.status === 401) {
+                    setTokenRestricted();
+                    throw new Error("FORBIDDEN_TIER");
+                }
+
                 const text = await response.text();
                 totalBytesReceived += new Blob([text]).size;
 
-                if (response.status === 403 || response.status === 401) throw new Error("FORBIDDEN_TIER");
                 if (!response.ok) continue; // Try next range
                 
                 const data = JSON.parse(text);
@@ -60,21 +83,23 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
                     break; // Exit range loop
                 }
             } catch (e: any) {
-                if (e.message === "FORBIDDEN_TIER") break; // Stop trying ranges
+                if (e.message === "FORBIDDEN_TIER") break; // Stop trying ranges immediately
             }
         }
 
-        // Fallback for current price only
+        // Fallback for current price only (Basic Quote - geralmente funciona no Free Tier)
         if (!success) {
             try {
                 const response = await fetch(`${urlBase}?token=${token}`);
                 const text = await response.text();
                 totalBytesReceived += new Blob([text]).size;
+                
                 if (response.ok) {
                     const data = JSON.parse(text);
                     const result = data.results?.[0];
                     if (result) {
                         resultData = result;
+                        // No basic quote não temos histórico longo garantido
                         resultData.historicalDataPrice = [];
                         success = true;
                     }
@@ -86,15 +111,13 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
             let dividendsHistory: DividendHistoryEvent[] = [];
             let finalHistory: { date: string; price: number }[] = [];
 
-            // Only process history and dividends if NOT in lite mode
-            if (!lite) {
+            // Only process history and dividends if NOT forced lite
+            if (!forceLite) {
                 // Strategy 1: 'dividendsData.cashDividends' (Standard Modern Brapi)
                 const cashDividends = resultData.dividendsData?.cashDividends;
                 
                 if (Array.isArray(cashDividends) && cashDividends.length > 0) {
                     dividendsHistory = cashDividends.map((d: any) => ({
-                        // 'lastDatePrior' is usually the Data Com (Ex-Date - 1). 
-                        // If not present, try 'approvedOn'.
                         exDate: d.lastDatePrior ? new Date(d.lastDatePrior).toISOString().split('T')[0] : (d.approvedOn ? new Date(d.approvedOn).toISOString().split('T')[0] : ''),
                         paymentDate: d.paymentDate ? new Date(d.paymentDate).toISOString().split('T')[0] : '',
                         value: d.rate || 0
@@ -119,7 +142,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
             const currentPrice = resultData.regularMarketPrice || 0;
 
             // Update current day in history if needed (only for full mode)
-            if (!lite && currentPrice > 0) {
+            if (!forceLite && currentPrice > 0) {
                 const todayISO = new Date().toISOString().split('T')[0];
                 const lastHistoryDate = finalHistory.length > 0 ? finalHistory[finalHistory.length - 1].date : '';
                 if (lastHistoryDate !== todayISO) {
@@ -129,8 +152,8 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
 
             allQuotes[ticker.toUpperCase()] = {
                 currentPrice: currentPrice,
-                // Only return complex arrays if not lite, otherwise undefined to merge carefully in context
-                ...(lite ? {} : { priceHistory: finalHistory, dividendsHistory })
+                // Only return complex arrays if not lite
+                ...(forceLite ? {} : { priceHistory: finalHistory, dividendsHistory })
             };
         } else {
             failedTickers.push(ticker);
@@ -149,6 +172,9 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
 
 export async function validateBrapiToken(token: string): Promise<boolean> {
     if (!token || token.trim() === '') return false;
+    // Reset restricted state when testing a new token
+    localStorage.removeItem('brapi_restricted');
+    
     const url = `https://brapi.dev/api/quote/PETR4?token=${token}`;
     try {
         const response = await fetch(url);

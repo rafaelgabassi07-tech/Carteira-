@@ -1,6 +1,6 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v1.7.0';
-const RUNTIME_CACHE = 'runtime-cache-v1.7.0';
+const CACHE_NAME = 'invest-portfolio-cache-v1.7.1';
+const RUNTIME_CACHE = 'runtime-cache-v1.7.1';
 
 const urlsToCache = [
   '/',
@@ -13,9 +13,16 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
+      .then(async cache => {
         console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        // Cache files individually so one failure doesn't break the whole SW
+        for (const url of urlsToCache) {
+            try {
+                await cache.add(url);
+            } catch (error) {
+                console.warn(`Failed to cache ${url}:`, error);
+            }
+        }
       })
   );
 });
@@ -23,13 +30,12 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Skip external requests (like Google Fonts, APIs) from cache logic mostly, or handle separately
+  // Skip external requests
   if (!url.origin.includes(self.location.origin)) {
-      // Allow browser default for external
       return; 
   }
 
-  // API calls usually shouldn't be cached by SW unless specific logic
+  // API calls shouldn't be cached by SW
   if (url.pathname.startsWith('/api') || url.pathname.includes('brapi') || url.pathname.includes('generativelanguage')) {
       return;
   }
@@ -41,12 +47,11 @@ self.addEventListener('fetch', event => {
       }
 
       return fetch(event.request).then(response => {
-        // Check if we received a valid response
         if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
 
-        // Cache JS, CSS, and Images dynamically (Vite assets)
+        // Cache JS, CSS, JSON and Images dynamically
         if (
             url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|json)$/) || 
             url.pathname.includes('/assets/')
@@ -58,6 +63,9 @@ self.addEventListener('fetch', event => {
         }
 
         return response;
+      }).catch(err => {
+          // If offline and no cache, just return nothing or a fallback if implemented
+          console.debug('Fetch failed:', err);
       });
     })
   );
