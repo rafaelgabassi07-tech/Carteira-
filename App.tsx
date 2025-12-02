@@ -130,11 +130,7 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      {/* Desktop Wrapper: Centers content and simulates a phone screen on large displays */}
-      <div className="min-h-[100dvh] w-full flex justify-center sm:items-center sm:bg-neutral-900 sm:py-8 transition-colors duration-500">
-        
-        {/* Main App Container */}
-        <div className="h-[100dvh] w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden relative shadow-2xl sm:h-[850px] sm:w-[414px] sm:rounded-[36px] sm:border-[8px] sm:border-neutral-800 transition-all duration-300">
+        <div className="h-[100dvh] w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden relative transition-colors duration-300">
             
             <OfflineBanner />
             
@@ -144,13 +140,11 @@ const App: React.FC = () => {
                 </Suspense>
             </main>
             
-            {/* Navigation is now always at the bottom of the container */}
             <BottomNav activeView={activeView} setActiveView={handleSetView} />
 
             {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
         
         </div>
-      </div>
     </ErrorBoundary>
   );
 };
