@@ -6,19 +6,6 @@ interface BrapiHistoricalData {
     close: number;
 }
 
-interface BrapiQuote {
-    symbol: string;
-    regularMarketPrice: number;
-    historicalDataPrice?: BrapiHistoricalData[];
-    dividendData?: {
-        historicalDataPrice?: {
-            date: number; // exDate timestamp
-            paymentDate: number; // paymentDate timestamp
-            dividends: { value: number }[];
-        }[];
-    };
-}
-
 function getBrapiToken(prefs: AppPreferences): string {
     if (prefs.brapiToken && prefs.brapiToken.trim() !== '') {
         return prefs.brapiToken;
@@ -51,7 +38,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
         let resultData: any = null;
 
         // Optimized ranges: If lite, just get 1d. If full, try deep history.
-        const ranges = lite ? ['1d'] : ['5y', '1y', '3mo'];
+        const ranges = lite ? ['1d'] : ['1y', '3mo'];
         
         for (const range of ranges) {
             try {
@@ -101,7 +88,20 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
 
             // Only process history and dividends if NOT in lite mode
             if (!lite) {
-                if (resultData.dividendData?.historicalDataPrice) {
+                // Strategy 1: 'dividendsData.cashDividends' (Standard Modern Brapi)
+                const cashDividends = resultData.dividendsData?.cashDividends;
+                
+                if (Array.isArray(cashDividends) && cashDividends.length > 0) {
+                    dividendsHistory = cashDividends.map((d: any) => ({
+                        // 'lastDatePrior' is usually the Data Com (Ex-Date - 1). 
+                        // If not present, try 'approvedOn'.
+                        exDate: d.lastDatePrior ? new Date(d.lastDatePrior).toISOString().split('T')[0] : (d.approvedOn ? new Date(d.approvedOn).toISOString().split('T')[0] : ''),
+                        paymentDate: d.paymentDate ? new Date(d.paymentDate).toISOString().split('T')[0] : '',
+                        value: d.rate || 0
+                    })).filter((d: any) => d.value > 0 && d.exDate && d.paymentDate);
+                } 
+                // Strategy 2: Legacy 'dividendData.historicalDataPrice'
+                else if (resultData.dividendData?.historicalDataPrice) {
                     dividendsHistory = resultData.dividendData.historicalDataPrice.map((item: any) => ({
                         exDate: new Date(item.date * 1000).toISOString().split('T')[0],
                         paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
