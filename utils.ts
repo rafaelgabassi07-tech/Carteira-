@@ -264,79 +264,63 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
 export const calculatePortfolioEvolution = (transactions: Transaction[], marketData: Record<string, any>): Record<string, PortfolioEvolutionPoint[]> => {
     if (transactions.length === 0) return { all_types: [] };
 
-    // Sort Transactions
+    // 1. Sort Transactions Chronologically
     const sortedTxs = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
-    const firstDate = new Date(sortedTxs[0].date);
-    const today = new Date();
     
-    const current = new Date(firstDate);
-    current.setHours(0,0,0,0);
+    // 2. Setup Date Range (First Transaction -> Today)
+    // We use 'fromISODate' to ensure timezone stability (avoiding "yesterday" bugs)
+    const startDate = fromISODate(sortedTxs[0].date);
+    const today = new Date();
     today.setHours(0,0,0,0);
-
+    
     const points: PortfolioEvolutionPoint[] = [];
     const currentHoldings: Record<string, { quantity: number, totalCost: number }> = {};
-    const lastPrices: Record<string, number> = {};
+    const lastKnownPrices: Record<string, number> = {};
     
-    // Performance Optimization: Build price cache map [ticker -> [date -> price]]
+    // 3. Pre-process Price History for fast lookup (Map<Ticker, Map<DateStr, Price>>)
     const priceCache: Record<string, Map<string, number>> = {};
-    const tickers = new Set<string>();
-    
-    transactions.forEach(tx => tickers.add(tx.ticker.toUpperCase()));
+    const tickers = new Set(transactions.map(t => t.ticker.toUpperCase()));
     
     tickers.forEach(ticker => {
         const history = marketData[ticker]?.priceHistory || [];
         const map = new Map<string, number>();
-        // Normalize dates in map to ensure hits
         history.forEach((h: any) => map.set(h.date.split('T')[0], h.price));
         priceCache[ticker] = map;
-        
-        // Inicializa lastPrices com o primeiro preço histórico disponível se possível
-        // Isso ajuda caso a transação seja antes do histórico disponível
-        if (history.length > 0) {
-             // Opcional: pré-popular se necessário, mas a lógica de loop abaixo cuida disso melhor
-        }
     });
 
+    // 4. Iterate Day by Day
+    const current = new Date(startDate);
     let txIndex = 0;
+    
+    // Safety break to prevent infinite loops if dates are malformed
     let loops = 0;
+    const MAX_LOOPS = 365 * 50; // 50 years max
 
-    // Loop dia a dia
-    while (current <= today && loops < 10000) {
+    while (current <= today && loops < MAX_LOOPS) {
         loops++;
         const dateISO = toISODate(current);
         const monthStr = current.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
 
-        // Processa transações do dia
-        while (txIndex < sortedTxs.length && sortedTxs[txIndex].date <= dateISO) {
+        // 4a. Process transactions for this specific day
+        while (txIndex < sortedTxs.length && sortedTxs[txIndex].date === dateISO) {
             const tx = sortedTxs[txIndex];
             const tkr = tx.ticker.toUpperCase();
+            
             if (!currentHoldings[tkr]) currentHoldings[tkr] = { quantity: 0, totalCost: 0 };
             
             if (tx.type === 'Compra') {
                 currentHoldings[tkr].quantity += tx.quantity;
                 currentHoldings[tkr].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
                 
-                // CRUCIAL FIX: Se não temos preço para este ativo ainda (ex: compra em dia sem pregão ou antes do histórico),
-                // tenta pegar o preço mais próximo disponível no histórico para evitar que o valor de mercado comece zerado ou errado.
-                if (!lastPrices[tkr]) {
-                    const priceMap = priceCache[tkr];
-                    if (priceMap && priceMap.size > 0) {
-                        // Tenta achar preço exato, senão pega o primeiro disponível
-                        const exactPrice = priceMap.get(dateISO);
-                        if (exactPrice) {
-                            lastPrices[tkr] = exactPrice;
-                        } else {
-                            // Encontrar o preço disponível mais próximo (anterior ou imediatamente posterior)
-                            // Simplificação: Pega o preço da transação como fallback inicial garantido
-                            lastPrices[tkr] = tx.price; 
-                        }
-                    } else {
-                        lastPrices[tkr] = tx.price;
-                    }
+                // CRITICAL FIX: If we just bought it, and we don't have a price history 
+                // for this specific day (e.g., bought on weekend/holiday or API lag), 
+                // use the TRANSACTION PRICE as the 'last known price'.
+                // This prevents the chart from dipping to 0 or flatlining incorrectly.
+                if (!lastKnownPrices[tkr]) {
+                     lastKnownPrices[tkr] = tx.price;
                 }
-
             } else {
-                // Venda
+                // Sell logic (Average Price method)
                 const h = currentHoldings[tkr];
                 if (h.quantity > 0) {
                     const avg = h.totalCost / h.quantity;
@@ -347,34 +331,42 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
             txIndex++;
         }
 
+        // 4b. Calculate Total Portfolio Value for this day
         let invested = 0;
         let marketValue = 0;
+        let hasActiveHoldings = false;
 
         for (const tkr in currentHoldings) {
             const h = currentHoldings[tkr];
-            if (h.quantity > EPSILON) {
-                invested += h.totalCost;
-                
-                // Tenta pegar o preço DESTE dia
-                const cachedPrice = priceCache[tkr]?.get(dateISO);
-                
-                if (cachedPrice !== undefined) {
-                    lastPrices[tkr] = cachedPrice;
-                }
-                
-                // Usa o último preço conhecido (Carry Forward)
-                // Se ainda não tiver histórico (ex: feriado logo após compra), usa o lastPrices setado na compra (tx.price)
-                const priceToUse = lastPrices[tkr] || (h.totalCost / h.quantity);
-                
-                marketValue += h.quantity * priceToUse;
+            
+            // Cleanup dust
+            if (h.quantity < EPSILON) {
+                h.quantity = 0;
+                h.totalCost = 0;
+                continue;
             }
+
+            hasActiveHoldings = true;
+            invested += h.totalCost;
+            
+            // Price Discovery Logic:
+            // 1. Try exact match in history
+            const historicalPrice = priceCache[tkr]?.get(dateISO);
+            
+            if (historicalPrice) {
+                lastKnownPrices[tkr] = historicalPrice;
+            } 
+            // 2. Fallback: Use last known price (Carry Forward)
+            // If we bought it today (processed above), lastKnownPrices[tkr] is already tx.price.
+            // If we bought it previously, it keeps the previous day's close.
+            
+            const priceToUse = lastKnownPrices[tkr] || (h.totalCost / h.quantity); // Ultimate fallback: Avg Price
+            
+            marketValue += h.quantity * priceToUse;
         }
 
-        // Só adiciona ponto se houver algo investido para evitar ruído
-        if (invested > 0 || marketValue > 0) {
-            // Optimization: Avoid duplicates for same month if simple chart, 
-            // but for detailed line chart we want daily/weekly points. 
-            // Keeping daily for resolution.
+        // Only add point if we actually have holdings to avoid a long tail of zeros at start if logic drifts
+        if (hasActiveHoldings) {
             points.push({
                 dateISO,
                 month: monthStr,
@@ -383,7 +375,12 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
             });
         }
 
+        // Increment day
         current.setDate(current.getDate() + 1);
+        
+        // Optimization: If txIndex hasn't caught up (e.g. gap in txs), we could skip forward, 
+        // BUT we need to fill the chart points for the days in between to show price variation.
+        // So we iterate daily.
     }
 
     return { all_types: points };
