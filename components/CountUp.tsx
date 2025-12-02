@@ -37,7 +37,8 @@ const CountUp: React.FC<CountUpProps> = ({
       const percentage = Math.min(progress / duration, 1);
       
       // Ease out quart
-      const ease = 1 - Math.pow(1 - percentage, 4);
+      // FIX: Replaced Math.pow with the ** operator to resolve a strange build-time error.
+      const ease = 1 - (1 - percentage) ** 4;
       
       const currentCount = startValue + (change * ease);
       setCount(currentCount);

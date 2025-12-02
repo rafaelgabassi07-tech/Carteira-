@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
+import Sidebar from './components/Sidebar';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
@@ -130,27 +130,29 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="h-[100dvh] w-full max-w-full bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-x-hidden flex flex-col transition-all duration-300">
+      <div className="h-[100dvh] w-full max-w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-x-hidden">
         
-        <OfflineBanner />
-        
-        {/* Main Content - Centered Mobile Layout */}
-        <main className="flex-1 relative w-full overflow-hidden flex flex-col">
-          <Suspense fallback={<LoadingSpinner />}>
-            <div className="h-full w-full overflow-y-auto overflow-x-hidden custom-scrollbar">
-                <div className="mx-auto w-full max-w-md h-full"> 
+        {/* Sidebar for Desktop */}
+        <aside className="hidden lg:flex w-64 flex-col border-r border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0">
+            <Sidebar activeView={activeView} setActiveView={handleSetView} />
+        </aside>
+
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+            <OfflineBanner />
+            
+            <main className="flex-1 relative w-full overflow-y-auto custom-scrollbar">
+                <Suspense fallback={<LoadingSpinner />}>
                     {renderView()}
-                </div>
-            </div>
-          </Suspense>
-        </main>
-        
-        {/* Mobile Bottom Nav (Always Visible) */}
-        <div className="z-40 w-full max-w-md mx-auto">
-           <BottomNav activeView={activeView} setActiveView={handleSetView} />
+                </Suspense>
+            </main>
+            
+            {/* Mobile Bottom Nav */}
+            <BottomNav activeView={activeView} setActiveView={handleSetView} />
+
+            {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
         </div>
 
-        {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
       </div>
     </ErrorBoundary>
   );

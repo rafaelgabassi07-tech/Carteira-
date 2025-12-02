@@ -71,7 +71,14 @@ const ChangelogCard: React.FC<{
 };
 
 // --- Main Modal Component ---
-const UpdateCheckModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+// FIX: Added updateAvailable and onUpdate to the props to match usage in SettingsView.
+interface UpdateCheckModalProps {
+    onClose: () => void;
+    updateAvailable?: boolean;
+    onUpdate?: () => void;
+}
+
+const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({ onClose, updateAvailable, onUpdate }) => {
     const { t } = useI18n();
     const [checking, setChecking] = useState(true);
 
