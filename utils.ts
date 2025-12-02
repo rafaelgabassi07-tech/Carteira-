@@ -218,7 +218,6 @@ const EPSILON = 0.000001;
 export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<string, { quantity: number; totalCost: number }> => {
     const metrics: Record<string, { quantity: number; totalCost: number }> = {};
 
-    // Clone to avoid mutating original array if sort is in place (though toSorted is better, sticking to compatibility)
     const sortedTransactions = [...transactions].sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
         if (a.type === 'Compra' && b.type === 'Venda') return -1;
@@ -265,11 +264,11 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
 export const calculatePortfolioEvolution = (transactions: Transaction[], marketData: Record<string, any>): Record<string, PortfolioEvolutionPoint[]> => {
     if (transactions.length === 0) return { all_types: [] };
 
+    // Sort Transactions
     const sortedTxs = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
     const firstDate = new Date(sortedTxs[0].date);
     const today = new Date();
     
-    // Normalize time to midnight
     const current = new Date(firstDate);
     current.setHours(0,0,0,0);
     today.setHours(0,0,0,0);
@@ -278,26 +277,36 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
     const currentHoldings: Record<string, { quantity: number, totalCost: number }> = {};
     const lastPrices: Record<string, number> = {};
     
-    // Performance Optimization: Pre-process Market Data into Hash Maps
-    // Transforms O(Days * Tickers * History) into O(Days * Tickers)
+    // Performance Optimization: Build price cache map [ticker -> [date -> price]]
     const priceCache: Record<string, Map<string, number>> = {};
-    Object.keys(marketData).forEach(ticker => {
+    const tickers = new Set<string>();
+    
+    transactions.forEach(tx => tickers.add(tx.ticker.toUpperCase()));
+    
+    tickers.forEach(ticker => {
         const history = marketData[ticker]?.priceHistory || [];
         const map = new Map<string, number>();
-        history.forEach((h: any) => map.set(h.date, h.price));
+        // Normalize dates in map to ensure hits
+        history.forEach((h: any) => map.set(h.date.split('T')[0], h.price));
         priceCache[ticker] = map;
+        
+        // Inicializa lastPrices com o primeiro preço histórico disponível se possível
+        // Isso ajuda caso a transação seja antes do histórico disponível
+        if (history.length > 0) {
+             // Opcional: pré-popular se necessário, mas a lógica de loop abaixo cuida disso melhor
+        }
     });
 
     let txIndex = 0;
     let loops = 0;
 
-    // Iterate day by day from first transaction to today
+    // Loop dia a dia
     while (current <= today && loops < 10000) {
         loops++;
         const dateISO = toISODate(current);
         const monthStr = current.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
 
-        // Apply transactions happening on this day
+        // Processa transações do dia
         while (txIndex < sortedTxs.length && sortedTxs[txIndex].date <= dateISO) {
             const tx = sortedTxs[txIndex];
             const tkr = tx.ticker.toUpperCase();
@@ -306,8 +315,28 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
             if (tx.type === 'Compra') {
                 currentHoldings[tkr].quantity += tx.quantity;
                 currentHoldings[tkr].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
+                
+                // CRUCIAL FIX: Se não temos preço para este ativo ainda (ex: compra em dia sem pregão ou antes do histórico),
+                // tenta pegar o preço mais próximo disponível no histórico para evitar que o valor de mercado comece zerado ou errado.
+                if (!lastPrices[tkr]) {
+                    const priceMap = priceCache[tkr];
+                    if (priceMap && priceMap.size > 0) {
+                        // Tenta achar preço exato, senão pega o primeiro disponível
+                        const exactPrice = priceMap.get(dateISO);
+                        if (exactPrice) {
+                            lastPrices[tkr] = exactPrice;
+                        } else {
+                            // Encontrar o preço disponível mais próximo (anterior ou imediatamente posterior)
+                            // Simplificação: Pega o preço da transação como fallback inicial garantido
+                            lastPrices[tkr] = tx.price; 
+                        }
+                    } else {
+                        lastPrices[tkr] = tx.price;
+                    }
+                }
+
             } else {
-                // Venda: reduce cost proportionally
+                // Venda
                 const h = currentHoldings[tkr];
                 if (h.quantity > 0) {
                     const avg = h.totalCost / h.quantity;
@@ -326,21 +355,26 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
             if (h.quantity > EPSILON) {
                 invested += h.totalCost;
                 
-                // Get price from O(1) cache
+                // Tenta pegar o preço DESTE dia
                 const cachedPrice = priceCache[tkr]?.get(dateISO);
                 
                 if (cachedPrice !== undefined) {
                     lastPrices[tkr] = cachedPrice;
                 }
                 
-                // Fallback to last known price (Carry Forward) or Avg Price if no history
+                // Usa o último preço conhecido (Carry Forward)
+                // Se ainda não tiver histórico (ex: feriado logo após compra), usa o lastPrices setado na compra (tx.price)
                 const priceToUse = lastPrices[tkr] || (h.totalCost / h.quantity);
                 
                 marketValue += h.quantity * priceToUse;
             }
         }
 
-        if (invested > 0) {
+        // Só adiciona ponto se houver algo investido para evitar ruído
+        if (invested > 0 || marketValue > 0) {
+            // Optimization: Avoid duplicates for same month if simple chart, 
+            // but for detailed line chart we want daily/weekly points. 
+            // Keeping daily for resolution.
             points.push({
                 dateISO,
                 month: monthStr,
