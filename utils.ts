@@ -1,6 +1,6 @@
 
 import { useState, useEffect, Dispatch, SetStateAction, useRef } from 'react';
-import type { Transaction, AppTheme, Asset, PortfolioEvolutionPoint } from './types';
+import type { Transaction, AppTheme, PortfolioEvolutionPoint } from './types';
 
 // --- Hook para estado persistente no localStorage com Debounce ---
 export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatch<SetStateAction<T>>] {
@@ -139,6 +139,7 @@ export const toISODate = (date: Date): string => {
 export const fromISODate = (dateString: string): Date => {
     if (!dateString) return new Date();
     const [year, month, day] = dateString.split('-').map(Number);
+    // Set to noon to avoid timezone rollover issues
     return new Date(year, month - 1, day, 12, 0, 0);
 };
 
@@ -260,7 +261,7 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
     return activeMetrics;
 };
 
-// --- Optimized Portfolio Evolution Calculation ---
+// --- Robust Portfolio Evolution Calculation ---
 export const calculatePortfolioEvolution = (transactions: Transaction[], marketData: Record<string, any>): Record<string, PortfolioEvolutionPoint[]> => {
     if (transactions.length === 0) return { all_types: [] };
 
@@ -268,40 +269,44 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
     const sortedTxs = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
     
     // 2. Setup Date Range (First Transaction -> Today)
-    // We use 'fromISODate' to ensure timezone stability (avoiding "yesterday" bugs)
     const startDate = fromISODate(sortedTxs[0].date);
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(12, 0, 0, 0); // Noon to match startDate logic
     
     const points: PortfolioEvolutionPoint[] = [];
+    
+    // Current State Trackers
     const currentHoldings: Record<string, { quantity: number, totalCost: number }> = {};
     const lastKnownPrices: Record<string, number> = {};
     
     // 3. Pre-process Price History for fast lookup (Map<Ticker, Map<DateStr, Price>>)
     const priceCache: Record<string, Map<string, number>> = {};
-    const tickers = new Set(transactions.map(t => t.ticker.toUpperCase()));
+    const allTickers = new Set(transactions.map(t => t.ticker.toUpperCase()));
     
-    tickers.forEach(ticker => {
+    allTickers.forEach(ticker => {
         const history = marketData[ticker]?.priceHistory || [];
         const map = new Map<string, number>();
-        history.forEach((h: any) => map.set(h.date.split('T')[0], h.price));
+        history.forEach((h: any) => {
+            // Ensure date key matches ISO format used in loop
+            if (h.date && h.price) {
+                map.set(h.date.split('T')[0], h.price);
+            }
+        });
         priceCache[ticker] = map;
     });
 
     // 4. Iterate Day by Day
-    const current = new Date(startDate);
+    const currentLoopDate = new Date(startDate);
     let txIndex = 0;
-    
-    // Safety break to prevent infinite loops if dates are malformed
     let loops = 0;
-    const MAX_LOOPS = 365 * 50; // 50 years max
+    const MAX_LOOPS = 365 * 30; // Safety brake (30 years)
 
-    while (current <= today && loops < MAX_LOOPS) {
+    while (currentLoopDate <= today && loops < MAX_LOOPS) {
         loops++;
-        const dateISO = toISODate(current);
-        const monthStr = current.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        const dateISO = toISODate(currentLoopDate);
+        const monthStr = currentLoopDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
 
-        // 4a. Process transactions for this specific day
+        // 4a. Process transactions that happened ON this specific day
         while (txIndex < sortedTxs.length && sortedTxs[txIndex].date === dateISO) {
             const tx = sortedTxs[txIndex];
             const tkr = tx.ticker.toUpperCase();
@@ -312,15 +317,11 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
                 currentHoldings[tkr].quantity += tx.quantity;
                 currentHoldings[tkr].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
                 
-                // CRITICAL FIX: If we just bought it, and we don't have a price history 
-                // for this specific day (e.g., bought on weekend/holiday or API lag), 
-                // use the TRANSACTION PRICE as the 'last known price'.
-                // This prevents the chart from dipping to 0 or flatlining incorrectly.
-                if (!lastKnownPrices[tkr]) {
-                     lastKnownPrices[tkr] = tx.price;
-                }
+                // IMPORTANT: Update price immediately with the purchase price.
+                // This acts as the "initial market price" if historical API data is missing for today.
+                lastKnownPrices[tkr] = tx.price;
             } else {
-                // Sell logic (Average Price method)
+                // Sell logic (Average Price method for cost reduction)
                 const h = currentHoldings[tkr];
                 if (h.quantity > 0) {
                     const avg = h.totalCost / h.quantity;
@@ -332,14 +333,14 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
         }
 
         // 4b. Calculate Total Portfolio Value for this day
-        let invested = 0;
-        let marketValue = 0;
+        let dailyInvested = 0;
+        let dailyMarketValue = 0;
         let hasActiveHoldings = false;
 
         for (const tkr in currentHoldings) {
             const h = currentHoldings[tkr];
             
-            // Cleanup dust
+            // Ignore dust quantities (cleanup floating point errors)
             if (h.quantity < EPSILON) {
                 h.quantity = 0;
                 h.totalCost = 0;
@@ -347,40 +348,37 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
             }
 
             hasActiveHoldings = true;
-            invested += h.totalCost;
+            dailyInvested += h.totalCost;
             
-            // Price Discovery Logic:
-            // 1. Try exact match in history
+            // Price Discovery Priority:
+            // 1. Exact match in API history for this date
+            // 2. Previous known price (carried forward)
+            // 3. Transaction price (set in step 4a)
             const historicalPrice = priceCache[tkr]?.get(dateISO);
             
             if (historicalPrice) {
                 lastKnownPrices[tkr] = historicalPrice;
             } 
-            // 2. Fallback: Use last known price (Carry Forward)
-            // If we bought it today (processed above), lastKnownPrices[tkr] is already tx.price.
-            // If we bought it previously, it keeps the previous day's close.
             
-            const priceToUse = lastKnownPrices[tkr] || (h.totalCost / h.quantity); // Ultimate fallback: Avg Price
+            // Use fallback if no price found today
+            const priceToUse = lastKnownPrices[tkr] || (h.totalCost / h.quantity); 
             
-            marketValue += h.quantity * priceToUse;
+            dailyMarketValue += h.quantity * priceToUse;
         }
 
-        // Only add point if we actually have holdings to avoid a long tail of zeros at start if logic drifts
-        if (hasActiveHoldings) {
+        // Add point to chart data
+        // We only add points if there is something invested to avoid leading zeros making the chart look weird
+        if (hasActiveHoldings || points.length > 0) {
             points.push({
                 dateISO,
                 month: monthStr,
-                invested,
-                marketValue
+                invested: dailyInvested,
+                marketValue: dailyMarketValue
             });
         }
 
-        // Increment day
-        current.setDate(current.getDate() + 1);
-        
-        // Optimization: If txIndex hasn't caught up (e.g. gap in txs), we could skip forward, 
-        // BUT we need to fill the chart points for the days in between to show price variation.
-        // So we iterate daily.
+        // Next Day
+        currentLoopDate.setDate(currentLoopDate.getDate() + 1);
     }
 
     return { all_types: points };
