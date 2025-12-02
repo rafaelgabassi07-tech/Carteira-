@@ -19,8 +19,7 @@ interface SidebarProps {
 const SidebarItem: React.FC<{
   label: string;
   view: View;
-  // FIX: Changed icon prop type from React.ReactNode to React.ReactElement for better type safety with cloneElement.
-  icon: React.ReactElement;
+  icon: React.ReactElement<{ className?: string }>;
   isActive: boolean;
   onClick: () => void;
 }> = ({ label, icon, isActive, onClick }) => {
@@ -34,7 +33,6 @@ const SidebarItem: React.FC<{
       className={`flex items-center w-full px-6 py-4 transition-all duration-200 group relative ${activeClass}`}
     >
       <div className={`mr-4 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'scale-110' : ''}`}>
-        {/* FIX: Removed unnecessary cast after correcting the prop type. */}
         {React.cloneElement(icon, { className: 'w-5 h-5' })}
       </div>
       <span className="font-semibold text-sm tracking-wide">{label}</span>

@@ -19,7 +19,10 @@ const CountUp: React.FC<CountUpProps> = ({
 }) => {
   const [count, setCount] = useState(end);
   const startRef = useRef(end);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | null>(null);
+  // Ref to track current count for cleanup logic without stale closures
+  const countRef = useRef(count);
+  countRef.current = count;
 
   useEffect(() => {
     let startTime: number | null = null;
@@ -37,7 +40,6 @@ const CountUp: React.FC<CountUpProps> = ({
       const percentage = Math.min(progress / duration, 1);
       
       // Ease out quart
-      // FIX: Replaced Math.pow with the ** operator to resolve a strange build-time error.
       const ease = 1 - (1 - percentage) ** 4;
       
       const currentCount = startValue + (change * ease);
@@ -57,7 +59,8 @@ const CountUp: React.FC<CountUpProps> = ({
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
-      startRef.current = count;
+      // Use ref to get the latest count when unmounting/re-running
+      startRef.current = countRef.current;
     };
   }, [end, duration]);
 

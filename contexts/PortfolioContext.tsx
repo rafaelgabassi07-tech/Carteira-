@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, DividendHistoryEvent, AppStats, AppNotification, PortfolioEvolutionPoint, MonthlyIncome } from '../types';
+import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, DividendHistoryEvent, AppStats, AppNotification, PortfolioEvolutionPoint } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { generateNotifications } from '../services/dynamicDataService';
@@ -17,7 +17,6 @@ interface PortfolioContextType {
   yieldOnCost: number;
   projectedAnnualIncome: number;
   portfolioEvolution: Record<string, PortfolioEvolutionPoint[]>;
-  monthlyIncome: MonthlyIncome[];
   lastSync: number | null;
   isRefreshing: boolean;
   marketDataError: string | null;
@@ -79,7 +78,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [notifications, setNotifications] = usePersistentState<AppNotification[]>('app-notifications', []);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
-  // Use a ref to access current marketData inside useCallback without adding it to dependencies (avoids loops)
+  const initialLoadDone = useRef(false);
   const marketDataRef = useRef(marketData);
   useEffect(() => { marketDataRef.current = marketData; }, [marketData]);
 
@@ -127,7 +126,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const now = Date.now();
       const currentData = marketDataRef.current[ticker.toUpperCase()];
       
-      // Avoid refresh loop: Check stale time
       if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
@@ -214,7 +212,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
-          // If lite mode (background update), only fetch prices. Skip heavy metadata.
           const promises: Promise<any>[] = [fetchBrapiQuotes(preferences, tickers, lite)];
           
           if (!lite) {
@@ -238,7 +235,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       next[tkr] = { 
                           ...prevData, 
                           ...newData,
-                          // Important: Don't overwrite complex history arrays with undefined if we are in lite mode
                           priceHistory: newData.priceHistory?.length > 0 ? newData.priceHistory : prevData.priceHistory || [],
                           dividendsHistory: newData.dividendsHistory?.length > 0 ? newData.dividendsHistory : prevData.dividendsHistory || [],
                           lastUpdated: Date.now() 
@@ -266,11 +262,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
       const checkAndRefresh = () => {
           if (document.hidden) return;
-
           const now = new Date();
           const day = now.getDay();
           const hour = now.getHours();
-          
           const isWeekDay = day >= 1 && day <= 5;
           const isMarketHours = hour >= 10 && hour < 18;
           const isOnline = navigator.onLine;
@@ -287,7 +281,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await refreshMarketData(true, false, false); 
   }, [refreshMarketData]);
 
-  // Memoized Asset Calculation - Core Performance Critical Path
   const assets = useMemo(() => {
       const metrics = calculatePortfolioMetrics(sourceTransactions);
       return Object.keys(metrics).map(ticker => {
@@ -311,23 +304,37 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }).filter(a => a.quantity > 0.000001);
   }, [sourceTransactions, sourceMarketData]);
 
+  const assetTickers = useMemo(() => assets.map(a => a.ticker).sort().join(','), [assets]);
+
+  // FIX: Guarantees a full (non-lite) data load on startup if assets exist,
+  // ensuring the patrimony evolution chart has historical data.
   useEffect(() => {
-      if (isRefreshing || isDemoMode) return;
-      // Auto-repair missing fundamental data
-      const incompleteAssets = assets.filter(a => a.segment === 'Outros' || a.priceHistory.length === 0);
+    if (!isRefreshing && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
+      initialLoadDone.current = true;
+      console.log("CONTEXT: Performing initial full data sync for charts...");
+      refreshMarketData(true, true, false); // force=true, silent=true, lite=false
+    }
+  }, [sourceTransactions.length, isDemoMode, isRefreshing, refreshMarketData]);
+
+  // FIX: Improved auto-repair logic to be more reliable.
+  useEffect(() => {
+      if (isRefreshing || isDemoMode || !initialLoadDone.current) return;
+      
+      const incompleteAssets = assets.filter(a => a.segment === 'Outros' || !a.priceHistory || a.priceHistory.length === 0);
+
       if (incompleteAssets.length > 0 && navigator.onLine) {
+          console.log(`CONTEXT: Auto-repair triggered for ${incompleteAssets.length} assets.`);
           const timer = setTimeout(() => {
-              refreshMarketData(true, true, false); 
+              refreshMarketData(true, true, false);
           }, 5000);
           return () => clearTimeout(timer);
       }
-  }, [assets.length, isRefreshing, isDemoMode, refreshMarketData]); 
+  }, [assetTickers, isRefreshing, isDemoMode, assets, refreshMarketData]);
 
   const currentPatrimony = useMemo(() => {
     return assets.reduce((acc, a) => acc + a.quantity * a.currentPrice, 0);
   }, [assets]);
 
-  // --- Notification Generation ---
   useEffect(() => {
     if (isDemoMode) return;
 
@@ -381,74 +388,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice * ((a.dy || 0) / 100)), 0);
   }, [assets]);
 
-  // FIX: Calculate monthly income for BarChart.
-  const monthlyIncome = useMemo((): MonthlyIncome[] => {
-    const allReceivedDividends: { paymentDate: string; totalReceived: number }[] = [];
-    
-    const txsByTicker = new Map<string, Transaction[]>();
-    sourceTransactions.forEach(tx => {
-        const tickerTxs = txsByTicker.get(tx.ticker) || [];
-        tickerTxs.push(tx);
-        txsByTicker.set(tx.ticker, tickerTxs);
-    });
-    txsByTicker.forEach(txs => txs.sort((a, b) => a.date.localeCompare(b.date)));
-
-    assets.forEach(asset => {
-        const assetTransactions = txsByTicker.get(asset.ticker) || [];
-        if (!asset.dividendsHistory) return;
-
-        asset.dividendsHistory.forEach(div => {
-            let quantityOnExDate = 0;
-            for (const tx of assetTransactions) {
-                if (tx.date > div.exDate) break;
-                if (tx.type === 'Compra') {
-                    quantityOnExDate += tx.quantity;
-                } else {
-                    quantityOnExDate -= tx.quantity;
-                }
-            }
-
-            if (quantityOnExDate > 0) {
-                allReceivedDividends.push({
-                    paymentDate: div.paymentDate,
-                    totalReceived: quantityOnExDate * div.value,
-                });
-            }
-        });
-    });
-
-    const incomeByMonth: { [key: string]: number } = {};
-    const today = new Date();
-    const last12MonthsKeys: string[] = [];
-
-    for (let i = 11; i >= 0; i--) {
-        const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const monthKey = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-        last12MonthsKeys.push(monthKey);
-        incomeByMonth[monthKey] = 0;
-    }
-
-    const oneYearAgo = new Date(today.getFullYear(), today.getMonth() - 11, 1);
-    oneYearAgo.setHours(0,0,0,0);
-
-    allReceivedDividends.forEach(div => {
-        const paymentDate = new Date(div.paymentDate);
-        paymentDate.setHours(12,0,0,0); // Avoid timezone issues
-        if (paymentDate >= oneYearAgo) {
-            const monthKey = paymentDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-            if (monthKey in incomeByMonth) {
-                incomeByMonth[monthKey] += div.totalReceived;
-            }
-        }
-    });
-
-    return last12MonthsKeys.map(key => ({
-        month: key,
-        total: incomeByMonth[key],
-    }));
-  }, [assets, sourceTransactions]);
-
-  // Calculate Evolution (Now Optimized)
   const portfolioEvolution = useMemo(() => {
       return calculatePortfolioEvolution(sourceTransactions, sourceMarketData);
   }, [sourceTransactions, sourceMarketData]);
@@ -483,15 +422,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const value = useMemo(() => ({
       assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-      yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
+      yieldOnCost, projectedAnnualIncome, portfolioEvolution, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
       setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
-      deleteNotification, clearAllNotifications
+      deleteNotification, clearAllNotifications,
+      monthlyIncome: [] // CLEANUP: Removed obsolete monthlyIncome
   }), [
       assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-      yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
+      yieldOnCost, projectedAnnualIncome, portfolioEvolution, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,

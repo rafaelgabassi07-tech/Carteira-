@@ -16,8 +16,7 @@ interface BottomNavProps {
 const NavItem: React.FC<{
   label: string;
   view: View;
-  // FIX: Changed icon prop type from React.ReactNode to React.ReactElement for better type safety with cloneElement.
-  icon: React.ReactElement;
+  icon: React.ReactElement<{ className?: string }>;
   isActive: boolean;
   onClick: () => void;
 }> = ({ label, icon, isActive, onClick }) => {
@@ -29,7 +28,6 @@ const NavItem: React.FC<{
       className={`flex flex-col items-center justify-center w-full h-full pt-1 pb-1 transition-colors duration-200 group active:scale-95 focus:outline-none ${activeClass}`}
     >
       <div className={`transition-transform duration-300 ease-in-out mb-1 ${isActive ? '-translate-y-1' : 'translate-y-0'}`}>
-        {/* FIX: Removed unnecessary cast after correcting the prop type. */}
         {React.cloneElement(icon, { className: 'w-6 h-6' })}
       </div>
       <span 
