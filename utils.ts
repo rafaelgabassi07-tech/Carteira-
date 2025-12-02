@@ -261,125 +261,106 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
     return activeMetrics;
 };
 
-// --- Robust Portfolio Evolution Calculation ---
 export const calculatePortfolioEvolution = (transactions: Transaction[], marketData: Record<string, any>): Record<string, PortfolioEvolutionPoint[]> => {
     if (transactions.length === 0) return { all_types: [] };
 
-    // 1. Sort Transactions Chronologically
-    const sortedTxs = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
-    
-    // 2. Setup Date Range (First Transaction -> Today)
-    const startDate = fromISODate(sortedTxs[0].date);
-    const today = new Date();
-    today.setHours(12, 0, 0, 0); // Noon to match startDate logic
-    
-    const points: PortfolioEvolutionPoint[] = [];
-    
-    // Current State Trackers
-    const currentHoldings: Record<string, { quantity: number, totalCost: number }> = {};
-    const lastKnownPrices: Record<string, number> = {};
-    
-    // 3. Pre-process Price History for fast lookup (Map<Ticker, Map<DateStr, Price>>)
-    const priceCache: Record<string, Map<string, number>> = {};
-    const allTickers = new Set(transactions.map(t => t.ticker.toUpperCase()));
-    
-    allTickers.forEach(ticker => {
+    // 1. Coletar todas as datas relevantes (histórico de preços + datas de transação)
+    const dateSet = new Set<string>();
+    const involvedTickers = new Set(transactions.map(t => t.ticker.toUpperCase()));
+
+    // Adiciona datas de histórico disponíveis
+    involvedTickers.forEach(ticker => {
         const history = marketData[ticker]?.priceHistory || [];
-        const map = new Map<string, number>();
-        history.forEach((h: any) => {
-            // Ensure date key matches ISO format used in loop
-            if (h.date && h.price) {
-                map.set(h.date.split('T')[0], h.price);
-            }
-        });
-        priceCache[ticker] = map;
+        history.forEach((h: any) => dateSet.add(h.date));
+    });
+    
+    // Se não houver histórico, usa pelo menos as datas das transações
+    transactions.forEach(t => dateSet.add(t.date));
+
+    // Ordena as datas
+    const sortedDates = Array.from(dateSet).sort();
+    
+    // Mapa de transações por data para acesso rápido
+    const transactionsByDate: Record<string, Transaction[]> = {};
+    transactions.forEach(tx => {
+        if (!transactionsByDate[tx.date]) transactionsByDate[tx.date] = [];
+        transactionsByDate[tx.date].push(tx);
     });
 
-    // 4. Iterate Day by Day
-    const currentLoopDate = new Date(startDate);
-    let txIndex = 0;
-    let loops = 0;
-    const MAX_LOOPS = 365 * 30; // Safety brake (30 years)
+    const points: PortfolioEvolutionPoint[] = [];
+    const holdings: Record<string, number> = {}; // Qtd atual por ticker
+    const invested: Record<string, number> = {}; // Valor investido atual por ticker
 
-    while (currentLoopDate <= today && loops < MAX_LOOPS) {
-        loops++;
-        const dateISO = toISODate(currentLoopDate);
-        const monthStr = currentLoopDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-
-        // 4a. Process transactions that happened ON this specific day
-        while (txIndex < sortedTxs.length && sortedTxs[txIndex].date === dateISO) {
-            const tx = sortedTxs[txIndex];
+    sortedDates.forEach(date => {
+        // A. Processar transações até esta data (cumulativo)
+        // Precisamos processar todas as transações que aconteceram NESTA data ou ANTES, 
+        // mas como estamos iterando sortedDates, precisamos ter cuidado com lacunas se usássemos apenas 'transactionsByDate[date]'.
+        // Mas a lógica correta de "evolução" é recalcular o estado do portfólio para cada ponto no tempo.
+        
+        // Vamos iterar DIA a DIA no array de datas sortedDates.
+        // Mas precisamos aplicar as transações que ocorreram NAQUELE dia.
+        const todaysTransactions = transactionsByDate[date] || [];
+        
+        todaysTransactions.forEach(tx => {
             const tkr = tx.ticker.toUpperCase();
-            
-            if (!currentHoldings[tkr]) currentHoldings[tkr] = { quantity: 0, totalCost: 0 };
-            
             if (tx.type === 'Compra') {
-                currentHoldings[tkr].quantity += tx.quantity;
-                currentHoldings[tkr].totalCost += (tx.quantity * tx.price) + (tx.costs || 0);
-                
-                // IMPORTANT: Update price immediately with the purchase price.
-                // This acts as the "initial market price" if historical API data is missing for today.
-                lastKnownPrices[tkr] = tx.price;
+                holdings[tkr] = (holdings[tkr] || 0) + tx.quantity;
+                invested[tkr] = (invested[tkr] || 0) + (tx.quantity * tx.price + (tx.costs || 0));
             } else {
-                // Sell logic (Average Price method for cost reduction)
-                const h = currentHoldings[tkr];
-                if (h.quantity > 0) {
-                    const avg = h.totalCost / h.quantity;
-                    h.quantity -= tx.quantity;
-                    h.totalCost -= tx.quantity * avg;
+                const currentQty = holdings[tkr] || 0;
+                const currentInvested = invested[tkr] || 0;
+                const avgPrice = currentQty > 0 ? currentInvested / currentQty : 0;
+                const sellQty = Math.min(tx.quantity, currentQty);
+                
+                holdings[tkr] = currentQty - sellQty;
+                invested[tkr] = Math.max(0, currentInvested - (sellQty * avgPrice));
+            }
+        });
+
+        // B. Calcular valor de mercado neste dia
+        let totalInvested = 0;
+        let totalMarket = 0;
+
+        involvedTickers.forEach(tkr => {
+            const qty = holdings[tkr] || 0;
+            if (qty > 0) {
+                totalInvested += invested[tkr] || 0;
+                
+                // Tenta pegar o preço do histórico para ESTA data
+                const history = marketData[tkr]?.priceHistory || [];
+                const pricePoint = history.find((h: any) => h.date === date);
+                
+                if (pricePoint) {
+                    totalMarket += qty * pricePoint.price;
+                } else {
+                    // Se não tem preço neste dia exato (ex: feriado no meio do histórico, ou transação recente sem update),
+                    // tenta pegar o último preço conhecido ANTES desta data.
+                    // Isso é um fallback mais simples e seguro que a lógica complexa anterior.
+                    const lastPrice = history
+                        .filter((h: any) => h.date < date)
+                        .sort((a: any, b: any) => b.date.localeCompare(a.date))[0];
+                    
+                    if (lastPrice) {
+                        totalMarket += qty * lastPrice.price;
+                    } else {
+                        // Se não tem histórico nenhum anterior, usa o preço médio como estimativa (fallback final)
+                        const avg = invested[tkr] / qty;
+                        totalMarket += qty * avg;
+                    }
                 }
             }
-            txIndex++;
-        }
+        });
 
-        // 4b. Calculate Total Portfolio Value for this day
-        let dailyInvested = 0;
-        let dailyMarketValue = 0;
-        let hasActiveHoldings = false;
-
-        for (const tkr in currentHoldings) {
-            const h = currentHoldings[tkr];
-            
-            // Ignore dust quantities (cleanup floating point errors)
-            if (h.quantity < EPSILON) {
-                h.quantity = 0;
-                h.totalCost = 0;
-                continue;
-            }
-
-            hasActiveHoldings = true;
-            dailyInvested += h.totalCost;
-            
-            // Price Discovery Priority:
-            // 1. Exact match in API history for this date
-            // 2. Previous known price (carried forward)
-            // 3. Transaction price (set in step 4a)
-            const historicalPrice = priceCache[tkr]?.get(dateISO);
-            
-            if (historicalPrice) {
-                lastKnownPrices[tkr] = historicalPrice;
-            } 
-            
-            // Use fallback if no price found today
-            const priceToUse = lastKnownPrices[tkr] || (h.totalCost / h.quantity); 
-            
-            dailyMarketValue += h.quantity * priceToUse;
-        }
-
-        // Add point to chart data
-        // We only add points if there is something invested to avoid leading zeros making the chart look weird
-        if (hasActiveHoldings || points.length > 0) {
+        if (totalInvested > 0 || totalMarket > 0) {
+            const [y, m, d] = date.split('-');
             points.push({
-                dateISO,
-                month: monthStr,
-                invested: dailyInvested,
-                marketValue: dailyMarketValue
+                dateISO: date,
+                month: `${d}/${m}`,
+                invested: totalInvested,
+                marketValue: totalMarket
             });
         }
-
-        // Next Day
-        currentLoopDate.setDate(currentLoopDate.getDate() + 1);
-    }
+    });
 
     return { all_types: points };
 };

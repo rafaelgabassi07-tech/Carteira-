@@ -113,7 +113,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         return showAllHistory ? userDividendHistory : userDividendHistory.slice(0, 3);
     }, [userDividendHistory, showAllHistory]);
 
-    // --- Dividends Metrics Calculation ---
+    // --- Metrics Calculation ---
     const today = new Date();
     const currentYear = today.getFullYear();
     const oneYearAgo = new Date();
@@ -247,6 +247,8 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         {asset?.dividendsHistory && asset.dividendsHistory.length > 0 ? (
                             <>
                                 <DividendChart data={asset.dividendsHistory} />
+                                
+                                {/* Metrics Cards */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="col-span-2 bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] flex justify-between items-center shadow-sm">
                                         <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('total_accumulated')}</span>
@@ -256,9 +258,12 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                     <MetricItem label={t('monthly_average_12m')} value={formatCurrency(averageMonthly)} className="bg-[var(--bg-secondary)]" />
                                     <MetricItem label={t('real_yield_12m')} value={dyReal.toFixed(2)} subValue="%" highlight={dyReal > 10 ? 'green' : 'neutral'} className="bg-[var(--bg-secondary)] col-span-2" />
                                 </div>
+
+                                {/* Detailed History List */}
                                 <h3 className="font-bold text-sm text-[var(--text-secondary)] mt-2 px-1 uppercase tracking-wider">
                                     {showAllHistory ? t('full_history') : t('recent_dividends')}
                                 </h3>
+                                
                                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
                                     {displayedDividends.map((div, index) => {
                                         return (
@@ -274,13 +279,14 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.value * div.userQuantity)}</p>
-                                                    <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">{div.userQuantity} × {formatCurrency(div.value)}</p>
+                                                    <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.totalReceived)}</p>
+                                                    <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5 opacity-80">{div.userQuantity} cotas × {formatCurrency(div.value)}</p>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
+                                
                                 {!showAllHistory && userDividendHistory.length > 3 && (
                                     <button onClick={() => { vibrate(); setShowAllHistory(true); }} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-secondary)] rounded-xl border border-dashed border-[var(--border-color)] transition-all">
                                         {t('view_full_history')} ({userDividendHistory.length})

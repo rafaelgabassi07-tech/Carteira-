@@ -113,7 +113,7 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
+      case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
       case 'noticias': return <NewsView addToast={addToast} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
@@ -131,7 +131,6 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
         <div className="h-[100dvh] w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden relative transition-colors duration-300">
-            
             <OfflineBanner />
             
             <main className="flex-1 relative w-full overflow-y-auto custom-scrollbar">
@@ -143,7 +142,6 @@ const App: React.FC = () => {
             <BottomNav activeView={activeView} setActiveView={handleSetView} />
 
             {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
-        
         </div>
     </ErrorBoundary>
   );
