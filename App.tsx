@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
-import Sidebar from './components/Sidebar';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
@@ -130,14 +130,9 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="h-[100dvh] w-full max-w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-x-hidden">
+      {/* Mobile-Only Layout forced via w-full and removal of sidebar */}
+      <div className="h-[100dvh] w-full max-w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-x-hidden">
         
-        {/* Sidebar for Desktop */}
-        <aside className="hidden lg:flex w-64 flex-col border-r border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0">
-            <Sidebar activeView={activeView} setActiveView={handleSetView} />
-        </aside>
-
-        {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
             <OfflineBanner />
             
@@ -147,7 +142,7 @@ const App: React.FC = () => {
                 </Suspense>
             </main>
             
-            {/* Mobile Bottom Nav */}
+            {/* Navigation is now always at the bottom */}
             <BottomNav activeView={activeView} setActiveView={handleSetView} />
 
             {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}

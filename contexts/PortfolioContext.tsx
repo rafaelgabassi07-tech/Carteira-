@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, DividendHistoryEvent, AppStats, AppNotification, PortfolioEvolutionPoint } from '../types';
+import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, DividendHistoryEvent, AppStats, AppNotification, PortfolioEvolutionPoint, MonthlyIncome } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { generateNotifications } from '../services/dynamicDataService';
@@ -17,6 +17,7 @@ interface PortfolioContextType {
   yieldOnCost: number;
   projectedAnnualIncome: number;
   portfolioEvolution: Record<string, PortfolioEvolutionPoint[]>;
+  monthlyIncome: MonthlyIncome[];
   lastSync: number | null;
   isRefreshing: boolean;
   marketDataError: string | null;
@@ -306,17 +307,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const assetTickers = useMemo(() => assets.map(a => a.ticker).sort().join(','), [assets]);
 
-  // FIX: Guarantees a full (non-lite) data load on startup if assets exist,
-  // ensuring the patrimony evolution chart has historical data.
   useEffect(() => {
     if (!isRefreshing && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
       initialLoadDone.current = true;
       console.log("CONTEXT: Performing initial full data sync for charts...");
-      refreshMarketData(true, true, false); // force=true, silent=true, lite=false
+      refreshMarketData(true, true, false); 
     }
   }, [sourceTransactions.length, isDemoMode, isRefreshing, refreshMarketData]);
 
-  // FIX: Improved auto-repair logic to be more reliable.
   useEffect(() => {
       if (isRefreshing || isDemoMode || !initialLoadDone.current) return;
       
@@ -392,6 +390,56 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return calculatePortfolioEvolution(sourceTransactions, sourceMarketData);
   }, [sourceTransactions, sourceMarketData]);
 
+  const monthlyIncome = useMemo(() => {
+      const incomeMap: Record<string, number> = {};
+      
+      const transactionsByTicker: Record<string, Transaction[]> = {};
+      sourceTransactions.forEach(tx => {
+          if (!transactionsByTicker[tx.ticker]) transactionsByTicker[tx.ticker] = [];
+          transactionsByTicker[tx.ticker].push(tx);
+      });
+      
+      Object.values(transactionsByTicker).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date)));
+
+      assets.forEach(asset => {
+          const hist = asset.dividendsHistory || [];
+          if (hist.length === 0) return;
+          
+          const txs = transactionsByTicker[asset.ticker] || [];
+          
+          hist.forEach(div => {
+              if (div.value <= 0) return;
+              
+              let qty = 0;
+              for (const tx of txs) {
+                  if (tx.date > div.exDate) break; 
+                  if (tx.type === 'Compra') qty += tx.quantity;
+                  else qty -= tx.quantity;
+              }
+              const userQty = Math.max(0, qty);
+              
+              if (userQty > 0) {
+                  const payDate = div.paymentDate; 
+                  const monthKey = payDate.substring(0, 7); 
+                  incomeMap[monthKey] = (incomeMap[monthKey] || 0) + (userQty * div.value);
+              }
+          });
+      });
+
+      const sortedMonths = Object.keys(incomeMap).sort();
+      const relevantMonths = sortedMonths.slice(-12);
+
+      return relevantMonths.map(key => {
+          const [year, month] = key.split('-').map(Number);
+          const date = new Date(year, month - 1, 15); 
+          const monthStr = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+          return {
+              month: monthStr,
+              total: incomeMap[key]
+          };
+      });
+  }, [assets, sourceTransactions]);
+
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
       if (targetTx.type !== 'Venda') return 0;
 
@@ -422,16 +470,15 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const value = useMemo(() => ({
       assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-      yieldOnCost, projectedAnnualIncome, portfolioEvolution, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
+      yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
       setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
-      deleteNotification, clearAllNotifications,
-      monthlyIncome: [] // CLEANUP: Removed obsolete monthlyIncome
+      deleteNotification, clearAllNotifications
   }), [
       assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-      yieldOnCost, projectedAnnualIncome, portfolioEvolution, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
+      yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,

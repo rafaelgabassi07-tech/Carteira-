@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { View } from '../App';
 import LayoutGridIcon from './icons/LayoutGridIcon';
@@ -49,7 +50,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
   };
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[68px] bg-[var(--bg-secondary)]/90 backdrop-blur-lg border-t border-[var(--border-color)] z-[100] pb-safe max-w-md mx-auto shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+    <div className="fixed bottom-0 left-0 right-0 h-[68px] bg-[var(--bg-secondary)]/90 backdrop-blur-lg border-t border-[var(--border-color)] z-[100] pb-safe max-w-md mx-auto shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
       <div className="flex justify-around items-stretch h-full px-2">
         <NavItem label={t('nav_portfolio')} view="dashboard" icon={<LayoutGridIcon />} isActive={activeView === 'dashboard'} onClick={() => handleNavClick('dashboard')} />
         <NavItem label={t('nav_analysis')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />

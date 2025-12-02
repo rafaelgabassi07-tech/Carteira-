@@ -67,12 +67,6 @@ export interface Dividend {
     paymentDate: string;
 }
 
-// FIX: Added missing MonthlyIncome interface.
-export interface MonthlyIncome {
-    month: string;
-    total: number;
-}
-
 export interface CalendarEvent {
     ticker: string;
     eventType: 'Confirmado' | 'Previsão' | 'Pago';
@@ -85,6 +79,11 @@ export interface PortfolioEvolutionPoint {
     month: string;
     invested: number;
     marketValue: number;
+}
+
+export interface MonthlyIncome {
+    month: string;
+    total: number;
 }
 
 export interface ToastMessage {
