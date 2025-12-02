@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
@@ -60,19 +60,20 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     // Efeito para buscar dados se estiverem faltando ou desatualizados ao entrar
     useEffect(() => {
         const checkAndLoad = async () => {
-            // Se não tiver dados ou histórico vazio, força refresh. 
-            // Mesmo se tiver, o refreshSingleAsset(..., true) garante dados frescos.
-            setIsRefreshing(true);
-            try {
-                await refreshSingleAsset(ticker, true);
-            } catch (e) {
-                console.error("Erro ao atualizar ativo:", e);
-            } finally {
-                setIsRefreshing(false);
+            // Força a busca se não tiver histórico, pois a API pode ter mudado
+            if (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0) {
+                setIsRefreshing(true);
+                try {
+                    await refreshSingleAsset(ticker, true);
+                } catch (e) {
+                    console.error("Erro ao atualizar ativo:", e);
+                } finally {
+                    setIsRefreshing(false);
+                }
             }
         };
         checkAndLoad();
-    }, [ticker, refreshSingleAsset]); 
+    }, [ticker, refreshSingleAsset, asset]); 
 
     const handleRefresh = useCallback(async () => {
         if (isRefreshing) return;
@@ -91,38 +92,49 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         return transactions.filter(tx => tx.ticker === ticker).sort((a, b) => b.date.localeCompare(a.date));
     }, [transactions, ticker]);
 
-    // Lógica para cálculo de proventos recebidos e elegibilidade
+    // Lógica principal: Calcular histórico com base na posse do ativo
     const fullDividendHistory = useMemo(() => {
         const history = asset?.dividendsHistory || [];
         if (history.length === 0) return [];
         
-        // Transações ordenadas da mais antiga para a mais recente para o replay
-        const txs = transactions
+        // 1. Obter transações em ordem cronológica (antiga -> nova)
+        const sortedTransactions = transactions
             .filter(t => t.ticker === ticker)
             .sort((a,b) => a.date.localeCompare(b.date));
-        
-        // Histórico de dividendos ordenado do mais recente para o mais antigo (para exibição)
-        const historySorted = [...history].sort((a,b) => b.exDate.localeCompare(a.exDate));
-
-        return historySorted.map(div => {
-            let qty = 0;
-            // Replay de transações até a Data Com (dia anterior à Data Ex)
-            // Se eu comprei ANTES da Ex-Date (ou seja, date < exDate), eu tenho direito.
-            for(const tx of txs) {
-                if (tx.date >= div.exDate) break; // Transação ocorreu na ou após Ex-Date, não conta.
-                
-                if (tx.type === 'Compra') qty += tx.quantity;
-                else qty -= tx.quantity;
-            }
-            const userQty = Math.max(0, qty);
             
-            return {
-                ...div,
-                userQuantity: userQty,
-                totalReceived: userQty * div.value,
-                isReceived: userQty > 0
-            };
-        });
+        // Se nunca comprou, não mostra nada (filtro "desde a compra")
+        if (sortedTransactions.length === 0) return [];
+
+        const firstPurchaseDate = sortedTransactions[0].date;
+
+        // 2. Ordenar dividendos por Data de Pagamento (mais recente -> mais antiga) para exibição
+        const dividendsSorted = [...history].sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
+
+        // 3. Processar e Filtrar
+        // Filtra APENAS eventos que aconteceram DEPOIS (ou no dia) da primeira compra
+        const processed = dividendsSorted
+            .filter(div => div.exDate >= firstPurchaseDate) 
+            .map(div => {
+                let qty = 0;
+                // Replay das transações até a Data Com (inclusive)
+                for(const tx of sortedTransactions) {
+                    if (tx.date > div.exDate) break; // Transação posterior à data de corte, para.
+                    
+                    if (tx.type === 'Compra') qty += tx.quantity;
+                    else qty -= tx.quantity;
+                }
+                
+                const userQty = Math.max(0, qty);
+                
+                return {
+                    ...div,
+                    userQuantity: userQty,
+                    totalReceived: userQty * div.value,
+                    isReceived: userQty > 0
+                };
+            });
+
+        return processed;
     }, [asset?.dividendsHistory, transactions, ticker]);
 
     const displayedDividends = useMemo(() => {
@@ -249,21 +261,20 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             case 'dividends':
                  return (
                     <div className="space-y-4 pb-4 animate-fade-in">
-                        {/* Se estiver atualizando e sem dados, mostra loading. Se tiver dados (mesmo desatualizados), mostra dados. */}
                         {isRefreshing && fullDividendHistory.length === 0 ? (
                             <div className="flex justify-center py-8"><span className="loading loading-spinner text-[var(--accent-color)]"></span></div>
                         ) : fullDividendHistory.length > 0 ? (
                             <>
-                                {/* Gráfico de Barras: Valor Recebido por Cota (Requested Feature) */}
+                                {/* Gráfico de Barras: Valor Recebido por Cota */}
                                 <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm">
                                     <div className="flex justify-between items-center mb-3">
                                         <h3 className="font-bold text-sm text-[var(--text-primary)]">Valor por Cota</h3>
                                         <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Histórico</span>
                                     </div>
-                                    <DividendChart data={asset?.dividendsHistory || []} />
+                                    <DividendChart data={fullDividendHistory} />
                                 </div>
                                 
-                                {/* Cards de Resumo de Recebimento */}
+                                {/* Cards de Resumo */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="col-span-2 bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] flex justify-between items-center shadow-sm">
                                         <div>
@@ -288,34 +299,41 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                         return (
                                             <div 
                                                 key={`${div.exDate}-${index}`} 
-                                                className={`p-4 flex justify-between items-center ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedHistoryItem === div.exDate ? 'bg-[var(--bg-tertiary-hover)]' : ''} ${!div.isReceived ? 'opacity-60 bg-[var(--bg-primary)]/30' : ''}`}
+                                                className={`p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedHistoryItem === div.exDate ? 'bg-[var(--bg-tertiary-hover)]' : ''} ${!div.isReceived ? 'opacity-60 bg-[var(--bg-primary)]/30' : ''}`}
                                                 onClick={() => { setSelectedHistoryItem(div.exDate); vibrate(); }}
                                             >
-                                                <div>
-                                                    <div className="flex items-center gap-2 mb-1">
+                                                {/* Left Side: Dates and Base Value */}
+                                                <div className="flex flex-col gap-1.5">
+                                                    {/* Data de Pagamento em Destaque */}
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-primary)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-color)]">
+                                                            PAGAMENTO
+                                                        </span>
                                                         <span className="font-bold text-sm text-[var(--text-primary)]">
                                                             {new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC' })}
                                                         </span>
-                                                        {div.isReceived && <span className="w-2 h-2 rounded-full bg-[var(--green-text)]"></span>}
+                                                        {div.isReceived && <span className="w-2 h-2 rounded-full bg-[var(--green-text)] ml-auto sm:ml-0"></span>}
                                                     </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="text-[10px] text-[var(--text-secondary)] font-medium">
-                                                            Data Com: {new Date(div.exDate).toLocaleDateString(locale, { day:'2-digit', month:'2-digit', timeZone: 'UTC' })}
-                                                        </span>
-                                                        <span className="text-[10px] text-[var(--text-secondary)] font-medium">
-                                                            Valor/Cota: <b>{formatCurrency(div.value)}</b>
-                                                        </span>
+                                                    
+                                                    {/* Data Com e Valor por Cota */}
+                                                    <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                        <span>Data Com: <b>{new Date(div.exDate).toLocaleDateString(locale, { day:'2-digit', month:'2-digit', year:'2-digit', timeZone: 'UTC' })}</b></span>
+                                                        <span className="w-1 h-1 rounded-full bg-[var(--border-color)]"></span>
+                                                        <span>Base: <b>{formatCurrency(div.value)}</b></span>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
+
+                                                {/* Right Side: User Gain */}
+                                                <div className="flex flex-row sm:flex-col justify-between items-center sm:items-end border-t sm:border-t-0 border-[var(--border-color)]/50 pt-2 sm:pt-0 mt-1 sm:mt-0">
+                                                    <span className="text-[10px] text-[var(--text-secondary)] sm:hidden">Recebido</span>
                                                     {div.isReceived ? (
-                                                        <>
+                                                        <div className="text-right">
                                                             <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.totalReceived)}</p>
                                                             <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">{div.userQuantity} cotas</p>
-                                                        </>
+                                                        </div>
                                                     ) : (
                                                         <span className="text-[9px] font-bold text-[var(--text-secondary)] border border-[var(--border-color)] px-2 py-1 rounded-md">
-                                                            Não Recebido
+                                                            Sem Saldo na Data Com
                                                         </span>
                                                     )}
                                                 </div>
@@ -336,7 +354,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                 <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-3 border border-[var(--border-color)] opacity-50">
                                     <span className="text-2xl font-bold">$</span>
                                 </div>
-                                <p className="text-sm font-medium mb-2">{t('no_dividends_for_asset')}</p>
+                                <p className="text-sm font-medium mb-2">Sem histórico desde a compra.</p>
                                 <button onClick={handleRefresh} className="text-xs text-[var(--accent-color)] font-bold hover:underline">
                                     Tentar Atualizar
                                 </button>
