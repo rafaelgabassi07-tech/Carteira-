@@ -1,11 +1,10 @@
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import AnalysisIcon from '../components/icons/AnalysisIcon';
-import DividendChart from '../components/DividendChart';
 import { vibrate } from '../utils';
 
 interface AssetDetailViewProps {
@@ -51,8 +50,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const { getAssetByTicker, transactions, refreshSingleAsset } = usePortfolio();
     const [activeTab, setActiveTab] = useState('summary');
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [showAllHistory, setShowAllHistory] = useState(false);
-    const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
     
     // Obter ativo do contexto
     const asset = getAssetByTicker(ticker);
@@ -91,83 +88,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const assetTransactions = useMemo(() => {
         return transactions.filter(tx => tx.ticker === ticker).sort((a, b) => b.date.localeCompare(a.date));
     }, [transactions, ticker]);
-
-    // Lógica para cálculo de proventos recebidos e elegibilidade
-    const fullDividendHistory = useMemo(() => {
-        const history = asset?.dividendsHistory || [];
-        if (history.length === 0) return [];
-        
-        // Ordenar histórico de dividendos por Data de Pagamento (mais recente -> mais antiga) para exibição
-        const dividendsSorted = [...history].sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
-
-        // Transações ordenadas cronologicamente (antiga -> recente)
-        const sortedTransactions = transactions
-            .filter(t => t.ticker === ticker)
-            .sort((a,b) => a.date.localeCompare(b.date));
-            
-        // Se nunca comprou (Modo Análise), mostra o histórico completo sem filtrar "meus ganhos"
-        if (sortedTransactions.length === 0) {
-            return dividendsSorted.map(div => ({
-                ...div,
-                userQuantity: 0,
-                totalReceived: 0,
-                isReceived: false // Não recebido pois não tem posição
-            }));
-        }
-
-        const firstPurchaseDate = sortedTransactions[0].date;
-
-        // Processar e Filtrar "Desde a Compra"
-        const processed = dividendsSorted
-            .filter(div => div.exDate >= firstPurchaseDate) // FILTRO: Apenas eventos após a primeira compra
-            .map(div => {
-                let qty = 0;
-                // Replay das transações até a Data Com (inclusive)
-                for(const tx of sortedTransactions) {
-                    if (tx.date > div.exDate) break; // Transação posterior à data de corte, para.
-                    
-                    if (tx.type === 'Compra') qty += tx.quantity;
-                    else qty -= tx.quantity;
-                }
-                
-                const userQty = Math.max(0, qty);
-                
-                return {
-                    ...div,
-                    userQuantity: userQty,
-                    totalReceived: userQty * div.value,
-                    isReceived: userQty > 0
-                };
-            });
-
-        return processed;
-    }, [asset?.dividendsHistory, transactions, ticker]);
-
-    const displayedDividends = useMemo(() => {
-        return showAllHistory ? fullDividendHistory : fullDividendHistory.slice(0, 5);
-    }, [fullDividendHistory, showAllHistory]);
-
-    // --- Metrics Calculation ---
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(currentYear - 1);
-
-    const totalDividendsReceived = useMemo(() => {
-        return fullDividendHistory.reduce((acc, div) => acc + (div.totalReceived || 0), 0);
-    }, [fullDividendHistory]);
-
-    const totalYTD = useMemo(() => {
-        return fullDividendHistory
-            .filter(d => new Date(d.paymentDate).getFullYear() === currentYear)
-            .reduce((acc, div) => acc + (div.totalReceived || 0), 0);
-    }, [fullDividendHistory, currentYear]);
-
-    const averageMonthly = useMemo(() => {
-        const last12m = fullDividendHistory.filter(d => new Date(d.paymentDate) >= oneYearAgo);
-        const total = last12m.reduce((acc, div) => acc + (div.totalReceived || 0), 0);
-        return last12m.length > 0 ? total / 12 : 0;
-    }, [fullDividendHistory, oneYearAgo]);
 
     if (!asset && !isRefreshing) {
         return (
@@ -264,122 +184,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         )) : <p className="text-sm text-center text-[var(--text-secondary)] py-12">{t('no_transactions_for_asset')}</p>}
                     </div>
                 );
-            case 'dividends':
-                 return (
-                    <div className="space-y-4 pb-4 animate-fade-in">
-                        {isRefreshing && fullDividendHistory.length === 0 ? (
-                            <div className="flex justify-center py-8"><span className="loading loading-spinner text-[var(--accent-color)]"></span></div>
-                        ) : fullDividendHistory.length > 0 ? (
-                            <>
-                                {/* Gráfico de Barras: Valor Recebido por Cota (Requested Feature) */}
-                                <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h3 className="font-bold text-sm text-[var(--text-primary)]">Valor por Cota</h3>
-                                        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Histórico</span>
-                                    </div>
-                                    {/* Usa fullDividendHistory, que já está processado */}
-                                    <DividendChart data={fullDividendHistory} />
-                                </div>
-                                
-                                {/* Cards de Resumo de Recebimento */}
-                                {assetTransactions.length > 0 && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="col-span-2 bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] flex justify-between items-center shadow-sm">
-                                            <div>
-                                                <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block mb-1">{t('total_dividends_received')}</span>
-                                                <span className="text-2xl font-black text-[var(--green-text)]">{formatCurrency(totalDividendsReceived)}</span>
-                                            </div>
-                                            <div className="w-10 h-10 rounded-full bg-[var(--green-text)]/10 flex items-center justify-center text-[var(--green-text)]">
-                                                <span className="font-bold text-lg">$</span>
-                                            </div>
-                                        </div>
-                                        <MetricItem label={t('total_year', { year: currentYear })} value={formatCurrency(totalYTD)} className="bg-[var(--bg-secondary)]" />
-                                        <MetricItem label="Média (12m)" value={formatCurrency(averageMonthly)} className="bg-[var(--bg-secondary)]" />
-                                    </div>
-                                )}
-
-                                {/* Lista Detalhada do Histórico */}
-                                <h3 className="font-bold text-sm text-[var(--text-secondary)] mt-2 px-1 uppercase tracking-wider">
-                                    {showAllHistory ? t('full_history') : t('recent_dividends')}
-                                </h3>
-                                
-                                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
-                                    {displayedDividends.map((div, index) => {
-                                        return (
-                                            <div 
-                                                key={`${div.exDate}-${index}`} 
-                                                className={`p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedHistoryItem === div.exDate ? 'bg-[var(--bg-tertiary-hover)]' : ''} ${!div.isReceived && assetTransactions.length > 0 ? 'opacity-60 bg-[var(--bg-primary)]/30' : ''}`}
-                                                onClick={() => { setSelectedHistoryItem(div.exDate); vibrate(); }}
-                                            >
-                                                {/* Left Side: Dates and Base Value */}
-                                                <div className="flex flex-col gap-1.5">
-                                                    {/* Data de Pagamento em Destaque */}
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-primary)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-color)]">
-                                                            PAGAMENTO
-                                                        </span>
-                                                        <span className="font-bold text-sm text-[var(--text-primary)]">
-                                                            {new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC' })}
-                                                        </span>
-                                                        {div.isReceived && <span className="w-2 h-2 rounded-full bg-[var(--green-text)] ml-auto sm:ml-0"></span>}
-                                                    </div>
-                                                    
-                                                    {/* Data Com e Valor por Cota */}
-                                                    <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-                                                        <span>Data Com: <b>{new Date(div.exDate).toLocaleDateString(locale, { day:'2-digit', month:'2-digit', year:'2-digit', timeZone: 'UTC' })}</b></span>
-                                                        <span className="w-1 h-1 rounded-full bg-[var(--border-color)]"></span>
-                                                        <span>Base: <b>{formatCurrency(div.value)}</b></span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Right Side: User Gain or Analysis Mode */}
-                                                {assetTransactions.length > 0 ? (
-                                                    <div className="flex flex-row sm:flex-col justify-between items-center sm:items-end border-t sm:border-t-0 border-[var(--border-color)]/50 pt-2 sm:pt-0 mt-1 sm:mt-0">
-                                                        <span className="text-[10px] text-[var(--text-secondary)] sm:hidden">Recebido</span>
-                                                        {div.isReceived ? (
-                                                            <div className="text-right">
-                                                                <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.totalReceived)}</p>
-                                                                <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">{div.userQuantity} cotas</p>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-[9px] font-bold text-[var(--text-secondary)] border border-[var(--border-color)] px-2 py-1 rounded-md">
-                                                                Sem Saldo na Data Com
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    // Modo Análise (Sem Transações)
-                                                    <div className="hidden sm:block">
-                                                        <span className="text-[9px] font-bold text-[var(--text-secondary)] border border-[var(--border-color)] px-2 py-1 rounded-md">
-                                                            Histórico
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                
-                                {!showAllHistory && fullDividendHistory.length > 5 && (
-                                    <button onClick={() => { vibrate(); setShowAllHistory(true); }} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-secondary)] rounded-xl border border-dashed border-[var(--border-color)] transition-all">
-                                        {t('view_full_history')} ({fullDividendHistory.length})
-                                    </button>
-                                )}
-                                {showAllHistory && (<button onClick={() => { vibrate(); setShowAllHistory(false); }} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">{t('show_less')}</button>)}
-                            </>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-12 text-[var(--text-secondary)]">
-                                <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-3 border border-[var(--border-color)] opacity-50">
-                                    <span className="text-2xl font-bold">$</span>
-                                </div>
-                                <p className="text-sm font-medium mb-2">Sem histórico disponível.</p>
-                                <button onClick={handleRefresh} className="text-xs text-[var(--accent-color)] font-bold hover:underline">
-                                    Tentar Atualizar
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                );
             default: return null;
         }
     }
@@ -416,12 +220,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         className={`pb-2 px-4 text-sm font-bold transition-colors ${activeTab === 'history' ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
                         {t('history')}
-                    </button>
-                     <button
-                        onClick={() => setActiveTab('dividends')}
-                        className={`pb-2 px-4 text-sm font-bold transition-colors ${activeTab === 'dividends' ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                    >
-                        {t('dividends_received')}
                     </button>
                 </div>
                 
