@@ -11,6 +11,7 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
 import ShareModal from '../components/modals/ShareModal';
 import DividendsSummaryCard from '../components/DividendsSummaryCard';
+import PortfolioPieChart from '../components/PortfolioPieChart';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -148,6 +149,37 @@ const PortfolioSummary: React.FC = () => {
     );
 };
 
+const DiversificationCard: React.FC = () => {
+    const { t } = useI18n();
+    const { assets, preferences } = usePortfolio();
+    
+    const data = useMemo(() => {
+        const segments: Record<string, number> = {};
+        let totalValue = 0;
+        assets.forEach(a => {
+            const val = a.quantity * a.currentPrice;
+            const seg = a.segment || t('outros');
+            segments[seg] = (segments[seg] || 0) + val;
+            totalValue += val;
+        });
+        
+        return Object.entries(segments).map(([name, value]) => ({
+            name,
+            value,
+            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
+        })).sort((a, b) => b.value - a.value);
+    }, [assets, t]);
+
+    return (
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mx-4 mt-4 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all hover:shadow-md">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg text-[var(--text-primary)]">{t('diversification')}</h3>
+            </div>
+            <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
+        </div>
+    );
+};
+
 interface PortfolioViewProps {
     setActiveView: (view: View) => void;
     setTransactionFilter: (ticker: string) => void;
@@ -244,6 +276,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                         <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
                             <PortfolioSummary />
                             <DividendsSummaryCard />
+                            <DiversificationCard />
                         </div>
                     </>
                 ) : (
