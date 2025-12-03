@@ -80,6 +80,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
   const initialLoadDone = useRef(false);
+  
+  // Use a ref to access latest market data in callbacks without adding it to dependencies
   const marketDataRef = useRef(marketData);
   useEffect(() => { marketDataRef.current = marketData; }, [marketData]);
 
@@ -128,7 +130,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const currentData = marketDataRef.current[ticker.toUpperCase()];
       
       // Use STALE_TIME instead of CACHE_TTL for smarter refreshing
-      if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
+      // Check lastUpdated field explicitly
+      if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) {
+          return;
+      }
 
       try {
           const { quotes } = await fetchBrapiQuotes(preferences, [ticker], false);
@@ -140,7 +145,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   ...(prev[ticker.toUpperCase()] || {}),
                   ...(quotes[ticker.toUpperCase()] || {}),
                   ...(data[ticker.toUpperCase()] || {}),
-                  lastUpdated: now
+                  lastUpdated: now // Ensure this is set
               }
           }));
       } catch (e) { console.error(e); }
