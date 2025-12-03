@@ -57,8 +57,12 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     // Efeito para buscar dados se estiverem faltando ou desatualizados ao entrar
     useEffect(() => {
         const checkAndLoad = async () => {
-            // Se não tiver histórico ou array vazio, força atualização
-            if (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0) {
+            // Check staleness: If we don't have a timestamp, OR if it's been more than 5 minutes
+            const isStale = !asset?.lastUpdated || (Date.now() - asset.lastUpdated > 5 * 60 * 1000);
+            
+            // Only force refresh if data is missing AND we haven't checked recently
+            // This prevents spamming API for assets that simply don't have dividends (like some stocks or incomplete data)
+            if (isStale && (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0)) {
                 setIsRefreshing(true);
                 try {
                     await refreshSingleAsset(ticker, true);
@@ -70,7 +74,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             }
         };
         checkAndLoad();
-    }, [ticker, refreshSingleAsset, asset]); 
+    }, [ticker, refreshSingleAsset, asset?.lastUpdated]); 
 
     const handleRefresh = useCallback(async () => {
         if (isRefreshing) return;
@@ -130,7 +134,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                             </div>
                         </div>
 
-                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
+                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up">
                              <div className="flex items-center gap-2 mb-4">
                                 <div className="p-2 bg-[var(--accent-color)]/10 rounded-lg text-[var(--accent-color)]">
                                     <AnalysisIcon className="w-5 h-5" />
@@ -140,26 +144,63 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                              
                              {!asset ? <IndicatorSkeleton /> : (
                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <MetricItem label={t('quantity')} value={asset.quantity} />
-                                    <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} />
-                                    <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} />
-                                    <MetricItem label="Total Investido" value={formatCurrency(asset.quantity * asset.avgPrice)} className="sm:col-span-1" />
-                                    <MetricItem label="Saldo Atual" value={formatCurrency(asset.quantity * asset.currentPrice)} highlight={variation >= 0 ? 'green' : 'red'} />
-                                    <MetricItem label={t('result')} value={formatCurrency(variation)} subValue={`(${variationPercent.toFixed(2)}%)`} highlight={variation >= 0 ? 'green' : 'red'} />
+                                    <MetricItem label={t('quantity')} value={asset.quantity} className="animate-fade-in-up" style={{animationDelay: '0ms'}}/>
+                                    <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} className="animate-fade-in-up" style={{animationDelay: '50ms'}}/>
+                                    <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} className="animate-fade-in-up" style={{animationDelay: '100ms'}}/>
+                                    
+                                    <MetricItem 
+                                        label="Total Investido" 
+                                        value={formatCurrency(asset.quantity * asset.avgPrice)} 
+                                        className="sm:col-span-1 animate-fade-in-up" style={{animationDelay: '150ms'}}
+                                    />
+                                    <MetricItem 
+                                        label="Saldo Atual" 
+                                        value={formatCurrency(asset.quantity * asset.currentPrice)} 
+                                        highlight={variation >= 0 ? 'green' : 'red'}
+                                        className="animate-fade-in-up" style={{animationDelay: '200ms'}}
+                                    />
+                                     <MetricItem 
+                                        label={t('result')} 
+                                        value={formatCurrency(variation)} 
+                                        subValue={`(${variationPercent.toFixed(2)}%)`}
+                                        highlight={variation >= 0 ? 'green' : 'red'}
+                                        className="animate-fade-in-up" style={{animationDelay: '250ms'}}
+                                    />
+
+                                    {/* Analysis Section Header */}
                                     <div className="col-span-2 sm:col-span-3 mt-4 mb-1 flex items-center gap-2">
                                         <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
                                         <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('nav_analysis')} & {t('data')}</span>
                                         <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
                                     </div>
-                                    <MetricItem label={t('dy_12m')} value={asset.dy?.toFixed(2) ?? '-'} subValue="%" highlight={asset.dy && asset.dy > 10 ? 'green' : undefined} />
-                                    <MetricItem label={t('yield_on_cost')} value={asset.yieldOnCost?.toFixed(2) ?? '-'} subValue="%" highlight={asset.yieldOnCost && asset.yieldOnCost > 8 ? 'green' : undefined} />
-                                    <MetricItem label={t('pvp')} value={asset.pvp?.toFixed(2) ?? '-'} highlight={asset.pvp && asset.pvp < 1.0 ? 'green' : (asset.pvp && asset.pvp > 1.2 ? 'red' : 'neutral')} />
-                                    <MetricItem label={t('vacancy')} value={asset.vacancyRate?.toFixed(1) ?? '0'} subValue="%" />
-                                    <MetricItem label={t('shareholders')} value={asset.shareholders ? (asset.shareholders/1000).toFixed(1) + 'k' : '-'} />
-                                    <MetricItem label={t('daily_liquidity')} value={asset.liquidity ? (asset.liquidity/1000000).toFixed(1) + 'M' : '-'} />
+
+                                    <MetricItem 
+                                        label={t('dy_12m')} 
+                                        value={asset.dy?.toFixed(2) ?? '-'} 
+                                        subValue="%" 
+                                        highlight={asset.dy && asset.dy > 10 ? 'green' : undefined}
+                                        className="animate-fade-in-up" style={{animationDelay: '300ms'}}
+                                    />
+                                    <MetricItem 
+                                        label={t('yield_on_cost')} 
+                                        value={asset.yieldOnCost?.toFixed(2) ?? '-'} 
+                                        subValue="%" 
+                                        highlight={asset.yieldOnCost && asset.yieldOnCost > 8 ? 'green' : undefined}
+                                        className="animate-fade-in-up" style={{animationDelay: '350ms'}}
+                                    />
+                                    <MetricItem 
+                                        label={t('pvp')} 
+                                        value={asset.pvp?.toFixed(2) ?? '-'} 
+                                        highlight={asset.pvp && asset.pvp < 1.0 ? 'green' : (asset.pvp && asset.pvp > 1.2 ? 'red' : 'neutral')}
+                                        className="animate-fade-in-up" style={{animationDelay: '400ms'}}
+                                    />
+                                     <MetricItem label={t('vacancy')} value={asset.vacancyRate?.toFixed(1) ?? '0'} subValue="%" className="animate-fade-in-up" style={{animationDelay: '450ms'}}/>
+                                     <MetricItem label={t('shareholders')} value={asset.shareholders ? (asset.shareholders/1000).toFixed(1) + 'k' : '-'} className="animate-fade-in-up" style={{animationDelay: '500ms'}}/>
+                                     <MetricItem label={t('daily_liquidity')} value={asset.liquidity ? (asset.liquidity/1000000).toFixed(1) + 'M' : '-'} className="animate-fade-in-up" style={{animationDelay: '550ms'}}/>
                                 </div>
                              )}
                         </div>
+
                         <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3.5 rounded-xl shadow-lg shadow-[var(--accent-color)]/20 hover:shadow-[var(--accent-color)]/40 active:scale-[0.98] transition-all">
                             {t('view_transactions')}
                         </button>
@@ -167,7 +208,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 );
             case 'history':
                 return (
-                    <div className="space-y-3 pb-4">
+                    <div className="space-y-3 animate-fade-in pb-4">
                         {assetTransactions.length > 0 ? assetTransactions.map((tx, index) => (
                             <div key={tx.id} className="bg-[var(--bg-secondary)] p-4 rounded-xl text-sm border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: `${index * 50}ms`}}>
                                 <div className="flex justify-between items-center">

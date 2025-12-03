@@ -127,6 +127,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const now = Date.now();
       const currentData = marketDataRef.current[ticker.toUpperCase()];
       
+      // Use STALE_TIME instead of CACHE_TTL for smarter refreshing
       if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
@@ -204,7 +205,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const refreshMarketData = useCallback(async (force = false, silent = false, lite = false) => {
       if(isRefreshing) return;
-      if(!force && lastSync && Date.now() - lastSync < CACHE_TTL.PRICES) return; 
+      
+      // FIX: Use STALE_TIME (5-10min) instead of CACHE_TTL (Infinite) for checks
+      // This ensures we actually refresh data periodically instead of never refreshing
+      if(!force && lastSync && Date.now() - lastSync < STALE_TIME.MARKET_DATA) return; 
 
       const tickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
       if(tickers.length === 0) return;
@@ -300,7 +304,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               dy: data.dy, pvp: data.pvp, segment: data.assetType || data.sector || 'Outros',
               administrator: data.administrator, vacancyRate: data.vacancyRate, liquidity: data.dailyLiquidity,
               shareholders: data.shareholders, yieldOnCost: avgPrice > 0 ? ((curPrice * ((data.dy||0)/100))/avgPrice)*100 : 0,
-              nextPaymentDate: data.nextPaymentDate, lastDividend: data.lastDividend
+              nextPaymentDate: data.nextPaymentDate, lastDividend: data.lastDividend,
+              lastUpdated: data.lastUpdated // Pass this through
           };
       }).filter(a => a.quantity > 0.000001);
   }, [sourceTransactions, sourceMarketData]);
