@@ -54,85 +54,100 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
         let success = false;
         let resultData: any = null;
 
-        // Se forçado Lite, pulamos tentativas complexas e vamos direto pro fallback/basic
-        const ranges = forceLite ? [] : ['1y', '3mo'];
+        // Estratégia de Fallback em Cascata
         
-        for (const range of ranges) {
+        // Nível 1: Dados Completos (Histórico 1 ano + Dividendos) 
+        // Só tenta se não for forçado Lite e não estiver restrito
+        if (!forceLite) {
             try {
-                // If lite, we don't need dividend data, saving processing time and bandwidth
-                const dividendsParam = 'true';
-                const response = await fetch(`${urlBase}?range=${range}&dividends=${dividendsParam}&token=${token}`);
+                const response = await fetch(`${urlBase}?range=1y&dividends=true&token=${token}`);
                 
-                // Se recebermos 403, marcamos como restrito para o futuro e paramos de tentar endpoints complexos
                 if (response.status === 403 || response.status === 401) {
                     setTokenRestricted();
                     throw new Error("FORBIDDEN_TIER");
                 }
 
-                const text = await response.text();
-                totalBytesReceived += new Blob([text]).size;
-
-                if (!response.ok) continue; // Try next range
-                
-                const data = JSON.parse(text);
-                const result = data.results?.[0];
-
-                if (result) {
-                    resultData = result;
-                    success = true;
-                    break; // Exit range loop
-                }
-            } catch (e: any) {
-                if (e.message === "FORBIDDEN_TIER") break; // Stop trying ranges immediately
-            }
-        }
-
-        // Fallback for current price only (Basic Quote - geralmente funciona no Free Tier)
-        if (!success) {
-            try {
-                const response = await fetch(`${urlBase}?token=${token}`);
-                const text = await response.text();
-                totalBytesReceived += new Blob([text]).size;
-                
                 if (response.ok) {
+                    const text = await response.text();
+                    totalBytesReceived += new Blob([text]).size;
                     const data = JSON.parse(text);
-                    const result = data.results?.[0];
-                    if (result) {
-                        resultData = result;
-                        // No basic quote não temos histórico longo garantido
-                        resultData.historicalDataPrice = [];
+                    if (data.results?.[0]) {
+                        resultData = data.results[0];
                         success = true;
                     }
                 }
-            } catch (e) { console.error(`Failed fallback for ${ticker}`, e); }
+            } catch (e: any) {
+                if (e.message !== "FORBIDDEN_TIER") console.warn(`Brapi Full fetch failed for ${ticker}`, e);
+            }
+        }
+
+        // Nível 2: Apenas Dividendos + Cotação (Sem range histórico pesado)
+        // Executa se Nível 1 falhou ou foi pulado, mas ainda não é 'lite' estrito
+        if (!success && !lite) {
+            try {
+                // Tenta pegar dividendos sem especificar range (alguns planos free aceitam)
+                const response = await fetch(`${urlBase}?dividends=true&token=${token}`);
+                
+                // Se der 403 aqui também, paciência
+                if (response.status !== 403 && response.status !== 401 && response.ok) {
+                    const text = await response.text();
+                    totalBytesReceived += new Blob([text]).size;
+                    const data = JSON.parse(text);
+                    if (data.results?.[0]) {
+                        resultData = data.results[0];
+                        // Marca que não temos histórico de preço detalhado
+                        resultData.historicalDataPrice = []; 
+                        success = true;
+                    }
+                }
+            } catch (e) {
+                console.warn(`Brapi Dividends fetch failed for ${ticker}`, e);
+            }
+        }
+
+        // Nível 3: Fallback Final - Cotação Básica (Quase sempre funciona)
+        if (!success) {
+            try {
+                const response = await fetch(`${urlBase}?token=${token}`);
+                if (response.ok) {
+                    const text = await response.text();
+                    totalBytesReceived += new Blob([text]).size;
+                    const data = JSON.parse(text);
+                    if (data.results?.[0]) {
+                        resultData = data.results[0];
+                        resultData.historicalDataPrice = [];
+                        // Se falhou antes, provavelmente não temos dividendos aqui
+                        success = true;
+                    }
+                }
+            } catch (e) { console.error(`Brapi Basic fetch failed for ${ticker}`, e); }
         }
 
         if (success && resultData) {
             let dividendsHistory: DividendHistoryEvent[] = [];
             let finalHistory: { date: string; price: number }[] = [];
 
-            // Only process history and dividends if NOT forced lite
-            if (!forceLite) {
-                // Strategy 1: 'dividendsData.cashDividends' (Standard Modern Brapi)
-                const cashDividends = resultData.dividendsData?.cashDividends;
-                
-                if (Array.isArray(cashDividends) && cashDividends.length > 0) {
-                    dividendsHistory = cashDividends.map((d: any) => ({
-                        exDate: d.lastDatePrior ? new Date(d.lastDatePrior).toISOString().split('T')[0] : (d.approvedOn ? new Date(d.approvedOn).toISOString().split('T')[0] : ''),
-                        paymentDate: d.paymentDate ? new Date(d.paymentDate).toISOString().split('T')[0] : '',
-                        value: d.rate || 0
-                    })).filter((d: any) => d.value > 0 && d.exDate && d.paymentDate);
-                } 
-                // Strategy 2: Legacy 'dividendData.historicalDataPrice'
-                else if (resultData.dividendData?.historicalDataPrice) {
-                    dividendsHistory = resultData.dividendData.historicalDataPrice.map((item: any) => ({
-                        exDate: new Date(item.date * 1000).toISOString().split('T')[0],
-                        paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
-                        value: item.dividends?.[0]?.value || 0
-                    })).filter((d: any) => d.value > 0);
-                }
+            // Processamento de Dividendos (Tenta extrair de onde estiver disponível)
+            const cashDividends = resultData.dividendsData?.cashDividends;
+            
+            if (Array.isArray(cashDividends) && cashDividends.length > 0) {
+                dividendsHistory = cashDividends.map((d: any) => ({
+                    exDate: d.lastDatePrior ? new Date(d.lastDatePrior).toISOString().split('T')[0] : (d.approvedOn ? new Date(d.approvedOn).toISOString().split('T')[0] : ''),
+                    paymentDate: d.paymentDate ? new Date(d.paymentDate).toISOString().split('T')[0] : '',
+                    value: d.rate || 0
+                })).filter((d: any) => d.value > 0 && d.exDate && d.paymentDate);
+            } else if (resultData.dividendData?.historicalDataPrice) {
+                // Formato legado/alternativo
+                dividendsHistory = resultData.dividendData.historicalDataPrice.map((item: any) => ({
+                    exDate: new Date(item.date * 1000).toISOString().split('T')[0],
+                    paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
+                    value: item.dividends?.[0]?.value || 0
+                })).filter((d: any) => d.value > 0);
+            }
 
-                const rawHistory = resultData.historicalDataPrice || [];
+            // Processamento de Histórico de Preço
+            const rawHistory = resultData.historicalDataPrice || [];
+            if (Array.isArray(rawHistory) && rawHistory.length > 0) {
                 finalHistory = rawHistory.map((item: any) => ({
                     date: new Date(item.date * 1000).toISOString().split('T')[0],
                     price: item.close,
@@ -141,10 +156,10 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
 
             const currentPrice = resultData.regularMarketPrice || 0;
 
-            // Update current day in history if needed (only for full mode)
-            if (!forceLite && currentPrice > 0) {
+            // Update current day in history if needed
+            if (!forceLite && currentPrice > 0 && finalHistory.length > 0) {
                 const todayISO = new Date().toISOString().split('T')[0];
-                const lastHistoryDate = finalHistory.length > 0 ? finalHistory[finalHistory.length - 1].date : '';
+                const lastHistoryDate = finalHistory[finalHistory.length - 1].date;
                 if (lastHistoryDate !== todayISO) {
                     finalHistory.push({ date: todayISO, price: currentPrice });
                 }
@@ -152,8 +167,8 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
 
             allQuotes[ticker.toUpperCase()] = {
                 currentPrice: currentPrice,
-                // Only return complex arrays if not lite
-                ...(forceLite ? {} : { priceHistory: finalHistory, dividendsHistory })
+                priceHistory: finalHistory,
+                dividendsHistory: dividendsHistory // Agora sempre retornamos o array, mesmo que vazio
             };
         } else {
             failedTickers.push(ticker);
@@ -172,8 +187,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
 
 export async function validateBrapiToken(token: string): Promise<boolean> {
     if (!token || token.trim() === '') return false;
-    // Reset restricted state when testing a new token
-    localStorage.removeItem('brapi_restricted');
+    localStorage.removeItem('brapi_restricted'); // Reset ao testar novo token
     
     const url = `https://brapi.dev/api/quote/PETR4?token=${token}`;
     try {
