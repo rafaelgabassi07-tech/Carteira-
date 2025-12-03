@@ -135,6 +135,7 @@ const DividendsSummaryCard: React.FC = () => {
                     countPayments++;
                     
                     // Monthly Grouping (YYYY-MM)
+                    // Ensure we use the date portion reliably
                     const monthKey = div.paymentDate.substring(0, 7);
                     monthlyAggregation[monthKey] = (monthlyAggregation[monthKey] || 0) + amount;
 
@@ -144,23 +145,34 @@ const DividendsSummaryCard: React.FC = () => {
             });
         });
 
-        // 2. Prepare Monthly Data Array (sorted)
+        // 2. Prepare Monthly Data Array
+        // Safe Date Generation (timezone independent for YYYY-MM keys)
         const now = new Date();
         const filledMonthlyData = [];
+        
         for (let i = 11; i >= 0; i--) {
+            // Calculate target date by subtracting months
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const key = d.toISOString().substring(0, 7);
+            
+            // Generate key manually to avoid ISO conversion shifting timezones
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const key = `${year}-${month}`;
+            
             const value = monthlyAggregation[key] || 0;
+            
             filledMonthlyData.push({
                 month: d.toLocaleDateString('pt-BR', { month: 'short' }),
-                year: d.getFullYear(),
+                year: year,
                 monthIndex: d.getMonth(),
                 value
             });
         }
 
         // 3. Current Month Stats
-        const currentMonthKey = new Date().toISOString().substring(0, 7);
+        const currentYear = now.getFullYear();
+        const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const currentMonthKey = `${currentYear}-${currentMonth}`;
         const currentMonthValue = monthlyAggregation[currentMonthKey] || 0;
 
         // 4. Top Payers

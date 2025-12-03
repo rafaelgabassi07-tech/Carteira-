@@ -57,47 +57,34 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     // Obter ativo do contexto
     const asset = getAssetByTicker(ticker);
 
-    // Lógica de Cache Inteligente
+    // Efeito para buscar dados se estiverem faltando ou desatualizados ao entrar
     useEffect(() => {
         const checkAndLoad = async () => {
-            // Se o ativo não existe no contexto, precisamos buscar.
-            if (!asset) {
+            // Check staleness: If we don't have a timestamp, OR if it's been more than 5 minutes
+            const isStale = !asset?.lastUpdated || (Date.now() - asset.lastUpdated > 5 * 60 * 1000);
+            
+            // Only force refresh if data is missing AND we haven't checked recently
+            // This prevents spamming API for assets that simply don't have dividends (like some stocks or incomplete data)
+            if (isStale && (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0)) {
                 setIsRefreshing(true);
                 try {
-                    await refreshSingleAsset(ticker, true); // Força busca inicial
+                    await refreshSingleAsset(ticker, true);
+                } catch (e) {
+                    console.error("Erro ao atualizar ativo:", e);
                 } finally {
                     setIsRefreshing(false);
                 }
-                return;
-            }
-
-            // Se existe, verifica se está obsoleto (stale)
-            // 5 minutos de cache em memória para a visualização de detalhes
-            const STALE_THRESHOLD = 5 * 60 * 1000; 
-            const lastUpdate = asset.lastUpdated || 0;
-            const isStale = (Date.now() - lastUpdate) > STALE_THRESHOLD;
-
-            if (isStale) {
-                // Atualiza silenciosamente em background se já temos dados para mostrar
-                // Se não temos dados críticos (preço zero), mostra loading
-                const showLoading = asset.currentPrice === 0;
-                if (showLoading) setIsRefreshing(true);
-                
-                refreshSingleAsset(ticker, false) // false = respeita lógica de debounce do contexto se for muito recente
-                    .finally(() => {
-                        if (showLoading) setIsRefreshing(false);
-                    });
             }
         };
         checkAndLoad();
-    }, [ticker, asset?.lastUpdated]); // Removemos dependências instáveis
+    }, [ticker, refreshSingleAsset, asset?.lastUpdated]); 
 
     const handleRefresh = useCallback(async () => {
         if (isRefreshing) return;
         vibrate();
         setIsRefreshing(true);
         try {
-            await refreshSingleAsset(ticker, true); // Força atualização manual
+            await refreshSingleAsset(ticker, true); // Force refresh
         } catch (error) {
             console.error("Failed to refresh asset details:", error);
         } finally {
@@ -114,14 +101,17 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         const history = asset?.dividendsHistory || [];
         if (history.length === 0) return [];
         
-        // Transações ordenadas da mais antiga para a mais recente
-        const txsSorted = transactions
+        // Transações ordenadas da mais antiga para a mais recente para o replay
+        const txs = transactions
             .filter(t => t.ticker === ticker)
             .sort((a,b) => a.date.localeCompare(b.date));
-            
-        // Se não há transações (modo apenas visualização), mostra tudo sem valores recebidos
-        if (txsSorted.length === 0) {
-             return [...history].sort((a,b) => b.paymentDate.localeCompare(a.paymentDate)).map(div => ({
+        
+        // Histórico de dividendos ordenado do mais recente para o mais antigo (para exibição)
+        const historySorted = [...history].sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
+
+        // Se nunca comprou, não mostra nada (ou mostraria histórico geral sem recebimentos)
+        if (txs.length === 0) {
+             return historySorted.map(div => ({
                 ...div,
                 userQuantity: 0,
                 totalReceived: 0,
@@ -129,32 +119,34 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             }));
         }
 
-        const firstPurchaseDate = txsSorted[0].date;
+        const firstPurchaseDate = txs[0].date;
 
-        // Histórico de dividendos ordenado por Pagamento (recente -> antigo)
-        const historySorted = [...history].sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
-
-        const processed = historySorted
-            .filter(div => div.exDate >= firstPurchaseDate) // FILTRO: Apenas após a primeira compra
-            .map(div => {
-                let qty = 0;
-                // Replay de transações até a Data Com
-                for(const tx of txsSorted) {
-                    if (tx.date > div.exDate) break;
-                    if (tx.type === 'Compra') qty += tx.quantity;
-                    else qty -= tx.quantity;
-                }
-                const userQty = Math.max(0, qty);
+        let processedHistory = historySorted.map(div => {
+            let qty = 0;
+            // Replay de transações até a Data Com (dia anterior à Data Ex)
+            // Se eu comprei ANTES da Ex-Date (ou seja, date < exDate), eu tenho direito.
+            for(const tx of txs) {
+                if (tx.date >= div.exDate) break; // Transação ocorreu na ou após Ex-Date, não conta.
                 
-                return {
-                    ...div,
-                    userQuantity: userQty,
-                    totalReceived: userQty * div.value,
-                    isReceived: userQty > 0
-                };
-            });
+                if (tx.type === 'Compra') qty += tx.quantity;
+                else qty -= tx.quantity;
+            }
+            const userQty = Math.max(0, qty);
+            
+            return {
+                ...div,
+                userQuantity: userQty,
+                totalReceived: userQty * div.value,
+                isReceived: userQty > 0
+            };
+        });
 
-        return processed;
+        // FILTRO: Exibir apenas proventos cuja Data Ex seja posterior ou igual à primeira compra.
+        if (firstPurchaseDate) {
+            processedHistory = processedHistory.filter(div => div.exDate >= firstPurchaseDate);
+        }
+
+        return processedHistory;
     }, [asset?.dividendsHistory, transactions, ticker]);
 
     const displayedDividends = useMemo(() => {
@@ -195,6 +187,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         );
     }
     
+    // Dados para o Summary Tab
     const currentValue = asset ? asset.quantity * asset.currentPrice : 0;
     const totalInvested = asset ? asset.quantity * asset.avgPrice : 0;
     const variation = currentValue - totalInvested;
@@ -233,23 +226,24 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                              
                              {!asset ? <IndicatorSkeleton /> : (
                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <MetricItem label={t('quantity')} value={asset.quantity} />
-                                    <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} />
-                                    <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} />
-                                    <MetricItem label="Total Investido" value={formatCurrency(asset.quantity * asset.avgPrice)} className="sm:col-span-1" />
-                                    <MetricItem label="Saldo Atual" value={formatCurrency(asset.quantity * asset.currentPrice)} highlight={variation >= 0 ? 'green' : 'red'} />
-                                    <MetricItem label={t('result')} value={formatCurrency(variation)} subValue={`(${variationPercent.toFixed(2)}%)`} highlight={variation >= 0 ? 'green' : 'red'} />
+                                    <MetricItem label={t('quantity')} value={asset.quantity} className="animate-fade-in-up" style={{animationDelay: '0ms'}}/>
+                                    <MetricItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} className="animate-fade-in-up" style={{animationDelay: '50ms'}}/>
+                                    <MetricItem label={t('current_price')} value={formatCurrency(asset.currentPrice)} className="animate-fade-in-up" style={{animationDelay: '100ms'}}/>
+                                    <MetricItem label="Total Investido" value={formatCurrency(asset.quantity * asset.avgPrice)} className="sm:col-span-1 animate-fade-in-up" style={{animationDelay: '150ms'}} />
+                                    <MetricItem label="Saldo Atual" value={formatCurrency(asset.quantity * asset.currentPrice)} highlight={variation >= 0 ? 'green' : 'red'} className="animate-fade-in-up" style={{animationDelay: '200ms'}} />
+                                    <MetricItem label={t('result')} value={formatCurrency(variation)} subValue={`(${variationPercent.toFixed(2)}%)`} highlight={variation >= 0 ? 'green' : 'red'} className="animate-fade-in-up" style={{animationDelay: '250ms'}} />
+                                    
                                     <div className="col-span-2 sm:col-span-3 mt-4 mb-1 flex items-center gap-2">
                                         <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
                                         <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('nav_analysis')} & {t('data')}</span>
                                         <div className="h-px flex-1 bg-[var(--border-color)] opacity-50"></div>
                                     </div>
-                                    <MetricItem label={t('dy_12m')} value={asset.dy?.toFixed(2) ?? '-'} subValue="%" highlight={asset.dy && asset.dy > 10 ? 'green' : undefined} />
-                                    <MetricItem label={t('yield_on_cost')} value={asset.yieldOnCost?.toFixed(2) ?? '-'} subValue="%" highlight={asset.yieldOnCost && asset.yieldOnCost > 8 ? 'green' : undefined} />
-                                    <MetricItem label={t('pvp')} value={asset.pvp?.toFixed(2) ?? '-'} highlight={asset.pvp && asset.pvp < 1.0 ? 'green' : (asset.pvp && asset.pvp > 1.2 ? 'red' : 'neutral')} />
-                                    <MetricItem label={t('vacancy')} value={asset.vacancyRate?.toFixed(1) ?? '0'} subValue="%" />
-                                    <MetricItem label={t('shareholders')} value={asset.shareholders ? (asset.shareholders/1000).toFixed(1) + 'k' : '-'} />
-                                    <MetricItem label={t('daily_liquidity')} value={asset.liquidity ? (asset.liquidity/1000000).toFixed(1) + 'M' : '-'} />
+                                    <MetricItem label={t('dy_12m')} value={asset.dy?.toFixed(2) ?? '-'} subValue="%" highlight={asset.dy && asset.dy > 10 ? 'green' : undefined} className="animate-fade-in-up" style={{animationDelay: '300ms'}} />
+                                    <MetricItem label={t('yield_on_cost')} value={asset.yieldOnCost?.toFixed(2) ?? '-'} subValue="%" highlight={asset.yieldOnCost && asset.yieldOnCost > 8 ? 'green' : undefined} className="animate-fade-in-up" style={{animationDelay: '350ms'}} />
+                                    <MetricItem label={t('pvp')} value={asset.pvp?.toFixed(2) ?? '-'} highlight={asset.pvp && asset.pvp < 1.0 ? 'green' : (asset.pvp && asset.pvp > 1.2 ? 'red' : 'neutral')} className="animate-fade-in-up" style={{animationDelay: '400ms'}} />
+                                    <MetricItem label={t('vacancy')} value={asset.vacancyRate?.toFixed(1) ?? '0'} subValue="%" className="animate-fade-in-up" style={{animationDelay: '450ms'}} />
+                                    <MetricItem label={t('shareholders')} value={asset.shareholders ? (asset.shareholders/1000).toFixed(1) + 'k' : '-'} className="animate-fade-in-up" style={{animationDelay: '500ms'}} />
+                                    <MetricItem label={t('daily_liquidity')} value={asset.liquidity ? (asset.liquidity/1000000).toFixed(1) + 'M' : '-'} className="animate-fade-in-up" style={{animationDelay: '550ms'}} />
                                 </div>
                              )}
                         </div>
@@ -280,18 +274,21 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             case 'dividends':
                  return (
                     <div className="space-y-4 pb-4 animate-fade-in">
+                        {/* Se estiver atualizando e sem dados, mostra loading. Se tiver dados (mesmo desatualizados), mostra dados. */}
                         {isRefreshing && fullDividendHistory.length === 0 ? (
                             <div className="flex justify-center py-8"><span className="loading loading-spinner text-[var(--accent-color)]"></span></div>
                         ) : fullDividendHistory.length > 0 ? (
                             <>
+                                {/* Gráfico de Barras: Valor Recebido por Cota (Requested Feature) */}
                                 <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm">
                                     <div className="flex justify-between items-center mb-3">
                                         <h3 className="font-bold text-sm text-[var(--text-primary)]">Valor por Cota</h3>
                                         <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Histórico</span>
                                     </div>
-                                    <DividendChart data={fullDividendHistory} />
+                                    <DividendChart data={asset?.dividendsHistory || []} />
                                 </div>
                                 
+                                {/* Cards de Resumo de Recebimento */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="col-span-2 bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] flex justify-between items-center shadow-sm">
                                         <div>
@@ -306,6 +303,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                     <MetricItem label="Média (12m)" value={formatCurrency(averageMonthly)} className="bg-[var(--bg-secondary)]" />
                                 </div>
 
+                                {/* Lista Detalhada do Histórico */}
                                 <h3 className="font-bold text-sm text-[var(--text-secondary)] mt-2 px-1 uppercase tracking-wider">
                                     {showAllHistory ? t('full_history') : t('recent_dividends')}
                                 </h3>
@@ -331,11 +329,11 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                                     
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="text-[10px] text-[var(--text-secondary)]">Data Com:</span>
-                                                        <span className="text-[10px] font-medium text-[var(--text-primary)]">
+                                                        <span className="text-[10px] font-medium text-[var(--text-secondary)]">
                                                             {new Date(div.exDate).toLocaleDateString(locale, { day:'2-digit', month:'2-digit', year:'numeric', timeZone: 'UTC' })}
                                                         </span>
                                                         <span className="text-[10px] text-[var(--text-secondary)] mx-1">•</span>
-                                                        <span className="text-[10px] text-[var(--text-secondary)]">Base: <b>{formatCurrency(div.value)}</b></span>
+                                                        <span className="text-[10px] text-[var(--text-secondary)]">Valor Base: <b>{formatCurrency(div.value)}</b></span>
                                                     </div>
                                                 </div>
 

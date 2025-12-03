@@ -80,8 +80,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
   const initialLoadDone = useRef(false);
-  
-  // Use a ref to access latest market data in callbacks without adding it to dependencies
   const marketDataRef = useRef(marketData);
   useEffect(() => { marketDataRef.current = marketData; }, [marketData]);
 
@@ -130,10 +128,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const currentData = marketDataRef.current[ticker.toUpperCase()];
       
       // Use STALE_TIME instead of CACHE_TTL for smarter refreshing
-      // Check lastUpdated field explicitly
-      if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) {
-          return;
-      }
+      if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
           const { quotes } = await fetchBrapiQuotes(preferences, [ticker], false);
@@ -145,7 +140,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   ...(prev[ticker.toUpperCase()] || {}),
                   ...(quotes[ticker.toUpperCase()] || {}),
                   ...(data[ticker.toUpperCase()] || {}),
-                  lastUpdated: now // Ensure this is set
+                  lastUpdated: now
               }
           }));
       } catch (e) { console.error(e); }
@@ -211,8 +206,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const refreshMarketData = useCallback(async (force = false, silent = false, lite = false) => {
       if(isRefreshing) return;
       
-      // FIX: Use STALE_TIME (5-10min) instead of CACHE_TTL (Infinite) for checks
-      // This ensures we actually refresh data periodically instead of never refreshing
+      // Smart Check: Don't refresh if data is fresh, unless forced
       if(!force && lastSync && Date.now() - lastSync < STALE_TIME.MARKET_DATA) return; 
 
       const tickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
@@ -234,6 +228,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
           setMarketData(prev => {
               const next = { ...prev };
+              let hasChanges = false;
               
               if(brapiRes.status === 'fulfilled') {
                   const res = brapiRes.value;
@@ -242,6 +237,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       const prevData = next[tkr] || {};
                       const newData = data as any;
                       
+                      // Merge data efficiently
                       next[tkr] = { 
                           ...prevData, 
                           ...newData,
@@ -249,6 +245,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                           dividendsHistory: newData.dividendsHistory?.length > 0 ? newData.dividendsHistory : prevData.dividendsHistory || [],
                           lastUpdated: Date.now() 
                       };
+                      hasChanges = true;
                   });
               }
 
@@ -257,9 +254,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   logApiUsage('gemini', { requests: 1, ...res.stats as any });
                   Object.entries(res.data).forEach(([tkr, data]) => {
                       next[tkr] = { ...(next[tkr] || {}), ...(data as object), lastUpdated: Date.now() };
+                      hasChanges = true;
                   });
               }
-              return next;
+              
+              return hasChanges ? next : prev;
           });
           setLastSync(Date.now());
       } catch(e: any) {
@@ -269,9 +268,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
   }, [isRefreshing, lastSync, sourceTransactions, preferences, setMarketData, setLastSync, logApiUsage]);
 
+  // --- Optimized Background Polling ---
   useEffect(() => {
       const checkAndRefresh = () => {
+          // Battery Saver: Don't poll if tab is hidden
           if (document.hidden) return;
+          
           const now = new Date();
           const day = now.getDay();
           const hour = now.getHours();
@@ -283,7 +285,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               refreshMarketData(true, true, true);
           }
       };
-      const intervalId = setInterval(checkAndRefresh, 10 * 60 * 1000);
+      const intervalId = setInterval(checkAndRefresh, 10 * 60 * 1000); // 10 minutes
       return () => clearInterval(intervalId);
   }, [refreshMarketData]);
 
@@ -331,7 +333,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const incompleteAssets = assets.filter(a => a.segment === 'Outros' || !a.priceHistory || a.priceHistory.length === 0);
 
       if (incompleteAssets.length > 0 && navigator.onLine) {
-          console.log(`CONTEXT: Auto-repair triggered for ${incompleteAssets.length} assets.`);
           const timer = setTimeout(() => {
               refreshMarketData(true, true, false);
           }, 5000);

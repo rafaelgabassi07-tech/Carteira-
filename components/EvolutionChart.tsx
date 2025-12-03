@@ -14,6 +14,9 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 300, height: 288 });
+    
+    // Stable ID for gradient to prevent re-rendering flicker
+    const gradientId = useMemo(() => `marketValueGradient-${Math.random().toString(36).substr(2, 9)}`, []);
 
     useLayoutEffect(() => {
         const container = containerRef.current;
@@ -54,7 +57,6 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
         }
 
         // Add 10% padding top/bottom for "breathing room"
-        // We want to zoom in on the variation, so we don't force start at 0 for line charts
         let effectiveMin = minVal - (range * 0.1);
         let effectiveMax = maxVal + (range * 0.1);
         
@@ -81,8 +83,6 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
     };
     
     const getY = (value: number) => {
-        // Standard linear interpolation mapping value to pixel height
-        // y = height - padding.bottom - ((value - min) / (max - min)) * chartHeight
         const percent = (value - min) / (max - min);
         return (height - padding.bottom) - (percent * chartHeight);
     };
@@ -114,18 +114,15 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
         }
     };
     
-    // --- Dynamic Tooltip Positioning Logic ---
     let tooltipTransform = 'translate(-50%, -100%)';
     let arrowLeft = '50%';
     
     if (tooltip) {
-        const threshold = width * 0.25; // 25% boundary
+        const threshold = width * 0.25;
         if (tooltip.x < threshold) {
-            // Close to left edge: Shift box right, keep arrow left
             tooltipTransform = 'translate(-15%, -100%)';
             arrowLeft = '15%';
         } else if (tooltip.x > width - threshold) {
-            // Close to right edge: Shift box left, keep arrow right
             tooltipTransform = 'translate(-85%, -100%)';
             arrowLeft = '85%';
         }
@@ -139,14 +136,14 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
         );
     }
 
-    // Line Chart Path Generation
+    // Line Chart Path Generation with precision optimization
     const createPath = (key: 'marketValue' | 'invested') => {
-        return data.map((d, i) => `${getX(i)},${getY(d[key])}`).join(' ');
+        return data.map((d, i) => `${getX(i).toFixed(1)},${getY(d[key]).toFixed(1)}`).join(' ');
     };
 
     const createAreaPath = (key: 'marketValue' | 'invested') => {
         const line = createPath(key);
-        return `${getX(0)},${height - padding.bottom} ${line} ${getX(data.length - 1)},${height - padding.bottom}`;
+        return `${getX(0).toFixed(1)},${height - padding.bottom} ${line} ${getX(data.length - 1).toFixed(1)},${height - padding.bottom}`;
     };
 
     const variation = tooltip ? (tooltip.point.marketValue - tooltip.point.invested) : 0;
@@ -170,7 +167,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                 shapeRendering="geometricPrecision"
             >
                 <defs>
-                    <linearGradient id="marketValueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="var(--accent-color)" stopOpacity={0.4} />
                         <stop offset="100%" stopColor="var(--accent-color)" stopOpacity={0} />
                     </linearGradient>
@@ -205,10 +202,8 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                 {/* Chart Visualization */}
                 {chartType === 'line' ? (
                     <>
-                        {/* Market Value Area */}
-                        <polygon points={createAreaPath('marketValue')} fill="url(#marketValueGradient)" />
+                        <polygon points={createAreaPath('marketValue')} fill={`url(#${gradientId})`} />
                         
-                        {/* Invested Line (Dashed) */}
                         <polyline 
                             points={createPath('invested')} 
                             fill="none" 
@@ -218,7 +213,6 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                             opacity="0.7"
                         />
 
-                        {/* Market Value Line */}
                         <polyline 
                             points={createPath('marketValue')} 
                             fill="none" 
@@ -226,7 +220,6 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                             strokeWidth="2" 
                         />
                         
-                        {/* Active Point Dot */}
                         {tooltip && (
                             <g>
                                 <circle cx={tooltip.x} cy={getY(tooltip.point.invested)} r="3" fill="var(--bg-secondary)" stroke="var(--text-secondary)" strokeWidth="1.5" />
@@ -236,26 +229,21 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                         )}
                     </>
                 ) : (
-                    // Bar Chart Implementation
                     data.map((d, i) => {
                         const x = getX(i);
                         const investedY = getY(d.invested);
                         const marketY = getY(d.marketValue);
                         
-                        const investedH = (height - padding.bottom) - investedY;
-                        const marketH = (height - padding.bottom) - marketY;
+                        const investedH = Math.max(0, (height - padding.bottom) - investedY);
+                        const marketH = Math.max(0, (height - padding.bottom) - marketY);
                         const gain = d.marketValue - d.invested;
                         
                         return (
                             <g key={i} opacity={tooltip && tooltip.index !== i ? 0.4 : 1} className="transition-opacity duration-200">
-                                {/* Invested Bar (Background/Base) */}
                                 <rect x={x} y={investedY} width={barWidth} height={investedH} fill="var(--text-secondary)" fillOpacity="0.2" rx={2} />
-                                
-                                {/* Value Bar (Overlay) */}
                                 {gain >= 0 ? (
                                     <rect x={x} y={marketY} width={barWidth} height={marketH} fill="var(--accent-color)" rx={2} />
                                 ) : (
-                                    // Loss: Draw market value in red/warning color
                                     <rect x={x} y={marketY} width={barWidth} height={marketH} fill="var(--red-text)" opacity="0.8" rx={2} />
                                 )}
                             </g>
@@ -295,7 +283,6 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
                             {formatCurrency(variation)}
                         </span>
                     </div>
-                    {/* Dynamic Arrow */}
                     <div 
                         className="absolute top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)] transition-all duration-100"
                         style={{ left: arrowLeft, transform: 'translateX(-50%)' }}
