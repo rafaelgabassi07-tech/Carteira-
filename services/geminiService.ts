@@ -111,6 +111,40 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 }
 
+export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string): Promise<{ price: number, change: number } | null> {
+    let apiKey: string;
+    try {
+        apiKey = getGeminiApiKey(prefs);
+    } catch { return null; }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `
+        TASK: Find the CURRENT real-time price and today's percentage change for the asset "${ticker}" (B3/Brazil).
+        USE TOOL: googleSearch.
+        OUTPUT: JSON only: { "price": number, "changePercent": number }.
+        Example: { "price": 10.50, "changePercent": 0.45 }
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: { tools: [{ googleSearch: {} }], temperature: 0 }
+        });
+        
+        const cleanJson = response.text?.replace(/^```json\s*/, '').replace(/```$/, '').trim() || "{}";
+        const data = JSON.parse(cleanJson);
+        
+        if (typeof data.price === 'number') {
+            return { price: data.price, change: data.changePercent || 0 };
+        }
+        return null;
+    } catch (e) {
+        console.error("Gemini Quote Fallback Failed:", e);
+        return null;
+    }
+}
+
 export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ 
     data: Record<string, { 
         dy?: number; 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
-import { fetchAdvancedAssetData } from '../services/geminiService';
+import { fetchAdvancedAssetData, fetchLiveAssetQuote } from '../services/geminiService';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate, usePersistentState } from '../utils';
 import RefreshIcon from '../components/icons/RefreshIcon';
@@ -109,41 +109,65 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         setExpandedDetails(false);
 
         try {
-            const { quotes } = await fetchBrapiQuotes(preferences, [cleanTerm], false);
-            const data = quotes[cleanTerm];
+            // 1. Tentar API Principal (Brapi)
+            let marketData: MarketResult | null = null;
             
-            if (data && data.currentPrice > 0) {
-                const historyPrices = data.priceHistory?.map(p => p.price) || [];
+            try {
+                const { quotes } = await fetchBrapiQuotes(preferences, [cleanTerm], false);
+                const data = quotes[cleanTerm];
                 
-                // Use API provided change percent if available, otherwise calculate from history
-                let change = data.changePercent !== undefined ? data.changePercent : 0;
-                
-                if (change === 0 && historyPrices.length >= 2) {
-                    const lastClose = historyPrices[historyPrices.length - 2];
-                    change = ((data.currentPrice - lastClose) / lastClose) * 100;
+                if (data && data.currentPrice > 0) {
+                    const historyPrices = data.priceHistory?.map(p => p.price) || [];
+                    let change = data.changePercent !== undefined ? data.changePercent : 0;
+                    
+                    if (change === 0 && historyPrices.length >= 2) {
+                        const lastClose = historyPrices[historyPrices.length - 2];
+                        change = ((data.currentPrice - lastClose) / lastClose) * 100;
+                    }
+
+                    const min = historyPrices.length > 0 ? Math.min(...historyPrices) : data.currentPrice;
+                    const max = historyPrices.length > 0 ? Math.max(...historyPrices) : data.currentPrice;
+
+                    marketData = {
+                        ticker: cleanTerm,
+                        price: data.currentPrice,
+                        change: change,
+                        history: historyPrices,
+                        min,
+                        max,
+                        fundamentals: undefined
+                    };
                 }
+            } catch (brapiError) {
+                console.warn("Brapi failed, trying Gemini fallback...", brapiError);
+            }
 
-                const min = historyPrices.length > 0 ? Math.min(...historyPrices) : data.currentPrice;
-                const max = historyPrices.length > 0 ? Math.max(...historyPrices) : data.currentPrice;
+            // 2. Fallback para Gemini se Brapi falhar
+            if (!marketData) {
+                const geminiQuote = await fetchLiveAssetQuote(preferences, cleanTerm);
+                if (geminiQuote && geminiQuote.price > 0) {
+                    marketData = {
+                        ticker: cleanTerm,
+                        price: geminiQuote.price,
+                        change: geminiQuote.change,
+                        history: [], // Sem histórico no fallback
+                        min: geminiQuote.price,
+                        max: geminiQuote.price,
+                        fundamentals: undefined
+                    };
+                }
+            }
 
-                const baseResult: MarketResult = {
-                    ticker: cleanTerm,
-                    price: data.currentPrice,
-                    change: change,
-                    history: historyPrices,
-                    min,
-                    max,
-                    fundamentals: undefined
-                };
-                
-                setResult(baseResult);
-                setLoading(false);
+            if (marketData) {
+                setResult(marketData);
+                setLoading(false); // Preço carregado
 
                 setRecentSearches(prev => {
                     const filtered = prev.filter(item => item !== cleanTerm);
                     return [cleanTerm, ...filtered].slice(0, 5);
                 });
 
+                // 3. Buscar Fundamentos (Sempre via Gemini)
                 try {
                     const advData = await fetchAdvancedAssetData(preferences, [cleanTerm]);
                     const fund = advData.data[cleanTerm];
@@ -178,12 +202,12 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                 }
 
             } else {
-                setError('Ativo não encontrado ou sem liquidez.');
+                setError('Ativo não encontrado ou serviço indisponível.');
                 setLoading(false);
                 setLoadingFundamentals(false);
             }
         } catch (e) {
-            setError('Erro de conexão. Tente novamente.');
+            setError('Erro inesperado. Tente novamente.');
             setLoading(false);
             setLoadingFundamentals(false);
         }
@@ -260,7 +284,9 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-[var(--text-secondary)] font-medium">Cotação em tempo real</p>
+                                            <p className="text-xs text-[var(--text-secondary)] font-medium">
+                                                {result.history.length > 0 ? "Cotação em tempo real" : "Cotação via IA (Estimada)"}
+                                            </p>
                                         </div>
                                         <div className="flex flex-col items-end text-right">
                                             <span className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">{formatCurrency(result.price)}</span>
@@ -272,14 +298,14 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                         </div>
                                     </div>
                                     
-                                    {/* Small Sparkline */}
-                                    <div className="h-20 w-full mt-6 -mb-2 relative opacity-80">
-                                        {result.history.length >= 2 ? (
+                                    {/* Small Sparkline - Only show if we have history (Brapi success) */}
+                                    {result.history.length >= 2 ? (
+                                        <div className="h-20 w-full mt-6 -mb-2 relative opacity-80">
                                             <PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-xs">Gráfico indisponível</div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    ) : (
+                                        <div className="h-4 w-full mt-2"></div> 
+                                    )}
                                 </div>
 
                                 {/* MAIN CONTENT AREA */}
