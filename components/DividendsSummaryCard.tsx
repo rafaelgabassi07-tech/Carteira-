@@ -256,53 +256,85 @@ const MonthlyBarChart: React.FC<{ data: MonthlyData[]; avg: number }> = ({ data,
 const DetailedPayerRow: React.FC<{ payer: PayerData; rank: number }> = ({ payer, rank }) => {
     const { formatCurrency, locale } = useI18n();
     
-    // Safety check for dates
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString(locale, { day: '2-digit', month: 'short' });
+        const date = new Date(dateStr);
+        return date.toLocaleDateString(locale, { day: '2-digit', month: 'short' }).replace('.', '');
     };
 
-    const isFuture = payer.isProvisioned || (payer.nextPaymentDate && new Date(payer.nextPaymentDate) >= new Date());
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    
+    const payDateObj = payer.nextPaymentDate ? new Date(payer.nextPaymentDate) : null;
+    if(payDateObj) payDateObj.setHours(0,0,0,0);
+
+    const isFuture = payer.isProvisioned || (payDateObj && payDateObj >= today);
+    const isToday = payDateObj && payDateObj.getTime() === today.getTime();
+
+    // Calculate days remaining if future
+    let daysRemaining = null;
+    if (isFuture && payDateObj) {
+        const diffTime = Math.abs(payDateObj.getTime() - today.getTime());
+        daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    }
 
     return (
-        <div className="bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)] mb-2 flex items-center justify-between transition-all hover:border-[var(--accent-color)]/30 group active:scale-[0.99]">
+        <div className="bg-[var(--bg-primary)] p-3.5 rounded-2xl border border-[var(--border-color)] mb-2.5 flex items-center justify-between transition-all hover:border-[var(--accent-color)]/30 group relative overflow-hidden active:scale-[0.99]">
             
-            {/* Col 1: Asset Info */}
-            <div className="flex items-center gap-3 min-w-[30%]">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold shadow-sm ${rank <= 3 ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)]'}`}>
+            {/* Rank & Ticker */}
+            <div className="flex items-center gap-3 w-[28%]">
+                <div className={`w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-[9px] font-bold ${rank <= 3 ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)]'}`}>
                     {rank}
                 </div>
-                <div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm text-[var(--text-primary)]">{payer.ticker}</span>
-                        {payer.isProvisioned && (
-                            <span className="text-[7px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-full uppercase tracking-wide border border-amber-500/20">Prev.</span>
-                        )}
-                    </div>
-                    <span className="text-[10px] text-[var(--text-secondary)] font-medium">
-                        Retorno: {payer.yieldOnCost.toFixed(1)}%
+                <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-sm text-[var(--text-primary)] truncate leading-tight">{payer.ticker}</span>
+                    <span className="text-[9px] text-[var(--text-secondary)] font-medium truncate">
+                        Retorno: <span className={payer.yieldOnCost > 10 ? "text-[var(--green-text)] font-bold" : ""}>{payer.yieldOnCost.toFixed(1)}%</span>
                     </span>
                 </div>
             </div>
 
-            {/* Col 2: Calendar (Timeline style) */}
-            <div className="flex items-center gap-2 flex-1 justify-center px-2">
-                <div className="flex flex-col items-center">
-                    <span className="text-[8px] text-[var(--text-secondary)] uppercase font-bold mb-0.5">Com</span>
-                    <span className="text-[10px] font-bold text-[var(--text-primary)] bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-color)]">{formatDate(payer.lastExDate)}</span>
+            {/* Calendar Timeline */}
+            <div className="flex-1 flex flex-col items-center justify-center px-2">
+                {/* Visual Timeline */}
+                <div className="flex items-center w-full max-w-[140px] justify-between relative mb-1.5">
+                    {/* Line */}
+                    <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-[1.5px] bg-[var(--border-color)] -z-10"></div>
+                    
+                    {/* Ex Date Dot */}
+                    <div className="flex flex-col items-center bg-[var(--bg-primary)] px-1 z-10">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-secondary)] mb-1 opacity-50 ring-2 ring-[var(--bg-primary)]"></span>
+                        <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{formatDate(payer.lastExDate)}</span>
+                    </div>
+
+                    {/* Pay Date Dot (Highlighted if future) */}
+                    <div className="flex flex-col items-center bg-[var(--bg-primary)] px-1 z-10">
+                        <span className={`w-2 h-2 rounded-full mb-1 ring-2 ring-[var(--bg-primary)] ${isFuture ? 'bg-[var(--accent-color)] shadow-[0_0_6px_var(--accent-color)]' : 'bg-[var(--green-text)]'}`}></span>
+                        <span className={`text-[8px] font-bold uppercase tracking-wider ${isFuture ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>
+                            {formatDate(payer.nextPaymentDate)}
+                        </span>
+                    </div>
                 </div>
-                <div className="h-px w-4 bg-[var(--border-color)]"></div>
-                <div className="flex flex-col items-center">
-                    <span className="text-[8px] text-[var(--text-secondary)] uppercase font-bold mb-0.5">Pgto</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${isFuture ? 'text-[var(--accent-color)] bg-[var(--accent-color)]/10 border-[var(--accent-color)]/20' : 'text-[var(--text-primary)] bg-[var(--bg-secondary)] border-[var(--border-color)]'}`}>
-                        {formatDate(payer.nextPaymentDate)}
+                
+                {/* Status Text */}
+                {isFuture && (
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md leading-none ${isToday ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] animate-pulse' : 'bg-[var(--bg-secondary)] text-[var(--accent-color)] border border-[var(--border-color)]'}`}>
+                        {isToday ? 'HOJE!' : `${daysRemaining} dias`}
                     </span>
-                </div>
+                )}
+                {!isFuture && payer.count > 0 && (
+                    <span className="text-[8px] font-medium text-[var(--text-secondary)] opacity-50 leading-none">
+                        Pago
+                    </span>
+                )}
             </div>
             
-            {/* Col 3: Returns */}
-            <div className="text-right min-w-[25%]">
-                <span className="block font-black text-sm text-[var(--text-primary)]">{formatCurrency(payer.totalPaid)}</span>
+            {/* Values */}
+            <div className="text-right w-[28%] flex flex-col justify-center">
+                <span className="font-black text-sm text-[var(--text-primary)]">{formatCurrency(payer.totalPaid)}</span>
+                <span className="text-[9px] text-[var(--text-secondary)] font-medium mt-0.5 opacity-80">
+                    Méd: {formatCurrency(payer.averageMonthly)}
+                </span>
             </div>
         </div>
     );
