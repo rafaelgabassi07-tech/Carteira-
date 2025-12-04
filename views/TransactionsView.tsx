@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Transaction, ToastMessage } from '../types';
-import FloatingActionButton from '../components/FloatingActionButton';
 import TransactionModal from '../components/modals/TransactionModal';
 import EditIcon from '../components/icons/EditIcon';
 import TrashIcon from '../components/icons/TrashIcon';
@@ -184,7 +183,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
     };
     
     return (
-        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6" id="transactions-view">
+        <div className="p-4 pt-safe pb-32 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6" id="transactions-view">
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_transactions')}</h1>
                 
@@ -270,8 +269,6 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                     </div>
                 )}
             </div>
-            
-            <FloatingActionButton id="fab-add-transaction" onClick={() => { setShowAddModal(true); vibrate(); }} />
             
             {showAddModal && (
                 <TransactionModal 

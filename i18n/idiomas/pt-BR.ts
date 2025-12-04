@@ -1,10 +1,11 @@
 
+
 export const ptBR = {
     // App / Navigation
     main_portfolio: 'Dashboard',
     nav_portfolio: 'Dashboard',
     nav_transactions: 'Transações',
-    nav_analysis: 'Carteira',
+    // nav_analysis: 'Carteira', // Removido por redundância
     nav_news: 'Notícias',
     nav_settings: 'Configurações',
     nav_market: 'Mercado',
@@ -145,7 +146,8 @@ export const ptBR = {
     no_notifications_subtitle: 'Você não tem novas notificações no momento.',
     mark_all_as_read: 'Marcar todas como lidas',
 
-    // Analysis View
+    // Analysis View / Dashboard
+    analysis: 'Análise',
     diversification: 'Alocação por Setor',
     evolution_of_patrimony: 'Evolução Patrimonial',
     net_worth: 'Patrimônio Líquido',
@@ -159,6 +161,8 @@ export const ptBR = {
     invested_amount: 'Valor Investido',
     patrimony: 'Patrimônio',
     segments: 'Segmentos',
+    monthly_income: 'Renda Mensal',
+    avg_monthly_income_12m: 'Média Mensal (12m)',
     
     // Settings
     my_profile: 'Meu Perfil',

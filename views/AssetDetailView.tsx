@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -307,11 +308,11 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     );
 
     return (
-        <div className="p-4 pb-20 landscape-pb-6">
+        <div className="p-4 pt-safe pb-32 landscape-pb-6">
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center">
-                        <button onClick={onBack} className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] transition-all active:scale-95"><ChevronLeftIcon className="w-6 h-6" /></button>
+                        <button onClick={onBack} className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:bg-[var(--text-tertiary-hover)] transition-all active:scale-95"><ChevronLeftIcon className="w-6 h-6" /></button>
                         <h2 className="text-2xl font-bold tracking-tight">{ticker}</h2>
                     </div>
                     <button onClick={handleRefresh} disabled={isRefreshing} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] transition-all active:scale-95">

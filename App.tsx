@@ -17,20 +17,14 @@ const NewsView = React.lazy(() => import('./views/NewsView'));
 const SettingsView = React.lazy(() => import('./views/SettingsView'));
 const TransactionsView = React.lazy(() => import('./views/TransactionsView'));
 const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
-const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
 const MarketView = React.lazy(() => import('./views/MarketView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
 
+export type View = 'dashboard' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail' | 'mercado';
 
-export type View = 'dashboard' | 'carteira' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail' | 'mercado';
-
-interface AppProps {
-  swUrl: string;
-}
-
-const App: React.FC<AppProps> = ({ swUrl }) => {
-  const { assets, preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
+const App: React.FC = () => {
+  const { preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
   const { t } = useI18n();
   const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
@@ -53,9 +47,11 @@ const App: React.FC<AppProps> = ({ swUrl }) => {
   }, []);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator && swUrl) {
-        navigator.serviceWorker.register(swUrl)
+    if ('serviceWorker' in navigator) {
+        // Use explicit relative path for maximum compatibility.
+        navigator.serviceWorker.register('./sw.js')
             .then(registration => {
+                console.log('Service Worker registered successfully.');
                 registration.onupdatefound = () => {
                     const installingWorker = registration.installing;
                     if (installingWorker) {
@@ -82,7 +78,7 @@ const App: React.FC<AppProps> = ({ swUrl }) => {
             }
         });
     }
-  }, [swUrl]);
+  }, []);
 
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
     const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
@@ -118,7 +114,7 @@ const App: React.FC<AppProps> = ({ swUrl }) => {
       if (shareParam) {
           // If receiving shared text, go to Market
           setActiveView('mercado');
-      } else if (viewParam && ['dashboard', 'carteira', 'transacoes', 'noticias', 'settings', 'mercado'].includes(viewParam)) {
+      } else if (viewParam && ['dashboard', 'transacoes', 'noticias', 'settings', 'mercado'].includes(viewParam)) {
           // If coming from Shortcut
           setActiveView(viewParam as View);
       }
@@ -192,12 +188,11 @@ const App: React.FC<AppProps> = ({ swUrl }) => {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
+      case 'mercado': return <MarketView addToast={addToast} />;
       case 'noticias': return <NewsView addToast={addToast} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} updateAvailable={updateAvailable} onUpdateApp={handleUpdateApp} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
-      case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
-      case 'mercado': return <MarketView addToast={addToast} />;
       case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
       default: return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
     }
@@ -221,12 +216,13 @@ const App: React.FC<AppProps> = ({ swUrl }) => {
                         </div>
                     </Suspense>
                 </div>
-                
-                {/* Floating Bottom Nav - Visible on all screens */}
-                <div>
-                    <BottomNav activeView={activeView} setActiveView={handleSetView} />
-                </div>
             </main>
+
+            {/* Floating Bottom Nav - Visible on all screens */}
+            <BottomNav 
+                activeView={activeView} 
+                setActiveView={handleSetView}
+            />
 
             {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
         </div>

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import type { ToastMessage } from '../types';
 import { useI18n } from '../contexts/I18nContext';
@@ -58,7 +59,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
     const animationClass = screen === 'main' ? 'animate-fade-in' : 'animate-slide-in-right';
 
     return (
-        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto overflow-x-hidden custom-scrollbar landscape-pb-6">
+        <div className="p-4 pt-safe pb-32 md:pb-6 h-full overflow-y-auto overflow-x-hidden custom-scrollbar landscape-pb-6">
              <div className="max-w-2xl mx-auto">
                 {screen === 'main' && (
                     <h1 className="text-2xl font-bold mb-4 px-1 animate-fade-in">{t('nav_settings')}</h1>

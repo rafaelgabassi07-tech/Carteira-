@@ -1,20 +1,26 @@
 
+
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
-function getGeminiApiKey(): string {
-    // Strictly follow guidelines: Use process.env.API_KEY exclusively.
-    const key = process.env.API_KEY;
-    if (key && key.trim() !== '') {
-        return key;
+function getGeminiApiKey(prefs: AppPreferences): string {
+    // 1. Prioritize user-set key from preferences
+    if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
+        return prefs.geminiApiKey;
     }
-    // Fallback to import.meta.env for Vite environments if process.env isn't populated
+    // 2. Fallback to Vite environment variable
     const viteKey = (import.meta as any).env?.VITE_API_KEY;
     if (viteKey && viteKey.trim() !== '') {
         return viteKey;
     }
-    throw new Error("Chave de API do Gemini (process.env.API_KEY) não configurada.");
+    // 3. Fallback to standard process.env (for other environments)
+    const key = process.env.API_KEY;
+    if (key && key.trim() !== '') {
+        return key;
+    }
+    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada.");
 }
+
 
 // Helper robusto para limpar JSON vindo de LLMs
 function cleanAndParseJSON(text: string): any {
@@ -70,7 +76,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     
     let apiKey: string;
     try {
-        apiKey = getGeminiApiKey();
+        apiKey = getGeminiApiKey(prefs);
     } catch (error) {
         console.warn("News fetch skipped (No Key):", error);
         return emptyReturn;
@@ -155,7 +161,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string): Promise<{ price: number, change: number, sources: string[] } | null> {
     let apiKey: string;
     try {
-        apiKey = getGeminiApiKey();
+        apiKey = getGeminiApiKey(prefs);
     } catch { return null; }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -223,7 +229,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     let apiKey: string;
     try {
-        apiKey = getGeminiApiKey();
+        apiKey = getGeminiApiKey(prefs);
     } catch (error: any) {
         console.warn("Advanced data fetch skipped:", error.message);
         return emptyReturn;

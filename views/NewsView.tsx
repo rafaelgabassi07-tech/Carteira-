@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -331,7 +332,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   return (
     <div 
-        className={isEmbedded ? 'space-y-4' : `p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6 pt-2`}
+        className={isEmbedded ? 'space-y-4' : `p-4 h-full pb-32 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6 pt-2`}
         ref={containerRef}
         onTouchStart={!isEmbedded ? handleTouchStart : undefined}
         onTouchMove={!isEmbedded ? handleTouchMove : undefined}
@@ -348,7 +349,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       
       <div className={`w-full mx-auto ${isEmbedded ? '' : 'max-w-2xl'}`}>
         {!isEmbedded && (
-            <div className="mb-4">
+            <div className="mb-4 pt-safe">
                 <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{t('market_news')}</h1>
                 <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mt-0.5">Últimas Atualizações</p>
             </div>

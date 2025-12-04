@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -268,7 +269,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     return (
         <div className="h-full flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
             {/* Sticky Header with Search */}
-            <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-color)]/50 px-4 pt-4 pb-2 transition-all">
+            <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-color)]/50 px-4 pt-safe pb-2 transition-all">
                 <div className="max-w-2xl mx-auto w-full">
                     <h1 className="text-xl font-bold mb-4 px-1 flex items-center gap-2">
                         <GlobeIcon className="w-5 h-5 text-[var(--accent-color)]"/> {t('nav_market')}
@@ -315,7 +316,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-24 md:pb-6 landscape-pb-6 scroll-smooth">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-32 md:pb-6 landscape-pb-6 scroll-smooth">
                 <div className="max-w-2xl mx-auto h-full">
                     {viewMode === 'quotes' ? (
                         <div className="animate-fade-in space-y-6">

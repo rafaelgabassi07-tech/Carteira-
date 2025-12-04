@@ -2,9 +2,9 @@
 import React from 'react';
 import type { View } from '../App';
 import LayoutGridIcon from './icons/LayoutGridIcon';
-import WalletIcon from './icons/WalletIcon';
-import TransactionIcon from './icons/TransactionIcon';
 import GlobeIcon from './icons/GlobeIcon';
+import NewsIcon from './icons/NewsIcon';
+import TransactionIcon from './icons/TransactionIcon';
 import { vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -16,32 +16,29 @@ interface BottomNavProps {
 const NavItem: React.FC<{
   label: string;
   view: View;
-  icon: React.ReactElement<{ className?: string }>;
+  icon: React.ReactElement;
   isActive: boolean;
   onClick: () => void;
 }> = ({ label, icon, isActive, onClick }) => {
-  const activeClass = isActive ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100';
+  const activeClass = isActive ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)] opacity-70 group-hover:opacity-100';
   
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col items-center justify-center w-full h-full transition-colors duration-200 group active:scale-90 focus:outline-none ${activeClass}`}
+      className={`relative flex flex-col items-center justify-center w-full h-full transition-all duration-300 ease-spring group focus:outline-none focus-visible:ring-2 ring-[var(--accent-color)] rounded-lg ${activeClass}`}
+      style={{ transform: isActive ? 'scale(1.1)' : 'scale(1)' }}
     >
-      {/* Active Glow Effect */}
-      <div className={`absolute w-12 h-12 bg-[var(--accent-color)] rounded-full blur-xl opacity-20 transition-all duration-500 pointer-events-none ${isActive ? 'scale-100' : 'scale-0'}`}></div>
-
-      <div className={`transition-all duration-300 ease-spring relative z-10 ${isActive ? '-translate-y-2.5 scale-110' : 'translate-y-0'}`}>
+      <div className="transition-transform duration-300 ease-spring group-active:scale-90">
         {React.cloneElement(icon, { className: 'w-6 h-6' })}
       </div>
       <span 
-        className={`text-[9px] font-bold tracking-wide leading-none transition-all duration-300 absolute bottom-3 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+        className={`text-[10px] font-bold tracking-wide mt-1 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
       >
-          {label}
+        {label}
       </span>
     </button>
   );
 };
-
 
 const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
   const { t } = useI18n();
@@ -51,16 +48,28 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
     setActiveView(view);
   };
 
+  const navItems: { view: View; label: string; icon: React.ReactElement }[] = [
+    { view: 'dashboard', label: t('nav_portfolio'), icon: <LayoutGridIcon /> },
+    { view: 'transacoes', label: t('nav_transactions'), icon: <TransactionIcon /> },
+    { view: 'mercado', label: t('nav_market'), icon: <GlobeIcon /> },
+    { view: 'noticias', label: t('nav_news'), icon: <NewsIcon /> },
+  ];
+
   return (
     <div 
-      className="fixed bottom-5 left-5 right-5 h-[64px] bg-[var(--bg-secondary)]/90 backdrop-blur-xl border border-[var(--border-color)] z-[100] max-w-[400px] mx-auto shadow-[0_8px_32px_rgba(0,0,0,0.25)] rounded-2xl transition-all duration-300"
-      style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      className="fixed bottom-0 left-0 right-0 z-[100] transition-all duration-300 pb-safe"
     >
-      <div className="grid grid-cols-4 h-full px-1">
-        <NavItem label={t('nav_portfolio')} view="dashboard" icon={<LayoutGridIcon />} isActive={activeView === 'dashboard'} onClick={() => handleNavClick('dashboard')} />
-        <NavItem label={t('nav_analysis')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
-        <NavItem label={t('nav_market')} view="mercado" icon={<GlobeIcon />} isActive={activeView === 'mercado'} onClick={() => handleNavClick('mercado')} />
-        <NavItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
+      <div className="relative max-w-lg mx-auto h-[72px] glass rounded-2xl m-4">
+        <div className="grid grid-cols-4 h-full items-center justify-items-center">
+            {navItems.map(item => (
+                <NavItem 
+                    key={item.view} 
+                    {...item} 
+                    isActive={activeView === item.view} 
+                    onClick={() => handleNavClick(item.view)} 
+                />
+            ))}
+        </div>
       </div>
     </div>
   );
