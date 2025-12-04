@@ -354,7 +354,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                         <SectionHeader title="Histórico de Proventos" icon={<ClockIcon className="w-4 h-4"/>}/>
                                                         {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 ? (
                                                             <div className="bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]">
-                                                                <div className="h-40"><DividendChart data={result.fundamentals.dividendsHistory} /></div>
+                                                                <div className="h-64"><DividendChart data={result.fundamentals.dividendsHistory} /></div>
                                                             </div>
                                                         ) : <p className="text-center text-xs text-[var(--text-secondary)] py-4 opacity-70">Histórico indisponível</p>}
                                                     </div>

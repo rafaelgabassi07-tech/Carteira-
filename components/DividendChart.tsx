@@ -16,7 +16,7 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
     const [tooltip, setTooltip] = useState<{ date: string, value: number, x: number, y: number } | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dimensions, setDimensions] = useState({ width: 300, height: 200 });
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 }); // Start at 0 to prevent initial glitch
     const [isClicked, setIsClicked] = useState(false);
 
     useLayoutEffect(() => {
@@ -27,7 +27,10 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
             for (let entry of entries) {
                 const { width, height } = entry.contentRect;
                 if (width > 0 && height > 0) {
-                    setDimensions({ width, height });
+                    // Use requestAnimationFrame to avoid "ResizeObserver loop limit exceeded"
+                    requestAnimationFrame(() => {
+                        setDimensions({ width, height });
+                    });
                 }
             }
         });
@@ -61,21 +64,21 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
     }, [data, period]);
 
     const { width, height } = dimensions;
-    const padding = { top: 20, right: 10, bottom: 25, left: 40 };
+    const padding = { top: 30, right: 10, bottom: 30, left: 45 }; // Increased padding
     
     const maxValue = useMemo(() => Math.max(...filteredData.map(d => d.value), 0), [filteredData]);
-    const effectiveMaxValue = maxValue === 0 ? 1 : maxValue * 1.15; // 15% headroom
+    const effectiveMaxValue = maxValue === 0 ? 1 : maxValue * 1.2; // 20% headroom
 
     // Y-Axis Ticks
     const yTicks = useMemo(() => {
-        if (effectiveMaxValue <= 0) return [];
-        const numTicks = 4;
+        if (effectiveMaxValue <= 0) return [0];
+        const numTicks = 3; 
         const step = effectiveMaxValue / (numTicks - 1);
         return Array.from({ length: numTicks }, (_, i) => i * step);
     }, [effectiveMaxValue]);
 
     const handleMouseMove = (event: { clientX: number, clientY: number }) => {
-        if (!svgRef.current || filteredData.length === 0) return;
+        if (!svgRef.current || filteredData.length === 0 || width === 0) return;
         const rect = svgRef.current.getBoundingClientRect();
         const x = event.clientX - rect.left; 
         
@@ -85,7 +88,8 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
 
         if (index >= 0 && index < filteredData.length) {
             const pointData = filteredData[index];
-            const barHeight = (pointData.value / effectiveMaxValue) * (height - padding.top - padding.bottom);
+            const chartHeight = height - padding.top - padding.bottom;
+            const barHeight = (pointData.value / effectiveMaxValue) * chartHeight;
             const barX = padding.left + index * barSlotWidth + (barSlotWidth * 0.5);
             const barY = height - padding.bottom - barHeight;
             
@@ -101,15 +105,15 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
     };
 
     if (data.length === 0) return (
-        <div className="w-full h-48 flex items-center justify-center text-xs text-[var(--text-secondary)] border border-dashed border-[var(--border-color)] rounded-xl">
-            Sem dados históricos.
+        <div className="w-full h-full flex items-center justify-center text-xs text-[var(--text-secondary)] border border-dashed border-[var(--border-color)] rounded-xl opacity-50">
+            Sem histórico
         </div>
     );
 
     const chartWidth = Math.max(0, width - padding.left - padding.right);
     const chartHeight = Math.max(0, height - padding.top - padding.bottom);
     const barSlotWidth = filteredData.length > 0 ? chartWidth / filteredData.length : 0;
-    const barWidth = Math.max(2, Math.min(barSlotWidth * 0.7, 30)); // Responsive bar width
+    const barWidth = Math.max(4, Math.min(barSlotWidth * 0.6, 40)); 
 
     const handlePeriodChange = (p: Period) => {
         vibrate();
@@ -118,12 +122,12 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
 
     return (
         <div 
-            className={`bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] p-4 shadow-sm animate-fade-in-up transition-transform duration-200 ${isClicked ? 'scale-[1.02]' : ''}`}
+            className={`w-full h-full flex flex-col transition-transform duration-200 ${isClicked ? 'scale-[1.01]' : ''}`}
             onClick={handleClick}
         >
             {/* Header & Filters */}
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-[var(--text-primary)] text-sm px-1">Histórico de Pagamentos</h3>
+            <div className="flex justify-between items-center mb-4 px-1">
+                <h3 className="font-bold text-[var(--text-primary)] text-sm">Histórico de Pagamentos</h3>
                 <div className="flex bg-[var(--bg-primary)] p-0.5 rounded-lg border border-[var(--border-color)]">
                     {(['6m', '1y', '5y', 'all'] as Period[]).map((p) => (
                         <button
@@ -138,8 +142,8 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
             </div>
 
             {/* Chart Area */}
-            <div ref={containerRef} className="relative w-full h-48">
-                {filteredData.length > 0 ? (
+            <div ref={containerRef} className="relative flex-1 w-full min-h-[180px]">
+                {width > 0 && height > 0 && filteredData.length > 0 ? (
                     <svg 
                         ref={svgRef} 
                         width="100%" 
@@ -170,14 +174,15 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                                         y2={y} 
                                         stroke="var(--border-color)" 
                                         strokeWidth="0.5" 
-                                        strokeDasharray="2 2"
-                                        opacity="0.5"
+                                        strokeDasharray="3 3"
+                                        opacity="0.4"
                                     />
                                     <text 
-                                        x={padding.left - 6} 
+                                        x={padding.left - 8} 
                                         y={y + 3} 
                                         textAnchor="end" 
-                                        fontSize="9" 
+                                        fontSize="10" 
+                                        fontWeight="500"
                                         fill="var(--text-secondary)"
                                     >
                                         {tick.toFixed(2)}
@@ -193,9 +198,12 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                             const y = height - padding.bottom - barHeight;
                             const isHovered = tooltip?.date === d.paymentDate;
                             
-                            // Date Label logic (sparse labels)
-                            const showLabel = filteredData.length <= 12 || i % Math.ceil(filteredData.length / 6) === 0 || i === filteredData.length - 1;
-                            const dateLabel = new Date(d.paymentDate).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+                            // Date Label logic (Optimized for density)
+                            const maxLabels = Math.floor(chartWidth / 40); // Assuming ~40px per label
+                            const step = Math.ceil(filteredData.length / maxLabels);
+                            const showLabel = i % step === 0;
+                            
+                            const dateLabel = new Date(d.paymentDate).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
 
                             return (
                                 <g key={`${d.paymentDate}-${i}`}>
@@ -215,19 +223,21 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                                         height={Math.max(barHeight, 0)}
                                         fill="var(--accent-color)"
                                         rx={Math.min(barWidth/2, 4)}
-                                        className="transition-all duration-300 animate-grow-up"
+                                        className="transition-all duration-300"
                                         style={{ 
-                                            animationDelay: `${Math.min(i * 30, 500)}ms`,
-                                            opacity: isHovered ? 1 : 0.7
+                                            opacity: isHovered ? 1 : 0.8,
+                                            transformOrigin: 'bottom',
+                                            animation: 'grow-up 0.4s ease-out forwards',
+                                            animationDelay: `${i * 30}ms`
                                         }}
                                     />
                                     {/* X-Axis Label */}
                                     {showLabel && (
                                         <text 
                                             x={x + barWidth / 2} 
-                                            y={height - 5} 
+                                            y={height - 10} 
                                             textAnchor="middle" 
-                                            fontSize="8" 
+                                            fontSize="9" 
                                             fill="var(--text-secondary)"
                                             className="capitalize"
                                         >
@@ -239,27 +249,27 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                         })}
                     </svg>
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-[var(--text-secondary)]">
-                        Sem dados para o período selecionado.
+                    <div className="w-full h-full flex items-center justify-center text-xs text-[var(--text-secondary)] opacity-60">
+                        {width === 0 ? 'Carregando gráfico...' : 'Sem dados para o período.'}
                     </div>
                 )}
 
                 {/* Tooltip */}
                 {tooltip && (
                     <div 
-                        className="absolute bg-[var(--bg-secondary)] border border-[var(--border-color)] p-2 rounded-lg text-xs shadow-xl pointer-events-none transition-all z-10 whitespace-nowrap backdrop-blur-md"
+                        className="absolute bg-[var(--bg-secondary)] border border-[var(--border-color)] p-2 rounded-xl text-xs shadow-xl pointer-events-none transition-all z-20 whitespace-nowrap backdrop-blur-md"
                         style={{ 
                             left: tooltip.x, 
-                            top: tooltip.y - 10, 
+                            top: tooltip.y - 15, 
                             transform: `translate(-50%, -100%)`
                         }}
                     >
-                        <p className="text-[var(--text-secondary)] mb-0.5 capitalize">
+                        <p className="text-[var(--text-secondary)] mb-0.5 capitalize font-semibold">
                             {new Date(tooltip.date).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                         </p>
-                        <p className="font-bold text-[var(--text-primary)] text-sm flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)]"></span>
-                            {formatCurrency(tooltip.value)} <span className="text-[9px] font-normal text-[var(--text-secondary)]">/ cota</span>
+                        <p className="font-bold text-[var(--text-primary)] text-sm flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></span>
+                            {formatCurrency(tooltip.value)} <span className="text-[10px] font-normal text-[var(--text-secondary)]">/ cota</span>
                         </p>
                         <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)]"></div>
                     </div>
