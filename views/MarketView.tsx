@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
+import { fetchAdvancedAssetData } from '../services/geminiService';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate, usePersistentState } from '../utils';
 import RefreshIcon from '../components/icons/RefreshIcon';
@@ -10,6 +11,7 @@ import NewsIcon from '../components/icons/NewsIcon';
 import GlobeIcon from '../components/icons/GlobeIcon';
 import ClockIcon from '../components/icons/ClockIcon';
 import TrashIcon from '../components/icons/TrashIcon';
+import AnalysisIcon from '../components/icons/AnalysisIcon';
 import TransactionModal from '../components/modals/TransactionModal';
 import NewsView from './NewsView';
 import PortfolioLineChart from '../components/PortfolioLineChart';
@@ -26,7 +28,47 @@ interface MarketResult {
     history: number[];
     min: number;
     max: number;
+    // Dados Fundamentais (Carregados via Gemini)
+    fundamentals?: {
+        dy?: number;
+        pvp?: number;
+        sector?: string;
+        vacancy?: number;
+        administrator?: string;
+    };
 }
+
+// Categorias para descoberta
+const MARKET_CATEGORIES = [
+    { 
+        title: "Gigantes da Logística", 
+        color: "bg-orange-500", 
+        tickers: ["HGLG11", "BTLG11", "XPLG11", "VILG11"] 
+    },
+    { 
+        title: "Shoppings Premium", 
+        color: "bg-blue-500", 
+        tickers: ["XPML11", "VISC11", "HGBS11", "MALL11"] 
+    },
+    { 
+        title: "Papel & Recebíveis", 
+        color: "bg-emerald-500", 
+        tickers: ["MXRF11", "KNCR11", "CPTS11", "IRDM11"] 
+    },
+    { 
+        title: "Fiagros (Agro)", 
+        color: "bg-lime-600", 
+        tickers: ["SNAG11", "VGIA11", "KNCA11", "RZAG11"] 
+    }
+];
+
+const FundamentalBadge: React.FC<{ label: string; value: string | number; sub?: string; color?: string }> = ({ label, value, sub, color }) => (
+    <div className="flex flex-col p-3 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] flex-1 min-w-[100px]">
+        <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{label}</span>
+        <span className={`text-base font-bold ${color || 'text-[var(--text-primary)]'}`}>{value}</span>
+        {sub && <span className="text-[9px] text-[var(--text-secondary)]">{sub}</span>}
+    </div>
+);
 
 const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     const { t, formatCurrency } = useI18n();
@@ -35,6 +77,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     const [activeTab, setActiveTab] = useState<'quotes' | 'news'>('quotes');
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingFundamentals, setLoadingFundamentals] = useState(false);
     const [result, setResult] = useState<MarketResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -42,58 +85,87 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     // Persist Recent Searches
     const [recentSearches, setRecentSearches] = usePersistentState<string[]>('market_recent_searches', []);
 
-    const popularTickers = ['MXRF11', 'HGLG11', 'XPLG11', 'VISC11', 'KNRI11', 'XPML11', 'BCFF11', 'BTLG11', 'CPTS11'];
-
     const handleSearch = async (term: string) => {
         const cleanTerm = term.trim().toUpperCase();
         if (!cleanTerm || cleanTerm.length < 4) return;
         
         vibrate();
         setLoading(true);
+        setLoadingFundamentals(true); // Inicia loading secundário
         setError(null);
         setResult(null);
-        setSearchTerm(cleanTerm); // Normalize input
+        setSearchTerm(cleanTerm);
 
         try {
-            const { quotes } = await fetchBrapiQuotes(preferences, [cleanTerm], false); // Request full range for chart
+            // 1. Fetch Price (Rápido - Brapi)
+            const { quotes } = await fetchBrapiQuotes(preferences, [cleanTerm], false);
             const data = quotes[cleanTerm];
             
             if (data && data.currentPrice > 0) {
                 const historyPrices = data.priceHistory?.map(p => p.price) || [];
                 
-                // Calculate simple change based on history or fallback
+                // Calculate simple change
                 let change = 0;
                 if (historyPrices.length >= 2) {
                     const lastClose = historyPrices[historyPrices.length - 2];
                     change = ((data.currentPrice - lastClose) / lastClose) * 100;
                 }
 
-                // Stats
                 const min = historyPrices.length > 0 ? Math.min(...historyPrices) : data.currentPrice;
                 const max = historyPrices.length > 0 ? Math.max(...historyPrices) : data.currentPrice;
 
-                setResult({
+                // Define estrutura base imediatamente
+                const baseResult: MarketResult = {
                     ticker: cleanTerm,
                     price: data.currentPrice,
                     change: change,
                     history: historyPrices,
                     min,
-                    max
-                });
+                    max,
+                    fundamentals: undefined
+                };
+                
+                setResult(baseResult);
+                setLoading(false); // Libera a UI principal
 
-                // Update Recent Searches (Max 5, Unique)
+                // Update Recents
                 setRecentSearches(prev => {
                     const filtered = prev.filter(item => item !== cleanTerm);
                     return [cleanTerm, ...filtered].slice(0, 5);
                 });
 
+                // 2. Fetch Fundamentals (Paralelo - Gemini)
+                try {
+                    const advData = await fetchAdvancedAssetData(preferences, [cleanTerm]);
+                    const fund = advData.data[cleanTerm];
+                    
+                    if (fund) {
+                        setResult(prev => prev ? ({
+                            ...prev,
+                            fundamentals: {
+                                dy: fund.dy,
+                                pvp: fund.pvp,
+                                sector: fund.assetType,
+                                vacancy: fund.vacancyRate,
+                                administrator: fund.administrator
+                            }
+                        }) : null);
+                    }
+                } catch (err) {
+                    console.warn("Failed to fetch fundamentals", err);
+                } finally {
+                    setLoadingFundamentals(false);
+                }
+
             } else {
-                setError('Ativo não encontrado ou sem dados de negociação recentes.');
+                setError('Ativo não encontrado ou sem liquidez.');
+                setLoading(false);
+                setLoadingFundamentals(false);
             }
         } catch (e) {
-            setError('Erro ao buscar dados. Verifique sua conexão.');
-        } finally {
+            setError('Erro de conexão. Tente novamente.');
             setLoading(false);
+            setLoadingFundamentals(false);
         }
     };
 
@@ -146,7 +218,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Pesquisar ativo (ex: MXRF11)"
+                                placeholder="Pesquisar FII (ex: MXRF11)"
                                 className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-4 pl-5 pr-14 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all uppercase shadow-sm placeholder:text-[var(--text-secondary)]/50"
                             />
                             <button
@@ -161,11 +233,21 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                         {/* Result Card (Interactive) */}
                         {result && (
                             <div className="bg-[var(--bg-secondary)] rounded-3xl border border-[var(--border-color)] shadow-lg animate-fade-in-up overflow-hidden">
+                                {/* Header: Price & Ticker */}
                                 <div className="p-6 pb-2">
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
-                                            <h2 className="text-3xl font-black text-[var(--text-primary)] mb-1 tracking-tight">{result.ticker}</h2>
-                                            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Cotação em Tempo Real</p>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h2 className="text-3xl font-black text-[var(--text-primary)] tracking-tight">{result.ticker}</h2>
+                                                {result.fundamentals?.sector && (
+                                                    <span className="text-[10px] font-bold bg-[var(--bg-primary)] border border-[var(--border-color)] px-2 py-0.5 rounded-full text-[var(--text-secondary)] uppercase">
+                                                        {result.fundamentals.sector}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1">
+                                                {loadingFundamentals ? <span className="animate-pulse">Buscando dados...</span> : 'Cotação Tempo Real'}
+                                            </p>
                                         </div>
                                         <div className={`flex flex-col items-end`}>
                                             <span className="text-2xl font-bold text-[var(--text-primary)]">{formatCurrency(result.price)}</span>
@@ -177,7 +259,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 </div>
 
                                 {/* Chart Area */}
-                                <div className="h-32 w-full px-2 mb-2">
+                                <div className="h-32 w-full px-2 mb-4">
                                     {result.history.length > 2 ? (
                                         <PortfolioLineChart 
                                             data={result.history} 
@@ -189,19 +271,61 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                     )}
                                 </div>
 
-                                {/* Stats Grid */}
-                                <div className="grid grid-cols-2 gap-px bg-[var(--border-color)] border-t border-[var(--border-color)]">
-                                    <div className="bg-[var(--bg-secondary)] p-3 flex flex-col items-center">
-                                        <span className="text-[9px] text-[var(--text-secondary)] uppercase font-bold">Mínima (1A)</span>
-                                        <span className="font-bold text-[var(--text-primary)]">{formatCurrency(result.min)}</span>
+                                {/* Fundamentals Grid */}
+                                <div className="px-4 pb-4">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <AnalysisIcon className="w-4 h-4 text-[var(--accent-color)]"/>
+                                        <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Ficha Técnica</h3>
                                     </div>
-                                    <div className="bg-[var(--bg-secondary)] p-3 flex flex-col items-center">
-                                        <span className="text-[9px] text-[var(--text-secondary)] uppercase font-bold">Máxima (1A)</span>
-                                        <span className="font-bold text-[var(--text-primary)]">{formatCurrency(result.max)}</span>
+                                    
+                                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                                        <FundamentalBadge 
+                                            label="Dividend Yield" 
+                                            value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'}
+                                            sub="12 meses"
+                                            color={result.fundamentals?.dy && result.fundamentals.dy > 10 ? 'text-[var(--green-text)]' : undefined}
+                                        />
+                                        <FundamentalBadge 
+                                            label="P/VP" 
+                                            value={result.fundamentals?.pvp ? result.fundamentals.pvp.toFixed(2) : '-'}
+                                            color={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'text-[var(--green-text)]' : (result.fundamentals?.pvp && result.fundamentals.pvp > 1.2 ? 'text-[var(--red-text)]' : undefined)}
+                                        />
+                                        <FundamentalBadge 
+                                            label="Min (52sem)" 
+                                            value={formatCurrency(result.min)} 
+                                        />
+                                        <FundamentalBadge 
+                                            label="Max (52sem)" 
+                                            value={formatCurrency(result.max)} 
+                                        />
                                     </div>
+
+                                    {/* Valuation Bar */}
+                                    {result.fundamentals?.pvp && (
+                                        <div className="mt-2 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
+                                            <div className="flex justify-between text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">
+                                                <span>Descontado</span>
+                                                <span>Preço Justo (1.0)</span>
+                                                <span>Ágio</span>
+                                            </div>
+                                            <div className="h-2 w-full bg-[var(--bg-secondary)] rounded-full overflow-hidden flex relative">
+                                                <div className="w-1/3 bg-emerald-500/50"></div>
+                                                <div className="w-1/3 bg-gray-500/30"></div>
+                                                <div className="w-1/3 bg-rose-500/50"></div>
+                                                {/* Marker */}
+                                                <div 
+                                                    className="absolute top-0 bottom-0 w-1 bg-[var(--text-primary)] shadow-[0_0_8px_white] transition-all duration-1000"
+                                                    style={{ left: `${Math.min(Math.max((result.fundamentals.pvp / 1.5) * 100, 5), 95)}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="text-center mt-1 text-[10px] font-medium text-[var(--text-secondary)]">
+                                                P/VP Atual: {result.fundamentals.pvp.toFixed(2)}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                <div className="p-4 bg-[var(--bg-primary)]/50">
+                                <div className="p-4 bg-[var(--bg-primary)]/50 border-t border-[var(--border-color)]">
                                     <button 
                                         onClick={() => setShowAddModal(true)}
                                         className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[var(--accent-color)]/20"
@@ -245,21 +369,31 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                             </div>
                         )}
 
-                        {/* Popular Tags */}
+                        {/* Discovery Lists */}
                         {!result && (
-                            <div className="animate-fade-in delay-100">
-                                <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 px-1">Em Alta no Mercado</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {popularTickers.map(t => (
-                                        <button
-                                            key={t}
-                                            onClick={() => { setSearchTerm(t); handleSearch(t); }}
-                                            className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2 rounded-xl font-bold text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors active:scale-95"
-                                        >
-                                            {t}
-                                        </button>
-                                    ))}
-                                </div>
+                            <div className="animate-fade-in delay-100 space-y-6 mt-6">
+                                <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider px-1">Descubra Oportunidades</h3>
+                                
+                                {MARKET_CATEGORIES.map((cat, i) => (
+                                    <div key={i} className="space-y-2">
+                                        <div className="flex items-center gap-2 px-1">
+                                            <div className={`w-2 h-2 rounded-full ${cat.color}`}></div>
+                                            <span className="text-sm font-bold text-[var(--text-primary)]">{cat.title}</span>
+                                        </div>
+                                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">
+                                            {cat.tickers.map(t => (
+                                                <button
+                                                    key={t}
+                                                    onClick={() => { setSearchTerm(t); handleSearch(t); }}
+                                                    className="flex-shrink-0 w-28 bg-[var(--bg-secondary)] border border-[var(--border-color)] p-3 rounded-xl hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all active:scale-95 text-left group"
+                                                >
+                                                    <span className="block font-bold text-sm text-[var(--text-primary)] mb-1">{t}</span>
+                                                    <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors">Ver detalhes →</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>

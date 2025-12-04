@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
@@ -118,7 +117,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { dy?: number; pvp?: number; assetType?: string; administrator?: string; dividendsHistory?: DividendHistoryEvent[] }>, stats: { bytesSent: number, bytesReceived: number } }> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { dy?: number; pvp?: number; assetType?: string; administrator?: string; vacancyRate?: number; dividendsHistory?: DividendHistoryEvent[] }>, stats: { bytesSent: number, bytesReceived: number } }> {
     const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (tickers.length === 0) return emptyReturn;
 
