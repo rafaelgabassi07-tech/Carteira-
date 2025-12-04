@@ -25,7 +25,11 @@ const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
 
 export type View = 'dashboard' | 'carteira' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail' | 'mercado';
 
-const App: React.FC = () => {
+interface AppProps {
+  swUrl: string;
+}
+
+const App: React.FC<AppProps> = ({ swUrl }) => {
   const { assets, preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
   const { t } = useI18n();
   const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'dashboard');
@@ -49,10 +53,8 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-        // Use a simple, explicit relative path. This is the most reliable method
-        // in sandboxed environments where origin calculation can be complex.
-        navigator.serviceWorker.register('./sw.js')
+    if ('serviceWorker' in navigator && swUrl) {
+        navigator.serviceWorker.register(swUrl)
             .then(registration => {
                 registration.onupdatefound = () => {
                     const installingWorker = registration.installing;
@@ -80,7 +82,7 @@ const App: React.FC = () => {
             }
         });
     }
-  }, []);
+  }, [swUrl]);
 
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
     const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
