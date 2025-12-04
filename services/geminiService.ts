@@ -133,19 +133,22 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const ai = new GoogleGenAI({ apiKey });
 
     const tickersString = tickers.join(', ');
+    const today = new Date().toISOString().split('T')[0];
 
     // Prompt Aprimorado para Confiabilidade e Provisões
     const prompt = `
+      ROLE: Strict Financial Auditor.
       TASK: Retrieve rigorous financial data for these Brazilian FIIs: ${tickersString}.
+      CURRENT_DATE: ${today}.
       
       RULES FOR SEARCH:
       1. Use 'googleSearch' to find exact data from official sources (B3, StatusInvest, ClubeFII, FundsExplorer).
       2. For 'assetType' (Sector), map to EXACTLY one: "Tijolo", "Papel", "Fiagro", "FOF", "Infra", "Híbrido", "Outros".
       
       RULES FOR DIVIDENDS (CRITICAL):
-      1. Fetch the last 8 PAID dividends.
-      2. **IMPORTANT**: Check if there are any **ANNOUNCED (provisioned)** dividends that haven't been paid yet.
-      3. Dates MUST be strictly 'YYYY-MM-DD'. Verify the year.
+      1. Fetch the last 6 dividends.
+      2. **PROVISIONED CHECK**: Compare current date (${today}) with 'Payment Date'. If Payment Date > Current Date, set "isProvisioned": true.
+      3. Dates MUST be strictly 'YYYY-MM-DD'. Verify the year (must be recent).
       4. Value is "R$ per share".
       
       OUTPUT: JSON Object ONLY. Keys = Ticker (e.g., "MXRF11").
@@ -156,12 +159,13 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         "pvp": number (e.g. 1.03),
         "assetType": string (Category),
         "administrator": string,
+        "vacancyRate": number (percentage, e.g. 5.5),
         "dividendsHistory": [
            { 
              "exDate": "YYYY-MM-DD", 
              "paymentDate": "YYYY-MM-DD", 
              "value": number,
-             "isProvisioned": boolean  // true if announced but not paid yet (date in future)
+             "isProvisioned": boolean
            }
         ]
       }
@@ -216,6 +220,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                     pvp: typeof assetData.pvp === 'number' ? assetData.pvp : undefined,
                     assetType: typeof assetData.assetType === 'string' ? assetData.assetType : undefined,
                     administrator: typeof assetData.administrator === 'string' ? assetData.administrator : undefined,
+                    vacancyRate: typeof assetData.vacancyRate === 'number' ? assetData.vacancyRate : undefined,
                     dividendsHistory: cleanDividends.length > 0 ? cleanDividends : undefined
                 };
             }
