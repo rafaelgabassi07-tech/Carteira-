@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -48,32 +49,46 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-      if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('./sw.js').then(registration => {
-              registration.onupdatefound = () => {
-                  const installingWorker = registration.installing;
-                  if (installingWorker) {
-                      installingWorker.onstatechange = () => {
-                          if (installingWorker.state === 'installed') {
-                              if (navigator.serviceWorker.controller) {
-                                  console.log('New content is available for update.');
-                                  waitingWorkerRef.current = registration.waiting;
-                                  setUpdateAvailable(true);
-                              }
-                          }
-                      };
-                  }
-              };
-          });
+    if ('serviceWorker' in navigator) {
+        const registrationPromise = (() => {
+            try {
+                // Try the more robust absolute URL method first.
+                const swUrl = new URL('sw.js', window.location.href);
+                return navigator.serviceWorker.register(swUrl);
+            } catch (error) {
+                console.warn('Absolute URL registration failed, falling back to relative path:', error);
+                // Fallback for environments where `new URL` is not supported with the base.
+                return navigator.serviceWorker.register('./sw.js');
+            }
+        })();
 
-          let refreshing = false;
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-              if (!refreshing) {
-                  window.location.reload();
-                  refreshing = true;
-              }
-          });
-      }
+        registrationPromise.then(registration => {
+            registration.onupdatefound = () => {
+                const installingWorker = registration.installing;
+                if (installingWorker) {
+                    installingWorker.onstatechange = () => {
+                        if (installingWorker.state === 'installed') {
+                            if (navigator.serviceWorker.controller) {
+                                console.log('New content is available for update.');
+                                waitingWorkerRef.current = registration.waiting;
+                                setUpdateAvailable(true);
+                            }
+                        }
+                    };
+                }
+            };
+        }).catch(error => {
+            console.error('Service Worker registration failed:', error);
+        });
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                window.location.reload();
+                refreshing = true;
+            }
+        });
+    }
   }, []);
 
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
