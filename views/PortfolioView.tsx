@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Asset, ToastMessage } from '../types';
+import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import ShareIcon from '../components/icons/ShareIcon';
+import SettingsIcon from '../components/icons/SettingsIcon';
 import BellIcon from '../components/icons/BellIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
@@ -27,10 +27,9 @@ const WalletIcon: React.FC<{className?:string}> = ({className}) => (
 
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
-    onShare: () => void;
     onRefresh: () => void;
     isRefreshing: boolean;
-}> = ({ setActiveView, onShare, onRefresh, isRefreshing }) => {
+}> = ({ setActiveView, onRefresh, isRefreshing }) => {
     const { t } = useI18n();
     const { privacyMode, togglePrivacyMode } = usePortfolio();
 
@@ -52,8 +51,8 @@ const Header: React.FC<{
                 <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
                      {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                 </button>
-                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
-                    <ShareIcon className="w-5 h-5" />
+                <button id="settings-btn" onClick={() => { setActiveView('settings'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label={t('nav_settings')}>
+                    <SettingsIcon className="w-5 h-5" />
                 </button>
                 <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
                     <BellIcon className="w-5 h-5" />
@@ -199,24 +198,6 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
         }
     };
 
-    const handleShare = async () => {
-        const totalValue = assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0);
-        const shareData = {
-            title: t('share_portfolio_title'),
-            text: t('share_portfolio_text', { value: formatCurrency(totalValue) }),
-            url: window.location.origin,
-        };
-        try {
-            if (navigator.share) await navigator.share(shareData);
-            else {
-                await navigator.clipboard.writeText(shareData.text);
-                addToast('Copiado para área de transferência!', 'success');
-            }
-        } catch (err) {
-            // User cancelled
-        }
-    };
-
     // Data for Allocation Chart
     const allocationData = useMemo(() => {
         const segments: Record<string, number> = {};
@@ -254,7 +235,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             </div>
 
             <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
+                <Header setActiveView={setActiveView} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
                 
                 {assets.length > 0 ? (
                     <>
@@ -271,11 +252,6 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                                 </div>
                             </div>
                         </div>
-                        
-                        {/* 
-                            NOTA: A lista de ativos foi removida do Dashboard conforme solicitado.
-                            Ela permanece disponível na aba "Carteira" (AnalysisView).
-                        */}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
