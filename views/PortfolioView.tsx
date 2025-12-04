@@ -9,10 +9,7 @@ import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
-import SettingsIcon from '../components/icons/SettingsIcon';
-import DividendsSummaryCard from '../components/DividendsSummaryCard';
-import PortfolioPieChart from '../components/PortfolioPieChart';
-import WalletIcon from '../components/icons/WalletIcon';
+import AssetListItem from '../components/AssetListItem';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -21,14 +18,29 @@ const EyeIcon: React.FC<{className?:string}> = ({className}) => (
 const EyeOffIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
 );
+const SortIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+);
+const WalletIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+);
 
 // --- Components ---
 
+const PortfolioSkeleton: React.FC = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
+        {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-20 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]"></div>
+        ))}
+    </div>
+);
+
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
+    onShare: () => void;
     onRefresh: () => void;
     isRefreshing: boolean;
-}> = ({ setActiveView, onRefresh, isRefreshing }) => {
+}> = ({ setActiveView, onShare, onRefresh, isRefreshing }) => {
     const { t } = useI18n();
     const { privacyMode, togglePrivacyMode } = usePortfolio();
 
@@ -45,16 +57,16 @@ const Header: React.FC<{
                     className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
-                     <RefreshIcon className="w-4 h-4"/>
+                     <RefreshIcon className="w-5 h-5"/>
                 </button>
                 <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
-                     {privacyMode ? <EyeOffIcon className="w-4 h-4"/> : <EyeIcon className="w-4 h-4"/>}
+                     {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                 </button>
-                <button id="settings-btn" onClick={() => { setActiveView('settings'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
-                    <SettingsIcon className="w-4 h-4" />
+                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
+                    <ShareIcon className="w-5 h-5" />
                 </button>
                 <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
-                    <BellIcon className="w-4 h-4" />
+                    <BellIcon className="w-5 h-5" />
                 </button>
             </div>
         </header>
@@ -96,7 +108,7 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl w-full shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
+        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
             {/* Decorative Glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
 
@@ -119,7 +131,7 @@ const PortfolioSummary: React.FC = () => {
 
                 <div className="border-t border-[var(--border-color)]/50 my-5"></div>
 
-                <div className={`grid grid-cols-2 lg:grid-cols-4 gap-y-5 gap-x-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                <div className={`grid grid-cols-2 gap-y-5 gap-x-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
                     <Metric label={t('total_invested')}>
                         <p className="text-[var(--text-primary)]"><CountUp end={summary.totalInvested} formatter={format} /></p>
                     </Metric>
@@ -147,9 +159,12 @@ interface PortfolioViewProps {
 }
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
-    const { t } = useI18n();
-    const { assets, refreshMarketData, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
+    const { t, formatCurrency } = useI18n();
+    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
+    const [searchQuery, setSearchQuery] = useState('');
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+    const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
+    const [isSortOpen, setIsSortOpen] = useState(false);
     
     const isRefreshing = isContextRefreshing || isPullRefreshing;
 
@@ -196,28 +211,46 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             setIsPullRefreshing(false);
         }
     };
+
+    const handleShare = async () => {
+        const totalValue = assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0);
+        const shareData = {
+            title: t('share_portfolio_title'),
+            text: t('share_portfolio_text', { value: formatCurrency(totalValue) }),
+            url: window.location.origin,
+        };
+        try {
+            if (navigator.share) await navigator.share(shareData);
+            else {
+                await navigator.clipboard.writeText(shareData.text);
+                addToast('Copiado para área de transferência!', 'success');
+            }
+        } catch (err) {
+            // User cancelled
+        }
+    };
     
-    // Data for Allocation Chart
-    const allocationData = useMemo(() => {
-        const segments: Record<string, number> = {};
-        let totalValue = 0;
-        assets.forEach(a => {
-            const val = a.quantity * a.currentPrice;
-            const seg = a.segment || t('outros');
-            segments[seg] = (segments[seg] || 0) + val;
-            totalValue += val;
+    const totalPortfolioValue = useMemo(() => assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0), [assets]);
+    
+    const processedAssets = useMemo(() => {
+        let filtered = assets.filter(asset => asset.ticker.toLowerCase().includes(searchQuery.toLowerCase()));
+        return filtered.sort((a, b) => {
+            switch (sortOption) {
+                case 'valueDesc': return (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity);
+                case 'valueAsc': return (a.currentPrice * a.quantity) - (b.currentPrice * a.quantity);
+                case 'tickerAsc': return a.ticker.localeCompare(b.ticker);
+                case 'performanceDesc':
+                    const perfA = a.avgPrice > 0 ? (a.currentPrice - a.avgPrice) / a.avgPrice : 0;
+                    const perfB = b.avgPrice > 0 ? (b.currentPrice - b.avgPrice) / b.avgPrice : 0;
+                    return perfB - perfA;
+                default: return 0;
+            }
         });
-        
-        return Object.entries(segments).map(([name, value]) => ({
-            name,
-            value,
-            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
-        })).sort((a, b) => b.value - a.value);
-    }, [assets, t]);
+    }, [assets, searchQuery, sortOption]);
 
     return (
         <div 
-            className="pb-24 lg:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar"
+            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
             ref={containerRef}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -233,27 +266,78 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto w-full">
-                <Header setActiveView={setActiveView} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
+            <div className="max-w-7xl mx-auto">
+                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
                 
                 {assets.length > 0 ? (
                     <>
-                        {/* Dashboard Grid Container - Controls Padding Uniformly */}
-                        <div className="md:mx-auto lg:max-w-none px-4 py-4 space-y-4">
-                            
-                            {/* Summary Card */}
+                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
                             <PortfolioSummary />
-                            
-                            {/* Stats Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                                <DividendsSummaryCard />
-                                
-                                {/* Sector Allocation Card */}
-                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up w-full flex flex-col justify-center">
-                                    <h3 className="font-bold text-sm text-[var(--text-primary)] mb-4 uppercase tracking-wider">{t('diversification')}</h3>
-                                    <PortfolioPieChart data={allocationData} goals={preferences.segmentGoals || {}} />
+                        </div>
+
+                        <div className="px-4 mt-8">
+                            <div className="flex space-x-3 mb-5">
+                                <div className="flex-1 relative">
+                                    <input 
+                                        type="text" 
+                                        placeholder={t('search_asset_placeholder')} 
+                                        value={searchQuery} 
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
+                                        autoCapitalize="characters"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <button 
+                                        id="sort-btn"
+                                        onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
+                                        className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
+                                    >
+                                        <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
+                                    </button>
+                                    {isSortOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
+                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
+                                                <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
+                                                {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
+                                                    <button 
+                                                        key={option}
+                                                        onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }}
+                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}
+                                                    >
+                                                        {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
+                                                        {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
+
+                             <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2">
+                                 {t('my_assets')} 
+                                 <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
+                             </h3>
+                             
+                            {isRefreshing && processedAssets.length === 0 ? (
+                                <PortfolioSkeleton />
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
+                                    {processedAssets.map((asset, index) => (
+                                        <AssetListItem 
+                                            key={asset.ticker}
+                                            asset={asset} 
+                                            totalValue={totalPortfolioValue}
+                                            onClick={() => onSelectAsset(asset.ticker)} 
+                                            style={{ animationDelay: `${index * 50}ms` }}
+                                            privacyMode={privacyMode}
+                                            hideCents={preferences.hideCents}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </>
                 ) : (

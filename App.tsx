@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
-import Sidebar from './components/Sidebar';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
@@ -148,14 +147,9 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-        <div className="h-[100dvh] w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden relative transition-colors duration-300">
+        <div className="h-[100dvh] w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden relative transition-colors duration-300">
             <OfflineBanner />
             
-            {/* Desktop Sidebar - Hidden on Mobile */}
-            <aside className="hidden lg:flex w-64 flex-col border-r border-[var(--border-color)] bg-[var(--bg-secondary)]/50 backdrop-blur-xl z-50">
-                <Sidebar activeView={activeView} setActiveView={handleSetView} />
-            </aside>
-
             {/* Main Content Area */}
             <main className="flex-1 relative w-full h-full flex flex-col min-w-0">
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative">
@@ -164,8 +158,8 @@ const App: React.FC = () => {
                     </Suspense>
                 </div>
                 
-                {/* Mobile Bottom Nav - Hidden on Desktop */}
-                <div className="lg:hidden">
+                {/* Floating Bottom Nav - Visible on all screens */}
+                <div>
                     <BottomNav activeView={activeView} setActiveView={handleSetView} />
                 </div>
             </main>
