@@ -96,6 +96,27 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     
     const [recentSearches, setRecentSearches] = usePersistentState<string[]>('market_recent_searches', []);
 
+    // --- Share Target Logic ---
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sharedText = params.get('share_q');
+        
+        if (sharedText) {
+            // Smart Ticker Extraction from Shared Text
+            // Looks for pattern: 4 letters + (11, 11B, 3, 4) e.g. "Olha o MXRF11 caindo" -> "MXRF11"
+            const tickerMatch = sharedText.match(/[A-Za-z]{4}(11|3|4|11B)/);
+            
+            const term = tickerMatch ? tickerMatch[0].toUpperCase() : sharedText.trim().toUpperCase();
+            
+            setSearchTerm(term);
+            handleSearch(term);
+            
+            // Clean URL to prevent re-search on reload
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
+        }
+    }, []);
+
     const handleSearch = async (term: string) => {
         const cleanTerm = term.trim().toUpperCase();
         if (!cleanTerm || cleanTerm.length < 4) return;

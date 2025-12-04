@@ -1,7 +1,7 @@
 {
   "name": "FII Master",
   "short_name": "FII Master",
-  "description": "Gerencie sua carteira de Fundos Imobiliários com inteligência.",
+  "description": "Gerencie sua carteira de Fundos Imobiliários com inteligência, cotações em tempo real e análise de dividendos.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -22,20 +22,49 @@
       "purpose": "any maskable"
     }
   ],
+  "screenshots": [
+    {
+      "src": "https://images.unsplash.com/photo-1611974765270-ca1258634369?q=80&w=1080&auto=format&fit=crop",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Dashboard e Carteira"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?q=80&w=1080&auto=format&fit=crop",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Cotações e Notícias"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Nova Transação",
       "short_name": "Adicionar",
       "description": "Adicionar nova movimentação",
-      "url": "/transacoes",
+      "url": "/?view=transacoes",
       "icons": [{ "src": "/logo.svg", "sizes": "192x192" }]
     },
     {
       "name": "Mercado",
       "short_name": "Mercado",
       "description": "Ver cotações e notícias",
-      "url": "/mercado",
+      "url": "/?view=mercado",
       "icons": [{ "src": "/logo.svg", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "share_title",
+      "text": "share_q",
+      "url": "share_url"
+    }
+  },
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }

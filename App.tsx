@@ -37,6 +37,21 @@ const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   
+  // PWA Deep Linking & Share Target Handler
+  useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      const shareParam = params.get('share_q'); // From Share Target
+
+      if (shareParam) {
+          // If receiving shared text, go to Market
+          setActiveView('mercado');
+      } else if (viewParam && ['dashboard', 'carteira', 'transacoes', 'noticias', 'settings', 'mercado'].includes(viewParam)) {
+          // If coming from Shortcut
+          setActiveView(viewParam as View);
+      }
+  }, []);
+
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
     const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
     setToast(newToast);
