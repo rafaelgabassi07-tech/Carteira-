@@ -44,8 +44,6 @@ interface DividendStats {
     magicNumberCount: number; // Quantas "cotas base 10" dá pra comprar com a média
 }
 
-type SortMode = 'total' | 'roi' | 'date';
-
 // --- Logic Hook ---
 const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): DividendStats => {
     return useMemo(() => {
@@ -271,7 +269,7 @@ const PayerRow: React.FC<{
     payer: PayerData; 
     rank: number;
 }> = ({ payer, rank }) => {
-    const { formatCurrency, locale } = useI18n();
+    const { formatCurrency } = useI18n();
     const [isExpanded, setIsExpanded] = useState(false);
     const iconBg = stringToColor(payer.ticker);
     
@@ -337,22 +335,12 @@ const DividendsDetailModal: React.FC<{
     onClose: () => void; 
     stats: DividendStats;
 }> = ({ onClose, stats }) => {
-    const [sortMode, setSortMode] = useState<SortMode>('total');
-    const { formatCurrency, t } = useI18n();
+    const { formatCurrency } = useI18n();
 
+    // Sempre ordena por valor total, do maior para o menor
     const sortedPayers = useMemo(() => {
-        return [...stats.payersData].sort((a, b) => {
-            if (sortMode === 'total') return b.total - a.total;
-            if (sortMode === 'roi') return b.roi - a.roi;
-            if (sortMode === 'date') {
-                if (a.nextPayment && !b.nextPayment) return -1;
-                if (!a.nextPayment && b.nextPayment) return 1;
-                if (a.nextPayment && b.nextPayment) return a.nextPayment.localeCompare(b.nextPayment);
-                return a.ticker.localeCompare(b.ticker);
-            }
-            return 0;
-        });
-    }, [stats.payersData, sortMode]);
+        return [...stats.payersData].sort((a, b) => b.total - a.total);
+    }, [stats.payersData]);
 
     return (
         <Modal title="Relatório de Renda" onClose={onClose} type="slide-up" fullScreen={true}>
@@ -397,11 +385,6 @@ const DividendsDetailModal: React.FC<{
                 <div className="flex-1 w-full pb-10">
                     <div className="flex justify-between items-center mb-3 px-1">
                         <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Origem dos Proventos</h3>
-                        
-                        <div className="flex bg-[var(--bg-secondary)] p-0.5 rounded-lg border border-[var(--border-color)]">
-                            <button onClick={() => {setSortMode('total'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'total' ? 'bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Valor</button>
-                            <button onClick={() => {setSortMode('roi'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'roi' ? 'bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>% ROI</button>
-                        </div>
                     </div>
 
                     <div className="space-y-1 min-h-[200px]">
@@ -424,7 +407,7 @@ const DividendsDetailModal: React.FC<{
 
 // --- Main Card Component (Dashboard) ---
 const DividendsSummaryCard: React.FC = () => {
-    const { t, formatCurrency } = useI18n();
+    const { formatCurrency } = useI18n();
     const { assets, transactions, privacyMode } = usePortfolio();
     const [showModal, setShowModal] = useState(false);
 
