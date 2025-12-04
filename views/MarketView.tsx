@@ -15,6 +15,7 @@ import AnalysisIcon from '../components/icons/AnalysisIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
 import TrendingUpIcon from '../components/icons/TrendingUpIcon';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
+import SearchIcon from '../components/icons/SearchIcon';
 import TransactionModal from '../components/modals/TransactionModal';
 import NewsView from './NewsView';
 import PortfolioLineChart from '../components/PortfolioLineChart';
@@ -272,21 +273,24 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                 {viewMode === 'quotes' ? (
                     <div className="animate-fade-in space-y-6">
                         
-                        <div className="relative">
+                        <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none">
+                                <SearchIcon className="w-6 h-6" />
+                            </div>
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Pesquisar FII (ex: MXRF11)"
-                                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-4 pl-5 pr-14 text-lg font-bold focus:outline-none focus:border-[var(--accent-color)]/50 transition-all uppercase shadow-sm placeholder:text-[var(--text-secondary)]/50"
+                                placeholder="PESQUISAR ATIVO (EX: HGLG11)" 
+                                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-4 pl-14 pr-14 text-lg font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] transition-all shadow-sm placeholder:text-[var(--text-secondary)]/40 uppercase"
                             />
                             <button
                                 onClick={() => handleSearch(searchTerm)}
                                 disabled={loading}
-                                className="absolute right-2 top-2 bottom-2 bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--accent-color)] p-3 rounded-xl transition-colors disabled:opacity-50"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] p-2 rounded-xl transition-colors disabled:opacity-50 border border-[var(--border-color)]"
                             >
-                                <RefreshIcon className={`w-6 h-6 ${loading ? 'animate-spin' : ''}`} />
+                                {loading ? <RefreshIcon className="w-5 h-5 animate-spin text-[var(--accent-color)]" /> : <ChevronRightIcon className="w-5 h-5" />}
                             </button>
                         </div>
 
@@ -509,7 +513,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                     </div>
                 ) : (
                     <div className="flex-1 animate-fade-in">
-                        <NewsView addToast={addToast} />
+                        <NewsView addToast={addToast} isEmbedded={true} />
                     </div>
                 )}
             </div>

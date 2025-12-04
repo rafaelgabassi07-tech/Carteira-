@@ -255,9 +255,6 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
           const touchY = e.targetTouches[0].clientY;
           const pullDistance = touchY - touchStartY.current;
           if(pullDistance > 0) {
-              // Only prevent default if we are handling the pull refresh, 
-              // but be careful not to block scroll if not at top.
-              // In embedded mode, scroll handling is trickier, so we might disable P2R or rely on parent
               if (!isEmbedded && e.cancelable) e.preventDefault();
               setPullPosition(Math.min(pullDistance, 100));
           }
@@ -284,7 +281,6 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
         : news;
   }, [news, activeTab, favorites]);
 
-  // Adjust container styles based on embedded prop
   const containerClass = isEmbedded 
     ? "h-full w-full" 
     : "p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6";
@@ -307,51 +303,26 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
       )}
       
       <div className="w-full max-w-7xl mx-auto">
-        {!isEmbedded && (
-            <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">{t('market_news')}</h1>
-            <div className="flex gap-2">
-                <button 
-                    onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
-                    className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
-                    aria-label="Filtros"
-                >
-                    <FilterIcon className="w-5 h-5" />
-                </button>
-                <button 
-                    onClick={handleRefresh} 
-                    disabled={loading}
-                    className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
-                    aria-label={t('refresh_prices')}
-                >
-                    <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
-                </button>
-            </div>
-            </div>
-        )}
-        
-        {/* If embedded, show compact filter toggle or integrate it */}
-        {isEmbedded && (
-             <div className="flex justify-between items-center mb-4">
-                 <div className="flex gap-2 w-full">
-                    <div className="relative flex-1">
-                        <input 
-                            type="text"
-                            placeholder={t('search_news_placeholder')}
-                            value={searchQuery}
-                            onChange={handleSearchChange}
-                            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
-                        />
-                    </div>
-                    <button 
-                        onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
-                        className={`p-3 rounded-lg transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
-                    >
-                        <FilterIcon className="w-5 h-5" />
-                    </button>
-                 </div>
-             </div>
-        )}
+        <div className="flex justify-between items-center mb-4">
+          {!isEmbedded && <h1 className="text-2xl font-bold">{t('market_news')}</h1>}
+          <div className={`flex gap-2 ${isEmbedded ? 'w-full justify-end' : ''}`}>
+               <button 
+                  onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                  className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  aria-label="Filtros"
+              >
+                  <FilterIcon className="w-5 h-5" />
+              </button>
+              <button 
+                  onClick={handleRefresh} 
+                  disabled={loading}
+                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
+                  aria-label={t('refresh_prices')}
+              >
+                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+              </button>
+          </div>
+        </div>
         
         {/* Filter Panel */}
         {showFilters && (
@@ -384,17 +355,15 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
             </div>
         )}
 
-        {!isEmbedded && (
-            <div className="mb-4">
-            <input 
-                type="text"
-                placeholder={t('search_news_placeholder')}
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
-            />
-            </div>
-        )}
+        <div className="mb-4">
+          <input 
+            type="text"
+            placeholder={t('search_news_placeholder')}
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
+          />
+        </div>
         
         <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
             <button 
