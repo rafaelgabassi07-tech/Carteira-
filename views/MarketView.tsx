@@ -41,12 +41,18 @@ const MARKET_CATEGORIES = [
     { title: "Fiagros (Agro)", color: "bg-lime-600", tickers: ["SNAG11", "VGIA11", "KNCA11", "RZAG11"] }
 ];
 
-const InfoBlock: React.FC<{ label: string; value: React.ReactNode; sub?: string; highlight?: boolean; colorClass?: string }> = ({ label, value, sub, highlight, colorClass }) => (
-    <div className={`flex flex-col p-3 rounded-xl border h-full justify-between ${highlight ? 'bg-[var(--bg-tertiary-hover)] border-[var(--accent-color)]/20' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
-        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 opacity-80">{label}</span>
+// --- Modern Stat Item Component ---
+const StatItem: React.FC<{ label: string; value: React.ReactNode; sub?: string; highlight?: boolean; colorClass?: string; icon?: React.ReactNode }> = ({ label, value, sub, highlight, colorClass, icon }) => (
+    <div className={`flex flex-col p-4 rounded-2xl h-full justify-between transition-colors ${highlight ? 'bg-[var(--bg-tertiary-hover)] ring-1 ring-[var(--accent-color)]/20' : 'bg-[var(--bg-primary)] border border-[var(--border-color)]'}`}>
+        <div className="flex justify-between items-start mb-2">
+            <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-80">{label}</span>
+            {icon && <div className="text-[var(--text-secondary)] opacity-50 scale-75">{icon}</div>}
+        </div>
         <div>
-            <span className={`text-sm font-bold truncate block ${colorClass ? colorClass : (highlight ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]')}`}>{value}</span>
-            {sub && <span className="text-[9px] text-[var(--text-secondary)] mt-0.5 truncate block">{sub}</span>}
+            <span className={`text-base font-bold truncate block tracking-tight ${colorClass ? colorClass : (highlight ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]')}`}>
+                {value}
+            </span>
+            {sub && <span className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate block font-medium opacity-70">{sub}</span>}
         </div>
     </div>
 );
@@ -54,18 +60,26 @@ const InfoBlock: React.FC<{ label: string; value: React.ReactNode; sub?: string;
 const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => void }> = ({ label, isActive, onClick }) => (
     <button
         onClick={onClick}
-        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${isActive ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-sm' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+        className={`px-5 py-2.5 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${isActive ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-md shadow-[var(--accent-color)]/20' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)]'}`}
     >
         {label}
     </button>
 );
 
+const SectionHeader: React.FC<{ title: string, icon?: React.ReactNode }> = ({ title, icon }) => (
+    <div className="flex items-center gap-2 mb-3 mt-1 px-1">
+        {icon && <span className="text-[var(--accent-color)]">{icon}</span>}
+        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{title}</h3>
+        <div className="h-px bg-[var(--border-color)] flex-1 opacity-50 ml-2"></div>
+    </div>
+);
+
 const FundamentalSkeleton: React.FC = () => (
-    <div className="animate-pulse space-y-4 px-4 pb-4">
-        <div className="h-24 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+    <div className="animate-pulse space-y-4 px-5 pb-5">
+        <div className="h-20 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="h-16 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
+                <div key={i} className="h-24 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
             ))}
         </div>
     </div>
@@ -196,18 +210,18 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     return (
         <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6">
             <div className="max-w-2xl mx-auto h-full flex flex-col">
-                <h1 className="text-2xl font-bold mb-4">{t('nav_market')}</h1>
+                <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_market')}</h1>
 
-                <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-6 border border-[var(--border-color)] shrink-0 shadow-sm">
+                <div className="flex bg-[var(--bg-secondary)] p-1 rounded-2xl mb-6 border border-[var(--border-color)] shrink-0 shadow-sm">
                     <button 
                         onClick={() => { setViewMode('quotes'); vibrate(); }}
-                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wide ${viewMode === 'quotes' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-wide ${viewMode === 'quotes' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-sm ring-1 ring-[var(--border-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
                         <GlobeIcon className="w-4 h-4" /> Cotações
                     </button>
                     <button 
                         onClick={() => { setViewMode('news'); vibrate(); }}
-                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wide ${viewMode === 'news' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-wide ${viewMode === 'news' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-sm ring-1 ring-[var(--border-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
                         <NewsIcon className="w-4 h-4" /> Notícias
                     </button>
@@ -235,132 +249,146 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                         </div>
 
                         {result && (
-                            <div className="bg-[var(--bg-secondary)] rounded-3xl border border-[var(--border-color)] shadow-lg animate-fade-in-up overflow-hidden">
-                                <div className="p-6 pb-2">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h2 className="text-3xl font-black text-[var(--text-primary)] tracking-tight">{result.ticker}</h2>
-                                                {result.fundamentals?.segment && (
-                                                    <span className="text-[10px] font-bold bg-[var(--bg-primary)] border border-[var(--border-color)] px-2 py-0.5 rounded-full text-[var(--text-secondary)] uppercase">
+                            <div className="bg-[var(--bg-secondary)] rounded-[24px] border border-[var(--border-color)] shadow-xl animate-fade-in-up overflow-hidden">
+                                
+                                {/* HEADER HERO */}
+                                <div className="p-6 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] border-b border-[var(--border-color)]">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex flex-col gap-2">
+                                            <h2 className="text-4xl font-black text-[var(--text-primary)] tracking-tighter leading-none">{result.ticker}</h2>
+                                            {result.fundamentals?.segment && (
+                                                <div className="self-start px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
+                                                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wide">
                                                         {result.fundamentals.segment}
                                                     </span>
-                                                )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col items-end text-right">
+                                            <span className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">{formatCurrency(result.price)}</span>
+                                            <div className={`flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md ${result.change >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                                                <span className="text-xs font-bold">
+                                                    {result.change >= 0 ? '▲' : '▼'} {Math.abs(result.change).toFixed(2)}%
+                                                </span>
                                             </div>
-                                            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1">
-                                                {loadingFundamentals ? <span className="flex items-center gap-1 animate-pulse"><SparklesIcon className="w-3 h-3"/> Analisando...</span> : 'Análise Completa'}
-                                            </p>
                                         </div>
-                                        <div className={`flex flex-col items-end`}>
-                                            <span className="text-2xl font-bold text-[var(--text-primary)]">{formatCurrency(result.price)}</span>
-                                            <span className={`text-sm font-bold ${result.change >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                                                {result.change >= 0 ? '▲' : '▼'} {Math.abs(result.change).toFixed(2)}%
-                                            </span>
-                                        </div>
+                                    </div>
+                                    
+                                    <div className="h-28 w-full mt-6 -mb-2 relative opacity-80">
+                                        {result.history.length >= 2 ? (
+                                            <PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-xs">Gráfico indisponível</div>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="h-28 w-full px-2 mb-4">
-                                    {result.history.length >= 2 ? (
-                                        <PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-xs">Gráfico indisponível</div>
-                                    )}
+                                {/* TABS */}
+                                <div className="px-5 py-4 border-b border-[var(--border-color)] overflow-x-auto no-scrollbar">
+                                    <div className="flex gap-2">
+                                        <TabButton label="Geral" isActive={detailTab === 'general'} onClick={() => setDetailTab('general')} />
+                                        <TabButton label="Dividendos" isActive={detailTab === 'dividends'} onClick={() => setDetailTab('dividends')} />
+                                        <TabButton label="Portfólio" isActive={detailTab === 'portfolio'} onClick={() => setDetailTab('portfolio')} />
+                                        <TabButton label="Riscos" isActive={detailTab === 'risks'} onClick={() => setDetailTab('risks')} />
+                                    </div>
                                 </div>
 
-                                {loadingFundamentals ? (
-                                    <FundamentalSkeleton />
-                                ) : (
-                                    <>
-                                        <div className="px-4 mb-4">
-                                            <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--border-color)] overflow-x-auto no-scrollbar">
-                                                <TabButton label="Geral" isActive={detailTab === 'general'} onClick={() => setDetailTab('general')} />
-                                                <TabButton label="Dividendos" isActive={detailTab === 'dividends'} onClick={() => setDetailTab('dividends')} />
-                                                <TabButton label="Portfólio" isActive={detailTab === 'portfolio'} onClick={() => setDetailTab('portfolio')} />
-                                                <TabButton label="Riscos" isActive={detailTab === 'risks'} onClick={() => setDetailTab('risks')} />
-                                            </div>
-                                        </div>
-
-                                        <div className="px-4 pb-4 animate-fade-in">
+                                {/* CONTENT */}
+                                <div className="pt-5 animate-fade-in min-h-[300px]">
+                                    {loadingFundamentals ? (
+                                        <FundamentalSkeleton />
+                                    ) : (
+                                        <div className="px-5 pb-6 space-y-6">
                                             
                                             {/* TAB: GENERAL */}
                                             {detailTab === 'general' && (
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                                    <InfoBlock label="P/VP" value={result.fundamentals?.pvp?.toFixed(2) ?? '-'} sub={result.fundamentals?.vpPerShare ? `VP: ${formatCurrency(result.fundamentals.vpPerShare)}` : ''} colorClass={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'text-[var(--green-text)]' : ''}/>
-                                                    <InfoBlock label="Dividend Yield" value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'} highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? true : false} />
-                                                    <InfoBlock label="Patrimônio Líq." value={result.fundamentals?.netWorth ?? '-'} />
-                                                    <InfoBlock label="Liquidez Diária" value="Analise na Corretora" sub="Dados em tempo real" />
-                                                    <InfoBlock label="Nº Cotistas" value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'} />
-                                                    <InfoBlock label="Gestão" value={result.fundamentals?.administrator ?? '-'} />
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                    <StatItem label="P/VP" value={result.fundamentals?.pvp?.toFixed(2) ?? '-'} sub={result.fundamentals?.vpPerShare ? `VP: ${formatCurrency(result.fundamentals.vpPerShare)}` : ''} colorClass={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'text-[var(--green-text)]' : ''}/>
+                                                    <StatItem label="Dividend Yield" value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'} highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? true : false} />
+                                                    <StatItem label="Patrimônio Líq." value={result.fundamentals?.netWorth ?? '-'} />
+                                                    <StatItem label="Liquidez Diária" value="Analise na Corretora" sub="Dados em tempo real" />
+                                                    <StatItem label="Nº Cotistas" value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'} />
+                                                    <StatItem label="Gestão" value={result.fundamentals?.administrator ?? '-'} />
                                                 </div>
                                             )}
 
                                             {/* TAB: DIVIDENDS */}
                                             {detailTab === 'dividends' && (
-                                                <div className="space-y-4">
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <InfoBlock label="Último Rendimento" value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'} highlight />
-                                                        <InfoBlock label="Cresc. 3 Anos (CAGR)" value={result.fundamentals?.dividendCAGR ? `${result.fundamentals.dividendCAGR > 0 ? '+' : ''}${result.fundamentals.dividendCAGR}%` : '-'} colorClass={result.fundamentals?.dividendCAGR && result.fundamentals.dividendCAGR > 0 ? 'text-[var(--green-text)]' : 'text-[var(--text-secondary)]'} />
+                                                <>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <StatItem label="Último Rendimento" value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'} highlight />
+                                                        <StatItem label="Cresc. 3 Anos (CAGR)" value={result.fundamentals?.dividendCAGR ? `${result.fundamentals.dividendCAGR > 0 ? '+' : ''}${result.fundamentals.dividendCAGR}%` : '-'} colorClass={result.fundamentals?.dividendCAGR && result.fundamentals.dividendCAGR > 0 ? 'text-[var(--green-text)]' : 'text-[var(--text-secondary)]'} />
                                                     </div>
-                                                    {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 ? (
-                                                        <div className="bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
-                                                            <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-2">Histórico Recente</p>
-                                                            <div className="h-32"><DividendChart data={result.fundamentals.dividendsHistory} /></div>
-                                                        </div>
-                                                    ) : <p className="text-center text-xs text-[var(--text-secondary)] py-4">Histórico indisponível</p>}
-                                                </div>
+                                                    
+                                                    <div>
+                                                        <SectionHeader title="Histórico Recente" icon={<ClockIcon className="w-4 h-4"/>}/>
+                                                        {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 ? (
+                                                            <div className="bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]">
+                                                                <div className="h-40"><DividendChart data={result.fundamentals.dividendsHistory} /></div>
+                                                            </div>
+                                                        ) : <p className="text-center text-xs text-[var(--text-secondary)] py-4 opacity-70">Histórico indisponível</p>}
+                                                    </div>
+                                                </>
                                             )}
 
                                             {/* TAB: PORTFOLIO */}
                                             {detailTab === 'portfolio' && (
-                                                <div className="space-y-3">
+                                                <div className="space-y-5">
                                                     {result.fundamentals?.businessDescription && (
-                                                        <div className="bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
-                                                            <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-1">Tese de Investimento</p>
-                                                            <p className="text-xs leading-relaxed opacity-90">{result.fundamentals.businessDescription}</p>
+                                                        <div className="bg-[var(--bg-primary)] p-5 rounded-2xl border border-[var(--border-color)] relative">
+                                                            <div className="absolute top-4 left-4 text-[var(--accent-color)] opacity-20">
+                                                                <SparklesIcon className="w-6 h-6" />
+                                                            </div>
+                                                            <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-2 pl-1">Tese de Investimento</p>
+                                                            <p className="text-sm leading-relaxed text-[var(--text-primary)] font-medium">"{result.fundamentals.businessDescription}"</p>
                                                         </div>
                                                     )}
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <InfoBlock label="Vacância Física" value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'} colorClass={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'text-[var(--red-text)]' : ''} />
-                                                        <InfoBlock label="Cap Rate (Est.)" value={result.fundamentals?.capRate ? `${result.fundamentals.capRate}%` : '-'} sub="Rentabilidade Imóvel" />
-                                                        <InfoBlock label="Taxa de Adm." value={result.fundamentals?.managementFee ?? '-'} />
+                                                    
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <StatItem label="Vacância Física" value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'} colorClass={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'text-[var(--red-text)]' : ''} />
+                                                        <StatItem label="Cap Rate (Est.)" value={result.fundamentals?.capRate ? `${result.fundamentals.capRate}%` : '-'} sub="Rentabilidade Imóvel" />
+                                                        <StatItem label="Taxa de Adm." value={result.fundamentals?.managementFee ?? '-'} />
                                                     </div>
                                                 </div>
                                             )}
 
                                             {/* TAB: RISKS */}
                                             {detailTab === 'risks' && (
-                                                <div className="space-y-3">
+                                                <div className="space-y-5">
                                                     {result.fundamentals?.riskAssessment && (
-                                                        <div className={`p-3 rounded-xl border flex gap-3 ${result.fundamentals.riskAssessment.includes('High') || result.fundamentals.riskAssessment.includes('Alto') ? 'bg-red-500/10 border-red-500/20' : (result.fundamentals.riskAssessment.includes('Medium') || result.fundamentals.riskAssessment.includes('Médio') ? 'bg-amber-500/10 border-amber-500/20' : 'bg-emerald-500/10 border-emerald-500/20')}`}>
-                                                            <div className="shrink-0 pt-0.5"><AnalysisIcon className="w-4 h-4 opacity-70"/></div>
+                                                        <div className={`p-5 rounded-2xl border flex gap-4 ${result.fundamentals.riskAssessment.includes('High') || result.fundamentals.riskAssessment.includes('Alto') ? 'bg-red-500/5 border-red-500/20' : (result.fundamentals.riskAssessment.includes('Medium') || result.fundamentals.riskAssessment.includes('Médio') ? 'bg-amber-500/5 border-amber-500/20' : 'bg-emerald-500/5 border-emerald-500/20')}`}>
+                                                            <div className={`shrink-0 p-2 rounded-full h-fit ${result.fundamentals.riskAssessment.includes('High') || result.fundamentals.riskAssessment.includes('Alto') ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                                                                <AnalysisIcon className="w-5 h-5"/>
+                                                            </div>
                                                             <div>
-                                                                <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-80">Avaliação de Risco (IA)</p>
-                                                                <p className="text-xs font-bold">{result.fundamentals.riskAssessment}</p>
+                                                                <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-60">Avaliação de Risco (IA)</p>
+                                                                <p className="text-sm font-bold leading-snug">{result.fundamentals.riskAssessment}</p>
                                                             </div>
                                                         </div>
                                                     )}
                                                     
                                                     {result.fundamentals?.strengths && result.fundamentals.strengths.length > 0 && (
-                                                        <div className="bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
-                                                            <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-2 flex items-center gap-1"><TrendingUpIcon className="w-3 h-3"/> Pontos Fortes</p>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {result.fundamentals.strengths.map((s, i) => (
-                                                                    <span key={i} className="text-[10px] bg-[var(--bg-secondary)] border border-[var(--border-color)] px-2 py-1 rounded-md font-medium">{s}</span>
-                                                                ))}
+                                                        <div>
+                                                            <SectionHeader title="Pontos Fortes" icon={<TrendingUpIcon className="w-4 h-4"/>}/>
+                                                            <div className="bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]">
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {result.fundamentals.strengths.map((s, i) => (
+                                                                        <span key={i} className="text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] px-3 py-1.5 rounded-lg font-bold text-[var(--text-primary)]">{s}</span>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
-                                    </>
-                                )}
+                                    )}
+                                </div>
 
-                                <div className="p-4 bg-[var(--bg-primary)]/50 border-t border-[var(--border-color)]">
+                                <div className="p-5 bg-[var(--bg-tertiary-hover)]/30 border-t border-[var(--border-color)]">
                                     <button 
                                         onClick={() => setShowAddModal(true)}
-                                        className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[var(--accent-color)]/20"
+                                        className="w-full bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-xl shadow-[var(--accent-color)]/20"
                                     >
                                         <PlusIcon className="w-5 h-5" />
                                         Adicionar à Carteira
@@ -370,50 +398,52 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                         )}
 
                         {error && (
-                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-center text-sm font-bold animate-fade-in">
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-center text-sm font-bold animate-fade-in">
                                 {error}
                             </div>
                         )}
 
                         {!result && (
-                            <div className="animate-fade-in space-y-6 mt-4">
+                            <div className="animate-fade-in space-y-8 mt-4">
                                 {recentSearches.length > 0 && (
                                     <div className="mb-6">
-                                        <div className="flex justify-between items-center mb-3 px-1">
+                                        <div className="flex justify-between items-center mb-4 px-1">
                                             <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2">
                                                 <ClockIcon className="w-3.5 h-3.5"/> Recentes
                                             </h3>
-                                            <button onClick={clearRecent} className="text-[var(--text-secondary)] hover:text-red-400 p-1">
+                                            <button onClick={clearRecent} className="text-[var(--text-secondary)] hover:text-red-400 p-1 transition-colors">
                                                 <TrashIcon className="w-3.5 h-3.5"/>
                                             </button>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
                                             {recentSearches.map(term => (
-                                                <button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group">
-                                                    {term} <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                                                <button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group">
+                                                    {term} <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">→</span>
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
                                 )}
 
-                                <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider px-1">Descubra Oportunidades</h3>
-                                {MARKET_CATEGORIES.map((cat, i) => (
-                                    <div key={i} className="space-y-2">
-                                        <div className="flex items-center gap-2 px-1">
-                                            <div className={`w-2 h-2 rounded-full ${cat.color}`}></div>
-                                            <span className="text-sm font-bold text-[var(--text-primary)]">{cat.title}</span>
+                                <div>
+                                    <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider px-1 mb-4">Descubra Oportunidades</h3>
+                                    {MARKET_CATEGORIES.map((cat, i) => (
+                                        <div key={i} className="mb-4">
+                                            <div className="flex items-center gap-2 px-1 mb-3">
+                                                <div className={`w-2 h-2 rounded-full ${cat.color}`}></div>
+                                                <span className="text-sm font-bold text-[var(--text-primary)]">{cat.title}</span>
+                                            </div>
+                                            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">
+                                                {cat.tickers.map(t => (
+                                                    <button key={t} onClick={() => { setSearchTerm(t); handleSearch(t); }} className="flex-shrink-0 w-32 bg-[var(--bg-secondary)] border border-[var(--border-color)] p-3.5 rounded-2xl hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all active:scale-95 text-left group">
+                                                        <span className="block font-bold text-sm text-[var(--text-primary)] mb-1">{t}</span>
+                                                        <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors font-medium">Ver detalhes →</span>
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">
-                                            {cat.tickers.map(t => (
-                                                <button key={t} onClick={() => { setSearchTerm(t); handleSearch(t); }} className="flex-shrink-0 w-28 bg-[var(--bg-secondary)] border border-[var(--border-color)] p-3 rounded-xl hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all active:scale-95 text-left group">
-                                                    <span className="block font-bold text-sm text-[var(--text-primary)] mb-1">{t}</span>
-                                                    <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors">Ver detalhes →</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
