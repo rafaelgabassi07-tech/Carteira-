@@ -23,13 +23,15 @@ interface MonthlyData {
 
 interface PayerData {
     ticker: string;
-    totalPaid: number; // Total recebido em R$
+    totalPaid: number; // Total recebido em R$ neste periodo/snapshot
     count: number;
     lastExDate?: string;
     nextPaymentDate?: string;
     isProvisioned?: boolean; // Se o próximo pagamento é futuro
     yieldOnCost: number; // Retorno sobre o investido neste ativo
     averageMonthly: number;
+    userQuantity: number; // Quantidade de cotas considerada
+    lastValuePerShare: number; // Valor unitário do último/próximo provento
 }
 
 interface DividendStats {
@@ -88,6 +90,8 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             let lastExDate: string | undefined = undefined;
             let nextPaymentDate: string | undefined = undefined;
             let isProvisioned = false;
+            let lastValuePerShare = 0;
+            let currentQuantityOwned = 0;
 
             // Sort history to find latest dates easily (Newest first)
             const sortedHistory = [...history].sort((a, b) => b.exDate.localeCompare(a.exDate));
@@ -99,10 +103,12 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                     lastExDate = provisioned.exDate;
                     nextPaymentDate = provisioned.paymentDate;
                     isProvisioned = true;
+                    lastValuePerShare = provisioned.value;
                 } else {
                     // Fallback to the absolute last one
                     lastExDate = sortedHistory[0].exDate;
                     nextPaymentDate = sortedHistory[0].paymentDate;
+                    lastValuePerShare = sortedHistory[0].value;
                 }
             }
 
@@ -117,6 +123,11 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                 }
                 qtyOwned = Math.max(0, qtyOwned);
 
+                // Update the quantity for the "latest" displayed dividend
+                if ((div.exDate === lastExDate) && qtyOwned > 0) {
+                    currentQuantityOwned = qtyOwned;
+                }
+
                 if (qtyOwned > 0) {
                     const amount = qtyOwned * div.value;
                     totalReceived += amount;
@@ -127,6 +138,9 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                     monthlyAggregation[monthKey] = (monthlyAggregation[monthKey] || 0) + amount;
                 }
             });
+            
+            // Fallback if current qty wasn't captured in loop (e.g. no recent dividend match, but asset exists)
+            if (currentQuantityOwned === 0) currentQuantityOwned = assetData.quantity;
 
             // Calculate Yield on Cost specific to this asset
             const assetYoC = assetTotalInvested > 0 ? (tickerTotalPaid / assetTotalInvested) * 100 : 0;
@@ -139,7 +153,9 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                 nextPaymentDate,
                 isProvisioned,
                 yieldOnCost: assetYoC,
-                averageMonthly: count > 0 ? tickerTotalPaid / count : 0 // Simple average of payments received
+                averageMonthly: count > 0 ? tickerTotalPaid / count : 0,
+                userQuantity: currentQuantityOwned,
+                lastValuePerShare
             };
         });
 
@@ -170,7 +186,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         return { 
             totalReceived, 
             monthlyData, 
-            payersData: Object.values(payerAggregation).filter(p => p.totalPaid > 0 || p.isProvisioned).sort((a,b) => b.totalPaid - a.totalPaid), 
+            payersData: Object.values(payerAggregation).filter(p => p.totalPaid > 0 || p.isProvisioned || p.nextPaymentDate).sort((a,b) => b.totalPaid - a.totalPaid), 
             currentMonthValue,
             currentMonthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
             averageIncome,
@@ -253,13 +269,31 @@ const MonthlyBarChart: React.FC<{ data: MonthlyData[]; avg: number }> = ({ data,
     );
 };
 
+const DetailRow: React.FC<{ label: string; value: string; highlight?: boolean }> = ({ label, value, highlight }) => (
+    <div className="flex flex-col">
+        <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-70 mb-0.5">{label}</span>
+        <span className={`text-xs font-bold ${highlight ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{value}</span>
+    </div>
+);
+
 const DetailedPayerRow: React.FC<{ payer: PayerData; rank: number }> = ({ payer, rank }) => {
     const { formatCurrency, locale } = useI18n();
+    const [isExpanded, setIsExpanded] = useState(false);
     
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return '-';
         const date = new Date(dateStr);
         return date.toLocaleDateString(locale, { day: '2-digit', month: 'short' }).replace('.', '');
+    };
+
+    const formatFullDate = (dateStr?: string) => {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        // Fix timezone issue for visual display
+        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+        const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
+        
+        return adjustedDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
     };
 
     const today = new Date();
@@ -278,64 +312,92 @@ const DetailedPayerRow: React.FC<{ payer: PayerData; rank: number }> = ({ payer,
         daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
     }
 
+    const projectedTotal = payer.userQuantity * payer.lastValuePerShare;
+
     return (
-        <div className="bg-[var(--bg-primary)] p-3.5 rounded-2xl border border-[var(--border-color)] mb-2.5 flex items-center justify-between transition-all hover:border-[var(--accent-color)]/30 group relative overflow-hidden active:scale-[0.99]">
+        <div className={`bg-[var(--bg-primary)] rounded-2xl border transition-all duration-300 overflow-hidden mb-2.5 ${isExpanded ? 'border-[var(--accent-color)] shadow-md' : 'border-[var(--border-color)] hover:border-[var(--accent-color)]/30'}`}>
             
-            {/* Rank & Ticker */}
-            <div className="flex items-center gap-3 w-[28%]">
-                <div className={`w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-[9px] font-bold ${rank <= 3 ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)]'}`}>
-                    {rank}
-                </div>
-                <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-sm text-[var(--text-primary)] truncate leading-tight">{payer.ticker}</span>
-                    <span className="text-[9px] text-[var(--text-secondary)] font-medium truncate">
-                        Retorno: <span className={payer.yieldOnCost > 10 ? "text-[var(--green-text)] font-bold" : ""}>{payer.yieldOnCost.toFixed(1)}%</span>
-                    </span>
-                </div>
-            </div>
-
-            {/* Calendar Timeline */}
-            <div className="flex-1 flex flex-col items-center justify-center px-2">
-                {/* Visual Timeline */}
-                <div className="flex items-center w-full max-w-[140px] justify-between relative mb-1.5">
-                    {/* Line */}
-                    <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-[1.5px] bg-[var(--border-color)] -z-10"></div>
-                    
-                    {/* Ex Date Dot */}
-                    <div className="flex flex-col items-center bg-[var(--bg-primary)] px-1 z-10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-secondary)] mb-1 opacity-50 ring-2 ring-[var(--bg-primary)]"></span>
-                        <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{formatDate(payer.lastExDate)}</span>
+            {/* Header (Clickable) */}
+            <div 
+                onClick={() => { vibrate(); setIsExpanded(!isExpanded); }}
+                className="p-3.5 flex items-center justify-between cursor-pointer active:bg-[var(--bg-tertiary-hover)] transition-colors relative"
+            >
+                {/* Rank & Ticker */}
+                <div className="flex items-center gap-3 w-[28%]">
+                    <div className={`w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-[9px] font-bold ${rank <= 3 ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)]'}`}>
+                        {rank}
                     </div>
-
-                    {/* Pay Date Dot (Highlighted if future) */}
-                    <div className="flex flex-col items-center bg-[var(--bg-primary)] px-1 z-10">
-                        <span className={`w-2 h-2 rounded-full mb-1 ring-2 ring-[var(--bg-primary)] ${isFuture ? 'bg-[var(--accent-color)] shadow-[0_0_6px_var(--accent-color)]' : 'bg-[var(--green-text)]'}`}></span>
-                        <span className={`text-[8px] font-bold uppercase tracking-wider ${isFuture ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>
-                            {formatDate(payer.nextPaymentDate)}
+                    <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-sm text-[var(--text-primary)] truncate leading-tight">{payer.ticker}</span>
+                        <span className="text-[9px] text-[var(--text-secondary)] font-medium truncate opacity-80">
+                            YOC: <span className={payer.yieldOnCost > 10 ? "text-[var(--green-text)] font-bold" : ""}>{payer.yieldOnCost.toFixed(1)}%</span>
                         </span>
                     </div>
                 </div>
+
+                {/* Calendar Timeline */}
+                <div className="flex-1 flex flex-col items-center justify-center px-2">
+                    <div className="flex items-center w-full max-w-[140px] justify-between relative mb-1.5">
+                        <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-[1.5px] bg-[var(--border-color)] -z-10"></div>
+                        
+                        {/* Ex Date Dot */}
+                        <div className="flex flex-col items-center bg-[var(--bg-primary)] px-1 z-10">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-secondary)] mb-1 opacity-50 ring-2 ring-[var(--bg-primary)]"></span>
+                            <span className="text-[8px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{formatDate(payer.lastExDate)}</span>
+                        </div>
+
+                        {/* Pay Date Dot */}
+                        <div className="flex flex-col items-center bg-[var(--bg-primary)] px-1 z-10">
+                            <span className={`w-2 h-2 rounded-full mb-1 ring-2 ring-[var(--bg-primary)] ${isFuture ? 'bg-[var(--accent-color)] shadow-[0_0_6px_var(--accent-color)]' : 'bg-[var(--green-text)]'}`}></span>
+                            <span className={`text-[8px] font-bold uppercase tracking-wider ${isFuture ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>
+                                {formatDate(payer.nextPaymentDate)}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    {isFuture && (
+                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md leading-none ${isToday ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] animate-pulse' : 'bg-[var(--bg-secondary)] text-[var(--accent-color)] border border-[var(--border-color)]'}`}>
+                            {isToday ? 'HOJE!' : `${daysRemaining} dias`}
+                        </span>
+                    )}
+                    {!isFuture && payer.count > 0 && (
+                        <span className="text-[8px] font-medium text-[var(--text-secondary)] opacity-50 leading-none">Pago</span>
+                    )}
+                </div>
                 
-                {/* Status Text */}
-                {isFuture && (
-                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md leading-none ${isToday ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] animate-pulse' : 'bg-[var(--bg-secondary)] text-[var(--accent-color)] border border-[var(--border-color)]'}`}>
-                        {isToday ? 'HOJE!' : `${daysRemaining} dias`}
-                    </span>
-                )}
-                {!isFuture && payer.count > 0 && (
-                    <span className="text-[8px] font-medium text-[var(--text-secondary)] opacity-50 leading-none">
-                        Pago
-                    </span>
-                )}
+                {/* Values & Arrow */}
+                <div className="text-right w-[28%] flex flex-col justify-center items-end">
+                    <div className="flex items-center gap-1">
+                        <span className="font-black text-sm text-[var(--text-primary)]">{formatCurrency(payer.totalPaid > 0 ? payer.totalPaid : projectedTotal)}</span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[9px] text-[var(--text-secondary)] font-medium opacity-80">
+                            Méd: {formatCurrency(payer.averageMonthly)}
+                        </span>
+                        <ChevronRightIcon className={`w-3 h-3 text-[var(--text-secondary)] transition-transform duration-300 ${isExpanded ? '-rotate-90' : 'rotate-90'}`} />
+                    </div>
+                </div>
             </div>
-            
-            {/* Values */}
-            <div className="text-right w-[28%] flex flex-col justify-center">
-                <span className="font-black text-sm text-[var(--text-primary)]">{formatCurrency(payer.totalPaid)}</span>
-                <span className="text-[9px] text-[var(--text-secondary)] font-medium mt-0.5 opacity-80">
-                    Méd: {formatCurrency(payer.averageMonthly)}
-                </span>
-            </div>
+
+            {/* Accordion Body */}
+            {isExpanded && (
+                <div className="bg-[var(--bg-secondary)]/30 border-t border-[var(--border-color)] border-dashed p-4 animate-slide-down">
+                    <div className="grid grid-cols-2 gap-y-4 gap-x-2 mb-2">
+                        <DetailRow label="Data Com" value={formatFullDate(payer.lastExDate)} highlight />
+                        <DetailRow label="Data Pagamento" value={formatFullDate(payer.nextPaymentDate)} highlight />
+                        
+                        <div className="col-span-2 h-px bg-[var(--border-color)]/50 my-1"></div>
+
+                        <DetailRow label="Quantidade" value={`${payer.userQuantity} cotas`} />
+                        <DetailRow label="Valor Unitário" value={formatCurrency(payer.lastValuePerShare)} highlight />
+                        
+                        <div className="col-span-2 bg-[var(--bg-secondary)] p-2 rounded-lg border border-[var(--border-color)] flex justify-between items-center mt-1">
+                            <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Total Previsto</span>
+                            <span className="font-bold text-[var(--accent-color)]">{formatCurrency(projectedTotal)}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
