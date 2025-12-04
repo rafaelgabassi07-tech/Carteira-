@@ -3,12 +3,13 @@ import React, { useState, useMemo, useRef } from 'react';
 import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import SettingsIcon from '../components/icons/SettingsIcon';
+import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
+import SettingsIcon from '../components/icons/SettingsIcon';
 import DividendsSummaryCard from '../components/DividendsSummaryCard';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 
@@ -57,16 +58,16 @@ const Header: React.FC<{
                     className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
-                     <RefreshIcon className="w-5 h-5"/>
+                     <RefreshIcon className="w-4 h-4"/>
                 </button>
                 <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
-                     {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
+                     {privacyMode ? <EyeOffIcon className="w-4 h-4"/> : <EyeIcon className="w-4 h-4"/>}
                 </button>
                 <button id="settings-btn" onClick={() => { setActiveView('settings'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
-                    <SettingsIcon className="w-5 h-5" />
+                    <SettingsIcon className="w-4 h-4" />
                 </button>
                 <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
-                    <BellIcon className="w-5 h-5" />
+                    <BellIcon className="w-4 h-4" />
                 </button>
             </div>
         </header>
