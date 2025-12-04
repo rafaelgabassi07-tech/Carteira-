@@ -6,6 +6,7 @@ import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import AnalysisIcon from '../components/icons/AnalysisIcon';
 import DividendChart from '../components/DividendChart';
+import CountUp from '../components/CountUp';
 import { vibrate } from '../utils';
 
 interface AssetDetailViewProps {
@@ -125,12 +126,15 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{t('current_position')}</p>
-                        <p className="text-3xl font-black text-[var(--text-primary)] tracking-tight">{formatCurrency(currentValue)}</p>
+                        <p className="text-3xl font-black text-[var(--text-primary)] tracking-tight">
+                            <CountUp end={currentValue} formatter={formatCurrency} />
+                        </p>
                     </div>
                     <div className="text-right">
                         <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{t('result')}</p>
                         <div className={`text-lg font-bold ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                            {variation >= 0 ? '+' : ''}{formatCurrency(variation)}
+                            {variation >= 0 ? '+' : ''}
+                            <CountUp end={Math.abs(variation)} formatter={formatCurrency} />
                         </div>
                     </div>
                 </div>

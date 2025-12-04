@@ -154,7 +154,9 @@ const App: React.FC = () => {
             <main className="flex-1 relative w-full h-full flex flex-col min-w-0">
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                     <Suspense fallback={<LoadingSpinner />}>
-                        {renderView()}
+                        <div key={activeView} className="animate-page-enter h-full w-full">
+                            {renderView()}
+                        </div>
                     </Suspense>
                 </div>
                 
