@@ -226,42 +226,40 @@ const PayerListItem: React.FC<{
     const { formatCurrency } = useI18n();
     const iconColor = stringToColor(payer.ticker);
     
-    let rankDisplay: React.ReactNode = <span className="text-xs font-medium text-[var(--text-secondary)] opacity-50 w-5 text-center">#{rank}</span>;
-    if (rank === 1) rankDisplay = <span className="text-sm w-5 text-center">🥇</span>;
-    if (rank === 2) rankDisplay = <span className="text-sm w-5 text-center">🥈</span>;
-    if (rank === 3) rankDisplay = <span className="text-sm w-5 text-center">🥉</span>;
-
+    // Background bar calculation
     const valueToBar = sortBy === 'total' ? payer.total : payer.roi;
     const barWidth = (valueToBar / maxVal) * 100;
 
     return (
-        <div className={`relative p-3 rounded-xl border mb-2 flex items-center justify-between group transition-all active:bg-[var(--bg-tertiary-hover)] bg-[var(--bg-primary)] border-[var(--border-color)] overflow-hidden`}>
+        <div className={`relative px-4 py-3.5 rounded-xl border mb-2 flex items-center justify-between group transition-all active:bg-[var(--bg-tertiary-hover)] bg-[var(--bg-primary)] border-[var(--border-color)] overflow-hidden`}>
             
-            {/* Background Bar */}
-            <div className="absolute bottom-0 left-0 h-[2px] bg-[var(--accent-color)] transition-all duration-1000 ease-out opacity-60" style={{ width: `${barWidth}%` }}></div>
+            {/* Background Progress Bar (Subtle) */}
+            <div className="absolute bottom-0 left-0 h-[2px] bg-[var(--accent-color)] transition-all duration-1000 ease-out opacity-40" style={{ width: `${barWidth}%` }}></div>
 
+            {/* Left Side: Identity */}
             <div className="flex items-center gap-3 z-10 relative flex-1 min-w-0">
-                {rankDisplay}
-                
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-[10px] text-white shadow-sm shrink-0" style={{ backgroundColor: iconColor }}>
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-[10px] text-white shadow-sm shrink-0" style={{ backgroundColor: iconColor }}>
                     {payer.ticker.substring(0,4)}
                 </div>
                 
                 <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-sm text-[var(--text-primary)] leading-tight">{payer.ticker}</span>
-                    <span className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1">
-                        Média: {formatCurrency(payer.monthlyAverage)}/mês
+                    <span className="font-bold text-sm text-[var(--text-primary)] leading-tight tracking-tight">{payer.ticker}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">
+                        Méd: {formatCurrency(payer.monthlyAverage)}
                     </span>
                 </div>
             </div>
 
-            <div className="text-right z-10 relative pl-2">
-                <span className="font-bold text-sm text-[var(--text-primary)] block">
+            {/* Right Side: Values */}
+            <div className="text-right z-10 relative pl-4 flex flex-col items-end gap-1">
+                <span className="font-bold text-sm text-[var(--text-primary)]">
                     {formatCurrency(payer.total)}
                 </span>
-                <span className={`text-[10px] font-medium ${payer.roi >= 100 ? "text-[var(--green-text)]" : "text-[var(--text-secondary)]"}`}>
-                    ROI: {payer.roi.toFixed(1)}%
-                </span>
+                
+                {/* Badge de Retorno */}
+                <div className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${payer.roi >= 100 ? "bg-emerald-500/10 text-emerald-500" : "bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)]"}`}>
+                    Retorno: {payer.roi.toFixed(1)}%
+                </div>
             </div>
         </div>
     );
@@ -335,6 +333,12 @@ const DividendsDetailModal: React.FC<{
                             <button onClick={() => {setSortMode('total'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'total' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>Valor</button>
                             <button onClick={() => {setSortMode('roi'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'roi' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>Retorno %</button>
                         </div>
+                    </div>
+
+                    {/* Column Headers for Clarity */}
+                    <div className="flex justify-between px-4 mb-2 text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-70">
+                        <span>Ativo</span>
+                        <span>Total / Retorno</span>
                     </div>
 
                     <div className="space-y-1">
