@@ -3,6 +3,7 @@ export interface DividendHistoryEvent {
   exDate: string;
   paymentDate: string;
   value: number;
+  isProvisioned?: boolean; // Novo: Indica se é um dividendo futuro/anunciado
 }
 
 export interface Asset {

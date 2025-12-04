@@ -134,27 +134,37 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const tickersString = tickers.join(', ');
 
-    // Prompt Otimizado para Setorização Precisa e Proventos
+    // Prompt Aprimorado para Confiabilidade e Provisões
     const prompt = `
-      TASK: Retrieve current financial indicators AND recent dividend history for these Brazilian FIIs: ${tickersString}.
+      TASK: Retrieve rigorous financial data for these Brazilian FIIs: ${tickersString}.
       
-      CRITICAL RULES:
-      1. Use 'googleSearch' to find real-time values from reliable sources (StatusInvest, ClubeFII, FundsExplorer).
-      2. For 'assetType' (Sector), you MUST map the result to EXACTLY one of these categories:
-         [ "Tijolo", "Papel", "Fiagro", "FOF", "Infra", "Híbrido", "Outros" ]
-         - Example: "Logística", "Lajes", "Shoppings" -> "Tijolo".
-         - Example: "Recebíveis", "CRI" -> "Papel".
-      3. OUTPUT: JSON Object ONLY. Keys = Ticker (e.g., "MXRF11").
+      RULES FOR SEARCH:
+      1. Use 'googleSearch' to find exact data from official sources (B3, StatusInvest, ClubeFII, FundsExplorer).
+      2. For 'assetType' (Sector), map to EXACTLY one: "Tijolo", "Papel", "Fiagro", "FOF", "Infra", "Híbrido", "Outros".
       
-      Required Fields per Ticker:
-      - "dy": Dividend Yield 12m (number, e.g. 12.5)
-      - "pvp": P/VP (number, e.g. 1.03)
-      - "assetType": One of the strictly allowed categories above.
-      - "administrator": Name of administrator (string)
-      - "dividendsHistory": Array of the last 6 payments (Rendimentos). 
-         Object structure: { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number }. 
-         Dates MUST be in YYYY-MM-DD format. Value is the amount per share (e.g. 0.10).
-         Use exact dates found in announcements.
+      RULES FOR DIVIDENDS (CRITICAL):
+      1. Fetch the last 8 PAID dividends.
+      2. **IMPORTANT**: Check if there are any **ANNOUNCED (provisioned)** dividends that haven't been paid yet.
+      3. Dates MUST be strictly 'YYYY-MM-DD'. Verify the year.
+      4. Value is "R$ per share".
+      
+      OUTPUT: JSON Object ONLY. Keys = Ticker (e.g., "MXRF11").
+      
+      Structure per Ticker:
+      {
+        "dy": number (12m yield, e.g. 12.5),
+        "pvp": number (e.g. 1.03),
+        "assetType": string (Category),
+        "administrator": string,
+        "dividendsHistory": [
+           { 
+             "exDate": "YYYY-MM-DD", 
+             "paymentDate": "YYYY-MM-DD", 
+             "value": number,
+             "isProvisioned": boolean  // true if announced but not paid yet (date in future)
+           }
+        ]
+      }
     `;
 
     const bytesSent = new Blob([prompt]).size;
@@ -164,8 +174,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
-                tools: [{ googleSearch: {} }], // ENABLED SEARCH FOR REAL DATA
-                temperature: 0, // Deterministic output
+                tools: [{ googleSearch: {} }], 
+                temperature: 0, 
             }
         });
 
@@ -193,7 +203,12 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                 if (Array.isArray(assetData.dividendsHistory)) {
                     cleanDividends = assetData.dividendsHistory.filter((d: any) => {
                         return d.exDate && d.paymentDate && typeof d.value === 'number' && !isNaN(d.value);
-                    });
+                    }).map((d: any) => ({
+                        exDate: d.exDate,
+                        paymentDate: d.paymentDate,
+                        value: d.value,
+                        isProvisioned: !!d.isProvisioned
+                    }));
                 }
 
                 sanitizedData[ticker] = {

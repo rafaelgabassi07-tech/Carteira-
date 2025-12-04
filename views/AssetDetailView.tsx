@@ -64,7 +64,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             const isStale = !asset?.lastUpdated || (Date.now() - asset.lastUpdated > 5 * 60 * 1000);
             
             // Only force refresh if data is missing AND we haven't checked recently
-            // This prevents spamming API for assets that simply don't have dividends (like some stocks or incomplete data)
             if (isStale && (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0)) {
                 setIsRefreshing(true);
                 try {
@@ -142,8 +141,9 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         });
 
         // FILTRO: Exibir apenas proventos cuja Data Ex seja posterior ou igual à primeira compra.
+        // A menos que seja um provisionado futuro, que deve aparecer.
         if (firstPurchaseDate) {
-            processedHistory = processedHistory.filter(div => div.exDate >= firstPurchaseDate);
+            processedHistory = processedHistory.filter(div => div.exDate >= firstPurchaseDate || div.isProvisioned);
         }
 
         return processedHistory;
@@ -160,17 +160,19 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     oneYearAgo.setFullYear(currentYear - 1);
 
     const totalDividendsReceived = useMemo(() => {
-        return fullDividendHistory.reduce((acc, div) => acc + div.totalReceived, 0);
+        return fullDividendHistory
+            .filter(d => !d.isProvisioned) // Don't count future in total received
+            .reduce((acc, div) => acc + div.totalReceived, 0);
     }, [fullDividendHistory]);
 
     const totalYTD = useMemo(() => {
         return fullDividendHistory
-            .filter(d => new Date(d.paymentDate).getFullYear() === currentYear)
+            .filter(d => !d.isProvisioned && new Date(d.paymentDate).getFullYear() === currentYear)
             .reduce((acc, div) => acc + div.totalReceived, 0);
     }, [fullDividendHistory, currentYear]);
 
     const averageMonthly = useMemo(() => {
-        const last12m = fullDividendHistory.filter(d => new Date(d.paymentDate) >= oneYearAgo);
+        const last12m = fullDividendHistory.filter(d => !d.isProvisioned && new Date(d.paymentDate) >= oneYearAgo);
         const total = last12m.reduce((acc, div) => acc + div.totalReceived, 0);
         return last12m.length > 0 ? total / 12 : 0;
     }, [fullDividendHistory, oneYearAgo]);
@@ -310,21 +312,23 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                 
                                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-sm">
                                     {displayedDividends.map((div, index) => {
+                                        const isProvisioned = div.isProvisioned;
+                                        
                                         return (
                                             <div 
                                                 key={`${div.exDate}-${index}`} 
-                                                className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedHistoryItem === div.exDate ? 'bg-[var(--bg-tertiary-hover)]' : ''} ${!div.isReceived ? 'opacity-60 bg-[var(--bg-primary)]/30' : ''}`}
+                                                className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${index !== displayedDividends.length - 1 ? 'border-b border-[var(--border-color)]' : ''} ${selectedHistoryItem === div.exDate ? 'bg-[var(--bg-tertiary-hover)]' : ''} ${!div.isReceived && !isProvisioned ? 'opacity-60 bg-[var(--bg-primary)]/30' : ''}`}
                                                 onClick={() => { setSelectedHistoryItem(div.exDate); vibrate(); }}
                                             >
                                                 <div className="flex flex-col gap-1.5">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider bg-[var(--bg-primary)] px-1.5 py-0.5 rounded border border-[var(--border-color)]">
-                                                            Pagamento
+                                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${isProvisioned ? 'text-amber-400 border-amber-400/30 bg-amber-400/10' : 'text-[var(--text-secondary)] border-[var(--border-color)] bg-[var(--bg-primary)]'}`}>
+                                                            {isProvisioned ? 'Agendado' : 'Pago'}
                                                         </span>
                                                         <span className="font-bold text-sm text-[var(--text-primary)]">
                                                             {new Date(div.paymentDate).toLocaleDateString(locale, { timeZone: 'UTC' })}
                                                         </span>
-                                                        {div.isReceived && <span className="w-2 h-2 rounded-full bg-[var(--green-text)] ml-1"></span>}
+                                                        {div.isReceived && !isProvisioned && <span className="w-2 h-2 rounded-full bg-[var(--green-text)] ml-1"></span>}
                                                     </div>
                                                     
                                                     <div className="flex items-center gap-1.5">
@@ -338,17 +342,22 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                                 </div>
 
                                                 <div className="text-right flex flex-row sm:flex-col justify-between items-center sm:items-end">
-                                                    {div.isReceived ? (
-                                                        <>
+                                                    {isProvisioned ? (
+                                                        <div className="flex flex-col items-end">
+                                                            <p className="font-bold text-amber-400 text-sm">{formatCurrency(div.totalReceived)}</p>
+                                                            <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5 italic">Provisão</p>
+                                                        </div>
+                                                    ) : (
+                                                        div.isReceived ? (
                                                             <div className="flex flex-col items-end">
                                                                 <p className="font-bold text-[var(--green-text)] text-sm">{formatCurrency(div.totalReceived)}</p>
                                                                 <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">{div.userQuantity} cotas</p>
                                                             </div>
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-[9px] font-bold text-[var(--text-secondary)] border border-[var(--border-color)] px-2 py-1 rounded-md">
-                                                            Sem Saldo
-                                                        </span>
+                                                        ) : (
+                                                            <span className="text-[9px] font-bold text-[var(--text-secondary)] border border-[var(--border-color)] px-2 py-1 rounded-md">
+                                                                Sem Saldo
+                                                            </span>
+                                                        )
                                                     )}
                                                 </div>
                                             </div>
