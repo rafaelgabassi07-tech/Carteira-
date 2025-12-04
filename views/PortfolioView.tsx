@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Asset, ToastMessage, SortOption } from '../types';
+import type { Asset, ToastMessage } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
@@ -10,7 +10,7 @@ import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
 import DividendsSummaryCard from '../components/DividendsSummaryCard';
-import PortfolioPieChart from '../components/PortfolioPieChart'; // Import restaurado
+import PortfolioPieChart from '../components/PortfolioPieChart';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -19,22 +19,11 @@ const EyeIcon: React.FC<{className?:string}> = ({className}) => (
 const EyeOffIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
 );
-const SortIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-);
 const WalletIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
 );
 
 // --- Components ---
-
-const PortfolioSkeleton: React.FC = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
-        {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-20 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]"></div>
-        ))}
-    </div>
-);
 
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
@@ -151,51 +140,6 @@ const PortfolioSummary: React.FC = () => {
     );
 };
 
-// Memoized Asset Item
-const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: () => void, style?: React.CSSProperties, privacyMode: boolean, hideCents: boolean }>(({ asset, totalValue, onClick, style, privacyMode, hideCents }) => {
-    const { t, formatCurrency } = useI18n();
-    const currentValue = asset.quantity * asset.currentPrice;
-    const totalInvested = asset.quantity * asset.avgPrice;
-    const variation = currentValue - totalInvested;
-    const allocation = totalValue > 0 ? (currentValue / totalValue) * 100 : 0;
-    
-    const format = (val: number) => {
-        let formatted = formatCurrency(val);
-        if (hideCents) formatted = formatted.replace(/,\d{2}$/, '');
-        return formatted;
-    }
-
-    return (
-        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm h-full flex flex-col justify-between">
-            <div>
-                <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-sm text-[var(--accent-color)] border border-[var(--border-color)] shadow-inner">
-                            {asset.ticker.substring(0, 4)}
-                        </div>
-                        <div>
-                             <span className="font-bold text-base block leading-tight text-[var(--text-primary)]">{asset.ticker}</span>
-                             <span className="text-xs text-[var(--text-secondary)]">{t('shares', {count: asset.quantity})}</span>
-                        </div>
-                    </div>
-                    <div className={`text-right transition-all duration-300 ${privacyMode ? 'blur-sm select-none opacity-60' : ''}`}>
-                        <p className="font-bold text-base">{format(currentValue)}</p>
-                        <div className={`text-xs font-bold flex items-center justify-end gap-1 ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                            {variation >= 0 ? '+' : ''}{format(variation)}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-                 <div className="flex-1 bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden">
-                     <div className="bg-[var(--accent-color)] h-full rounded-full transition-all duration-1000" style={{ width: `${allocation}%` }}></div>
-                </div>
-                <span className="text-[10px] font-semibold text-[var(--text-secondary)] w-10 text-right">{allocation.toFixed(1)}%</span>
-            </div>
-        </div>
-    );
-});
-
 interface PortfolioViewProps {
     setActiveView: (view: View) => void;
     setTransactionFilter: (ticker: string) => void;
@@ -206,11 +150,8 @@ interface PortfolioViewProps {
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
     const { t, formatCurrency } = useI18n();
-    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
-    const [searchQuery, setSearchQuery] = useState('');
+    const { assets, refreshMarketData, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
-    const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
-    const [isSortOpen, setIsSortOpen] = useState(false);
     
     const isRefreshing = isContextRefreshing || isPullRefreshing;
 
@@ -275,24 +216,6 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             // User cancelled
         }
     };
-    
-    const totalPortfolioValue = useMemo(() => assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0), [assets]);
-    
-    const processedAssets = useMemo(() => {
-        let filtered = assets.filter(asset => asset.ticker.toLowerCase().includes(searchQuery.toLowerCase()));
-        return filtered.sort((a, b) => {
-            switch (sortOption) {
-                case 'valueDesc': return (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity);
-                case 'valueAsc': return (a.currentPrice * a.quantity) - (b.currentPrice * a.quantity);
-                case 'tickerAsc': return a.ticker.localeCompare(b.ticker);
-                case 'performanceDesc':
-                    const perfA = a.avgPrice > 0 ? (a.currentPrice - a.avgPrice) / a.avgPrice : 0;
-                    const perfB = b.avgPrice > 0 ? (b.currentPrice - b.avgPrice) / b.avgPrice : 0;
-                    return perfB - perfA;
-                default: return 0;
-            }
-        });
-    }, [assets, searchQuery, sortOption]);
 
     // Data for Allocation Chart
     const allocationData = useMemo(() => {
@@ -342,77 +265,17 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                                 <DividendsSummaryCard />
                                 
                                 {/* Sector Allocation Card */}
-                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up mt-4 md:mt-4 mx-0">
+                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up mt-4 md:mt-0">
                                     <h3 className="font-bold text-sm text-[var(--text-primary)] mb-4 uppercase tracking-wider">{t('diversification')}</h3>
                                     <PortfolioPieChart data={allocationData} goals={preferences.segmentGoals || {}} />
                                 </div>
                             </div>
                         </div>
-
-                        <div className="px-4 mt-8">
-                            <div className="flex space-x-3 mb-5">
-                                <div className="flex-1 relative">
-                                    <input 
-                                        type="text" 
-                                        placeholder={t('search_asset_placeholder')} 
-                                        value={searchQuery} 
-                                        onChange={e => setSearchQuery(e.target.value)}
-                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
-                                        autoCapitalize="characters"
-                                    />
-                                </div>
-                                <div className="relative">
-                                    <button 
-                                        id="sort-btn"
-                                        onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
-                                        className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
-                                    >
-                                        <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
-                                    </button>
-                                    {isSortOpen && (
-                                        <>
-                                            <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
-                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
-                                                <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
-                                                {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
-                                                    <button 
-                                                        key={option}
-                                                        onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }}
-                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}
-                                                    >
-                                                        {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
-                                                        {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                             <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2">
-                                 {t('my_assets')} 
-                                 <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
-                             </h3>
-                             
-                            {isRefreshing && processedAssets.length === 0 ? (
-                                <PortfolioSkeleton />
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
-                                    {processedAssets.map((asset, index) => (
-                                        <AssetListItem 
-                                            key={asset.ticker}
-                                            asset={asset} 
-                                            totalValue={totalPortfolioValue}
-                                            onClick={() => onSelectAsset(asset.ticker)} 
-                                            style={{ animationDelay: `${index * 50}ms` }}
-                                            privacyMode={privacyMode}
-                                            hideCents={preferences.hideCents}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        
+                        {/* 
+                            NOTA: A lista de ativos foi removida do Dashboard conforme solicitado.
+                            Ela permanece disponível na aba "Carteira" (AnalysisView).
+                        */}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
