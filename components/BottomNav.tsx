@@ -27,7 +27,10 @@ const NavItem: React.FC<{
       onClick={onClick}
       className={`relative flex flex-col items-center justify-center w-full h-full transition-colors duration-200 group active:scale-90 focus:outline-none ${activeClass}`}
     >
-      <div className={`transition-all duration-300 ease-spring ${isActive ? '-translate-y-2.5 scale-110' : 'translate-y-0'}`}>
+      {/* Active Glow Effect */}
+      <div className={`absolute w-12 h-12 bg-[var(--accent-color)] rounded-full blur-xl opacity-20 transition-all duration-500 pointer-events-none ${isActive ? 'scale-100' : 'scale-0'}`}></div>
+
+      <div className={`transition-all duration-300 ease-spring relative z-10 ${isActive ? '-translate-y-2.5 scale-110' : 'translate-y-0'}`}>
         {React.cloneElement(icon, { className: 'w-6 h-6' })}
       </div>
       <span 

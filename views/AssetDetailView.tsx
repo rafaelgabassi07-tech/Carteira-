@@ -19,14 +19,11 @@ const ProgressBar: React.FC<{ value: number; max: number; label?: string; colorC
     let percent = (value / max) * 100;
     if (percent > 100) percent = 100;
     
-    // Se inverse=true (ex: Vacância), quanto menor melhor.
-    // Se não (ex: P/VP), usamos lógica de range.
-    
     return (
         <div className="w-full mt-1.5">
             {label && <div className="flex justify-between text-[9px] text-[var(--text-secondary)] mb-0.5"><span>{label}</span><span>{value.toFixed(1)}%</span></div>}
             <div className="h-1.5 bg-[var(--bg-primary)] rounded-full overflow-hidden border border-[var(--border-color)]">
-                <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${percent}%` }}></div>
+                <div className={`h-full rounded-full transition-all duration-500 ease-out ${colorClass}`} style={{ width: `${percent}%` }}></div>
             </div>
         </div>
     );
@@ -37,9 +34,9 @@ const GroupHeader: React.FC<{ title: string }> = ({ title }) => (
 );
 
 const IndicatorItem: React.FC<{ label: string; value: string; subtext?: React.ReactNode }> = ({ label, value, subtext }) => (
-    <div className="flex flex-col">
-        <span className="text-[10px] text-[var(--text-secondary)] font-medium mb-0.5">{label}</span>
-        <span className="text-sm font-bold text-[var(--text-primary)]">{value}</span>
+    <div className="flex flex-col p-2 rounded-lg hover:bg-[var(--bg-tertiary-hover)] transition-colors">
+        <span className="text-[10px] text-[var(--text-secondary)] font-medium mb-0.5 uppercase tracking-wide opacity-80">{label}</span>
+        <span className="text-sm font-bold text-[var(--text-primary)] truncate">{value}</span>
         {subtext}
     </div>
 );
@@ -117,7 +114,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const currentValue = asset ? asset.quantity * asset.currentPrice : 0;
     const totalInvested = asset ? asset.quantity * asset.avgPrice : 0;
     const variation = currentValue - totalInvested;
-    const variationPercent = totalInvested > 0 ? (variation / totalInvested) * 100 : 0;
+    // const variationPercent = totalInvested > 0 ? (variation / totalInvested) * 100 : 0;
 
     if (!asset && !isRefreshing) return <div className="p-8 text-center">{t('asset_not_found')}</div>;
 
@@ -150,12 +147,15 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     <h3 className="font-bold text-sm text-[var(--text-primary)] uppercase tracking-wide">Indicadores Chave</h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                     {/* Valuation Group */}
                     <GroupHeader title="Preço & Valuation" />
                     <IndicatorItem label="Cotação Atual" value={formatCurrency(asset.currentPrice)} />
-                    <div className="flex flex-col">
-                        <IndicatorItem label="P/VP" value={asset.pvp?.toFixed(2) || '-'} />
+                    <div className="flex flex-col p-2">
+                        <div className="flex justify-between items-end">
+                            <span className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wide opacity-80">P/VP</span>
+                            <span className="text-sm font-bold text-[var(--text-primary)]">{asset.pvp?.toFixed(2) || '-'}</span>
+                        </div>
                         {asset.pvp && (
                             <ProgressBar 
                                 value={asset.pvp * 100} 
@@ -174,8 +174,11 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
 
                     {/* Quality Group */}
                     <GroupHeader title="Qualidade & Liquidez" />
-                    <div className="flex flex-col">
-                        <IndicatorItem label="Vacância Física" value={asset.vacancyRate !== undefined ? `${asset.vacancyRate}%` : '-'} />
+                    <div className="flex flex-col p-2">
+                        <div className="flex justify-between items-end">
+                            <span className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wide opacity-80">Vacância Física</span>
+                            <span className="text-sm font-bold text-[var(--text-primary)]">{asset.vacancyRate !== undefined ? `${asset.vacancyRate}%` : '-'}</span>
+                        </div>
                         {asset.vacancyRate !== undefined && (
                             <ProgressBar value={asset.vacancyRate} max={30} colorClass="bg-[var(--red-text)]" inverse />
                         )}
@@ -186,7 +189,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 </div>
             </div>
 
-            <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] font-bold py-3 rounded-xl border border-[var(--border-color)] hover:bg-[var(--accent-color)]/10 hover:border-[var(--accent-color)] transition-all">
+            <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] font-bold py-3.5 rounded-xl border border-[var(--border-color)] hover:bg-[var(--accent-color)]/10 hover:border-[var(--accent-color)] active:scale-[0.98] transition-all shadow-sm">
                 {t('view_transactions')}
             </button>
         </div>
@@ -222,7 +225,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     
                     <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
                         {(showAllHistory ? fullDividendHistory : fullDividendHistory.slice(0, 5)).map((div, index) => (
-                            <div key={`${div.exDate}-${index}`} className="p-4 border-b border-[var(--border-color)] last:border-0 flex justify-between items-center">
+                            <div key={`${div.exDate}-${index}`} className="p-4 border-b border-[var(--border-color)] last:border-0 flex justify-between items-center hover:bg-[var(--bg-tertiary-hover)] transition-colors">
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${div.isProvisioned ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
@@ -242,7 +245,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         ))}
                     </div>
                     {fullDividendHistory.length > 5 && (
-                        <button onClick={() => setShowAllHistory(!showAllHistory)} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] border border-[var(--border-color)] rounded-xl">
+                        <button onClick={() => setShowAllHistory(!showAllHistory)} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] border border-[var(--border-color)] rounded-xl bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors">
                             {showAllHistory ? t('show_less') : `${t('view_full_history')} (${fullDividendHistory.length})`}
                         </button>
                     )}
@@ -258,10 +261,10 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center">
-                        <button onClick={onBack} className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)]"><ChevronLeftIcon className="w-6 h-6" /></button>
+                        <button onClick={onBack} className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] transition-all active:scale-95"><ChevronLeftIcon className="w-6 h-6" /></button>
                         <h2 className="text-2xl font-bold tracking-tight">{ticker}</h2>
                     </div>
-                    <button onClick={handleRefresh} disabled={isRefreshing} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)]">
+                    <button onClick={handleRefresh} disabled={isRefreshing} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] transition-all active:scale-95">
                         <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
@@ -271,7 +274,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         <button
                             key={tab}
                             onClick={() => { setActiveTab(tab); vibrate(); }}
-                            className={`pb-2 px-4 text-sm font-bold transition-colors ${activeTab === tab ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)]'}`}
+                            className={`pb-2 px-4 text-sm font-bold transition-colors ${activeTab === tab ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                         >
                             {t(tab === 'dividends' ? 'dividends_received' : tab)}
                         </button>

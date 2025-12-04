@@ -158,6 +158,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         vpPerShare?: number; 
         businessDescription?: string; 
         riskAssessment?: string;
+        marketSentiment?: 'Bullish' | 'Bearish' | 'Neutral';
         strengths?: string[];
         dividendCAGR?: number;
         capRate?: number;
@@ -191,19 +192,19 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       RULES FOR SEARCH:
       1. Use 'googleSearch' to find exact data from official sources (B3, RI, StatusInvest, ClubeFII).
       2. 'businessDescription': Concise 1-sentence summary of the investment thesis.
-      3. 'riskAssessment': A string starting with "Baixo", "Médio" or "Alto" followed by a dash and a 3-5 word reason (e.g., "Alto - Vacância elevada e mono-inquilino").
-      4. 'strengths': JSON Array of 3 short bullet points (strings) highlighting key strengths.
-      5. 'dividendCAGR': 3-Year Compound Annual Growth Rate of dividends (approximate % float, e.g. 5.2). If negative, use negative number.
-      6. 'capRate': Estimated Capitalization Rate (%) for Brick funds (Logística/Shoppings). Null for Paper/FOF.
-      7. 'managementFee': formatted string (e.g. "1.20% a.a.").
+      3. 'riskAssessment': A string starting with "Baixo", "Médio" or "Alto" followed by a dash and a 3-5 word reason.
+      4. 'marketSentiment': Infer based on recent news/price action: "Bullish", "Bearish" or "Neutral".
+      5. 'strengths': JSON Array of 3 short bullet points highlighting key strengths.
+      6. 'dividendCAGR': 3-Year Compound Annual Growth Rate of dividends (approximate % float).
+      7. 'capRate': Estimated Capitalization Rate (%) for Brick funds.
       
       RULES FOR DIVIDENDS:
       1. Fetch the last 6 dividends.
-      2. Compare current date with 'Payment Date'. If Payment Date > Current Date, set "isProvisioned": true.
+      2. If Payment Date > Current Date, set "isProvisioned": true.
       3. Dates MUST be 'YYYY-MM-DD'.
       4. Value is "R$ per share".
       
-      OUTPUT: JSON Object ONLY. Keys = Ticker (e.g., "MXRF11").
+      OUTPUT: JSON Object ONLY. Keys = Ticker.
       
       Structure per Ticker:
       {
@@ -212,12 +213,13 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         "assetType": "Tijolo" | "Papel" | "Fiagro" | "FOF" | "Infra" | "Híbrido",
         "administrator": string,
         "vacancyRate": number (physical vacancy %),
-        "lastDividend": number (value of most recent),
-        "netWorth": string (e.g. "R$ 2.5B"),
-        "shareholders": number (integer),
+        "lastDividend": number,
+        "netWorth": string,
+        "shareholders": number,
         "vpPerShare": number,
         "businessDescription": string,
         "riskAssessment": string,
+        "marketSentiment": "Bullish" | "Bearish" | "Neutral",
         "strengths": string[],
         "dividendCAGR": number,
         "capRate": number,
@@ -281,6 +283,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                     vpPerShare: typeof assetData.vpPerShare === 'number' ? assetData.vpPerShare : undefined,
                     businessDescription: typeof assetData.businessDescription === 'string' ? assetData.businessDescription : undefined,
                     riskAssessment: typeof assetData.riskAssessment === 'string' ? assetData.riskAssessment : undefined,
+                    marketSentiment: typeof assetData.marketSentiment === 'string' ? assetData.marketSentiment : undefined,
                     strengths: Array.isArray(assetData.strengths) ? assetData.strengths : [],
                     dividendCAGR: typeof assetData.dividendCAGR === 'number' ? assetData.dividendCAGR : undefined,
                     capRate: typeof assetData.capRate === 'number' ? assetData.capRate : undefined,
