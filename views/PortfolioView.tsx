@@ -10,6 +10,7 @@ import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
 import DividendsSummaryCard from '../components/DividendsSummaryCard';
+import PortfolioPieChart from '../components/PortfolioPieChart'; // Import restaurado
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -200,6 +201,7 @@ interface PortfolioViewProps {
     setTransactionFilter: (ticker: string) => void;
     onSelectAsset: (ticker: string) => void;
     addToast: (message: string, type?: ToastMessage['type']) => void;
+    unreadNotificationsCount?: number;
 }
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
@@ -292,6 +294,24 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
         });
     }, [assets, searchQuery, sortOption]);
 
+    // Data for Allocation Chart
+    const allocationData = useMemo(() => {
+        const segments: Record<string, number> = {};
+        let totalValue = 0;
+        assets.forEach(a => {
+            const val = a.quantity * a.currentPrice;
+            const seg = a.segment || t('outros');
+            segments[seg] = (segments[seg] || 0) + val;
+            totalValue += val;
+        });
+        
+        return Object.entries(segments).map(([name, value]) => ({
+            name,
+            value,
+            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
+        })).sort((a, b) => b.value - a.value);
+    }, [assets, t]);
+
     return (
         <div 
             className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
@@ -315,9 +335,18 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 
                 {assets.length > 0 ? (
                     <>
-                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
+                        <div className="md:max-w-2xl md:mx-auto lg:max-w-4xl">
                             <PortfolioSummary />
-                            <DividendsSummaryCard />
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 px-4 sm:px-0">
+                                <DividendsSummaryCard />
+                                
+                                {/* Sector Allocation Card */}
+                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up mt-4 md:mt-4 mx-0">
+                                    <h3 className="font-bold text-sm text-[var(--text-primary)] mb-4 uppercase tracking-wider">{t('diversification')}</h3>
+                                    <PortfolioPieChart data={allocationData} goals={preferences.segmentGoals || {}} />
+                                </div>
+                            </div>
                         </div>
 
                         <div className="px-4 mt-8">
