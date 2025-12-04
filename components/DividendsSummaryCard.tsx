@@ -9,6 +9,7 @@ import Modal from './modals/Modal';
 import BarChart from './BarChart';
 import { vibrate } from '../utils';
 import ChevronRightIcon from './icons/ChevronRightIcon';
+import SortIcon from './icons/SortIcon'; // Reusing sort icon if available, or just text
 import type { DividendHistoryEvent, Transaction } from '../types';
 
 // --- Types ---
@@ -29,6 +30,8 @@ interface PayerData {
     roi: number; // (Total Recebido / Total Investido) * 100
 }
 
+type SortMode = 'total' | 'roi';
+
 // --- Helper: Generate consistent color from string ---
 const stringToColor = (str: string) => {
     let hash = 0;
@@ -42,7 +45,7 @@ const stringToColor = (str: string) => {
 // --- Components ---
 
 const StatCard: React.FC<{ label: string; value: React.ReactNode; subtext?: string; icon?: React.ReactNode; highlight?: boolean }> = ({ label, value, subtext, icon, highlight }) => (
-    <div className={`p-4 rounded-2xl border flex flex-col justify-between h-full ${highlight ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
+    <div className={`p-4 rounded-2xl border flex flex-col justify-between h-full shadow-sm ${highlight ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
         <div className="flex justify-between items-start mb-2">
             <span className={`text-[10px] uppercase font-bold tracking-wider ${highlight ? 'text-emerald-600' : 'text-[var(--text-secondary)]'}`}>{label}</span>
             {icon && <div className={highlight ? 'text-emerald-500' : 'text-[var(--text-secondary)] opacity-50'}>{icon}</div>}
@@ -51,66 +54,87 @@ const StatCard: React.FC<{ label: string; value: React.ReactNode; subtext?: stri
             <div className={`text-lg font-black tracking-tight ${highlight ? 'text-emerald-600' : 'text-[var(--text-primary)]'}`}>
                 {value}
             </div>
-            {subtext && <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5">{subtext}</p>}
+            {subtext && <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5 truncate">{subtext}</p>}
         </div>
     </div>
 );
 
-const PodiumItem: React.FC<{ payer: PayerData; rank: 1 | 2 | 3; maxVal: number }> = ({ payer, rank, maxVal }) => {
-    const { formatCurrency } = useI18n();
-    const height = rank === 1 ? 'h-32' : rank === 2 ? 'h-24' : 'h-20';
-    const color = rank === 1 ? 'bg-gradient-to-b from-yellow-300 to-yellow-500' : rank === 2 ? 'bg-gradient-to-b from-slate-300 to-slate-400' : 'bg-gradient-to-b from-amber-600 to-amber-700';
-    const glow = rank === 1 ? 'shadow-[0_0_25px_rgba(234,179,8,0.4)]' : 'shadow-md';
-    const iconColor = stringToColor(payer.ticker);
-
-    return (
-        <div className="flex flex-col items-center justify-end group w-1/3">
-            <div className="mb-3 text-center transform transition-transform duration-300 group-hover:-translate-y-2">
-                <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-black text-xs text-white shadow-lg mb-1.5 mx-auto ring-2 ring-[var(--bg-secondary)]" style={{ backgroundColor: iconColor }}>
-                    {payer.ticker.substring(0,4)}
-                </div>
-                <span className="font-bold text-xs text-[var(--text-primary)] block mb-0.5">{formatCurrency(payer.total)}</span>
-                <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">Retorno: {payer.roi.toFixed(1)}%</span>
-            </div>
-            <div className={`w-full max-w-[80px] ${height} ${color} rounded-t-2xl relative ${glow} flex items-end justify-center pb-2 opacity-90`}>
-                <span className="text-white/80 font-black text-4xl drop-shadow-md">{rank}</span>
-            </div>
-        </div>
-    );
-};
-
-const PayerRow: React.FC<{ payer: PayerData; index: number }> = ({ payer, index }) => {
+const PayerListItem: React.FC<{ 
+    payer: PayerData; 
+    rank: number; 
+    sortBy: SortMode;
+    maxVal: number;
+}> = ({ payer, rank, sortBy, maxVal }) => {
     const { formatCurrency } = useI18n();
     const iconColor = stringToColor(payer.ticker);
+    
+    // Style configuration based on rank
+    const isTop3 = rank <= 3;
+    let rankColor = 'text-[var(--text-secondary)]';
+    let containerClass = 'bg-[var(--bg-primary)] border-[var(--border-color)]';
+    let badge = null;
+
+    if (rank === 1) {
+        rankColor = 'text-yellow-500';
+        containerClass = 'bg-gradient-to-r from-yellow-500/10 to-[var(--bg-primary)] border-yellow-500/30';
+        badge = sortBy === 'total' ? '👑 Top Pagador' : '🚀 Maior Retorno';
+    } else if (rank === 2) {
+        rankColor = 'text-slate-400';
+        containerClass = 'bg-gradient-to-r from-slate-400/10 to-[var(--bg-primary)] border-slate-400/30';
+    } else if (rank === 3) {
+        rankColor = 'text-amber-700';
+        containerClass = 'bg-gradient-to-r from-amber-700/10 to-[var(--bg-primary)] border-amber-700/30';
+    }
+
+    // Bar width calculation
+    // If sorting by total, bar represents % of max Total. 
+    // If sorting by ROI, bar represents % of max ROI.
+    const barWidth = sortBy === 'total' 
+        ? (payer.total / maxVal) * 100 
+        : (payer.roi / maxVal) * 100;
 
     return (
-        <div className="relative overflow-hidden p-3.5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between group hover:border-[var(--accent-color)]/30 transition-all active:scale-[0.99]">
-            {/* Progress Background */}
-            <div 
-                className="absolute left-0 top-0 bottom-0 bg-[var(--bg-tertiary-hover)] opacity-0 group-hover:opacity-100 transition-opacity z-0" 
-                style={{ width: `${payer.percentageOfTotal}%` }}
-            />
+        <div className={`relative overflow-hidden p-3 rounded-2xl border flex items-center justify-between group transition-all mb-2 active:scale-[0.99] ${containerClass} ${isTop3 ? 'shadow-sm' : ''}`}>
             
-            <div className="flex items-center gap-3 z-10 relative">
-                <span className="text-xs font-bold text-[var(--text-secondary)] w-5 text-center">{index + 1}</span>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[10px] text-white shadow-sm" style={{ backgroundColor: iconColor }}>
+            {/* Background Progress Bar */}
+            <div 
+                className="absolute left-0 bottom-0 top-0 bg-[var(--text-primary)] opacity-[0.03] transition-all duration-500 z-0 pointer-events-none" 
+                style={{ width: `${barWidth}%` }}
+            />
+
+            <div className="flex items-center gap-3 z-10 relative flex-1 min-w-0">
+                {/* Rank Number */}
+                <div className={`w-6 text-center font-black text-sm ${rankColor} shrink-0`}>{rank}</div>
+                
+                {/* Asset Icon */}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[10px] text-white shadow-sm shrink-0 ring-1 ring-white/10" style={{ backgroundColor: iconColor }}>
                     {payer.ticker.substring(0,4)}
                 </div>
-                <div className="flex flex-col">
-                    <span className="font-bold text-sm text-[var(--text-primary)]">{payer.ticker}</span>
-                    <span className="text-[10px] text-[var(--text-secondary)] font-medium">
-                        Retorno s/ Custo: <span className="text-[var(--accent-color)]">{payer.roi.toFixed(1)}%</span>
+                
+                {/* Info */}
+                <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-[var(--text-primary)] truncate">{payer.ticker}</span>
+                        {badge && <span className="text-[8px] font-bold uppercase bg-[var(--bg-secondary)] border border-[var(--border-color)] px-1.5 rounded-md truncate opacity-80">{badge}</span>}
+                    </div>
+                    <span className="text-[10px] text-[var(--text-secondary)] font-medium truncate">
+                        {payer.count} pgts • ROI: <span className={payer.roi > 10 ? 'text-[var(--green-text)]' : 'text-[var(--text-secondary)]'}>{payer.roi.toFixed(1)}%</span>
                     </span>
                 </div>
             </div>
 
-            <div className="text-right z-10 relative">
-                <span className="font-bold text-sm text-[var(--green-text)] block">{formatCurrency(payer.total)}</span>
-                <span className="text-[10px] font-medium text-[var(--text-secondary)]">{payer.count} pgts</span>
+            {/* Values */}
+            <div className="text-right z-10 relative pl-2 shrink-0">
+                <span className={`font-bold text-sm block ${sortBy === 'total' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] opacity-70'}`}>
+                    {formatCurrency(payer.total)}
+                </span>
+                <span className={`text-[10px] font-bold block mt-0.5 ${sortBy === 'roi' ? 'text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-1.5 rounded' : 'text-[var(--text-secondary)] opacity-50'}`}>
+                    {payer.roi.toFixed(1)}%
+                </span>
             </div>
         </div>
     );
-};
+}
 
 // --- Detail Modal ---
 const DividendsDetailModal: React.FC<{ 
@@ -120,23 +144,34 @@ const DividendsDetailModal: React.FC<{
     totalReceived: number;
     totalInvestedGlobal: number;
 }> = ({ onClose, monthlyData, payersData, totalReceived, totalInvestedGlobal }) => {
-    const { t, formatCurrency } = useI18n();
+    const { formatCurrency } = useI18n();
     const [activeTab, setActiveTab] = useState<'evolution' | 'ranking'>('ranking');
+    const [sortMode, setSortMode] = useState<SortMode>('total');
 
     const chartData = useMemo(() => monthlyData.slice(-12).map(d => ({ month: d.month, total: d.total })), [monthlyData]);
     const averageIncome = useMemo(() => monthlyData.length > 0 ? totalReceived / monthlyData.length : 0, [totalReceived, monthlyData]);
     const bestMonth = useMemo(() => monthlyData.reduce((max, curr) => curr.total > max.total ? curr : max, { total: 0, month: '-' }), [monthlyData]);
     const globalROI = totalInvestedGlobal > 0 ? (totalReceived / totalInvestedGlobal) * 100 : 0;
 
-    // Top 3 for Podium
-    const topPayers = payersData.slice(0, 3);
-    const otherPayers = payersData.slice(3);
+    // Sorting Logic
+    const sortedPayers = useMemo(() => {
+        return [...payersData].sort((a, b) => {
+            if (sortMode === 'total') return b.total - a.total;
+            return b.roi - a.roi;
+        });
+    }, [payersData, sortMode]);
+
+    // Calculate max value for the bars based on current sort
+    const maxBarValue = useMemo(() => {
+        if (sortedPayers.length === 0) return 1;
+        return sortMode === 'total' ? sortedPayers[0].total : sortedPayers[0].roi;
+    }, [sortedPayers, sortMode]);
 
     return (
         <Modal title="Relatório de Renda" onClose={onClose} type="slide-up" fullScreen={true}>
             <div className="flex flex-col min-h-full pb-24">
                 
-                {/* --- Smart Header Grid --- */}
+                {/* --- Metrics Grid --- */}
                 <div className="grid grid-cols-2 gap-3 mb-6 shrink-0">
                     <StatCard 
                         label="Total Acumulado" 
@@ -145,9 +180,9 @@ const DividendsDetailModal: React.FC<{
                         icon={<div className="font-bold text-lg">$</div>}
                     />
                     <StatCard 
-                        label="Retorno (Yield)" 
+                        label="Yield (Retorno)" 
                         value={<span>{globalROI.toFixed(1)}<span className="text-sm">%</span></span>} 
-                        subtext="Do valor investido já retornou"
+                        subtext="Sobre o capital investido"
                         icon={<TrendingUpIcon className="w-5 h-5" />}
                     />
                     <StatCard 
@@ -182,30 +217,40 @@ const DividendsDetailModal: React.FC<{
                 {/* Content */}
                 <div className="animate-fade-in flex-1">
                     {activeTab === 'ranking' ? (
-                        <div className="space-y-6">
-                            {/* Podium (Only if we have at least 3 payers) */}
-                            {topPayers.length >= 1 && (
-                                <div className="flex justify-center items-end gap-2 mb-8 pt-4 px-2">
-                                    {topPayers[1] && <PodiumItem payer={topPayers[1]} rank={2} maxVal={topPayers[0].total} />}
-                                    <PodiumItem payer={topPayers[0]} rank={1} maxVal={topPayers[0].total} />
-                                    {topPayers[2] && <PodiumItem payer={topPayers[2]} rank={3} maxVal={topPayers[0].total} />}
-                                </div>
-                            )}
+                        <div className="space-y-4">
+                            {/* Sort Controls */}
+                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-1">
+                                <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mr-1">Ordenar por:</span>
+                                <button 
+                                    onClick={() => { setSortMode('total'); vibrate(); }}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${sortMode === 'total' ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-color)]'}`}
+                                >
+                                    Valor Total
+                                </button>
+                                <button 
+                                    onClick={() => { setSortMode('roi'); vibrate(); }}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${sortMode === 'roi' ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-color)]'}`}
+                                >
+                                    Retorno (%)
+                                </button>
+                            </div>
 
                             {/* List */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between px-2 mb-2">
-                                    <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-                                        {otherPayers.length > 0 ? 'Outros Ativos' : 'Lista Detalhada'}
-                                    </h4>
-                                    <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--bg-tertiary-hover)] px-2 py-1 rounded">Ord: Total Pago</span>
-                                </div>
-                                
-                                {(otherPayers.length > 0 ? otherPayers : (topPayers.length < 3 ? topPayers : [])).map((payer, idx) => (
-                                    <PayerRow key={payer.ticker} payer={payer} index={idx + (otherPayers.length > 0 ? 3 : 0)} />
-                                ))}
-                                {payersData.length === 0 && (
-                                    <p className="text-center text-[var(--text-secondary)] text-sm py-8">Nenhum dividendo registrado ainda.</p>
+                            <div className="space-y-1">
+                                {sortedPayers.length > 0 ? (
+                                    sortedPayers.map((payer, idx) => (
+                                        <PayerListItem 
+                                            key={payer.ticker} 
+                                            payer={payer} 
+                                            rank={idx + 1} 
+                                            sortBy={sortMode}
+                                            maxVal={maxBarValue}
+                                        />
+                                    ))
+                                ) : (
+                                    <div className="text-center py-12 text-[var(--text-secondary)]">
+                                        <p>Nenhum dividendo registrado.</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -232,7 +277,7 @@ const DividendsDetailModal: React.FC<{
                             
                             <div className="p-4 rounded-xl bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
                                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                                    <strong className="text-[var(--text-primary)]">Dica:</strong> A consistência é chave nos FIIs. Busque barras crescentes e estáveis ao longo do tempo, evitando ativos com pagamentos muito irregulares se seu foco é renda passiva constante.
+                                    <strong className="text-[var(--text-primary)]">Dica:</strong> A consistência é chave nos FIIs. Busque barras crescentes e estáveis ao longo do tempo para garantir previsibilidade na sua renda passiva.
                                 </p>
                             </div>
                         </div>
@@ -264,8 +309,6 @@ const DividendsSummaryCard: React.FC = () => {
             const history = asset?.dividendsHistory || [];
             
             // Calculate total invested in this asset specifically for ROI calculation
-            // Note: This approximates based on current holding average price if held, or purchase history if sold.
-            // Ideally, we sum up purchase costs.
             let assetInvested = 0;
             const assetTxs = transactions
                 .filter(t => t.ticker === ticker)
@@ -279,7 +322,6 @@ const DividendsSummaryCard: React.FC = () => {
             totalInvestedGlobal += assetInvested;
 
             if (history.length === 0) return;
-
             if (assetTxs.length === 0) return;
 
             history.forEach((div: DividendHistoryEvent) => {
@@ -331,15 +373,17 @@ const DividendsSummaryCard: React.FC = () => {
                 ...data,
                 percentageOfTotal: totalReceived > 0 ? (data.total / totalReceived) * 100 : 0,
                 roi: data.invested > 0 ? (data.total / data.invested) * 100 : 0
-            }))
-            .sort((a, b) => b.total - a.total);
+            }));
+            // Sort handled in modal
 
         // Current Month Context
         const now = new Date();
         const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const currentMonthValue = monthlyAggregation[currentMonthKey] || 0;
+        
+        const globalROI = totalInvestedGlobal > 0 ? (totalReceived / totalInvestedGlobal) * 100 : 0;
 
-        return { totalReceived, countPayments, monthlyData, payersData, currentMonthValue, totalInvestedGlobal };
+        return { totalReceived, countPayments, monthlyData, payersData, currentMonthValue, totalInvestedGlobal, globalROI };
     }, [assets, transactions]);
 
     const handleClick = () => {
@@ -374,9 +418,15 @@ const DividendsSummaryCard: React.FC = () => {
                     </div>
 
                     <div className={`mt-3 ${privacyMode ? 'blur-md select-none opacity-50' : ''}`}>
-                        <p className="text-3xl font-black text-[var(--text-primary)] tracking-tight">
-                            <CountUp end={stats.totalReceived} formatter={formatCurrency} />
-                        </p>
+                        <div className="flex items-baseline gap-2">
+                            <p className="text-3xl font-black text-[var(--text-primary)] tracking-tight">
+                                <CountUp end={stats.totalReceived} formatter={formatCurrency} />
+                            </p>
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                Yield: {stats.globalROI.toFixed(1)}%
+                            </span>
+                        </div>
+                        
                         {stats.currentMonthValue > 0 ? (
                             <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
