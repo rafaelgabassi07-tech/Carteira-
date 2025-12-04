@@ -80,10 +80,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
   const initialLoadDone = useRef(false);
+  const refreshInProgress = useRef(false);
   const marketDataRef = useRef(marketData);
   useEffect(() => { marketDataRef.current = marketData; }, [marketData]);
 
-  // --- One-time Preference Migration ---
   useEffect(() => {
     const startScreen = preferences.startScreen;
     if (startScreen === 'carteira' as any || startScreen === 'analise' as any) {
@@ -127,15 +127,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const now = Date.now();
       const currentData = marketDataRef.current[ticker.toUpperCase()];
       
-      // Strict Stale Time Check
       if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
           const { quotes } = await fetchBrapiQuotes(preferences, [ticker], false);
           
-          // CONDITIONAL FUNDAMENTAL FETCH (Saves Gemini Tokens)
           let advancedData = {};
-          // Only fetch fundamentals/dividends if missing or older than 24h
           const isFundamentalsStale = !currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
           const hasMissingDividends = !currentData?.dividendsHistory || currentData.dividendsHistory.length === 0;
 
@@ -215,22 +212,21 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [setNotifications]);
 
   const refreshMarketData = useCallback(async (force = false, silent = false, lite = false) => {
-      if(isRefreshing) return;
+      if(refreshInProgress.current) return;
       
       const now = Date.now();
-      // Smart Check: Don't refresh PRICES if data is fresh (15m), unless forced
       if(!force && lastSync && now - lastSync < STALE_TIME.MARKET_DATA) return; 
 
       const tickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
       if(tickers.length === 0) return;
 
+      refreshInProgress.current = true;
       if(!silent) setIsRefreshing(true);
       setMarketDataError(null);
 
       try {
           const promises: Promise<any>[] = [fetchBrapiQuotes(preferences, tickers, lite)];
           
-          // Only fetch Gemini (Fundamentals & Dividends) if we need to
           const firstAsset = marketDataRef.current[tickers[0].toUpperCase()];
           const fundamentalsStale = !firstAsset?.lastFundamentalUpdate || (now - firstAsset.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
           
@@ -278,7 +274,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   Object.entries(res.data).forEach(([tkr, data]) => {
                       next[tkr] = { 
                           ...(next[tkr] || {}), 
-                          ...(data as object), // Overwrites dividendsHistory and fundamentals
+                          ...(data as object),
                           lastFundamentalUpdate: now
                       };
                       hasChanges = true;
@@ -291,11 +287,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } catch(e: any) {
           setMarketDataError(e.message);
       } finally {
+          refreshInProgress.current = false;
           if(!silent) setIsRefreshing(false);
       }
-  }, [isRefreshing, lastSync, sourceTransactions, preferences, setMarketData, setLastSync, logApiUsage]);
+  }, [lastSync, sourceTransactions, preferences, setMarketData, setLastSync, logApiUsage]);
 
-  // --- Optimized Background Polling ---
   useEffect(() => {
       const checkAndRefresh = () => {
           if (document.hidden) return;
@@ -345,7 +341,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               nextPaymentDate: data.nextPaymentDate, lastDividend: data.lastDividend,
               lastUpdated: data.lastUpdated,
               lastFundamentalUpdate: data.lastFundamentalUpdate,
-              // Map new fields safely
               netWorth: data.netWorth,
               vpPerShare: data.vpPerShare,
               businessDescription: data.businessDescription,
@@ -358,35 +353,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }).filter(a => a.quantity > 0.000001);
   }, [sourceTransactions, sourceMarketData]);
 
-  // Initial Load Optimization
   useEffect(() => {
-    if (!isRefreshing && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
+    if (!refreshInProgress.current && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
       initialLoadDone.current = true;
-      
       const now = Date.now();
       const isStale = !lastSync || (now - lastSync > STALE_TIME.MARKET_DATA);
-
       if (isStale) {
-          console.log("CONTEXT: Data stale or missing, refreshing...");
           refreshMarketData(true, true, false); 
       }
     }
-  }, [sourceTransactions.length, isDemoMode, isRefreshing, refreshMarketData, lastSync]);
-
-  const assetTickers = useMemo(() => assets.map(a => a.ticker).sort().join(','), [assets]);
-
-  useEffect(() => {
-      if (isRefreshing || isDemoMode || !initialLoadDone.current) return;
-      
-      const incompleteAssets = assets.filter(a => a.segment === 'Outros' || !a.priceHistory || a.priceHistory.length === 0);
-
-      if (incompleteAssets.length > 0 && navigator.onLine) {
-          const timer = setTimeout(() => {
-              refreshMarketData(false, true, false);
-          }, 5000);
-          return () => clearTimeout(timer);
-      }
-  }, [assetTickers, isRefreshing, isDemoMode, assets, refreshMarketData]);
+  }, [sourceTransactions.length, isDemoMode, refreshMarketData, lastSync]);
 
   const currentPatrimony = useMemo(() => {
     return assets.reduce((acc, a) => acc + a.quantity * a.currentPrice, 0);
@@ -394,7 +370,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     if (isDemoMode) return;
-
     const timeoutId = setTimeout(() => {
         const newNotifications = generateNotifications(assets, currentPatrimony);
         if (newNotifications.length > 0) {
@@ -409,7 +384,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             });
         }
     }, 1000);
-
     return () => clearTimeout(timeoutId);
   }, [currentPatrimony, isDemoMode, assets, setNotifications]); 
 
@@ -438,7 +412,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const monthlyIncome = useMemo(() => {
       const incomeMap: Record<string, number> = {};
-      
       const transactionsByTicker: Record<string, Transaction[]> = {};
       sourceTransactions.forEach(tx => {
           if (!transactionsByTicker[tx.ticker]) transactionsByTicker[tx.ticker] = [];
@@ -455,7 +428,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           
           hist.forEach(div => {
               if (div.value <= 0) return;
-              
               let qty = 0;
               for (const tx of txs) {
                   if (tx.date > div.exDate) break; 
@@ -463,7 +435,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   else qty -= tx.quantity;
               }
               const userQty = Math.max(0, qty);
-              
               if (userQty > 0) {
                   const payDate = div.paymentDate; 
                   const monthKey = payDate.substring(0, 7); 
@@ -477,7 +448,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return relevantMonths.map(key => {
           const [year, month] = key.split('-').map(Number);
-          // Fix timezone offset for date display
           const date = new Date(year, month - 1, 15); 
           const monthStr = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
           return {
@@ -489,7 +459,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const getAveragePriceForTransaction = useCallback((targetTx: Transaction) => {
       if (targetTx.type !== 'Venda') return 0;
-
       const tickerTxs = sourceTransactions
           .filter(t => t.ticker === targetTx.ticker && t.date <= targetTx.date && t.id !== targetTx.id)
           .sort((a, b) => a.date.localeCompare(b.date));
@@ -511,7 +480,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
           }
       }
-
       return totalQty > 0 ? totalCost / totalQty : 0;
   }, [sourceTransactions]);
 

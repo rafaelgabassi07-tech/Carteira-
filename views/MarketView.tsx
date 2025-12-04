@@ -31,10 +31,9 @@ interface MarketResult {
     history: number[];
     min: number;
     max: number;
-    fundamentals?: Partial<Asset>; // Reusing Asset interface for fundamentals
+    fundamentals?: Partial<Asset>; 
 }
 
-// Categorias para descoberta
 const MARKET_CATEGORIES = [
     { title: "Gigantes da Logística", color: "bg-orange-500", tickers: ["HGLG11", "BTLG11", "XPLG11", "VILG11"] },
     { title: "Shoppings Premium", color: "bg-blue-500", tickers: ["XPML11", "VISC11", "HGBS11", "MALL11"] },
@@ -86,7 +85,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     const [error, setError] = useState<string | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
     
-    // Persist Recent Searches
     const [recentSearches, setRecentSearches] = usePersistentState<string[]>('market_recent_searches', []);
 
     const handleSearch = async (term: string) => {
@@ -99,10 +97,9 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         setError(null);
         setResult(null);
         setSearchTerm(cleanTerm);
-        setDetailTab('general'); // Reset tab
+        setDetailTab('general');
 
         try {
-            // 1. Fetch Price (Rápido - Brapi)
             const { quotes } = await fetchBrapiQuotes(preferences, [cleanTerm], false);
             const data = quotes[cleanTerm];
             
@@ -131,13 +128,11 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                 setResult(baseResult);
                 setLoading(false);
 
-                // Update Recents
                 setRecentSearches(prev => {
                     const filtered = prev.filter(item => item !== cleanTerm);
                     return [cleanTerm, ...filtered].slice(0, 5);
                 });
 
-                // 2. Fetch Fundamentals (Paralelo - Gemini)
                 try {
                     const advData = await fetchAdvancedAssetData(preferences, [cleanTerm]);
                     const fund = advData.data[cleanTerm];
@@ -203,7 +198,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
             <div className="max-w-2xl mx-auto h-full flex flex-col">
                 <h1 className="text-2xl font-bold mb-4">{t('nav_market')}</h1>
 
-                {/* Main View Switcher */}
                 <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-6 border border-[var(--border-color)] shrink-0 shadow-sm">
                     <button 
                         onClick={() => { setViewMode('quotes'); vibrate(); }}
@@ -219,11 +213,9 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                     </button>
                 </div>
 
-                {/* Content Area */}
                 {viewMode === 'quotes' ? (
                     <div className="animate-fade-in space-y-6">
                         
-                        {/* Search Bar */}
                         <div className="relative">
                             <input
                                 type="text"
@@ -242,10 +234,8 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                             </button>
                         </div>
 
-                        {/* Result Card (Interactive) */}
                         {result && (
                             <div className="bg-[var(--bg-secondary)] rounded-3xl border border-[var(--border-color)] shadow-lg animate-fade-in-up overflow-hidden">
-                                {/* Header: Price & Ticker */}
                                 <div className="p-6 pb-2">
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
@@ -270,7 +260,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                     </div>
                                 </div>
 
-                                {/* Price Chart */}
                                 <div className="h-28 w-full px-2 mb-4">
                                     {result.history.length >= 2 ? (
                                         <PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} />
@@ -283,7 +272,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                     <FundamentalSkeleton />
                                 ) : (
                                     <>
-                                        {/* Detailed Analysis Tabs */}
                                         <div className="px-4 mb-4">
                                             <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--border-color)] overflow-x-auto no-scrollbar">
                                                 <TabButton label="Geral" isActive={detailTab === 'general'} onClick={() => setDetailTab('general')} />
@@ -323,7 +311,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                 </div>
                                             )}
 
-                                            {/* TAB: PORTFOLIO & QUALITY */}
+                                            {/* TAB: PORTFOLIO */}
                                             {detailTab === 'portfolio' && (
                                                 <div className="space-y-3">
                                                     {result.fundamentals?.businessDescription && (
@@ -340,11 +328,11 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                 </div>
                                             )}
 
-                                            {/* TAB: RISKS & STRENGTHS */}
+                                            {/* TAB: RISKS */}
                                             {detailTab === 'risks' && (
                                                 <div className="space-y-3">
                                                     {result.fundamentals?.riskAssessment && (
-                                                        <div className={`p-3 rounded-xl border flex gap-3 ${result.fundamentals.riskAssessment.includes('High') ? 'bg-red-500/10 border-red-500/20' : (result.fundamentals.riskAssessment.includes('Medium') ? 'bg-amber-500/10 border-amber-500/20' : 'bg-emerald-500/10 border-emerald-500/20')}`}>
+                                                        <div className={`p-3 rounded-xl border flex gap-3 ${result.fundamentals.riskAssessment.includes('High') || result.fundamentals.riskAssessment.includes('Alto') ? 'bg-red-500/10 border-red-500/20' : (result.fundamentals.riskAssessment.includes('Medium') || result.fundamentals.riskAssessment.includes('Médio') ? 'bg-amber-500/10 border-amber-500/20' : 'bg-emerald-500/10 border-emerald-500/20')}`}>
                                                             <div className="shrink-0 pt-0.5"><AnalysisIcon className="w-4 h-4 opacity-70"/></div>
                                                             <div>
                                                                 <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-80">Avaliação de Risco (IA)</p>
@@ -387,7 +375,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                             </div>
                         )}
 
-                        {/* Recent Searches & Discovery */}
                         {!result && (
                             <div className="animate-fade-in space-y-6 mt-4">
                                 {recentSearches.length > 0 && (

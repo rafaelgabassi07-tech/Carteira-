@@ -73,7 +73,6 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
         // Limpeza e Parsing do JSON
         let cleanJson = textResponse;
-        // Remove code blocks markdown se existirem
         cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/```$/, '').trim();
         
         let articles: NewsArticle[] = [];
@@ -86,23 +85,17 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
         if (!Array.isArray(articles)) return emptyReturn;
 
-        // GROUNDING: Vincular URLs reais dos metadados de busca
         const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        
-        // Filtra apenas chunks que são do tipo WEB e possuem URI
         const webChunks = groundingChunks.filter(c => c.web && c.web.uri);
 
         articles = articles.map((article, index) => {
             let url = `https://www.google.com/search?q=${encodeURIComponent(article.title + " " + article.source)}`;
-            
-            // Tenta pegar URL do grounding se disponível na mesma posição aproximada
             if (index < webChunks.length) {
                 url = webChunks[index].web!.uri;
                 if ((!article.source || article.source === 'Fonte Desconhecida') && webChunks[index].web!.title) {
                     article.source = webChunks[index].web!.title;
                 }
             }
-
             return {
                 ...article,
                 url,
@@ -164,10 +157,10 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       RULES FOR SEARCH:
       1. Use 'googleSearch' to find exact data from official sources (B3, RI, StatusInvest, ClubeFII).
       2. 'businessDescription': Concise 1-sentence summary of the investment thesis.
-      3. 'riskAssessment': "Low", "Medium" or "High" followed by a 3-word reason (e.g., "High - High Vacancy Risk").
-      4. 'strengths': Array of 2 short key strengths (e.g. "Prime Location", "Long Contracts").
-      5. 'dividendCAGR': 3-Year Compound Annual Growth Rate of dividends (approximate % float).
-      6. 'capRate': Estimated Capitalization Rate (%) for Brick funds. Null for Paper/FOF.
+      3. 'riskAssessment': A string starting with "Baixo", "Médio" or "Alto" followed by a dash and a 3-5 word reason (e.g., "Alto - Vacância elevada e mono-inquilino").
+      4. 'strengths': JSON Array of 3 short bullet points (strings) highlighting key strengths.
+      5. 'dividendCAGR': 3-Year Compound Annual Growth Rate of dividends (approximate % float, e.g. 5.2). If negative, use negative number.
+      6. 'capRate': Estimated Capitalization Rate (%) for Brick funds (Logística/Shoppings). Null for Paper/FOF.
       7. 'managementFee': formatted string (e.g. "1.20% a.a.").
       
       RULES FOR DIVIDENDS:
@@ -216,7 +209,6 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         const textResponse = response.text || "{}";
         const bytesReceived = new Blob([textResponse]).size;
 
-        // Clean Parsing
         let cleanJson = textResponse.replace(/^```json\s*/, '').replace(/```$/, '').trim();
         let data;
         try {
@@ -226,13 +218,11 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
             return emptyReturn;
         }
 
-        // Sanitize data
         const sanitizedData: Record<string, any> = {};
         for (const ticker in data) {
             if (Object.prototype.hasOwnProperty.call(data, ticker)) {
                 const assetData = data[ticker];
                 
-                // Validate Dividends
                 let cleanDividends: DividendHistoryEvent[] = [];
                 if (Array.isArray(assetData.dividendsHistory)) {
                     cleanDividends = assetData.dividendsHistory.filter((d: any) => {
