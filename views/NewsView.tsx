@@ -62,17 +62,17 @@ const NewsCard: React.FC<{
   }
 
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col">
+    <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col hover:border-[var(--accent-color)]/30 transition-colors">
       <div className="p-4 flex-1 flex flex-col">
         <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs text-[var(--accent-color)] font-semibold mb-1">{article.source}</p>
-              <h3 className="text-sm font-bold mr-16 leading-tight">{article.title}</h3>
+              <p className="text-xs text-[var(--accent-color)] font-semibold mb-1 uppercase tracking-wide">{article.source}</p>
+              <h3 className="text-sm font-bold mr-16 leading-tight text-[var(--text-primary)]">{article.title}</h3>
             </div>
-             <div className="absolute top-2 right-1 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-lg p-0.5">
+             <div className="absolute top-2 right-1 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/90 backdrop-blur-sm rounded-lg p-0.5 border border-[var(--border-color)]">
                <button
                   onClick={handleShare}
-                  className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
+                  className="p-2 rounded-md text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors active:scale-90"
                   aria-label={t('share_news')}
               >
                   <ShareIcon className="w-4 h-4" />
@@ -80,7 +80,7 @@ const NewsCard: React.FC<{
               <div className="w-px h-4 bg-[var(--border-color)] mx-0.5"></div>
               <button
                   onClick={handleFavorite}
-                  className={`p-2 rounded-full transition-all active:scale-90 ${isFavorited ? 'text-yellow-400 scale-110' : 'text-gray-400 hover:text-yellow-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  className={`p-2 rounded-md transition-all active:scale-90 ${isFavorited ? 'text-yellow-400 scale-110' : 'text-gray-400 hover:text-yellow-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
                   aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
               >
                   <StarIcon filled={isFavorited} className="w-4 h-4" />
@@ -120,12 +120,8 @@ const NewsCardSkeleton: React.FC = () => (
     </div>
 );
 
-interface NewsViewProps {
-    addToast: (message: string, type?: ToastMessage['type']) => void;
-    isEmbedded?: boolean;
-}
 
-const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => {
+const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void; isEmbedded?: boolean }> = ({ addToast, isEmbedded = false }) => {
   const { t } = useI18n();
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
@@ -281,13 +277,9 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
         : news;
   }, [news, activeTab, favorites]);
 
-  const containerClass = isEmbedded 
-    ? "h-full w-full" 
-    : "p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6";
-
   return (
     <div 
-        className={containerClass}
+        className={`p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6 ${isEmbedded ? 'pt-2' : ''}`}
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -303,38 +295,52 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
       )}
       
       <div className="w-full max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          {!isEmbedded && <h1 className="text-2xl font-bold">{t('market_news')}</h1>}
-          <div className={`flex gap-2 ${isEmbedded ? 'w-full justify-end' : ''}`}>
-               <button 
-                  onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
-                  className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
-                  aria-label="Filtros"
-              >
-                  <FilterIcon className="w-5 h-5" />
-              </button>
-              <button 
-                  onClick={handleRefresh} 
-                  disabled={loading}
-                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
-                  aria-label={t('refresh_prices')}
-              >
-                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
-              </button>
-          </div>
+        {!isEmbedded && (
+            <div className="mb-4">
+                <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{t('market_news')}</h1>
+                <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mt-0.5">Últimas Atualizações</p>
+            </div>
+        )}
+        
+        <div className="flex gap-2 mb-4">
+            <div className="flex-1">
+                <input 
+                    type="text"
+                    placeholder={t('search_news_placeholder')}
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3.5 text-sm font-medium focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] transition-all shadow-sm"
+                />
+            </div>
+            
+            <button 
+                onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                className={`p-3.5 rounded-xl border transition-all active:scale-95 flex items-center justify-center aspect-square ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)] shadow-md' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                aria-label="Filtros"
+            >
+                <FilterIcon className="w-5 h-5" />
+            </button>
+            <button 
+                onClick={handleRefresh} 
+                disabled={loading}
+                className="p-3.5 rounded-xl bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)] flex items-center justify-center aspect-square"
+                aria-label={t('refresh_prices')}
+            >
+                <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+            </button>
         </div>
         
         {/* Filter Panel */}
         {showFilters && (
-            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-4">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-4 shadow-sm">
                  <div>
-                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Período</label>
-                    <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)]">
+                    <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2 block">Período</label>
+                    <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--border-color)]">
                       {(['today', 'week', 'month'] as const).map((r) => (
                           <button
                               key={r}
                               onClick={() => handleDateRangeChange(r)}
-                              className={`flex-1 py-1.5 text-xs font-bold rounded transition-all ${dateRange === r ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${dateRange === r ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm border border-[var(--border-color)]/50' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                           >
                               {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
                           </button>
@@ -343,51 +349,41 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
                 </div>
                 
                  <div>
-                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Fontes (Opcional)</label>
+                    <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2 block">Fontes (Opcional)</label>
                     <input 
                       type="text"
                       placeholder="Ex: InfoMoney, Valor, Brazil Journal"
                       value={sourceFilter}
                       onChange={handleSourceChange}
-                      className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors placeholder:text-[var(--text-secondary)]/50"
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] transition-all placeholder:text-[var(--text-secondary)]/50"
                     />
                 </div>
             </div>
         )}
-
-        <div className="mb-4">
-          <input 
-            type="text"
-            placeholder={t('search_news_placeholder')}
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
-          />
-        </div>
         
-        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
+        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-6 border border-[var(--border-color)] shrink-0 shadow-sm">
             <button 
               onClick={() => { setActiveTab('all'); vibrate(); }}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm ring-1 ring-[var(--border-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
             >
                 {t('news_tab_all')}
             </button>
              <button 
               onClick={() => { setActiveTab('favorites'); vibrate(); }}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm ring-1 ring-[var(--border-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
             >
                 {t('news_tab_favorites')}
-                {favorites.size > 0 && <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] px-1.5 py-0.5 rounded-full text-[9px]">{favorites.size}</span>}
+                {favorites.size > 0 && <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] px-1.5 py-0.5 rounded-full text-[9px] min-w-[18px] text-center">{favorites.size}</span>}
             </button>
         </div>
 
         {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
         
         {error && (
-          <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
-            <p className="font-bold">{t('error')}</p>
-            <p className="text-sm">{error}</p>
-            <button onClick={() => loadNews(true, searchQuery, dateRange, sourceFilter)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-4 rounded-2xl text-center">
+            <p className="font-bold mb-1">{t('error')}</p>
+            <p className="text-sm opacity-80">{error}</p>
+            <button onClick={() => loadNews(true, searchQuery, dateRange, sourceFilter)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2.5 px-6 rounded-xl text-sm shadow-lg shadow-[var(--accent-color)]/20 active:scale-95 transition-transform">
               {t('try_again')}
             </button>
           </div>
@@ -401,7 +397,7 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
                   <div 
                       key={`${article.title}-${index}`} 
                       className="animate-fade-in-up h-full" 
-                      style={{ animationDelay: `${index * 70}ms` }}
+                      style={{ animationDelay: `${index * 50}ms` }}
                   >
                       <NewsCard 
                       article={article}
@@ -412,8 +408,8 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
                   </div>
                   ))}
                   {activeTab === 'favorites' && (
-                      <div className="col-span-full text-center pt-4 pb-8">
-                          <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:underline uppercase tracking-wider">
+                      <div className="col-span-full text-center pt-6 pb-8">
+                          <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:text-red-500 hover:underline uppercase tracking-wider transition-colors">
                               {t('clear_favorites')}
                           </button>
                       </div>
@@ -423,14 +419,17 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
               <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">
                   {activeTab === 'favorites' ? (
                       <>
-                          <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-[var(--border-color)]">
-                              <StarIcon className="w-8 h-8 text-gray-600" />
+                          <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border border-[var(--border-color)]">
+                              <StarIcon className="w-8 h-8 opacity-30" />
                           </div>
-                          <p className="font-bold text-lg">{t('no_favorites_title')}</p>
-                          <p className="text-sm mt-2 max-w-[250px]">{t('no_favorites_subtitle')}</p>
+                          <p className="font-bold text-lg text-[var(--text-primary)]">{t('no_favorites_title')}</p>
+                          <p className="text-sm mt-2 max-w-[250px] opacity-70">{t('no_favorites_subtitle')}</p>
                       </>
                   ) : (
-                      <p>{t('no_news_found')}</p>
+                      <>
+                        <p className="font-bold">{t('no_news_found')}</p>
+                        <p className="text-xs mt-1 opacity-70">Tente ajustar os filtros de busca.</p>
+                      </>
                   )}
               </div>
             )}
