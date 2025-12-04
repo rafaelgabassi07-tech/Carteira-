@@ -117,7 +117,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { dy?: number; pvp?: number; assetType?: string; administrator?: string; vacancyRate?: number; dividendsHistory?: DividendHistoryEvent[] }>, stats: { bytesSent: number, bytesReceived: number } }> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { dy?: number; pvp?: number; assetType?: string; administrator?: string; vacancyRate?: number; lastDividend?: number; netWorth?: string; shareholders?: number; vpPerShare?: number; businessDescription?: string; dividendsHistory?: DividendHistoryEvent[] }>, stats: { bytesSent: number, bytesReceived: number } }> {
     const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (tickers.length === 0) return emptyReturn;
 
@@ -134,20 +134,22 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const tickersString = tickers.join(', ');
     const today = new Date().toISOString().split('T')[0];
 
-    // Prompt Aprimorado para Confiabilidade e Provisões
+    // Prompt Aprimorado para Análise Fundamentalista Completa
     const prompt = `
-      ROLE: Strict Financial Auditor.
+      ROLE: Strict Financial Auditor & Analyst.
       TASK: Retrieve rigorous financial data for these Brazilian FIIs: ${tickersString}.
       CURRENT_DATE: ${today}.
       
       RULES FOR SEARCH:
       1. Use 'googleSearch' to find exact data from official sources (B3, StatusInvest, ClubeFII, FundsExplorer).
-      2. For 'assetType' (Sector), map to EXACTLY one: "Tijolo", "Papel", "Fiagro", "FOF", "Infra", "Híbrido", "Outros".
+      2. For 'assetType', map to: "Tijolo", "Papel", "Fiagro", "FOF", "Infra", "Híbrido".
+      3. 'businessDescription': A concise 1-sentence summary of what the fund invests in (max 20 words).
+      4. 'netWorth': Total Patrimônio Líquido (formatted string like "R$ 2.5B").
       
-      RULES FOR DIVIDENDS (CRITICAL):
+      RULES FOR DIVIDENDS:
       1. Fetch the last 6 dividends.
-      2. **PROVISIONED CHECK**: Compare current date (${today}) with 'Payment Date'. If Payment Date > Current Date, set "isProvisioned": true.
-      3. Dates MUST be strictly 'YYYY-MM-DD'. Verify the year (must be recent).
+      2. Compare current date with 'Payment Date'. If Payment Date > Current Date, set "isProvisioned": true.
+      3. Dates MUST be 'YYYY-MM-DD'.
       4. Value is "R$ per share".
       
       OUTPUT: JSON Object ONLY. Keys = Ticker (e.g., "MXRF11").
@@ -156,16 +158,16 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       {
         "dy": number (12m yield, e.g. 12.5),
         "pvp": number (e.g. 1.03),
-        "assetType": string (Category),
+        "assetType": string,
         "administrator": string,
         "vacancyRate": number (percentage, e.g. 5.5),
+        "lastDividend": number (value of the most recent confirmed payment),
+        "netWorth": string (e.g. "R$ 1.2B"),
+        "shareholders": number (count),
+        "vpPerShare": number (Valor Patrimonial por Cota),
+        "businessDescription": string (Short summary in Portuguese),
         "dividendsHistory": [
-           { 
-             "exDate": "YYYY-MM-DD", 
-             "paymentDate": "YYYY-MM-DD", 
-             "value": number,
-             "isProvisioned": boolean
-           }
+           { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number, "isProvisioned": boolean }
         ]
       }
     `;
@@ -220,6 +222,11 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                     assetType: typeof assetData.assetType === 'string' ? assetData.assetType : undefined,
                     administrator: typeof assetData.administrator === 'string' ? assetData.administrator : undefined,
                     vacancyRate: typeof assetData.vacancyRate === 'number' ? assetData.vacancyRate : undefined,
+                    lastDividend: typeof assetData.lastDividend === 'number' ? assetData.lastDividend : undefined,
+                    netWorth: typeof assetData.netWorth === 'string' ? assetData.netWorth : undefined,
+                    shareholders: typeof assetData.shareholders === 'number' ? assetData.shareholders : undefined,
+                    vpPerShare: typeof assetData.vpPerShare === 'number' ? assetData.vpPerShare : undefined,
+                    businessDescription: typeof assetData.businessDescription === 'string' ? assetData.businessDescription : undefined,
                     dividendsHistory: cleanDividends.length > 0 ? cleanDividends : undefined
                 };
             }

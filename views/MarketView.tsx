@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -12,6 +11,7 @@ import GlobeIcon from '../components/icons/GlobeIcon';
 import ClockIcon from '../components/icons/ClockIcon';
 import TrashIcon from '../components/icons/TrashIcon';
 import AnalysisIcon from '../components/icons/AnalysisIcon';
+import SparklesIcon from '../components/icons/SparklesIcon';
 import TransactionModal from '../components/modals/TransactionModal';
 import NewsView from './NewsView';
 import PortfolioLineChart from '../components/PortfolioLineChart';
@@ -35,6 +35,11 @@ interface MarketResult {
         sector?: string;
         vacancy?: number;
         administrator?: string;
+        lastDividend?: number;
+        netWorth?: string;
+        shareholders?: number;
+        vpPerShare?: number;
+        businessDescription?: string;
     };
 }
 
@@ -62,11 +67,11 @@ const MARKET_CATEGORIES = [
     }
 ];
 
-const FundamentalBadge: React.FC<{ label: string; value: string | number; sub?: string; color?: string }> = ({ label, value, sub, color }) => (
-    <div className="flex flex-col p-3 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] flex-1 min-w-[100px]">
-        <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{label}</span>
-        <span className={`text-base font-bold ${color || 'text-[var(--text-primary)]'}`}>{value}</span>
-        {sub && <span className="text-[9px] text-[var(--text-secondary)]">{sub}</span>}
+const InfoBlock: React.FC<{ label: string; value: React.ReactNode; sub?: string; highlight?: boolean }> = ({ label, value, sub, highlight }) => (
+    <div className={`flex flex-col p-3 rounded-xl border ${highlight ? 'bg-[var(--bg-tertiary-hover)] border-[var(--accent-color)]/20' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
+        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 opacity-80">{label}</span>
+        <span className={`text-sm font-bold ${highlight ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>{value}</span>
+        {sub && <span className="text-[9px] text-[var(--text-secondary)] mt-0.5">{sub}</span>}
     </div>
 );
 
@@ -147,7 +152,12 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 pvp: fund.pvp,
                                 sector: fund.assetType,
                                 vacancy: fund.vacancyRate,
-                                administrator: fund.administrator
+                                administrator: fund.administrator,
+                                lastDividend: fund.lastDividend,
+                                netWorth: fund.netWorth,
+                                shareholders: fund.shareholders,
+                                vpPerShare: fund.vpPerShare,
+                                businessDescription: fund.businessDescription
                             }
                         }) : null);
                     }
@@ -246,7 +256,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                 )}
                                             </div>
                                             <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1">
-                                                {loadingFundamentals ? <span className="animate-pulse">Buscando dados...</span> : 'Cotação Tempo Real'}
+                                                {loadingFundamentals ? <span className="animate-pulse">Analisando...</span> : 'Análise Completa'}
                                             </p>
                                         </div>
                                         <div className={`flex flex-col items-end`}>
@@ -271,38 +281,59 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                     )}
                                 </div>
 
-                                {/* Fundamentals Grid */}
+                                {/* AI Summary (Insight) */}
+                                {result.fundamentals?.businessDescription && (
+                                    <div className="px-4 mb-4">
+                                        <div className="bg-[var(--accent-color)]/5 border border-[var(--accent-color)]/20 p-3 rounded-xl flex gap-3">
+                                            <div className="text-[var(--accent-color)] pt-0.5"><SparklesIcon className="w-4 h-4" /></div>
+                                            <div>
+                                                <p className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-wider mb-1">Resumo do Fundo</p>
+                                                <p className="text-xs text-[var(--text-primary)] leading-relaxed opacity-90">{result.fundamentals.businessDescription}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Fundamentals Grid (Rich Info) */}
                                 <div className="px-4 pb-4">
                                     <div className="flex items-center gap-2 mb-3">
-                                        <AnalysisIcon className="w-4 h-4 text-[var(--accent-color)]"/>
-                                        <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Ficha Técnica</h3>
+                                        <AnalysisIcon className="w-4 h-4 text-[var(--text-secondary)]"/>
+                                        <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Dados Fundamentais</h3>
                                     </div>
                                     
-                                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                                        <FundamentalBadge 
-                                            label="Dividend Yield" 
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        <InfoBlock 
+                                            label="Dividend Yield (12m)" 
                                             value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'}
-                                            sub="12 meses"
-                                            color={result.fundamentals?.dy && result.fundamentals.dy > 10 ? 'text-[var(--green-text)]' : undefined}
+                                            highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? true : false}
                                         />
-                                        <FundamentalBadge 
+                                        <InfoBlock 
+                                            label="Último Rendimento" 
+                                            value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'}
+                                        />
+                                        <InfoBlock 
                                             label="P/VP" 
                                             value={result.fundamentals?.pvp ? result.fundamentals.pvp.toFixed(2) : '-'}
-                                            color={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'text-[var(--green-text)]' : (result.fundamentals?.pvp && result.fundamentals.pvp > 1.2 ? 'text-[var(--red-text)]' : undefined)}
+                                            sub={result.fundamentals?.vpPerShare ? `VP: ${formatCurrency(result.fundamentals.vpPerShare)}` : undefined}
+                                            highlight={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? true : false}
                                         />
-                                        <FundamentalBadge 
-                                            label="Min (52sem)" 
-                                            value={formatCurrency(result.min)} 
+                                        <InfoBlock 
+                                            label="Patrimônio Líq." 
+                                            value={result.fundamentals?.netWorth || '-'}
                                         />
-                                        <FundamentalBadge 
-                                            label="Max (52sem)" 
-                                            value={formatCurrency(result.max)} 
+                                        <InfoBlock 
+                                            label="Vacância Física" 
+                                            value={result.fundamentals?.vacancy !== undefined ? `${result.fundamentals.vacancy}%` : '-'}
+                                        />
+                                        <InfoBlock 
+                                            label="Cotistas" 
+                                            value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'}
                                         />
                                     </div>
 
                                     {/* Valuation Bar */}
                                     {result.fundamentals?.pvp && (
-                                        <div className="mt-2 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
+                                        <div className="mt-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
                                             <div className="flex justify-between text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">
                                                 <span>Descontado</span>
                                                 <span>Preço Justo (1.0)</span>
@@ -317,9 +348,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                     className="absolute top-0 bottom-0 w-1 bg-[var(--text-primary)] shadow-[0_0_8px_white] transition-all duration-1000"
                                                     style={{ left: `${Math.min(Math.max((result.fundamentals.pvp / 1.5) * 100, 5), 95)}%` }}
                                                 ></div>
-                                            </div>
-                                            <div className="text-center mt-1 text-[10px] font-medium text-[var(--text-secondary)]">
-                                                P/VP Atual: {result.fundamentals.pvp.toFixed(2)}
                                             </div>
                                         </div>
                                     )}
