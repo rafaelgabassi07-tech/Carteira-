@@ -1,10 +1,12 @@
 
+
 import React from 'react';
 import type { View } from '../App';
 import LayoutGridIcon from './icons/LayoutGridIcon';
 import GlobeIcon from './icons/GlobeIcon';
 import NewsIcon from './icons/NewsIcon';
 import TransactionIcon from './icons/TransactionIcon';
+import WalletIcon from './icons/WalletIcon';
 import { vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -48,11 +50,12 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
     setActiveView(view);
   };
 
+  // Explicitly defining the navigation items as requested by the user.
   const navItems: { view: View; label: string; icon: React.ReactElement }[] = [
     { view: 'dashboard', label: t('nav_portfolio'), icon: <LayoutGridIcon /> },
     { view: 'transacoes', label: t('nav_transactions'), icon: <TransactionIcon /> },
     { view: 'mercado', label: t('nav_market'), icon: <GlobeIcon /> },
-    { view: 'noticias', label: t('nav_news'), icon: <NewsIcon /> },
+    { view: 'analise', label: t('nav_analysis'), icon: <WalletIcon /> },
   ];
 
   return (

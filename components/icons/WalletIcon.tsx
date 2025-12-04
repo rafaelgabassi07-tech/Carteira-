@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 const WalletIcon: React.FC<{ className?: string }> = ({ className }) => (

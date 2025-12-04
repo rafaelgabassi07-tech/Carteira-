@@ -5,7 +5,7 @@ export const ptBR = {
     main_portfolio: 'Dashboard',
     nav_portfolio: 'Dashboard',
     nav_transactions: 'Transações',
-    // nav_analysis: 'Carteira', // Removido por redundância
+    nav_analysis: 'Carteira',
     nav_news: 'Notícias',
     nav_settings: 'Configurações',
     nav_market: 'Mercado',

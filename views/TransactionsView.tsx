@@ -1,11 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import type { Transaction, ToastMessage } from '../types';
-import TransactionModal from '../components/modals/TransactionModal';
 import EditIcon from '../components/icons/EditIcon';
 import TrashIcon from '../components/icons/TrashIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
+import FloatingActionButton from '../components/FloatingActionButton';
+const TransactionModal = React.lazy(() => import('../components/modals/TransactionModal'));
 
 const TransactionItem = React.memo<{ 
     transaction: Transaction, 
@@ -270,22 +272,28 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                 )}
             </div>
             
+            <FloatingActionButton id="fab-add-transaction" onClick={() => { setShowAddModal(true); vibrate(); }} />
+
             {showAddModal && (
-                <TransactionModal 
-                    onClose={() => setShowAddModal(false)} 
-                    onSave={handleSaveTransaction}
-                    addToast={addToast}
-                />
+                <Suspense fallback={<div/>}>
+                    <TransactionModal 
+                        onClose={() => setShowAddModal(false)} 
+                        onSave={handleSaveTransaction}
+                        addToast={addToast}
+                    />
+                </Suspense>
             )}
 
             {editingTx && (
-                <TransactionModal 
-                    onClose={() => setEditingTx(null)} 
-                    onSave={handleSaveTransaction}
-                    onDelete={handleDeleteTransaction}
-                    transaction={editingTx} 
-                    addToast={addToast}
-                />
+                 <Suspense fallback={<div/>}>
+                    <TransactionModal 
+                        onClose={() => setEditingTx(null)} 
+                        onSave={handleSaveTransaction}
+                        onDelete={handleDeleteTransaction}
+                        transaction={editingTx} 
+                        addToast={addToast}
+                    />
+                </Suspense>
             )}
         </div>
     );

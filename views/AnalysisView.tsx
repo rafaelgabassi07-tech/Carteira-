@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useMemo } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import PatrimonyEvolutionCard from '../components/PatrimonyEvolutionCard';
@@ -29,10 +30,10 @@ const IncomeCard: React.FC = () => {
     }, [monthlyIncome]);
 
     return (
-        <AnalysisCard title="Renda Mensal" delay={100}>
+        <AnalysisCard title={t('monthly_income')} delay={100}>
              <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
                 <div className="flex flex-col">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">Média (12m)</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
                     <span className="font-semibold text-lg text-[var(--green-text)]">
                         <CountUp end={average} formatter={formatCurrency} />
                     </span>
@@ -58,7 +59,9 @@ const DiversificationCard: React.FC = () => {
     const data = useMemo(() => {
         const segments: Record<string, number> = {};
         let totalValue = 0;
-        assets.forEach(a => {
+        const activeAssets = assets.filter(a => a.quantity > 0.000001);
+
+        activeAssets.forEach(a => {
             const val = a.quantity * a.currentPrice;
             const seg = a.segment || t('outros');
             segments[seg] = (segments[seg] || 0) + val;
@@ -100,14 +103,14 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {
     };
     
     return (
-        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6">
+        <div className="p-4 pt-safe pb-32 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6">
             <div className="max-w-7xl mx-auto">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold">{t('nav_analysis')}</h1>
                     <button 
                         onClick={handleRefresh} 
                         disabled={isRefreshing}
-                        className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50"
+                        className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
                         aria-label={t('refresh_prices')}
                     >
                         <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
