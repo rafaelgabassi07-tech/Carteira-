@@ -14,6 +14,7 @@ import TrashIcon from '../components/icons/TrashIcon';
 import AnalysisIcon from '../components/icons/AnalysisIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
 import TrendingUpIcon from '../components/icons/TrendingUpIcon';
+import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import TransactionModal from '../components/modals/TransactionModal';
 import NewsView from './NewsView';
 import PortfolioLineChart from '../components/PortfolioLineChart';
@@ -42,46 +43,40 @@ const MARKET_CATEGORIES = [
 ];
 
 // --- Modern Stat Item Component ---
-const StatItem: React.FC<{ label: string; value: React.ReactNode; sub?: string; highlight?: boolean; colorClass?: string; icon?: React.ReactNode }> = ({ label, value, sub, highlight, colorClass, icon }) => (
-    <div className={`flex flex-col p-4 rounded-2xl h-full justify-between transition-colors ${highlight ? 'bg-[var(--bg-tertiary-hover)] ring-1 ring-[var(--accent-color)]/20' : 'bg-[var(--bg-primary)] border border-[var(--border-color)]'}`}>
-        <div className="flex justify-between items-start mb-2">
-            <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-80">{label}</span>
-            {icon && <div className="text-[var(--text-secondary)] opacity-50 scale-75">{icon}</div>}
-        </div>
-        <div>
-            <span className={`text-base font-bold truncate block tracking-tight ${colorClass ? colorClass : (highlight ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]')}`}>
+const StatItem: React.FC<{ label: string; value: React.ReactNode; sub?: string; highlight?: 'green' | 'red' | 'neutral'; className?: string }> = ({ label, value, sub, highlight, className }) => {
+    let textColor = 'text-[var(--text-primary)]';
+    if (highlight === 'green') textColor = 'text-[var(--green-text)]';
+    if (highlight === 'red') textColor = 'text-[var(--red-text)]';
+
+    return (
+        <div className={`flex flex-col p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] justify-center ${className}`}>
+            <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 opacity-80">{label}</span>
+            <span className={`text-base font-bold truncate block tracking-tight ${textColor}`}>
                 {value}
             </span>
             {sub && <span className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate block font-medium opacity-70">{sub}</span>}
         </div>
-    </div>
-);
-
-const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => void }> = ({ label, isActive, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`px-5 py-2.5 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${isActive ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] shadow-md shadow-[var(--accent-color)]/20' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)]'}`}
-    >
-        {label}
-    </button>
-);
+    );
+};
 
 const SectionHeader: React.FC<{ title: string, icon?: React.ReactNode }> = ({ title, icon }) => (
-    <div className="flex items-center gap-2 mb-3 mt-1 px-1">
-        {icon && <span className="text-[var(--accent-color)]">{icon}</span>}
-        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{title}</h3>
-        <div className="h-px bg-[var(--border-color)] flex-1 opacity-50 ml-2"></div>
+    <div className="flex items-center gap-2 mb-3 mt-4">
+        <div className="p-1.5 bg-[var(--bg-tertiary-hover)] rounded-lg text-[var(--accent-color)]">
+            {icon}
+        </div>
+        <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">{title}</h3>
     </div>
 );
 
 const FundamentalSkeleton: React.FC = () => (
     <div className="animate-pulse space-y-4 px-5 pb-5">
-        <div className="h-20 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="h-24 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
-            ))}
+        <div className="grid grid-cols-2 gap-3">
+            <div className="h-20 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
+            <div className="h-20 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
+            <div className="h-20 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
+            <div className="h-20 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
         </div>
+        <div className="h-24 bg-[var(--bg-primary)] rounded-2xl opacity-50"></div>
     </div>
 );
 
@@ -90,7 +85,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     const { preferences, addTransaction } = usePortfolio();
     
     const [viewMode, setViewMode] = useState<'quotes' | 'news'>('quotes');
-    const [detailTab, setDetailTab] = useState<'general' | 'dividends' | 'portfolio' | 'risks'>('general');
+    const [expandedDetails, setExpandedDetails] = useState(false);
     
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
@@ -111,7 +106,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         setError(null);
         setResult(null);
         setSearchTerm(cleanTerm);
-        setDetailTab('general');
+        setExpandedDetails(false);
 
         try {
             const { quotes } = await fetchBrapiQuotes(preferences, [cleanTerm], false);
@@ -251,18 +246,19 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                         {result && (
                             <div className="bg-[var(--bg-secondary)] rounded-[24px] border border-[var(--border-color)] shadow-xl animate-fade-in-up overflow-hidden">
                                 
-                                {/* HEADER HERO */}
+                                {/* HERO SECTION */}
                                 <div className="p-6 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] border-b border-[var(--border-color)]">
                                     <div className="flex justify-between items-start">
                                         <div className="flex flex-col gap-2">
-                                            <h2 className="text-4xl font-black text-[var(--text-primary)] tracking-tighter leading-none">{result.ticker}</h2>
-                                            {result.fundamentals?.segment && (
-                                                <div className="self-start px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)]">
-                                                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wide">
+                                            <div className="flex items-center gap-2">
+                                                <h2 className="text-4xl font-black text-[var(--text-primary)] tracking-tighter leading-none">{result.ticker}</h2>
+                                                {result.fundamentals?.segment && (
+                                                    <span className="px-2 py-1 rounded-md bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wide">
                                                         {result.fundamentals.segment}
                                                     </span>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-[var(--text-secondary)] font-medium">Cotação em tempo real</p>
                                         </div>
                                         <div className="flex flex-col items-end text-right">
                                             <span className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">{formatCurrency(result.price)}</span>
@@ -274,7 +270,8 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                         </div>
                                     </div>
                                     
-                                    <div className="h-28 w-full mt-6 -mb-2 relative opacity-80">
+                                    {/* Small Sparkline */}
+                                    <div className="h-20 w-full mt-6 -mb-2 relative opacity-80">
                                         {result.history.length >= 2 ? (
                                             <PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} />
                                         ) : (
@@ -283,108 +280,122 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                     </div>
                                 </div>
 
-                                {/* TABS */}
-                                <div className="px-5 py-4 border-b border-[var(--border-color)] overflow-x-auto no-scrollbar">
-                                    <div className="flex gap-2">
-                                        <TabButton label="Geral" isActive={detailTab === 'general'} onClick={() => setDetailTab('general')} />
-                                        <TabButton label="Dividendos" isActive={detailTab === 'dividends'} onClick={() => setDetailTab('dividends')} />
-                                        <TabButton label="Portfólio" isActive={detailTab === 'portfolio'} onClick={() => setDetailTab('portfolio')} />
-                                        <TabButton label="Riscos" isActive={detailTab === 'risks'} onClick={() => setDetailTab('risks')} />
-                                    </div>
-                                </div>
-
-                                {/* CONTENT */}
-                                <div className="pt-5 animate-fade-in min-h-[300px]">
+                                {/* MAIN CONTENT AREA */}
+                                <div className="pt-5 animate-fade-in">
                                     {loadingFundamentals ? (
                                         <FundamentalSkeleton />
                                     ) : (
                                         <div className="px-5 pb-6 space-y-6">
                                             
-                                            {/* TAB: GENERAL */}
-                                            {detailTab === 'general' && (
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                    <StatItem label="P/VP" value={result.fundamentals?.pvp?.toFixed(2) ?? '-'} sub={result.fundamentals?.vpPerShare ? `VP: ${formatCurrency(result.fundamentals.vpPerShare)}` : ''} colorClass={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'text-[var(--green-text)]' : ''}/>
-                                                    <StatItem label="Dividend Yield" value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'} highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? true : false} />
-                                                    <StatItem label="Patrimônio Líq." value={result.fundamentals?.netWorth ?? '-'} />
-                                                    <StatItem label="Liquidez Diária" value="Analise na Corretora" sub="Dados em tempo real" />
-                                                    <StatItem label="Nº Cotistas" value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'} />
-                                                    <StatItem label="Gestão" value={result.fundamentals?.administrator ?? '-'} />
+                                            {/* 1. KEY STATS GRID (The "At a Glance" view) */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <StatItem 
+                                                    label="Dividend Yield (12m)" 
+                                                    value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'} 
+                                                    highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? 'green' : 'neutral'}
+                                                />
+                                                <StatItem 
+                                                    label="P/VP" 
+                                                    value={result.fundamentals?.pvp?.toFixed(2) ?? '-'} 
+                                                    sub={result.fundamentals?.vpPerShare ? `VP: ${formatCurrency(result.fundamentals.vpPerShare)}` : ''} 
+                                                    highlight={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'green' : (result.fundamentals?.pvp && result.fundamentals.pvp > 1.2 ? 'red' : 'neutral')}
+                                                />
+                                                <StatItem 
+                                                    label="Último Rendimento" 
+                                                    value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'} 
+                                                />
+                                                <StatItem 
+                                                    label="Vacância" 
+                                                    value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'} 
+                                                    highlight={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'red' : 'neutral'}
+                                                />
+                                            </div>
+
+                                            {/* 2. AI INSIGHT (Unified) */}
+                                            {(result.fundamentals?.businessDescription || result.fundamentals?.riskAssessment) && (
+                                                <div className="bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <SparklesIcon className="w-4 h-4 text-[var(--accent-color)]" />
+                                                        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Análise IA</span>
+                                                        
+                                                        {result.fundamentals?.riskAssessment && (
+                                                            <span className={`ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                                                                result.fundamentals.riskAssessment.includes('High') || result.fundamentals.riskAssessment.includes('Alto') 
+                                                                ? 'bg-red-500/10 text-red-500 border-red-500/20' 
+                                                                : (result.fundamentals.riskAssessment.includes('Medium') || result.fundamentals.riskAssessment.includes('Médio') 
+                                                                    ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
+                                                                    : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20')
+                                                            }`}>
+                                                                Risco {result.fundamentals.riskAssessment.split('-')[0]}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {result.fundamentals?.businessDescription && (
+                                                        <p className="text-xs leading-relaxed text-[var(--text-primary)] font-medium opacity-90 mb-3">
+                                                            {result.fundamentals.businessDescription}
+                                                        </p>
+                                                    )}
+                                                    
+                                                    {result.fundamentals?.riskAssessment && (
+                                                        <p className="text-[10px] leading-relaxed text-[var(--text-secondary)] pt-2 border-t border-[var(--border-color)]">
+                                                            <span className="font-bold">Risco:</span> {result.fundamentals.riskAssessment}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
 
-                                            {/* TAB: DIVIDENDS */}
-                                            {detailTab === 'dividends' && (
-                                                <>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <StatItem label="Último Rendimento" value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'} highlight />
-                                                        <StatItem label="Cresc. 3 Anos (CAGR)" value={result.fundamentals?.dividendCAGR ? `${result.fundamentals.dividendCAGR > 0 ? '+' : ''}${result.fundamentals.dividendCAGR}%` : '-'} colorClass={result.fundamentals?.dividendCAGR && result.fundamentals.dividendCAGR > 0 ? 'text-[var(--green-text)]' : 'text-[var(--text-secondary)]'} />
-                                                    </div>
+                                            {/* 3. EXPANDABLE DETAILS */}
+                                            {expandedDetails && (
+                                                <div className="animate-fade-in-up space-y-6 pt-2">
                                                     
+                                                    {/* Dividends Chart */}
                                                     <div>
-                                                        <SectionHeader title="Histórico Recente" icon={<ClockIcon className="w-4 h-4"/>}/>
+                                                        <SectionHeader title="Histórico de Proventos" icon={<ClockIcon className="w-4 h-4"/>}/>
                                                         {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 ? (
                                                             <div className="bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]">
                                                                 <div className="h-40"><DividendChart data={result.fundamentals.dividendsHistory} /></div>
                                                             </div>
                                                         ) : <p className="text-center text-xs text-[var(--text-secondary)] py-4 opacity-70">Histórico indisponível</p>}
                                                     </div>
-                                                </>
-                                            )}
 
-                                            {/* TAB: PORTFOLIO */}
-                                            {detailTab === 'portfolio' && (
-                                                <div className="space-y-5">
-                                                    {result.fundamentals?.businessDescription && (
-                                                        <div className="bg-[var(--bg-primary)] p-5 rounded-2xl border border-[var(--border-color)] relative">
-                                                            <div className="absolute top-4 left-4 text-[var(--accent-color)] opacity-20">
-                                                                <SparklesIcon className="w-6 h-6" />
-                                                            </div>
-                                                            <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-2 pl-1">Tese de Investimento</p>
-                                                            <p className="text-sm leading-relaxed text-[var(--text-primary)] font-medium">"{result.fundamentals.businessDescription}"</p>
-                                                        </div>
-                                                    )}
-                                                    
+                                                    {/* Secondary Stats */}
                                                     <div className="grid grid-cols-2 gap-3">
-                                                        <StatItem label="Vacância Física" value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'} colorClass={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'text-[var(--red-text)]' : ''} />
-                                                        <StatItem label="Cap Rate (Est.)" value={result.fundamentals?.capRate ? `${result.fundamentals.capRate}%` : '-'} sub="Rentabilidade Imóvel" />
+                                                        <StatItem label="Patrimônio Líq." value={result.fundamentals?.netWorth ?? '-'} />
+                                                        <StatItem label="Nº Cotistas" value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'} />
+                                                        <StatItem label="CAGR Dividendos (3A)" value={result.fundamentals?.dividendCAGR ? `${result.fundamentals.dividendCAGR}%` : '-'} highlight={result.fundamentals?.dividendCAGR && result.fundamentals.dividendCAGR > 0 ? 'green' : 'neutral'} />
                                                         <StatItem label="Taxa de Adm." value={result.fundamentals?.managementFee ?? '-'} />
+                                                        <StatItem label="Gestão" value={result.fundamentals?.administrator ?? '-'} className="col-span-2" />
                                                     </div>
-                                                </div>
-                                            )}
 
-                                            {/* TAB: RISKS */}
-                                            {detailTab === 'risks' && (
-                                                <div className="space-y-5">
-                                                    {result.fundamentals?.riskAssessment && (
-                                                        <div className={`p-5 rounded-2xl border flex gap-4 ${result.fundamentals.riskAssessment.includes('High') || result.fundamentals.riskAssessment.includes('Alto') ? 'bg-red-500/5 border-red-500/20' : (result.fundamentals.riskAssessment.includes('Medium') || result.fundamentals.riskAssessment.includes('Médio') ? 'bg-amber-500/5 border-amber-500/20' : 'bg-emerald-500/5 border-emerald-500/20')}`}>
-                                                            <div className={`shrink-0 p-2 rounded-full h-fit ${result.fundamentals.riskAssessment.includes('High') || result.fundamentals.riskAssessment.includes('Alto') ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                                                                <AnalysisIcon className="w-5 h-5"/>
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-60">Avaliação de Risco (IA)</p>
-                                                                <p className="text-sm font-bold leading-snug">{result.fundamentals.riskAssessment}</p>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    
+                                                    {/* Strengths */}
                                                     {result.fundamentals?.strengths && result.fundamentals.strengths.length > 0 && (
                                                         <div>
                                                             <SectionHeader title="Pontos Fortes" icon={<TrendingUpIcon className="w-4 h-4"/>}/>
-                                                            <div className="bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]">
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {result.fundamentals.strengths.map((s, i) => (
-                                                                        <span key={i} className="text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] px-3 py-1.5 rounded-lg font-bold text-[var(--text-primary)]">{s}</span>
-                                                                    ))}
-                                                                </div>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {result.fundamentals.strengths.map((s, i) => (
+                                                                    <span key={i} className="text-xs bg-[var(--bg-primary)] border border-[var(--border-color)] px-3 py-1.5 rounded-lg font-bold text-[var(--text-primary)]">{s}</span>
+                                                                ))}
                                                             </div>
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
+
+                                            {/* Toggle Button */}
+                                            <button 
+                                                onClick={() => setExpandedDetails(!expandedDetails)}
+                                                className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] border border-[var(--border-color)] bg-[var(--bg-primary)] rounded-xl flex items-center justify-center gap-1 hover:bg-[var(--bg-tertiary-hover)] transition-colors"
+                                            >
+                                                {expandedDetails ? 'Ocultar Análise Completa' : 'Ver Análise Completa'}
+                                                <ChevronRightIcon className={`w-3 h-3 transition-transform duration-300 ${expandedDetails ? '-rotate-90' : 'rotate-90'}`} />
+                                            </button>
+
                                         </div>
                                     )}
                                 </div>
 
+                                {/* ADD ACTION */}
                                 <div className="p-5 bg-[var(--bg-tertiary-hover)]/30 border-t border-[var(--border-color)]">
                                     <button 
                                         onClick={() => setShowAddModal(true)}
