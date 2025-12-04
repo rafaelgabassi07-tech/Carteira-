@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 
 interface ToastProps {
@@ -28,18 +29,18 @@ const Toast: React.FC<ToastProps> = ({ message, type, action, onClose }) => {
   }[type];
 
   return (
-    <div className={`fixed bottom-20 left-1/2 -translate-x-1/2 max-w-sm w-full p-4 rounded-lg text-white shadow-2xl z-[60] animate-toast-in-out landscape-fab ${bgColor} flex items-center justify-between gap-3`}>
+    <div className={`fixed bottom-32 left-1/2 -translate-x-1/2 max-w-sm w-[90%] p-4 rounded-2xl text-white shadow-2xl z-[120] animate-toast-in-out landscape-fab ${bgColor} flex items-center justify-between gap-3 border border-white/10 backdrop-blur-md`}>
       <p className="text-sm font-medium">{message}</p>
       {action && (
           <button 
             onClick={action.onClick}
-            className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-md transition-colors whitespace-nowrap"
+            className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
           >
               {action.label}
           </button>
       )}
       {!action && (
-          <button onClick={onClose} className="text-white/60 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-white/60 hover:text-white p-1">✕</button>
       )}
       <style>{`
         @keyframes toast-in-out {
@@ -48,7 +49,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, action, onClose }) => {
           /* Persistent toasts don't fade out automatically in css */
         }
         .animate-toast-in-out {
-          animation: toast-in-out 0.5s ease-out forwards;
+          animation: toast-in-out 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
     </div>
