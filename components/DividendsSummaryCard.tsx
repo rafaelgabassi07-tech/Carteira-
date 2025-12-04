@@ -411,7 +411,7 @@ const DividendsSummaryCard: React.FC = () => {
         <>
             <div 
                 onClick={() => { vibrate(); setShowModal(true); }}
-                className="bg-[var(--bg-secondary)] p-5 rounded-2xl mx-4 mt-4 border border-[var(--border-color)] shadow-sm cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group animate-fade-in-up relative overflow-hidden"
+                className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group animate-fade-in-up relative overflow-hidden w-full"
             >
                 {/* Background Sparkle */}
                 <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity pointer-events-none">
