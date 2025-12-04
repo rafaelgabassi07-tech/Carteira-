@@ -25,12 +25,6 @@ const Tour: React.FC<TourProps> = ({ onFinish, isPortfolioEmpty }) => {
 
   const tourSteps: Step[] = useMemo(() => [
     {
-      element: '#privacy-toggle',
-      title: t('tour_privacy_title'),
-      content: t('tour_privacy_content'),
-      position: 'bottom',
-    },
-    {
       element: '#notifications-btn',
       title: t('tour_notifications_title'),
       content: t('tour_notifications_content'),

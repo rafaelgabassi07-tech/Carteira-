@@ -1,10 +1,10 @@
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
-import type { ToastMessage } from '../types';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
+import SettingsIcon from '../components/icons/SettingsIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -12,22 +12,12 @@ import { vibrate } from '../utils';
 import DividendsSummaryCard from '../components/DividendsSummaryCard';
 import PortfolioPieChart from '../components/PortfolioPieChart';
 
-// Icons
-const EyeIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-);
-const EyeOffIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-);
-
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
-    onShare: () => void;
     onRefresh: () => void;
     isRefreshing: boolean;
-}> = ({ setActiveView, onShare, onRefresh, isRefreshing }) => {
+}> = ({ setActiveView, onRefresh, isRefreshing }) => {
     const { t } = useI18n();
-    const { privacyMode, togglePrivacyMode } = usePortfolio();
 
     return (
         <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300">
@@ -44,11 +34,8 @@ const Header: React.FC<{
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
-                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
-                     {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
-                </button>
-                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
-                    <ShareIcon className="w-5 h-5" />
+                <button id="settings-btn" onClick={() => { setActiveView('settings'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
+                    <SettingsIcon className="w-5 h-5" />
                 </button>
                 <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
                     <BellIcon className="w-5 h-5" />
@@ -175,7 +162,7 @@ interface PortfolioViewProps {
 }
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, addToast }) => {
-    const { t, formatCurrency } = useI18n();
+    const { t } = useI18n();
     const { assets, refreshMarketData, isRefreshing: isContextRefreshing } = usePortfolio();
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
     
@@ -225,24 +212,6 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, addToast }
         }
     };
 
-    const handleShare = async () => {
-        const totalValue = assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0);
-        const shareData = {
-            title: t('share_portfolio_title'),
-            text: t('share_portfolio_text', { value: formatCurrency(totalValue) }),
-            url: window.location.origin,
-        };
-        try {
-            if (navigator.share) await navigator.share(shareData);
-            else {
-                await navigator.clipboard.writeText(shareData.text);
-                addToast('Copiado para área de transferência!', 'success');
-            }
-        } catch (err) {
-            // User cancelled
-        }
-    };
-
     return (
         <div 
             className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
@@ -262,7 +231,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, addToast }
             </div>
 
             <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
+                <Header setActiveView={setActiveView} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
                 
                 <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
                     <PortfolioSummary />
