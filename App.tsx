@@ -50,36 +50,27 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-        const registrationPromise = (() => {
-            try {
-                // Try the more robust absolute URL method first.
-                const swUrl = new URL('sw.js', window.location.href);
-                return navigator.serviceWorker.register(swUrl);
-            } catch (error) {
-                console.warn('Absolute URL registration failed, falling back to relative path:', error);
-                // Fallback for environments where `new URL` is not supported with the base.
-                return navigator.serviceWorker.register('./sw.js');
-            }
-        })();
-
-        registrationPromise.then(registration => {
-            registration.onupdatefound = () => {
-                const installingWorker = registration.installing;
-                if (installingWorker) {
-                    installingWorker.onstatechange = () => {
-                        if (installingWorker.state === 'installed') {
-                            if (navigator.serviceWorker.controller) {
-                                console.log('New content is available for update.');
-                                waitingWorkerRef.current = registration.waiting;
-                                setUpdateAvailable(true);
+        // Use a simple, explicit relative path. This is the most reliable method
+        // in sandboxed environments where origin calculation can be complex.
+        navigator.serviceWorker.register('./sw.js')
+            .then(registration => {
+                registration.onupdatefound = () => {
+                    const installingWorker = registration.installing;
+                    if (installingWorker) {
+                        installingWorker.onstatechange = () => {
+                            if (installingWorker.state === 'installed') {
+                                if (navigator.serviceWorker.controller) {
+                                    console.log('New content is available for update.');
+                                    waitingWorkerRef.current = registration.waiting;
+                                    setUpdateAvailable(true);
+                                }
                             }
-                        }
-                    };
-                }
-            };
-        }).catch(error => {
-            console.error('Service Worker registration failed:', error);
-        });
+                        };
+                    }
+                };
+            }).catch(error => {
+                console.error('Service Worker registration failed:', error);
+            });
 
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
