@@ -15,12 +15,12 @@ export const CACHE_TTL = {
 // Stale Time (Quanto tempo consideramos os dados "frescos" antes de pedir novos)
 export const STALE_TIME = {
     PRICES: 5 * 60 * 1000, // 5 Minutos (Refresh manual)
-    MARKET_DATA: 15 * 60 * 1000, // 15 Minutos (Polling de preço)
+    MARKET_DATA: 15 * 60 * 1000, // 15 Minutos (Polling de preço - Brapi)
     FUNDAMENTALS: 24 * 60 * 60 * 1000, // 24 Horas (Dados como DY, P/VP, Setor - Gemini)
 };
 
 // --- STATIC KNOWLEDGE BASE (Fallback) ---
-// Garante que ativos populares tenham setor correto instantaneamente, antes mesmo da IA carregar
+// Garante que ativos populares tenham setor correto instantaneamente, antes mesmo da IA carregar ou se ela falhar
 export const STATIC_FII_SECTORS: Record<string, string> = {
     // Papel (Recebíveis / CRI)
     'MXRF11': 'Papel', 'KNCR11': 'Papel', 'KNIP11': 'Papel', 'CPTS11': 'Papel', 'RECR11': 'Papel',
