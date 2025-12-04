@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Asset, ToastMessage, SortOption } from '../types';
+import type { ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
@@ -12,6 +12,7 @@ import { vibrate } from '../utils';
 import SettingsIcon from '../components/icons/SettingsIcon';
 import DividendsSummaryCard from '../components/DividendsSummaryCard';
 import PortfolioPieChart from '../components/PortfolioPieChart';
+import AssetListItem from '../components/AssetListItem';
 
 // Icons
 const EyeIcon: React.FC<{className?:string}> = ({className}) => (
@@ -151,51 +152,6 @@ const PortfolioSummary: React.FC = () => {
     );
 };
 
-// Memoized Asset Item
-const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: () => void, style?: React.CSSProperties, privacyMode: boolean, hideCents: boolean }>(({ asset, totalValue, onClick, style, privacyMode, hideCents }) => {
-    const { t, formatCurrency } = useI18n();
-    const currentValue = asset.quantity * asset.currentPrice;
-    const totalInvested = asset.quantity * asset.avgPrice;
-    const variation = currentValue - totalInvested;
-    const allocation = totalValue > 0 ? (currentValue / totalValue) * 100 : 0;
-    
-    const format = (val: number) => {
-        let formatted = formatCurrency(val);
-        if (hideCents) formatted = formatted.replace(/,\d{2}$/, '');
-        return formatted;
-    }
-
-    return (
-        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm h-full flex flex-col justify-between">
-            <div>
-                <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-sm text-[var(--accent-color)] border border-[var(--border-color)] shadow-inner">
-                            {asset.ticker.substring(0, 4)}
-                        </div>
-                        <div>
-                             <span className="font-bold text-base block leading-tight text-[var(--text-primary)]">{asset.ticker}</span>
-                             <span className="text-xs text-[var(--text-secondary)]">{t('shares', {count: asset.quantity})}</span>
-                        </div>
-                    </div>
-                    <div className={`text-right transition-all duration-300 ${privacyMode ? 'blur-sm select-none opacity-60' : ''}`}>
-                        <p className="font-bold text-base">{format(currentValue)}</p>
-                        <div className={`text-xs font-bold flex items-center justify-end gap-1 ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                            {variation >= 0 ? '+' : ''}{format(variation)}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-                 <div className="flex-1 bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden">
-                     <div className="bg-[var(--accent-color)] h-full rounded-full transition-all duration-1000" style={{ width: `${allocation}%` }}></div>
-                </div>
-                <span className="text-[10px] font-semibold text-[var(--text-secondary)] w-10 text-right">{allocation.toFixed(1)}%</span>
-            </div>
-        </div>
-    );
-});
-
 interface PortfolioViewProps {
     setActiveView: (view: View) => void;
     setTransactionFilter: (ticker: string) => void;
@@ -205,7 +161,7 @@ interface PortfolioViewProps {
 }
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
-    const { t, formatCurrency } = useI18n();
+    const { t } = useI18n();
     const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
     const [searchQuery, setSearchQuery] = useState('');
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
@@ -255,24 +211,6 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             addToast(error.message || t('toast_update_failed'), 'error');
         } finally {
             setIsPullRefreshing(false);
-        }
-    };
-
-    const handleShare = async () => {
-        const totalValue = assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0);
-        const shareData = {
-            title: t('share_portfolio_title'),
-            text: t('share_portfolio_text', { value: formatCurrency(totalValue) }),
-            url: window.location.origin,
-        };
-        try {
-            if (navigator.share) await navigator.share(shareData);
-            else {
-                await navigator.clipboard.writeText(shareData.text);
-                addToast('Copiado para área de transferência!', 'success');
-            }
-        } catch (err) {
-            // User cancelled
         }
     };
     
@@ -346,7 +284,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                                 <DividendsSummaryCard />
                                 
                                 {/* Sector Allocation Card */}
-                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up w-full">
+                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up w-full flex flex-col justify-center">
                                     <h3 className="font-bold text-sm text-[var(--text-primary)] mb-4 uppercase tracking-wider">{t('diversification')}</h3>
                                     <PortfolioPieChart data={allocationData} goals={preferences.segmentGoals || {}} />
                                 </div>
@@ -354,6 +292,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                         </div>
 
                         <div className="px-4 mt-4">
+                            {/* Actions Row */}
                             <div className="flex space-x-3 mb-5">
                                 <div className="flex-1 relative">
                                     <input 
@@ -402,7 +341,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                             {isRefreshing && processedAssets.length === 0 ? (
                                 <PortfolioSkeleton />
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 landscape-grid-cols-2">
                                     {processedAssets.map((asset, index) => (
                                         <AssetListItem 
                                             key={asset.ticker}

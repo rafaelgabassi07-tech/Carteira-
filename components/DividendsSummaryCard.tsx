@@ -197,7 +197,7 @@ const stringToColor = (str: string) => {
 // --- Sub-Components ---
 
 const MetricCard: React.FC<{ title: string; value: React.ReactNode; subtext?: React.ReactNode; icon?: React.ReactNode; accent?: boolean }> = ({ title, value, subtext, icon, accent }) => (
-    <div className={`p-4 rounded-xl border flex flex-col justify-between h-full ${accent ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-transparent' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
+    <div className={`p-4 rounded-xl border flex flex-col justify-between h-full ${accent ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-transparent shadow-lg shadow-[var(--accent-color)]/20' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
         <div className="flex justify-between items-start mb-2">
             <span className={`text-[10px] font-bold uppercase tracking-wider ${accent ? 'opacity-80' : 'text-[var(--text-secondary)]'}`}>{title}</span>
             {icon && <div className={accent ? 'text-white' : 'text-[var(--accent-color)] opacity-80'}>{icon}</div>}
@@ -274,7 +274,7 @@ const PayerRow: React.FC<{
     const iconBg = stringToColor(payer.ticker);
     
     return (
-        <div className="mb-2 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] overflow-hidden transition-all duration-300">
+        <div className={`mb-2 rounded-xl border overflow-hidden transition-all duration-300 ${isExpanded ? 'bg-[var(--bg-tertiary-hover)] border-[var(--accent-color)]/30' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
             {/* Main Visible Row */}
             <div 
                 className="flex items-center justify-between py-3 px-3 cursor-pointer hover:bg-[var(--bg-tertiary-hover)] transition-colors"
@@ -295,13 +295,13 @@ const PayerRow: React.FC<{
                 
                 <div className="flex items-center gap-3">
                     <span className="font-bold text-base text-[var(--text-primary)]">{formatCurrency(payer.total)}</span>
-                    <ChevronRightIcon className={`w-4 h-4 text-[var(--text-secondary)] transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} />
+                    <ChevronRightIcon className={`w-4 h-4 text-[var(--text-secondary)] transition-transform duration-300 ${isExpanded ? 'rotate-90 text-[var(--accent-color)]' : ''}`} />
                 </div>
             </div>
 
             {/* Expanded Details */}
-            <div className={`overflow-hidden transition-all duration-300 bg-[var(--bg-tertiary-hover)]/30 ${isExpanded ? 'max-h-40 border-t border-[var(--border-color)]' : 'max-h-0'}`}>
-                <div className="p-4 grid grid-cols-2 gap-4">
+            <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-48 border-t border-[var(--border-color)]/50' : 'max-h-0'}`}>
+                <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-4 bg-[var(--bg-primary)]/50">
                     <div className="flex flex-col">
                         <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)] mb-0.5">Retorno (ROI)</span>
                         <div className="flex items-baseline gap-1.5">
@@ -361,9 +361,9 @@ const DividendsDetailModal: React.FC<{
                     />
                     <div className="col-span-2">
                         <MetricCard 
-                            title="Poder de Reinvestimento" 
-                            value={`${stats.magicNumberCount} cotas base`}
-                            subtext="Estimativa de compra mensal (base R$ 10) apenas com rendimentos."
+                            title="Meta de Reinvestimento" 
+                            value={`${stats.magicNumberCount} cotas base 10`}
+                            subtext="Sua renda mensal já compra esta quantidade de novas cotas."
                             icon={<SparklesIcon className="w-4 h-4"/>}
                             accent
                         />
@@ -375,7 +375,7 @@ const DividendsDetailModal: React.FC<{
                     <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm w-full">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Evolução Recente</h3>
-                            <span className="text-[10px] font-bold bg-[var(--bg-primary)] px-2 py-0.5 rounded-full text-[var(--text-secondary)]">12 Meses</span>
+                            <span className="text-[10px] font-bold bg-[var(--bg-primary)] px-2 py-0.5 rounded-full text-[var(--text-secondary)] border border-[var(--border-color)]">12 Meses</span>
                         </div>
                         <MonthlyBarChart data={stats.monthlyData} avg={stats.averageIncome} />
                     </div>
@@ -442,7 +442,7 @@ const DividendsSummaryCard: React.FC = () => {
                             </span>
                             
                             {!privacyMode && (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isAboveAverage ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--bg-primary)] text-[var(--text-secondary)]'}`}>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${isAboveAverage ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-color)]'}`}>
                                     {isAboveAverage ? 'Acima da média' : 'Abaixo da média'}
                                 </span>
                             )}
