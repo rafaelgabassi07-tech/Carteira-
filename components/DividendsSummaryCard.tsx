@@ -216,42 +216,47 @@ const MonthlyBarChart: React.FC<{ data: MonthlyData[]; avg: number }> = ({ data,
     const maxVal = Math.max(...data.map(d => d.total), avg * 1.2, 1);
 
     return (
-        <div className="relative h-44 w-full pt-8 pb-4">
+        <div className="relative h-48 w-full pt-8 pb-6 px-1">
             {/* Avg Line */}
             {avg > 0 && (
-                <div className="absolute left-0 right-0 border-t border-dashed border-[var(--text-secondary)] opacity-40 z-0 flex items-end" style={{ bottom: `${Math.min((avg / maxVal) * 100, 100)}%` }}>
-                    <span className="text-[9px] text-[var(--text-secondary)] -mt-5 bg-[var(--bg-secondary)] px-1 font-bold">Média</span>
+                <div className="absolute left-0 right-0 z-0 flex items-end pointer-events-none" style={{ bottom: `${Math.min((avg / maxVal) * 100, 100)}%`, paddingBottom: '24px' }}> {/* Adjusted paddingBottom to match bar container padding */}
+                    <div className="w-full border-t border-dashed border-[var(--text-secondary)] opacity-30 relative">
+                        <span className="text-[9px] text-[var(--text-secondary)] absolute right-0 -top-5 bg-[var(--bg-secondary)] pl-1 font-bold">
+                            Média: {formatCurrency(avg)}
+                        </span>
+                    </div>
                 </div>
             )}
 
-            <div className="flex items-end gap-2 h-full w-full relative z-10 px-2">
+            <div className="flex items-end gap-1 sm:gap-2 h-full w-full relative z-10">
                 {data.map((d, i) => {
                     const heightPercent = (d.total / maxVal) * 100;
                     const delay = i * 50; 
                     const isCurrent = i === data.length - 1;
                     
                     return (
-                        <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                        <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end min-w-0">
                             {/* Tooltip */}
-                            <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-primary)] border border-[var(--border-color)] text-[10px] font-bold py-1 px-2 rounded-lg shadow-xl pointer-events-none whitespace-nowrap z-20 -translate-y-1">
+                            <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-primary)] border border-[var(--border-color)] text-[10px] font-bold py-1 px-2 rounded-lg shadow-xl pointer-events-none whitespace-nowrap z-20 -translate-y-1 transform -translate-x-1/2 left-1/2">
                                 {formatCurrency(d.total)}
                             </div>
                             
                             <div 
-                                className={`w-full rounded-t-sm transition-all duration-300 relative overflow-hidden min-h-[4px] ${isCurrent ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}
+                                className={`w-full rounded-t-sm transition-all duration-300 relative overflow-hidden min-h-[4px] max-w-[40px] ${isCurrent ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}
                                 style={{ 
                                     height: `${Math.max(heightPercent, 2)}%`,
                                     background: isCurrent 
                                         ? 'linear-gradient(to top, var(--accent-color), var(--accent-color))' 
                                         : 'linear-gradient(to top, var(--text-secondary), var(--text-secondary))',
                                     animation: `grow-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards`,
-                                    animationDelay: `${delay}ms`
+                                    animationDelay: `${delay}ms`,
+                                    transformOrigin: 'bottom'
                                 }}
                             >
                                 {/* Gradient Overlay */}
                                 <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent"></div>
                             </div>
-                            <span className={`text-[9px] mt-2 font-bold uppercase tracking-wider ${isCurrent ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)] opacity-70'}`}>
+                            <span className={`text-[8px] sm:text-[9px] mt-2 font-bold uppercase tracking-wider truncate w-full text-center ${isCurrent ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)] opacity-70'}`}>
                                 {d.month}
                             </span>
                         </div>
@@ -307,11 +312,9 @@ const DividendsDetailModal: React.FC<{
             if (sortMode === 'total') return b.total - a.total;
             if (sortMode === 'roi') return b.roi - a.roi;
             if (sortMode === 'date') {
-                // If a has payment and b doesn't, a comes first
                 if (a.nextPayment && !b.nextPayment) return -1;
                 if (!a.nextPayment && b.nextPayment) return 1;
                 if (a.nextPayment && b.nextPayment) return a.nextPayment.localeCompare(b.nextPayment);
-                // Fallback to name if neither has upcoming payment
                 return a.ticker.localeCompare(b.ticker);
             }
             return 0;
@@ -320,10 +323,10 @@ const DividendsDetailModal: React.FC<{
 
     return (
         <Modal title="Relatório de Renda" onClose={onClose} type="slide-up" fullScreen={true}>
-            <div className="flex flex-col min-h-full pb-safe space-y-6 animate-fade-in">
+            <div className="flex flex-col min-h-full pb-safe space-y-6 animate-fade-in overflow-x-hidden w-full max-w-full">
                 
                 {/* 1. Key Metrics Grid */}
-                <div className="grid grid-cols-2 gap-3 px-2">
+                <div className="grid grid-cols-2 gap-3 px-1 w-full">
                     <MetricCard 
                         title="Acumulado" 
                         value={<CountUp end={stats.totalReceived} formatter={formatCurrency} />} 
@@ -347,8 +350,8 @@ const DividendsDetailModal: React.FC<{
                 </div>
 
                 {/* 2. Evolution Chart */}
-                <div className="px-2">
-                    <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm">
+                <div className="w-full">
+                    <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm w-full">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Evolução Recente</h3>
                             <span className="text-[10px] font-bold bg-[var(--bg-primary)] px-2 py-0.5 rounded-full text-[var(--text-secondary)]">12 Meses</span>
@@ -358,8 +361,8 @@ const DividendsDetailModal: React.FC<{
                 </div>
 
                 {/* 3. Breakdown List */}
-                <div className="flex-1 px-2 pb-10">
-                    <div className="flex justify-between items-center mb-3 px-2">
+                <div className="flex-1 w-full pb-10">
+                    <div className="flex justify-between items-center mb-3 px-1">
                         <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Detalhamento</h3>
                         
                         <div className="flex bg-[var(--bg-primary)] p-0.5 rounded-lg border border-[var(--border-color)]">
@@ -437,7 +440,7 @@ const DividendsSummaryCard: React.FC = () => {
                         </div>
 
                         {/* Barra de Progresso do Mês */}
-                        <div className="mt-3 mb-1 w-full bg-[var(--bg-primary)] h-1.5 rounded-full overflow-hidden flex">
+                        <div className="mt-3 mb-1 w-full bg-[var(--bg-primary)] h-1.5 rounded-full overflow-hidden flex shadow-inner border border-[var(--border-color)]">
                             <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${Math.max(monthProgress, 0)}%` }}></div>
                             <div className="bg-amber-500 h-full transition-all duration-1000 opacity-50" style={{ width: `${Math.max(100 - monthProgress, 0)}%` }}></div>
                         </div>
