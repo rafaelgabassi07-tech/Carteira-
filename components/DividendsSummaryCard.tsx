@@ -219,7 +219,7 @@ const MonthlyBarChart: React.FC<{ data: MonthlyData[]; avg: number }> = ({ data,
         <div className="relative h-48 w-full pt-8 pb-6 px-1">
             {/* Avg Line */}
             {avg > 0 && (
-                <div className="absolute left-0 right-0 z-0 flex items-end pointer-events-none" style={{ bottom: `${Math.min((avg / maxVal) * 100, 100)}%`, paddingBottom: '24px' }}> {/* Adjusted paddingBottom to match bar container padding */}
+                <div className="absolute left-0 right-0 z-0 flex items-end pointer-events-none" style={{ bottom: `${Math.min((avg / maxVal) * 100, 100)}%`, paddingBottom: '24px' }}> 
                     <div className="w-full border-t border-dashed border-[var(--text-secondary)] opacity-30 relative">
                         <span className="text-[9px] text-[var(--text-secondary)] absolute right-0 -top-5 bg-[var(--bg-secondary)] pl-1 font-bold">
                             Média: {formatCurrency(avg)}
@@ -272,27 +272,60 @@ const PayerRow: React.FC<{
     rank: number;
 }> = ({ payer, rank }) => {
     const { formatCurrency, locale } = useI18n();
+    const [isExpanded, setIsExpanded] = useState(false);
     const iconBg = stringToColor(payer.ticker);
     
     return (
-        <div className="flex items-center justify-between py-3 px-3 hover:bg-[var(--bg-tertiary-hover)] rounded-xl transition-colors group cursor-pointer border border-transparent hover:border-[var(--border-color)] mb-1">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-                <span className="text-[10px] font-bold text-[var(--text-secondary)] w-4 text-center">{rank}</span>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black text-[var(--bg-primary)] shadow-sm shrink-0" style={{ backgroundColor: iconBg }}>
-                    {payer.ticker.substring(0,4)}
+        <div className="mb-2 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] overflow-hidden transition-all duration-300">
+            {/* Main Visible Row */}
+            <div 
+                className="flex items-center justify-between py-3 px-3 cursor-pointer hover:bg-[var(--bg-tertiary-hover)] transition-colors"
+                onClick={() => { setIsExpanded(!isExpanded); vibrate(); }}
+            >
+                <div className="flex items-center gap-3 flex-1">
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)] w-4 text-center opacity-60">#{rank}</span>
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center text-[10px] font-black text-[var(--bg-primary)] shadow-sm shrink-0" style={{ backgroundColor: iconBg }}>
+                        {payer.ticker.substring(0,4)}
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="font-bold text-sm text-[var(--text-primary)] tracking-tight">{payer.ticker}</span>
+                        <div className="flex items-center gap-1">
+                            <span className="text-[10px] font-medium text-[var(--text-secondary)]">Total Recebido</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-sm text-[var(--text-primary)] truncate">{payer.ticker}</span>
-                    <span className="text-[10px] text-[var(--text-secondary)] truncate">
-                        {payer.nextPayment ? `Pgto: ${new Date(payer.nextPayment).toLocaleDateString(locale, {day:'2-digit', month:'2-digit'})}` : `Méd: ${formatCurrency(payer.monthlyAverage)}`}
-                    </span>
+                
+                <div className="flex items-center gap-3">
+                    <span className="font-bold text-base text-[var(--text-primary)]">{formatCurrency(payer.total)}</span>
+                    <ChevronRightIcon className={`w-4 h-4 text-[var(--text-secondary)] transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} />
                 </div>
             </div>
-            
-            <div className="text-right pl-2">
-                <div className="font-bold text-sm text-[var(--text-primary)] tabular-nums">{formatCurrency(payer.total)}</div>
-                <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md inline-block mt-0.5 ${payer.roi >= 1 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)]'}`}>
-                    {payer.roi.toFixed(1)}% Ret.
+
+            {/* Expanded Details */}
+            <div className={`overflow-hidden transition-all duration-300 bg-[var(--bg-tertiary-hover)]/30 ${isExpanded ? 'max-h-40 border-t border-[var(--border-color)]' : 'max-h-0'}`}>
+                <div className="p-4 grid grid-cols-2 gap-4">
+                    <div className="flex flex-col">
+                        <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)] mb-0.5">Retorno (ROI)</span>
+                        <div className="flex items-baseline gap-1.5">
+                            <span className={`text-sm font-bold ${payer.roi >= 10 ? 'text-emerald-500' : 'text-[var(--text-primary)]'}`}>{payer.roi.toFixed(1)}%</span>
+                            <span className="text-[9px] text-[var(--text-secondary)]">Yield on Cost</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col">
+                        <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)] mb-0.5">Frequência</span>
+                        <span className="text-sm font-bold text-[var(--text-primary)]">{payer.count}x Pagamentos</span>
+                    </div>
+
+                    <div className="flex flex-col">
+                        <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)] mb-0.5">Investido Total</span>
+                        <span className="text-sm font-bold text-[var(--text-secondary)]">{formatCurrency(payer.invested)}</span>
+                    </div>
+
+                    <div className="flex flex-col">
+                        <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)] mb-0.5">Média Mensal</span>
+                        <span className="text-sm font-bold text-[var(--text-primary)]">{formatCurrency(payer.monthlyAverage)}</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -363,16 +396,15 @@ const DividendsDetailModal: React.FC<{
                 {/* 3. Breakdown List */}
                 <div className="flex-1 w-full pb-10">
                     <div className="flex justify-between items-center mb-3 px-1">
-                        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Detalhamento</h3>
+                        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Origem dos Proventos</h3>
                         
-                        <div className="flex bg-[var(--bg-primary)] p-0.5 rounded-lg border border-[var(--border-color)]">
-                            <button onClick={() => {setSortMode('total'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'total' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Valor</button>
-                            <button onClick={() => {setSortMode('roi'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'roi' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Retorno</button>
-                            <button onClick={() => {setSortMode('date'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'date' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}><CalendarIcon className="w-3.5 h-3.5"/></button>
+                        <div className="flex bg-[var(--bg-secondary)] p-0.5 rounded-lg border border-[var(--border-color)]">
+                            <button onClick={() => {setSortMode('total'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'total' ? 'bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Valor</button>
+                            <button onClick={() => {setSortMode('roi'); vibrate();}} className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${sortMode === 'roi' ? 'bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>% ROI</button>
                         </div>
                     </div>
 
-                    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] p-2 shadow-sm min-h-[200px]">
+                    <div className="space-y-1 min-h-[200px]">
                         {sortedPayers.length > 0 ? (
                             sortedPayers.map((payer, index) => (
                                 <PayerRow key={payer.ticker} payer={payer} rank={index + 1} />
