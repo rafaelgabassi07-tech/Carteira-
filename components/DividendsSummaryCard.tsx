@@ -23,12 +23,13 @@ interface MonthlyData {
 
 interface PayerData {
     ticker: string;
-    totalPaid: number; // Total pago historicamente
+    totalPaid: number; // Total recebido em R$
     count: number;
     lastExDate?: string;
     nextPaymentDate?: string;
-    dy: number;
-    annualProjection: number; // Projeção baseada no DY atual
+    isProvisioned?: boolean; // Se o próximo pagamento é futuro
+    yieldOnCost: number; // Retorno sobre o investido neste ativo
+    averageMonthly: number;
 }
 
 interface DividendStats {
@@ -71,7 +72,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                 .filter(t => t.ticker === ticker)
                 .sort((a, b) => a.date.localeCompare(b.date));
 
-            // Calculate Invested Total
+            // Calculate Invested Total per Asset
             let assetTotalInvested = 0;
             assetTxs.forEach(tx => {
                 if (tx.type === 'Compra') {
@@ -86,14 +87,23 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             let count = 0;
             let lastExDate: string | undefined = undefined;
             let nextPaymentDate: string | undefined = undefined;
+            let isProvisioned = false;
 
-            // Sort history to find latest dates easily
+            // Sort history to find latest dates easily (Newest first)
             const sortedHistory = [...history].sort((a, b) => b.exDate.localeCompare(a.exDate));
+            
             if (sortedHistory.length > 0) {
-                lastExDate = sortedHistory[0].exDate;
-                // Find nearest payment date (can be future)
-                const futurePayment = sortedHistory.find(d => d.isProvisioned || d.paymentDate >= now.toISOString().split('T')[0]);
-                nextPaymentDate = futurePayment ? futurePayment.paymentDate : sortedHistory[0].paymentDate;
+                // Try to find a future/provisioned dividend first
+                const provisioned = sortedHistory.find(d => d.isProvisioned || d.paymentDate >= now.toISOString().split('T')[0]);
+                if (provisioned) {
+                    lastExDate = provisioned.exDate;
+                    nextPaymentDate = provisioned.paymentDate;
+                    isProvisioned = true;
+                } else {
+                    // Fallback to the absolute last one
+                    lastExDate = sortedHistory[0].exDate;
+                    nextPaymentDate = sortedHistory[0].paymentDate;
+                }
             }
 
             sortedHistory.forEach((div: DividendHistoryEvent) => {
@@ -118,14 +128,18 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                 }
             });
 
+            // Calculate Yield on Cost specific to this asset
+            const assetYoC = assetTotalInvested > 0 ? (tickerTotalPaid / assetTotalInvested) * 100 : 0;
+
             payerAggregation[ticker] = {
                 ticker,
                 totalPaid: tickerTotalPaid,
                 count,
                 lastExDate,
                 nextPaymentDate,
-                dy: assetData.dy || 0,
-                annualProjection: projectedYearly
+                isProvisioned,
+                yieldOnCost: assetYoC,
+                averageMonthly: count > 0 ? tickerTotalPaid / count : 0 // Simple average of payments received
             };
         });
 
@@ -146,7 +160,6 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         // 3. Global Stats
         const currentMonthValue = monthlyAggregation[currentMonthKey] || 0;
         
-        // Average Income (Exclude zeros for realistic average of active months)
         const activeMonths = Object.values(monthlyAggregation).filter(v => v > 0);
         const averageIncome = activeMonths.length > 0 ? activeMonths.reduce((a,b)=>a+b,0) / activeMonths.length : 0;
 
@@ -157,7 +170,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         return { 
             totalReceived, 
             monthlyData, 
-            payersData: Object.values(payerAggregation).sort((a,b) => b.totalPaid - a.totalPaid), 
+            payersData: Object.values(payerAggregation).filter(p => p.totalPaid > 0 || p.isProvisioned).sort((a,b) => b.totalPaid - a.totalPaid), 
             currentMonthValue,
             currentMonthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
             averageIncome,
@@ -176,7 +189,7 @@ const MetricCard: React.FC<{
     icon: React.ReactNode; 
     highlight?: boolean 
 }> = ({ label, value, subValue, icon, highlight }) => (
-    <div className={`p-3 rounded-2xl border flex flex-col justify-between h-24 relative overflow-hidden ${highlight ? 'bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-tertiary-hover)] border-[var(--accent-color)]/30' : 'bg-[var(--bg-secondary)] border-[var(--border-color)]'}`}>
+    <div className={`p-3 rounded-2xl border flex flex-col justify-between h-24 relative overflow-hidden transition-all ${highlight ? 'bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-tertiary-hover)] border-[var(--accent-color)]/30 shadow-md' : 'bg-[var(--bg-secondary)] border-[var(--border-color)]'}`}>
         {highlight && <div className="absolute top-0 right-0 p-2 opacity-10 text-[var(--accent-color)]">{icon}</div>}
         <div className="flex items-center gap-1.5 mb-1 z-10">
             <div className={`scale-75 ${highlight ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)]'}`}>{icon}</div>
@@ -194,36 +207,41 @@ const MonthlyBarChart: React.FC<{ data: MonthlyData[]; avg: number }> = ({ data,
     const maxVal = Math.max(...data.map(d => d.total), avg * 1.2, 1);
 
     return (
-        <div className="relative h-40 w-full pt-6 pb-4">
+        <div className="relative h-44 w-full pt-8 pb-4">
             {/* Avg Line */}
             {avg > 0 && (
                 <div className="absolute left-0 right-0 z-0 flex items-end pointer-events-none" style={{ bottom: `${Math.min((avg / maxVal) * 100, 100)}%`, paddingBottom: '16px' }}> 
-                    <div className="w-full border-t border-dashed border-[var(--text-secondary)] opacity-30 relative">
-                        <span className="text-[8px] text-[var(--text-secondary)] absolute right-0 -top-4 bg-[var(--bg-secondary)] pl-1 font-bold">
+                    <div className="w-full border-t border-dashed border-[var(--accent-color)] opacity-40 relative">
+                        <span className="text-[9px] text-[var(--accent-color)] absolute right-0 -top-5 bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-color)] font-bold shadow-sm">
                             Média: {formatCurrency(avg)}
                         </span>
                     </div>
                 </div>
             )}
 
-            <div className="flex items-end gap-1.5 h-full w-full relative z-10 px-1">
+            <div className="flex items-end gap-2 h-full w-full relative z-10 px-2">
                 {data.map((d, i) => {
                     const heightPercent = (d.total / maxVal) * 100;
                     const isCurrent = i === data.length - 1;
                     
                     return (
                         <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                            {/* Tooltip on hover */}
+                            <div className="absolute -top-8 bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] text-[var(--text-primary)] text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
+                                {formatCurrency(d.total)}
+                            </div>
+
                             <div 
-                                className={`w-full rounded-t-sm transition-all duration-500 relative overflow-hidden min-h-[4px] max-w-[32px] ${isCurrent ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`}
+                                className={`w-full rounded-t-sm transition-all duration-700 ease-out relative overflow-hidden min-h-[4px] max-w-[40px] shadow-sm ${isCurrent ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}
                                 style={{ 
                                     height: `${Math.max(heightPercent, 2)}%`,
                                     background: isCurrent 
                                         ? 'linear-gradient(to top, var(--accent-color), var(--accent-color))' 
-                                        : 'linear-gradient(to top, var(--text-secondary), var(--text-secondary))',
+                                        : 'linear-gradient(to top, var(--text-secondary), var(--bg-tertiary-hover))',
                                 }}
                             >
                             </div>
-                            <span className={`text-[8px] mt-1.5 font-bold uppercase tracking-wider truncate w-full text-center ${isCurrent ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)] opacity-70'}`}>
+                            <span className={`text-[9px] mt-2 font-bold uppercase tracking-wider truncate w-full text-center ${isCurrent ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)]'}`}>
                                 {d.month}
                             </span>
                         </div>
@@ -237,42 +255,48 @@ const MonthlyBarChart: React.FC<{ data: MonthlyData[]; avg: number }> = ({ data,
 const DetailedPayerRow: React.FC<{ payer: PayerData; rank: number }> = ({ payer, rank }) => {
     const { formatCurrency, locale } = useI18n();
     
-    // Format dates safely
+    // Safety check for dates
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString(locale, { day: '2-digit', month: 'short' });
+        return new Date(dateStr).toLocaleDateString(locale, { day: '2-digit', month: '2-digit' });
     };
 
+    const isFuture = payer.isProvisioned || (payer.nextPaymentDate && new Date(payer.nextPaymentDate) >= new Date());
+
     return (
-        <div className="bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)] mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-50 w-3">{rank}</span>
+        <div className="bg-[var(--bg-primary)] p-3.5 rounded-xl border border-[var(--border-color)] mb-2 flex items-center justify-between transition-all hover:border-[var(--accent-color)]/30 group">
+            
+            {/* Col 1: Asset Info */}
+            <div className="flex items-center gap-3 w-1/3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${rank <= 3 ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)]'}`}>
+                    {rank}
+                </div>
                 <div>
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-[var(--text-primary)]">{payer.ticker}</span>
-                        {payer.annualProjection > 0 && (
-                            <span className="text-[9px] bg-[var(--bg-secondary)] border border-[var(--border-color)] px-1.5 rounded text-[var(--text-secondary)]">
-                                {formatCurrency(payer.annualProjection/12)}/mês
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1">
-                        <div className="flex flex-col">
-                            <span className="text-[8px] text-[var(--text-secondary)] uppercase font-bold">Data Com</span>
-                            <span className="text-[10px] font-medium text-[var(--text-primary)]">{formatDate(payer.lastExDate)}</span>
-                        </div>
-                        <div className="w-px h-4 bg-[var(--border-color)]"></div>
-                        <div className="flex flex-col">
-                            <span className="text-[8px] text-[var(--text-secondary)] uppercase font-bold">Pagamento</span>
-                            <span className="text-[10px] font-medium text-[var(--text-primary)]">{formatDate(payer.nextPaymentDate)}</span>
-                        </div>
-                    </div>
+                    <span className="font-bold text-sm text-[var(--text-primary)] block leading-tight">{payer.ticker}</span>
+                    {payer.isProvisioned && (
+                        <span className="text-[8px] font-bold text-amber-500 bg-amber-500/10 px-1 rounded uppercase tracking-wide">Prev.</span>
+                    )}
+                </div>
+            </div>
+
+            {/* Col 2: Calendar (Dates) */}
+            <div className="flex flex-col items-center justify-center w-1/3 border-l border-r border-[var(--border-color)]/50 px-2">
+                <div className="flex justify-between w-full mb-1">
+                    <span className="text-[8px] text-[var(--text-secondary)] uppercase font-bold">Com</span>
+                    <span className="text-[9px] font-medium text-[var(--text-primary)]">{formatDate(payer.lastExDate)}</span>
+                </div>
+                <div className="flex justify-between w-full">
+                    <span className="text-[8px] text-[var(--text-secondary)] uppercase font-bold">Pgto</span>
+                    <span className={`text-[9px] font-bold ${isFuture ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>{formatDate(payer.nextPaymentDate)}</span>
                 </div>
             </div>
             
-            <div className="text-right">
-                <span className="block font-bold text-sm text-[var(--accent-color)]">{formatCurrency(payer.totalPaid)}</span>
-                <span className="text-[9px] font-medium text-[var(--text-secondary)]">Total Recebido</span>
+            {/* Col 3: Returns */}
+            <div className="text-right w-1/3 pl-2">
+                <span className="block font-black text-sm text-[var(--text-primary)]">{formatCurrency(payer.totalPaid)}</span>
+                <span className="text-[9px] font-medium text-[var(--green-text)] block mt-0.5">
+                    Retorno: {payer.yieldOnCost.toFixed(1)}%
+                </span>
             </div>
         </div>
     );
@@ -291,7 +315,7 @@ const IncomeReportModal: React.FC<{ onClose: () => void; stats: DividendStats }>
                     <MetricCard 
                         label="Média Mensal" 
                         value={formatCurrency(stats.averageIncome)} 
-                        subValue="Base: Últimos 12 meses"
+                        subValue="Últimos 12 meses"
                         icon={<CalendarIcon className="w-5 h-5"/>}
                         highlight
                     />
@@ -303,7 +327,7 @@ const IncomeReportModal: React.FC<{ onClose: () => void; stats: DividendStats }>
                         highlight
                     />
                     <MetricCard 
-                        label="Total Recebido" 
+                        label="Total Acumulado" 
                         value={formatCurrency(stats.totalReceived)} 
                         icon={<TrendingUpIcon className="w-5 h-5"/>}
                     />
@@ -315,7 +339,7 @@ const IncomeReportModal: React.FC<{ onClose: () => void; stats: DividendStats }>
                 </div>
 
                 {/* 2. Evolution Chart */}
-                <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)]">
+                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)]">
                     <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Evolução de Pagamentos</h3>
                     <MonthlyBarChart data={stats.monthlyData} avg={stats.averageIncome} />
                 </div>
@@ -324,8 +348,16 @@ const IncomeReportModal: React.FC<{ onClose: () => void; stats: DividendStats }>
                 <div>
                     <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
                         <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-color)]"/>
-                        Detalhamento por Ativo
+                        Origem & Calendário
                     </h3>
+                    
+                    {/* List Header */}
+                    <div className="flex text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider px-3 mb-2">
+                        <div className="w-1/3">Ativo</div>
+                        <div className="w-1/3 text-center">Datas (Com / Pgto)</div>
+                        <div className="w-1/3 text-right">Total / Rentab.</div>
+                    </div>
+
                     <div className="space-y-1">
                         {stats.payersData.map((payer, idx) => (
                             <DetailedPayerRow key={payer.ticker} payer={payer} rank={idx + 1} />
