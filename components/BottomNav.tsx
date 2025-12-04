@@ -4,8 +4,6 @@ import type { View } from '../App';
 import LayoutGridIcon from './icons/LayoutGridIcon';
 import WalletIcon from './icons/WalletIcon';
 import TransactionIcon from './icons/TransactionIcon';
-import NewsIcon from './icons/NewsIcon';
-import SettingsIcon from './icons/SettingsIcon';
 import GlobeIcon from './icons/GlobeIcon';
 import { vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
@@ -57,7 +55,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
         <NavItem label={t('nav_analysis')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
         <NavItem label={t('nav_market')} view="mercado" icon={<GlobeIcon />} isActive={activeView === 'mercado'} onClick={() => handleNavClick('mercado')} />
         <NavItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
-        <NavItem label={t('nav_news')} view="noticias" icon={<NewsIcon />} isActive={activeView === 'noticias'} onClick={() => handleNavClick('noticias')} />
       </div>
     </div>
   );

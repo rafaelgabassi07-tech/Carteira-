@@ -11,7 +11,7 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = React.memo(({ sentiment }) => {
+const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
     const { t } = useI18n();
     const sentimentMap = {
         Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
@@ -25,14 +25,14 @@ const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = React.
             {sentimentData.text}
         </span>
     );
-});
+};
 
-const NewsCard = React.memo<{ 
+const NewsCard: React.FC<{ 
   article: NewsArticle;
   isFavorited: boolean;
   onToggleFavorite: () => void;
   addToast: (message: string, type?: ToastMessage['type']) => void;
-}>(({ article, isFavorited, onToggleFavorite, addToast }) => {
+}> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
   const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -63,26 +63,13 @@ const NewsCard = React.memo<{
 
   return (
     <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col">
-      {article.imageUrl && (
-          <div className="h-32 w-full overflow-hidden relative">
-              <img 
-                src={article.imageUrl} 
-                alt={article.title} 
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)] to-transparent opacity-60"></div>
-          </div>
-      )}
-      
-      <div className="p-4 flex-1 flex flex-col relative">
+      <div className="p-4 flex-1 flex flex-col">
         <div className="flex justify-between items-start">
             <div>
               <p className="text-xs text-[var(--accent-color)] font-semibold mb-1">{article.source}</p>
               <h3 className="text-sm font-bold mr-16 leading-tight">{article.title}</h3>
             </div>
-             <div className="absolute top-4 right-4 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/90 backdrop-blur-sm rounded-lg p-0.5 border border-[var(--border-color)]">
+             <div className="absolute top-2 right-1 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-lg p-0.5">
                <button
                   onClick={handleShare}
                   className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
@@ -117,7 +104,7 @@ const NewsCard = React.memo<{
       </div>
     </div>
   );
-});
+};
 
 const NewsCardSkeleton: React.FC = () => (
     <div className="bg-[var(--bg-secondary)] p-4 rounded-lg animate-pulse border border-[var(--border-color)]">
@@ -133,8 +120,12 @@ const NewsCardSkeleton: React.FC = () => (
     </div>
 );
 
+interface NewsViewProps {
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+    isEmbedded?: boolean;
+}
 
-const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
+const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => {
   const { t } = useI18n();
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
@@ -166,7 +157,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     localStorage.setItem('news-favorites', JSON.stringify(Array.from(favorites)));
   }, [favorites]);
 
-  const handleToggleFavorite = useCallback((articleTitle: string) => {
+  const handleToggleFavorite = (articleTitle: string) => {
     setFavorites(prevFavorites => {
       const newFavorites = new Set(prevFavorites);
       if (newFavorites.has(articleTitle)) {
@@ -176,7 +167,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       }
       return newFavorites;
     });
-  }, []);
+  };
 
   const clearFavorites = () => {
       if (window.confirm(t('clear_cache_confirm'))) {
@@ -264,7 +255,10 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           const touchY = e.targetTouches[0].clientY;
           const pullDistance = touchY - touchStartY.current;
           if(pullDistance > 0) {
-              if (e.cancelable) e.preventDefault();
+              // Only prevent default if we are handling the pull refresh, 
+              // but be careful not to block scroll if not at top.
+              // In embedded mode, scroll handling is trickier, so we might disable P2R or rely on parent
+              if (!isEmbedded && e.cancelable) e.preventDefault();
               setPullPosition(Math.min(pullDistance, 100));
           }
       }
@@ -290,42 +284,74 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         : news;
   }, [news, activeTab, favorites]);
 
+  // Adjust container styles based on embedded prop
+  const containerClass = isEmbedded 
+    ? "h-full w-full" 
+    : "p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6";
+
   return (
     <div 
-        className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6"
+        className={containerClass}
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
     >
-      <div 
-        className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
-        style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
-      >
-        <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
-      </div>
+      {!isEmbedded && (
+          <div 
+            className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
+            style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
+          >
+            <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
+          </div>
+      )}
       
       <div className="w-full max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">{t('market_news')}</h1>
-          <div className="flex gap-2">
-               <button 
-                  onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
-                  className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
-                  aria-label="Filtros"
-              >
-                  <FilterIcon className="w-5 h-5" />
-              </button>
-              <button 
-                  onClick={handleRefresh} 
-                  disabled={loading}
-                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
-                  aria-label={t('refresh_prices')}
-              >
-                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
-              </button>
-          </div>
-        </div>
+        {!isEmbedded && (
+            <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">{t('market_news')}</h1>
+            <div className="flex gap-2">
+                <button 
+                    onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                    className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                    aria-label="Filtros"
+                >
+                    <FilterIcon className="w-5 h-5" />
+                </button>
+                <button 
+                    onClick={handleRefresh} 
+                    disabled={loading}
+                    className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
+                    aria-label={t('refresh_prices')}
+                >
+                    <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+                </button>
+            </div>
+            </div>
+        )}
+        
+        {/* If embedded, show compact filter toggle or integrate it */}
+        {isEmbedded && (
+             <div className="flex justify-between items-center mb-4">
+                 <div className="flex gap-2 w-full">
+                    <div className="relative flex-1">
+                        <input 
+                            type="text"
+                            placeholder={t('search_news_placeholder')}
+                            value={searchQuery}
+                            onChange={handleSearchChange}
+                            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
+                        />
+                    </div>
+                    <button 
+                        onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                        className={`p-3 rounded-lg transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                    >
+                        <FilterIcon className="w-5 h-5" />
+                    </button>
+                 </div>
+             </div>
+        )}
         
         {/* Filter Panel */}
         {showFilters && (
@@ -358,15 +384,17 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             </div>
         )}
 
-        <div className="mb-4">
-          <input 
-            type="text"
-            placeholder={t('search_news_placeholder')}
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
-          />
-        </div>
+        {!isEmbedded && (
+            <div className="mb-4">
+            <input 
+                type="text"
+                placeholder={t('search_news_placeholder')}
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
+            />
+            </div>
+        )}
         
         <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
             <button 
