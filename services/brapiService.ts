@@ -32,7 +32,7 @@ const setTokenRestricted = () => {
 };
 
 export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[], lite = false): Promise<{
-    quotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[] }>,
+    quotes: Record<string, { currentPrice: number; changePercent?: number; priceHistory?: { date: string; price: number }[] }>,
     stats: { bytesReceived: number }
 }> {
     const emptyReturn = { quotes: {}, stats: { bytesReceived: 0 } };
@@ -41,7 +41,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
     }
 
     const token = getBrapiToken(prefs);
-    const allQuotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[] }> = {};
+    const allQuotes: Record<string, { currentPrice: number; changePercent?: number; priceHistory?: { date: string; price: number }[] }> = {};
     const failedTickers: string[] = [];
     let totalBytesReceived = 0;
 
@@ -55,11 +55,11 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
         let resultData: any = null;
 
         // Estratégia de Fallback em Cascata
-        // Nível 1: Dados de Range (Histórico 1 ano) - Sem dividendos, focando em preço
+        // Nível 1: Dados de Range (Histórico 3 meses - Otimizado para Sparkline)
         if (!forceLite) {
             try {
                 // Requesting simple range data
-                const response = await fetch(`${urlBase}?range=1y&token=${token}`);
+                const response = await fetch(`${urlBase}?range=3mo&token=${token}`);
                 
                 if (response.status === 403 || response.status === 401) {
                     setTokenRestricted();
@@ -110,6 +110,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
             }
 
             const currentPrice = resultData.regularMarketPrice || 0;
+            const changePercent = resultData.regularMarketChangePercent || 0;
 
             // Update current day in history if needed
             if (!forceLite && currentPrice > 0 && finalHistory.length > 0) {
@@ -122,8 +123,8 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
 
             allQuotes[ticker.toUpperCase()] = {
                 currentPrice: currentPrice,
+                changePercent: changePercent,
                 priceHistory: finalHistory,
-                // Removed dividendsHistory as requested (relies on Gemini now)
             };
         } else {
             failedTickers.push(ticker);

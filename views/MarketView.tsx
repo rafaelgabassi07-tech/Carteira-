@@ -115,8 +115,10 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
             if (data && data.currentPrice > 0) {
                 const historyPrices = data.priceHistory?.map(p => p.price) || [];
                 
-                let change = 0;
-                if (historyPrices.length >= 2) {
+                // Use API provided change percent if available, otherwise calculate from history
+                let change = data.changePercent !== undefined ? data.changePercent : 0;
+                
+                if (change === 0 && historyPrices.length >= 2) {
                     const lastClose = historyPrices[historyPrices.length - 2];
                     change = ((data.currentPrice - lastClose) / lastClose) * 100;
                 }
@@ -232,7 +234,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Pesquisar FII (ex: MXRF11)"
-                                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-4 pl-5 pr-14 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all uppercase shadow-sm placeholder:text-[var(--text-secondary)]/50"
+                                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-4 pl-5 pr-14 text-lg font-bold focus:outline-none focus:border-[var(--accent-color)]/50 transition-all uppercase shadow-sm placeholder:text-[var(--text-secondary)]/50"
                             />
                             <button
                                 onClick={() => handleSearch(searchTerm)}
