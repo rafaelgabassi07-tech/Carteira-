@@ -1,13 +1,15 @@
+
 import React from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
 import type { AppPreferences } from '../../types';
+import DownloadIcon from '../icons/DownloadIcon';
 
 const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const { t } = useI18n();
-    const { preferences, updatePreferences } = usePortfolio();
+    const { preferences, updatePreferences, deferredPrompt, installPwa } = usePortfolio();
     
     const startScreens: { id: AppPreferences['startScreen'], label: string }[] = [
         { id: 'dashboard', label: t('nav_portfolio') }, // "Dashboard"
@@ -38,6 +40,16 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     <p className="font-bold text-sm">{t('haptic_feedback')}</p>
                     <ToggleSwitch enabled={preferences.hapticFeedback} setEnabled={(val) => updatePreferences({ hapticFeedback: val })} />
                 </div>
+
+                {deferredPrompt && (
+                    <button 
+                        onClick={installPwa} 
+                        className="w-full flex items-center justify-center gap-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold py-3 rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-colors"
+                    >
+                        <DownloadIcon className="w-4 h-4" />
+                        Instalar Aplicativo
+                    </button>
+                )}
             </div>
         </div>
     );

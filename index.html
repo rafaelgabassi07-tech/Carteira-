@@ -1,12 +1,19 @@
-
 <!DOCTYPE html>
 <html lang="en" data-theme="dark" data-style="premium">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2338bdf8'/%3E%3Cstop offset='100%25' stop-color='%233b82f6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='120' fill='%2318181b'/%3E%3Crect x='144' y='144' width='224' height='224' rx='32' stroke='url(%23grad)' stroke-width='32' fill='none' /%3E%3Cpath d='M192 288V256M256 288V224M320 288V192' stroke='url(%23grad)' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.json" />
+    
+    <!-- PWA / Mobile Settings -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#09090b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FII Master" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+
     <title>FII Master</title>
     
     <!-- Google Fonts Import -->
@@ -112,9 +119,9 @@
       html, body {
         width: 100%;
         max-width: 100%;
-        overflow-x: hidden; /* Critical for mobile-only feel */
+        overflow-x: hidden; 
         height: 100%;
-        overscroll-behavior-y: none; /* Prevents bounce effect on body */
+        overscroll-behavior-y: none; 
       }
 
       body {
@@ -123,7 +130,18 @@
         color: var(--text-primary);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        -webkit-tap-highlight-color: transparent;
+        
+        /* Native App Feel Enhancements */
+        -webkit-tap-highlight-color: transparent; /* Remove gray tap box on Android/iOS */
+        user-select: none; /* Disable text selection for app-like feel */
+        -webkit-user-select: none;
+        -webkit-touch-callout: none; /* Disable long-press menu on iOS */
+      }
+
+      /* Allow text selection on inputs and specific readable areas if needed */
+      input, textarea, [contenteditable="true"] {
+        user-select: text;
+        -webkit-user-select: text;
       }
       
       /* --- UTILITIES --- */
@@ -258,7 +276,6 @@
               console.debug('Service Worker registration failed (likely preview env):', err);
             });
             
-          // Reload page when the new service worker takes control (Standard PWA behavior)
           navigator.serviceWorker.addEventListener('controllerchange', () => {
              window.location.reload();
           });

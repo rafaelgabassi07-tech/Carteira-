@@ -25,6 +25,7 @@ interface PortfolioContextType {
   apiStats: AppStats;
   notifications: AppNotification[];
   unreadNotificationsCount: number;
+  deferredPrompt: any; // PWA Install Prompt
   // Actions
   addTransaction: (t: Transaction) => void;
   updateTransaction: (t: Transaction) => void;
@@ -50,6 +51,7 @@ interface PortfolioContextType {
   markNotificationsAsRead: () => void;
   deleteNotification: (id: number) => void;
   clearAllNotifications: () => void;
+  installPwa: () => void;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -78,11 +80,33 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [apiStats, setApiStats] = usePersistentState<AppStats>('api_stats', { gemini: {requests:0, bytesSent:0, bytesReceived:0}, brapi: {requests:0, bytesSent:0, bytesReceived:0} });
   const [notifications, setNotifications] = usePersistentState<AppNotification[]>('app-notifications', []);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   const initialLoadDone = useRef(false);
   const refreshInProgress = useRef(false);
   const marketDataRef = useRef(marketData);
   useEffect(() => { marketDataRef.current = marketData; }, [marketData]);
+
+  // PWA Install Event Listener
+  useEffect(() => {
+      const handleBeforeInstallPrompt = (e: any) => {
+          e.preventDefault();
+          setDeferredPrompt(e);
+      };
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const installPwa = useCallback(() => {
+      if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then((choiceResult: any) => {
+              if (choiceResult.outcome === 'accepted') {
+                  setDeferredPrompt(null);
+              }
+          });
+      }
+  }, [deferredPrompt]);
 
   useEffect(() => {
     const startScreen = preferences.startScreen;
@@ -485,20 +509,20 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const value = useMemo(() => ({
       assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-      yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
+      yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount, deferredPrompt,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
       setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
-      deleteNotification, clearAllNotifications
+      deleteNotification, clearAllNotifications, installPwa
   }), [
       assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
-      yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount,
+      yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount, deferredPrompt,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
       setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
-      deleteNotification, clearAllNotifications
+      deleteNotification, clearAllNotifications, installPwa
   ]);
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;

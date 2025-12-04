@@ -1,6 +1,6 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v1.7.1';
-const RUNTIME_CACHE = 'runtime-cache-v1.7.1';
+const CACHE_NAME = 'invest-portfolio-cache-v1.8.0'; // Bumped Version
+const RUNTIME_CACHE = 'runtime-cache-v1.8.0';
 
 const urlsToCache = [
   '/',
@@ -15,7 +15,6 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(async cache => {
         console.log('Opened cache');
-        // Cache files individually so one failure doesn't break the whole SW
         for (const url of urlsToCache) {
             try {
                 await cache.add(url);
@@ -30,13 +29,30 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Skip external requests
+  // Skip external requests not related to our assets
   if (!url.origin.includes(self.location.origin)) {
       return; 
   }
 
   // API calls shouldn't be cached by SW
   if (url.pathname.startsWith('/api') || url.pathname.includes('brapi') || url.pathname.includes('generativelanguage')) {
+      return;
+  }
+
+  // Navigation Fallback (SPA Support for Offline)
+  // If requesting a page (HTML), try network, then cache, then fallback to /index.html
+  if (event.request.mode === 'navigate') {
+      event.respondWith(
+          fetch(event.request)
+              .catch(() => {
+                  return caches.match(event.request)
+                      .then(cachedResponse => {
+                          if (cachedResponse) return cachedResponse;
+                          // If not in cache, serve index.html (SPA Entry point)
+                          return caches.match('/index.html');
+                      });
+              })
+      );
       return;
   }
 
@@ -64,7 +80,6 @@ self.addEventListener('fetch', event => {
 
         return response;
       }).catch(err => {
-          // If offline and no cache, just return nothing or a fallback if implemented
           console.debug('Fetch failed:', err);
       });
     })

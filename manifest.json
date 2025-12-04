@@ -4,9 +4,10 @@
   "description": "Gerencie sua carteira de Fundos Imobiliários com inteligência.",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#09090b",
   "theme_color": "#09090b",
-  "orientation": "portrait",
+  "categories": ["finance", "productivity", "business"],
   "icons": [
     {
       "src": "/logo.svg",
@@ -19,6 +20,22 @@
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova Transação",
+      "short_name": "Adicionar",
+      "description": "Adicionar nova movimentação",
+      "url": "/transacoes",
+      "icons": [{ "src": "/logo.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mercado",
+      "short_name": "Mercado",
+      "description": "Ver cotações e notícias",
+      "url": "/mercado",
+      "icons": [{ "src": "/logo.svg", "sizes": "192x192" }]
     }
   ]
 }
