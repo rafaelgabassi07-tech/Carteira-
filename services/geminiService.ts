@@ -142,9 +142,10 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       
       RULES FOR SEARCH:
       1. Use 'googleSearch' to find exact data from official sources (B3, StatusInvest, ClubeFII, FundsExplorer).
-      2. For 'assetType', map to: "Tijolo", "Papel", "Fiagro", "FOF", "Infra", "Híbrido".
-      3. 'businessDescription': A concise 1-sentence summary of what the fund invests in (max 20 words).
-      4. 'netWorth': Total Patrimônio Líquido (formatted string like "R$ 2.5B").
+      2. For 'assetType', map to exact categories: "Tijolo", "Papel", "Fiagro", "FOF", "Infra" or "Híbrido".
+      3. 'businessDescription': A strictly concise 1-sentence summary (max 180 chars) describing the fund's core thesis.
+      4. 'netWorth': Total Patrimônio Líquido formatted (e.g. "R$ 2.5B").
+      5. 'vacancyRate': Physical vacancy percentage (0 if not applicable).
       
       RULES FOR DIVIDENDS:
       1. Fetch the last 6 dividends.
@@ -156,16 +157,16 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       
       Structure per Ticker:
       {
-        "dy": number (12m yield, e.g. 12.5),
+        "dy": number (12m yield % value only, e.g. 12.5),
         "pvp": number (e.g. 1.03),
         "assetType": string,
         "administrator": string,
-        "vacancyRate": number (percentage, e.g. 5.5),
-        "lastDividend": number (value of the most recent confirmed payment),
-        "netWorth": string (e.g. "R$ 1.2B"),
-        "shareholders": number (count),
+        "vacancyRate": number,
+        "lastDividend": number (value of the most recent confirmed/paid dividend per share),
+        "netWorth": string,
+        "shareholders": number (integer count),
         "vpPerShare": number (Valor Patrimonial por Cota),
-        "businessDescription": string (Short summary in Portuguese),
+        "businessDescription": string,
         "dividendsHistory": [
            { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number, "isProvisioned": boolean }
         ]

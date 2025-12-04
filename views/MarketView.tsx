@@ -67,11 +67,22 @@ const MARKET_CATEGORIES = [
     }
 ];
 
-const InfoBlock: React.FC<{ label: string; value: React.ReactNode; sub?: string; highlight?: boolean }> = ({ label, value, sub, highlight }) => (
+const InfoBlock: React.FC<{ label: string; value: React.ReactNode; sub?: string; highlight?: boolean; colorClass?: string }> = ({ label, value, sub, highlight, colorClass }) => (
     <div className={`flex flex-col p-3 rounded-xl border ${highlight ? 'bg-[var(--bg-tertiary-hover)] border-[var(--accent-color)]/20' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
         <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 opacity-80">{label}</span>
-        <span className={`text-sm font-bold ${highlight ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>{value}</span>
-        {sub && <span className="text-[9px] text-[var(--text-secondary)] mt-0.5">{sub}</span>}
+        <span className={`text-sm font-bold truncate ${colorClass ? colorClass : (highlight ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]')}`}>{value}</span>
+        {sub && <span className="text-[9px] text-[var(--text-secondary)] mt-0.5 truncate">{sub}</span>}
+    </div>
+);
+
+const FundamentalSkeleton: React.FC = () => (
+    <div className="animate-pulse space-y-4 px-4 pb-4">
+        <div className="h-16 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="h-16 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
+            ))}
+        </div>
     </div>
 );
 
@@ -256,7 +267,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                 )}
                                             </div>
                                             <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1">
-                                                {loadingFundamentals ? <span className="animate-pulse">Analisando...</span> : 'Análise Completa'}
+                                                {loadingFundamentals ? <span className="flex items-center gap-1 animate-pulse"><SparklesIcon className="w-3 h-3"/> Analisando...</span> : 'Análise Completa'}
                                             </p>
                                         </div>
                                         <div className={`flex flex-col items-end`}>
@@ -270,7 +281,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
 
                                 {/* Chart Area */}
                                 <div className="h-32 w-full px-2 mb-4">
-                                    {result.history.length > 2 ? (
+                                    {result.history.length >= 2 ? (
                                         <PortfolioLineChart 
                                             data={result.history} 
                                             isPositive={result.change >= 0}
@@ -281,77 +292,89 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                     )}
                                 </div>
 
-                                {/* AI Summary (Insight) */}
-                                {result.fundamentals?.businessDescription && (
-                                    <div className="px-4 mb-4">
-                                        <div className="bg-[var(--accent-color)]/5 border border-[var(--accent-color)]/20 p-3 rounded-xl flex gap-3">
-                                            <div className="text-[var(--accent-color)] pt-0.5"><SparklesIcon className="w-4 h-4" /></div>
-                                            <div>
-                                                <p className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-wider mb-1">Resumo do Fundo</p>
-                                                <p className="text-xs text-[var(--text-primary)] leading-relaxed opacity-90">{result.fundamentals.businessDescription}</p>
+                                {loadingFundamentals ? (
+                                    <FundamentalSkeleton />
+                                ) : (
+                                    <>
+                                        {/* AI Summary (Insight) */}
+                                        {result.fundamentals?.businessDescription && (
+                                            <div className="px-4 mb-4 animate-fade-in-up">
+                                                <div className="bg-[var(--accent-color)]/5 border border-[var(--accent-color)]/20 p-3 rounded-xl flex gap-3">
+                                                    <div className="text-[var(--accent-color)] pt-0.5 shrink-0"><SparklesIcon className="w-4 h-4" /></div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-wider mb-1">Resumo do Fundo</p>
+                                                        <p className="text-xs text-[var(--text-primary)] leading-relaxed opacity-90 line-clamp-3">{result.fundamentals.businessDescription}</p>
+                                                    </div>
+                                                </div>
                                             </div>
+                                        )}
+
+                                        {/* Fundamentals Grid (Rich Info) */}
+                                        <div className="px-4 pb-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <AnalysisIcon className="w-4 h-4 text-[var(--text-secondary)]"/>
+                                                <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Indicadores</h3>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                <InfoBlock 
+                                                    label="Dividend Yield (12m)" 
+                                                    value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'}
+                                                    highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? true : false}
+                                                    colorClass={result.fundamentals?.dy && result.fundamentals.dy > 8 ? 'text-[var(--green-text)]' : ''}
+                                                />
+                                                <InfoBlock 
+                                                    label="Último Rendimento" 
+                                                    value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'}
+                                                />
+                                                <InfoBlock 
+                                                    label="P/VP" 
+                                                    value={result.fundamentals?.pvp ? result.fundamentals.pvp.toFixed(2) : '-'}
+                                                    sub={result.fundamentals?.vpPerShare ? `VP: ${formatCurrency(result.fundamentals.vpPerShare)}` : undefined}
+                                                    colorClass={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'text-[var(--green-text)]' : (result.fundamentals?.pvp && result.fundamentals.pvp > 1.2 ? 'text-[var(--red-text)]' : '')}
+                                                />
+                                                <InfoBlock 
+                                                    label="Patrimônio Líq." 
+                                                    value={result.fundamentals?.netWorth || '-'}
+                                                />
+                                                <InfoBlock 
+                                                    label="Vacância Física" 
+                                                    value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'}
+                                                    colorClass={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'text-[var(--red-text)]' : ''}
+                                                />
+                                                <InfoBlock 
+                                                    label="Cotistas" 
+                                                    value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'}
+                                                />
+                                            </div>
+
+                                            {/* Valuation Bar */}
+                                            {result.fundamentals?.pvp && (
+                                                <div className="mt-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
+                                                    <div className="flex justify-between text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-2">
+                                                        <span>Descontado</span>
+                                                        <span className={result.fundamentals.pvp < 1 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}>
+                                                            {result.fundamentals.pvp < 1 
+                                                                ? `Desconto de ${((1 - result.fundamentals.pvp) * 100).toFixed(0)}%` 
+                                                                : (result.fundamentals.pvp > 1 ? `Ágio de ${((result.fundamentals.pvp - 1) * 100).toFixed(0)}%` : 'Preço Justo')}
+                                                        </span>
+                                                        <span>Ágio</span>
+                                                    </div>
+                                                    <div className="h-2 w-full bg-[var(--bg-secondary)] rounded-full overflow-hidden flex relative">
+                                                        <div className="w-1/3 bg-emerald-500/50"></div>
+                                                        <div className="w-1/3 bg-gray-500/30"></div>
+                                                        <div className="w-1/3 bg-rose-500/50"></div>
+                                                        {/* Marker */}
+                                                        <div 
+                                                            className="absolute top-0 bottom-0 w-1 bg-[var(--text-primary)] shadow-[0_0_8px_white] transition-all duration-1000 z-10 scale-125"
+                                                            style={{ left: `${Math.min(Math.max((result.fundamentals.pvp / 1.5) * 100, 5), 95)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
+                                    </>
                                 )}
-
-                                {/* Fundamentals Grid (Rich Info) */}
-                                <div className="px-4 pb-4">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <AnalysisIcon className="w-4 h-4 text-[var(--text-secondary)]"/>
-                                        <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Dados Fundamentais</h3>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        <InfoBlock 
-                                            label="Dividend Yield (12m)" 
-                                            value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'}
-                                            highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? true : false}
-                                        />
-                                        <InfoBlock 
-                                            label="Último Rendimento" 
-                                            value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'}
-                                        />
-                                        <InfoBlock 
-                                            label="P/VP" 
-                                            value={result.fundamentals?.pvp ? result.fundamentals.pvp.toFixed(2) : '-'}
-                                            sub={result.fundamentals?.vpPerShare ? `VP: ${formatCurrency(result.fundamentals.vpPerShare)}` : undefined}
-                                            highlight={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? true : false}
-                                        />
-                                        <InfoBlock 
-                                            label="Patrimônio Líq." 
-                                            value={result.fundamentals?.netWorth || '-'}
-                                        />
-                                        <InfoBlock 
-                                            label="Vacância Física" 
-                                            value={result.fundamentals?.vacancy !== undefined ? `${result.fundamentals.vacancy}%` : '-'}
-                                        />
-                                        <InfoBlock 
-                                            label="Cotistas" 
-                                            value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'}
-                                        />
-                                    </div>
-
-                                    {/* Valuation Bar */}
-                                    {result.fundamentals?.pvp && (
-                                        <div className="mt-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
-                                            <div className="flex justify-between text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">
-                                                <span>Descontado</span>
-                                                <span>Preço Justo (1.0)</span>
-                                                <span>Ágio</span>
-                                            </div>
-                                            <div className="h-2 w-full bg-[var(--bg-secondary)] rounded-full overflow-hidden flex relative">
-                                                <div className="w-1/3 bg-emerald-500/50"></div>
-                                                <div className="w-1/3 bg-gray-500/30"></div>
-                                                <div className="w-1/3 bg-rose-500/50"></div>
-                                                {/* Marker */}
-                                                <div 
-                                                    className="absolute top-0 bottom-0 w-1 bg-[var(--text-primary)] shadow-[0_0_8px_white] transition-all duration-1000"
-                                                    style={{ left: `${Math.min(Math.max((result.fundamentals.pvp / 1.5) * 100, 5), 95)}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
 
                                 <div className="p-4 bg-[var(--bg-primary)]/50 border-t border-[var(--border-color)]">
                                     <button 
