@@ -5,7 +5,7 @@ import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { generateNotifications } from '../services/dynamicDataService';
 import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, CacheManager, toISODate, calculatePortfolioEvolution } from '../utils';
-import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME } from '../constants';
+import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME, STATIC_FII_SECTORS } from '../constants';
 
 interface PortfolioContextType {
   assets: Asset[];
@@ -132,8 +132,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       try {
           const { quotes } = await fetchBrapiQuotes(preferences, [ticker], false);
-          // Only fetch advanced data if missing or very stale (24h)
+          
+          // CONDITIONAL FUNDAMENTAL FETCH (Saves Gemini Tokens)
           let advancedData = {};
+          // Only fetch fundamentals if missing or older than 24h (STALE_TIME.FUNDAMENTALS)
           if (!currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS)) {
              const adv = await fetchAdvancedAssetData(preferences, [ticker]);
              advancedData = adv.data;
@@ -213,7 +215,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if(isRefreshing) return;
       
       const now = Date.now();
-      // Smart Check: Don't refresh PRICES if data is fresh (10m), unless forced
+      // Smart Check: Don't refresh PRICES if data is fresh (15m), unless forced
       if(!force && lastSync && now - lastSync < STALE_TIME.MARKET_DATA) return; 
 
       const tickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
@@ -232,7 +234,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const fundamentalsStale = !firstAsset?.lastFundamentalUpdate || (now - firstAsset.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
 
           if (!lite && (force || fundamentalsStale)) {
-              console.log("CONTEXT: Fetching fresh fundamentals...");
+              console.log("CONTEXT: Fetching fresh fundamentals via Gemini...");
               promises.push(fetchAdvancedAssetData(preferences, tickers));
           } else {
               // Push null so indices match in Promise.all
@@ -322,11 +324,21 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const histMap = new Map<string, DividendHistoryEvent>();
           (data.dividendsHistory || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d));
           
+          // INTELLIGENT SECTOR FALLBACK
+          // 1. API Data (Gemini/Brapi)
+          // 2. Static Known Data
+          // 3. Default "Outros"
+          let segment = data.assetType || data.sector;
+          if (!segment || segment === 'Outros') {
+              segment = STATIC_FII_SECTORS[ticker.toUpperCase()];
+          }
+          if (!segment) segment = 'Outros';
+
           return {
               ticker, quantity: m.quantity, avgPrice, currentPrice: curPrice,
               priceHistory: data.priceHistory || [],
               dividendsHistory: Array.from(histMap.values()).sort((a,b) => b.exDate.localeCompare(a.exDate)),
-              dy: data.dy, pvp: data.pvp, segment: data.assetType || data.sector || 'Outros',
+              dy: data.dy, pvp: data.pvp, segment: segment,
               administrator: data.administrator, vacancyRate: data.vacancyRate, liquidity: data.dailyLiquidity,
               shareholders: data.shareholders, yieldOnCost: avgPrice > 0 ? ((curPrice * ((data.dy||0)/100))/avgPrice)*100 : 0,
               nextPaymentDate: data.nextPaymentDate, lastDividend: data.lastDividend,
@@ -342,7 +354,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       initialLoadDone.current = true;
       
       const now = Date.now();
-      // Only force refresh if data is actually stale (older than 10 mins) or empty
+      // Only force refresh if data is actually stale (older than 15 mins) or empty
       const isStale = !lastSync || (now - lastSync > STALE_TIME.MARKET_DATA);
 
       if (isStale) {

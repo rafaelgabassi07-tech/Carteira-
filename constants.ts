@@ -19,6 +19,34 @@ export const STALE_TIME = {
     FUNDAMENTALS: 24 * 60 * 60 * 1000, // 24 Horas (Dados como DY, P/VP, Setor - Gemini)
 };
 
+// --- STATIC KNOWLEDGE BASE (Fallback) ---
+// Garante que ativos populares tenham setor correto instantaneamente, antes mesmo da IA carregar
+export const STATIC_FII_SECTORS: Record<string, string> = {
+    // Papel (Recebíveis / CRI)
+    'MXRF11': 'Papel', 'KNCR11': 'Papel', 'KNIP11': 'Papel', 'CPTS11': 'Papel', 'RECR11': 'Papel',
+    'IRDM11': 'Papel', 'VGIR11': 'Papel', 'KNSC11': 'Papel', 'RBRR11': 'Papel', 'HGCR11': 'Papel',
+    'MCCI11': 'Papel', 'CVBI11': 'Papel', 'VGHF11': 'Papel', 'DEVA11': 'Papel', 'HCTR11': 'Papel',
+    'RBRY11': 'Papel', 'HABT11': 'Papel', 'BCRI11': 'Papel', 'NCHB11': 'Papel', 'VCJR11': 'Papel',
+    
+    // Tijolo (Logística, Shoppings, Lajes, Híbrido de Tijolo)
+    'HGLG11': 'Tijolo', 'BTLG11': 'Tijolo', 'XPLG11': 'Tijolo', 'VILG11': 'Tijolo', 'ALZR11': 'Tijolo',
+    'VISC11': 'Tijolo', 'XPML11': 'Tijolo', 'HGBS11': 'Tijolo', 'MALL11': 'Tijolo', 'HSML11': 'Tijolo',
+    'KNRI11': 'Tijolo', 'HGRE11': 'Tijolo', 'JSRE11': 'Tijolo', 'PVBI11': 'Tijolo', 'BRCO11': 'Tijolo',
+    'GGRC11': 'Tijolo', 'TRXF11': 'Tijolo', 'HGRU11': 'Tijolo', 'RBRP11': 'Tijolo', 'RECT11': 'Tijolo',
+    'LVBI11': 'Tijolo', 'VINO11': 'Tijolo', 'SDIL11': 'Tijolo', 'TGAR11': 'Tijolo', 'RBRL11': 'Tijolo',
+
+    // Fiagro
+    'SNAG11': 'Fiagro', 'KNCA11': 'Fiagro', 'VGIA11': 'Fiagro', 'RZAG11': 'Fiagro', 'FGAA11': 'Fiagro',
+    'XPCA11': 'Fiagro', 'EGAF11': 'Fiagro', 'CPTR11': 'Fiagro', 'AAZQ11': 'Fiagro',
+
+    // FOF (Fundos de Fundos)
+    'BCFF11': 'FOF', 'KFOF11': 'FOF', 'XPSF11': 'FOF', 'MGFF11': 'FOF', 'SNFF11': 'FOF', 'RBRF11': 'FOF',
+    'CPFF11': 'FOF', 'HFOF11': 'FOF',
+
+    // Infraestrutura
+    'JURO11': 'Infra', 'BDIF11': 'Infra', 'XPID11': 'Infra', 'CPTI11': 'Infra', 'KDIF11': 'Infra'
+};
+
 // --- FONTS ---
 export const APP_FONTS: AppFont[] = [
     {
