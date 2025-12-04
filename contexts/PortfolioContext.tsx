@@ -135,8 +135,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           
           // CONDITIONAL FUNDAMENTAL FETCH (Saves Gemini Tokens)
           let advancedData = {};
-          // Only fetch fundamentals if missing or older than 24h (STALE_TIME.FUNDAMENTALS)
-          if (!currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS)) {
+          // Only fetch fundamentals/dividends if missing or older than 24h (STALE_TIME.FUNDAMENTALS)
+          const isFundamentalsStale = !currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
+          const hasMissingDividends = !currentData?.dividendsHistory || currentData.dividendsHistory.length === 0;
+
+          if (force || isFundamentalsStale || hasMissingDividends) {
              const adv = await fetchAdvancedAssetData(preferences, [ticker]);
              advancedData = adv.data;
           }
@@ -228,13 +231,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           // Always fetch Brapi (Quotes are dynamic)
           const promises: Promise<any>[] = [fetchBrapiQuotes(preferences, tickers, lite)];
           
-          // Only fetch Gemini (Fundamentals) if we need to (stale or never fetched)
+          // Only fetch Gemini (Fundamentals & Dividends) if we need to (stale or never fetched)
           // We check the FIRST asset to decide for batch (optimization)
           const firstAsset = marketDataRef.current[tickers[0].toUpperCase()];
           const fundamentalsStale = !firstAsset?.lastFundamentalUpdate || (now - firstAsset.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
+          
+          // Also check if any asset is missing dividendsHistory
+          const anyMissingDividends = tickers.some(t => {
+              const data = marketDataRef.current[t.toUpperCase()];
+              return !data?.dividendsHistory || data.dividendsHistory.length === 0;
+          });
 
-          if (!lite && (force || fundamentalsStale)) {
-              console.log("CONTEXT: Fetching fresh fundamentals via Gemini...");
+          if (!lite && (force || fundamentalsStale || anyMissingDividends)) {
+              console.log("CONTEXT: Fetching fresh fundamentals/dividends via Gemini...");
               promises.push(fetchAdvancedAssetData(preferences, tickers));
           } else {
               // Push null so indices match in Promise.all
@@ -260,7 +269,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                           ...prevData, 
                           ...newData,
                           priceHistory: newData.priceHistory?.length > 0 ? newData.priceHistory : prevData.priceHistory || [],
-                          dividendsHistory: newData.dividendsHistory?.length > 0 ? newData.dividendsHistory : prevData.dividendsHistory || [],
+                          // NOTE: Brapi service no longer returns dividends, so we preserve existing or rely on Gemini
+                          dividendsHistory: prevData.dividendsHistory || [], 
                           lastUpdated: now 
                       };
                       hasChanges = true;
@@ -273,8 +283,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                   Object.entries(res.data).forEach(([tkr, data]) => {
                       next[tkr] = { 
                           ...(next[tkr] || {}), 
-                          ...(data as object), 
-                          lastFundamentalUpdate: now // Timestamp distinct from lastUpdated
+                          ...(data as object), // Overwrites dividendsHistory and fundamentals
+                          lastFundamentalUpdate: now
                       };
                       hasChanges = true;
                   });
@@ -325,7 +335,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           (data.dividendsHistory || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d));
           
           // INTELLIGENT SECTOR FALLBACK
-          // 1. API Data (Gemini/Brapi)
+          // 1. API Data (Gemini)
           // 2. Static Known Data
           // 3. Default "Outros"
           let segment = data.assetType || data.sector;

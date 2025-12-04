@@ -118,7 +118,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { dy?: number; pvp?: number; assetType?: string; administrator?: string; }>, stats: { bytesSent: number, bytesReceived: number } }> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { dy?: number; pvp?: number; assetType?: string; administrator?: string; dividendsHistory?: DividendHistoryEvent[] }>, stats: { bytesSent: number, bytesReceived: number } }> {
     const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (tickers.length === 0) return emptyReturn;
 
@@ -134,9 +134,9 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     const tickersString = tickers.join(', ');
 
-    // Prompt Otimizado para Setorização Precisa
+    // Prompt Otimizado para Setorização Precisa e Proventos
     const prompt = `
-      TASK: Retrieve current financial indicators for these Brazilian FIIs: ${tickersString}.
+      TASK: Retrieve current financial indicators AND recent dividend history for these Brazilian FIIs: ${tickersString}.
       
       CRITICAL RULES:
       1. Use 'googleSearch' to find real-time values from reliable sources (StatusInvest, ClubeFII, FundsExplorer).
@@ -151,6 +151,10 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       - "pvp": P/VP (number, e.g. 1.03)
       - "assetType": One of the strictly allowed categories above.
       - "administrator": Name of administrator (string)
+      - "dividendsHistory": Array of the last 6 payments (Rendimentos). 
+         Object structure: { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number }. 
+         Dates MUST be in YYYY-MM-DD format. Value is the amount per share (e.g. 0.10).
+         Use exact dates found in announcements.
     `;
 
     const bytesSent = new Blob([prompt]).size;
@@ -170,18 +174,34 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
         // Clean Parsing
         let cleanJson = textResponse.replace(/^```json\s*/, '').replace(/```$/, '').trim();
-        const data = JSON.parse(cleanJson);
+        let data;
+        try {
+            data = JSON.parse(cleanJson);
+        } catch (e) {
+            console.error("Failed to parse Gemini asset data JSON:", e);
+            return emptyReturn;
+        }
 
         // Sanitize data
         const sanitizedData: Record<string, any> = {};
         for (const ticker in data) {
             if (Object.prototype.hasOwnProperty.call(data, ticker)) {
                 const assetData = data[ticker];
+                
+                // Validate Dividends
+                let cleanDividends: DividendHistoryEvent[] = [];
+                if (Array.isArray(assetData.dividendsHistory)) {
+                    cleanDividends = assetData.dividendsHistory.filter((d: any) => {
+                        return d.exDate && d.paymentDate && typeof d.value === 'number' && !isNaN(d.value);
+                    });
+                }
+
                 sanitizedData[ticker] = {
                     dy: typeof assetData.dy === 'number' ? assetData.dy : undefined,
                     pvp: typeof assetData.pvp === 'number' ? assetData.pvp : undefined,
                     assetType: typeof assetData.assetType === 'string' ? assetData.assetType : undefined,
                     administrator: typeof assetData.administrator === 'string' ? assetData.administrator : undefined,
+                    dividendsHistory: cleanDividends.length > 0 ? cleanDividends : undefined
                 };
             }
         }

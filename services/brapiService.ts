@@ -32,7 +32,7 @@ const setTokenRestricted = () => {
 };
 
 export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[], lite = false): Promise<{
-    quotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[], dividendsHistory?: DividendHistoryEvent[] }>,
+    quotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[] }>,
     stats: { bytesReceived: number }
 }> {
     const emptyReturn = { quotes: {}, stats: { bytesReceived: 0 } };
@@ -41,7 +41,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
     }
 
     const token = getBrapiToken(prefs);
-    const allQuotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[], dividendsHistory?: DividendHistoryEvent[] }> = {};
+    const allQuotes: Record<string, { currentPrice: number; priceHistory?: { date: string; price: number }[] }> = {};
     const failedTickers: string[] = [];
     let totalBytesReceived = 0;
 
@@ -55,12 +55,11 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
         let resultData: any = null;
 
         // Estratégia de Fallback em Cascata
-        
-        // Nível 1: Dados Completos (Histórico 1 ano + Dividendos) 
-        // Só tenta se não for forçado Lite e não estiver restrito
+        // Nível 1: Dados de Range (Histórico 1 ano) - Sem dividendos, focando em preço
         if (!forceLite) {
             try {
-                const response = await fetch(`${urlBase}?range=1y&dividends=true&token=${token}`);
+                // Requesting simple range data
+                const response = await fetch(`${urlBase}?range=1y&token=${token}`);
                 
                 if (response.status === 403 || response.status === 401) {
                     setTokenRestricted();
@@ -81,31 +80,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
             }
         }
 
-        // Nível 2: Apenas Dividendos + Cotação (Sem range histórico pesado)
-        // Executa se Nível 1 falhou ou foi pulado, mas ainda não é 'lite' estrito
-        if (!success && !lite) {
-            try {
-                // Tenta pegar dividendos sem especificar range (alguns planos free aceitam)
-                const response = await fetch(`${urlBase}?dividends=true&token=${token}`);
-                
-                // Se der 403 aqui também, paciência
-                if (response.status !== 403 && response.status !== 401 && response.ok) {
-                    const text = await response.text();
-                    totalBytesReceived += new Blob([text]).size;
-                    const data = JSON.parse(text);
-                    if (data.results?.[0]) {
-                        resultData = data.results[0];
-                        // Marca que não temos histórico de preço detalhado
-                        resultData.historicalDataPrice = []; 
-                        success = true;
-                    }
-                }
-            } catch (e) {
-                console.warn(`Brapi Dividends fetch failed for ${ticker}`, e);
-            }
-        }
-
-        // Nível 3: Fallback Final - Cotação Básica (Quase sempre funciona)
+        // Nível 2: Fallback Final - Cotação Básica
         if (!success) {
             try {
                 const response = await fetch(`${urlBase}?token=${token}`);
@@ -116,7 +91,6 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
                     if (data.results?.[0]) {
                         resultData = data.results[0];
                         resultData.historicalDataPrice = [];
-                        // Se falhou antes, provavelmente não temos dividendos aqui
                         success = true;
                     }
                 }
@@ -124,26 +98,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
         }
 
         if (success && resultData) {
-            let dividendsHistory: DividendHistoryEvent[] = [];
             let finalHistory: { date: string; price: number }[] = [];
-
-            // Processamento de Dividendos (Tenta extrair de onde estiver disponível)
-            const cashDividends = resultData.dividendsData?.cashDividends;
-            
-            if (Array.isArray(cashDividends) && cashDividends.length > 0) {
-                dividendsHistory = cashDividends.map((d: any) => ({
-                    exDate: d.lastDatePrior ? new Date(d.lastDatePrior).toISOString().split('T')[0] : (d.approvedOn ? new Date(d.approvedOn).toISOString().split('T')[0] : ''),
-                    paymentDate: d.paymentDate ? new Date(d.paymentDate).toISOString().split('T')[0] : '',
-                    value: d.rate || 0
-                })).filter((d: any) => d.value > 0 && d.exDate && d.paymentDate);
-            } else if (resultData.dividendData?.historicalDataPrice) {
-                // Formato legado/alternativo
-                dividendsHistory = resultData.dividendData.historicalDataPrice.map((item: any) => ({
-                    exDate: new Date(item.date * 1000).toISOString().split('T')[0],
-                    paymentDate: new Date(item.paymentDate * 1000).toISOString().split('T')[0],
-                    value: item.dividends?.[0]?.value || 0
-                })).filter((d: any) => d.value > 0);
-            }
 
             // Processamento de Histórico de Preço
             const rawHistory = resultData.historicalDataPrice || [];
@@ -168,7 +123,7 @@ export async function fetchBrapiQuotes(prefs: AppPreferences, tickers: string[],
             allQuotes[ticker.toUpperCase()] = {
                 currentPrice: currentPrice,
                 priceHistory: finalHistory,
-                dividendsHistory: dividendsHistory // Agora sempre retornamos o array, mesmo que vazio
+                // Removed dividendsHistory as requested (relies on Gemini now)
             };
         } else {
             failedTickers.push(ticker);
