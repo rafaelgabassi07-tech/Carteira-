@@ -197,10 +197,11 @@ const MonthlyBarChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
                         </div>
                         
                         <div 
-                            className="w-full rounded-t-sm transition-all duration-300 bg-[var(--accent-color)]/30 group-hover:bg-[var(--accent-color)] relative overflow-hidden" 
+                            className="w-full rounded-t-md transition-all duration-300 bg-[var(--accent-color)] opacity-60 group-hover:opacity-100 relative overflow-hidden" 
                             style={{ 
                                 height: `${Math.max(heightPercent, 2)}%`,
-                                animation: `grow-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards`,
+                                transformOrigin: 'bottom',
+                                animation: `grow-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards`,
                                 animationDelay: `${delay}ms`
                             }}
                         >
