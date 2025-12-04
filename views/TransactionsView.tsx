@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Transaction, ToastMessage } from '../types';
 import FloatingActionButton from '../components/FloatingActionButton';

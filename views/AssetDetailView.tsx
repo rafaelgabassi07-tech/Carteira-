@@ -7,6 +7,7 @@ import RefreshIcon from '../components/icons/RefreshIcon';
 import AnalysisIcon from '../components/icons/AnalysisIcon';
 import DividendChart from '../components/DividendChart';
 import CountUp from '../components/CountUp';
+import GlobeIcon from '../components/icons/GlobeIcon';
 import { vibrate } from '../utils';
 
 interface AssetDetailViewProps {
@@ -17,8 +18,7 @@ interface AssetDetailViewProps {
 
 // Helper para barras de progresso (P/VP e Vacância)
 const ProgressBar: React.FC<{ value: number; max: number; label?: string; colorClass: string; inverse?: boolean }> = ({ value, max, label, colorClass, inverse }) => {
-    let percent = (value / max) * 100;
-    if (percent > 100) percent = 100;
+    let percent = Math.max(0, Math.min((value / max) * 100, 100));
     
     return (
         <div className="w-full mt-1.5">
@@ -50,19 +50,24 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const [showAllHistory, setShowAllHistory] = useState(false);
     
     // Protection against infinite loops
-    const lastFetchAttempt = useRef(0);
+    const initialCheckDone = useRef(false);
     
     const asset = getAssetByTicker(ticker);
 
     useEffect(() => {
-        const checkAndLoad = async () => {
-            const now = Date.now();
-            // Only auto-refresh if data is very stale (5 mins) and we haven't tried recently (30s)
-            const isStale = !asset?.lastUpdated || (now - asset.lastUpdated > 5 * 60 * 1000);
-            const canRetry = (now - lastFetchAttempt.current > 30000);
+        // Reset check on ticker change
+        initialCheckDone.current = false;
+    }, [ticker]);
 
-            if (isStale && canRetry && (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0)) {
-                lastFetchAttempt.current = now;
+    useEffect(() => {
+        if (initialCheckDone.current) return;
+
+        const checkAndLoad = async () => {
+            initialCheckDone.current = true; // Mark as checked immediately
+            const now = Date.now();
+            const isStale = !asset?.lastUpdated || (now - asset.lastUpdated > 5 * 60 * 1000);
+
+            if (isStale) {
                 setIsRefreshing(true);
                 try {
                     await refreshSingleAsset(ticker, true);
@@ -71,14 +76,16 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 }
             }
         };
-        checkAndLoad();
-    }, [ticker, refreshSingleAsset, asset?.lastUpdated, asset?.dividendsHistory]); 
+        
+        // Use timeout to push this to next tick
+        const tId = setTimeout(checkAndLoad, 100);
+        return () => clearTimeout(tId);
+    }, [ticker, refreshSingleAsset, asset?.lastUpdated]); 
 
     const handleRefresh = useCallback(async () => {
         if (isRefreshing) return;
         vibrate();
         setIsRefreshing(true);
-        lastFetchAttempt.current = Date.now();
         try {
             await refreshSingleAsset(ticker, true);
         } finally {
@@ -200,6 +207,34 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         <IndicatorItem label="Liquidez Diária" value={asset.liquidity ? `R$ ${(asset.liquidity/1000000).toFixed(1)}M` : '-'} />
                         <IndicatorItem label="Nº Cotistas" value={asset.shareholders ? `${(asset.shareholders/1000).toFixed(0)}k` : '-'} />
                         <IndicatorItem label="Gestão" value={asset.administrator || '-'} />
+                    </div>
+                )}
+
+                {/* Sources - Search Grounding */}
+                {asset?.sources && asset.sources.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-[var(--border-color)]">
+                        <div className="flex items-center gap-1.5 mb-2 opacity-70">
+                            <GlobeIcon className="w-3 h-3 text-[var(--text-secondary)]" />
+                            <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Fontes Consultadas</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {asset.sources.slice(0, 3).map((url, idx) => {
+                                try {
+                                    const hostname = new URL(url).hostname.replace('www.', '');
+                                    return (
+                                        <a 
+                                            key={idx} 
+                                            href={url} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-[9px] text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-2 py-1 rounded-md hover:bg-[var(--accent-color)]/20 truncate max-w-[150px] transition-colors"
+                                        >
+                                            {hostname}
+                                        </a>
+                                    );
+                                } catch { return null; }
+                            })}
+                        </div>
                     </div>
                 )}
             </div>

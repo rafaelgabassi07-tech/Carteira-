@@ -1,10 +1,9 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Transaction, TransactionType, ToastMessage } from '../../types';
 import Modal from './Modal';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
-import { vibrate, getTodayISODate } from '../../utils';
+import { vibrate, getTodayISODate, parseLocalFloat } from '../../utils';
 
 interface TransactionModalProps { 
     onClose: () => void; 
@@ -24,27 +23,20 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
     const [ticker, setTicker] = useState(transaction?.ticker || initialTicker || '');
     
     // States as string to handle inputs with comma/dot
-    const [quantity, setQuantity] = useState(transaction?.quantity?.toString() || '');
-    const [price, setPrice] = useState(transaction?.price?.toString() || '');
-    const [costs, setCosts] = useState(transaction?.costs?.toString() || '');
+    // Ensure existing values are formatted with comma for consistency with Brazilian inputs
+    // We replace '.' with ',' so "10.50" becomes "10,50" initially
+    const [quantity, setQuantity] = useState(transaction?.quantity?.toString().replace('.', ',') || '');
+    const [price, setPrice] = useState(transaction?.price?.toFixed(2).replace('.', ',') || '');
+    const [costs, setCosts] = useState(transaction?.costs?.toFixed(2).replace('.', ',') || '');
     
     const [date, setDate] = useState(transaction?.date || getTodayISODate());
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    // Helper to parse localized string to float safe
-    const parseLocalFloat = (val: string) => {
-        if (!val) return 0;
-        // Replace comma with dot for parsing
-        return parseFloat(val.replace(',', '.')) || 0;
-    };
-
     // Helper to handle input change allowing only valid characters
     const handleNumberInput = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
         let val = e.target.value;
-        // Allow digits, one comma or one dot.
+        // Allow digits, comma and dot
         val = val.replace(/[^0-9,.]/g, '');
-        // Prevent multiple separators
-        if ((val.match(/[.,]/g) || []).length > 1) return;
         setter(val);
     };
 
@@ -78,7 +70,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
         if (!isEditMode && ticker.length >= 4 && !price) {
             const asset = getAssetByTicker(ticker.toUpperCase());
             if (asset && asset.currentPrice > 0) {
-                setPrice(asset.currentPrice.toFixed(2).replace('.', ',')); // Format for BR input
+                // Pre-fill with current price, using comma for Brazil locale feel
+                setPrice(asset.currentPrice.toFixed(2).replace('.', ',')); 
                 vibrate();
                 addToast(`Preço atual (${formatCurrency(asset.currentPrice)}) preenchido!`, 'info');
             }
@@ -152,8 +145,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
                     <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('price_per_share')}</label>
                         <input 
-                            value={price}
-                            onChange={handleNumberInput(setPrice)}
+                            value={price} 
+                            onChange={handleNumberInput(setPrice)} 
                             type="text" 
                             inputMode="decimal"
                             placeholder="0,00"

@@ -374,7 +374,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               capRate: data.capRate,
               managementFee: data.managementFee
           };
-      }).filter(a => a.quantity > 0.000001);
+      });
   }, [sourceTransactions, sourceMarketData]);
 
   useEffect(() => {

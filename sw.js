@@ -1,16 +1,16 @@
-
-const CACHE_NAME = 'invest-portfolio-cache-v1.9.0'; // Bumped Version
-const RUNTIME_CACHE = 'runtime-cache-v1.9.0';
+const CACHE_NAME = 'invest-portfolio-cache-v1.9.2'; // Bumped Version for update
+const RUNTIME_CACHE = 'runtime-cache-v1.9.2';
 
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/logo.svg'
+  './',
+  './index.html',
+  './manifest.json',
+  './logo.svg'
 ];
 
 self.addEventListener('install', event => {
-  self.skipWaiting();
+  // DO NOT skipWaiting() here. We want the new service worker to wait
+  // for the user to confirm the update via a prompt in the app.
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(async cache => {
@@ -40,7 +40,7 @@ self.addEventListener('fetch', event => {
   }
 
   // Navigation Fallback (SPA Support for Offline)
-  // If requesting a page (HTML), try network, then cache, then fallback to /index.html
+  // If requesting a page (HTML), try network, then cache, then fallback to index.html
   if (event.request.mode === 'navigate') {
       event.respondWith(
           fetch(event.request)
@@ -49,7 +49,7 @@ self.addEventListener('fetch', event => {
                       .then(cachedResponse => {
                           if (cachedResponse) return cachedResponse;
                           // If not in cache, serve index.html (SPA Entry point)
-                          return caches.match('/index.html');
+                          return caches.match('./index.html');
                       });
               })
       );
@@ -117,4 +117,11 @@ self.addEventListener('notificationclick', function(event) {
       }
     })
   );
+});
+
+// Listener to activate the new service worker when the user clicks 'Update'
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

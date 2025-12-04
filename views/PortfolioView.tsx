@@ -1,22 +1,42 @@
-
-import React, { useState, useMemo, useRef } from 'react';
-import type { Asset, ToastMessage, SortOption } from '../types';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import type { Asset, ToastMessage, SortOption, Transaction } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import BellIcon from '../components/icons/BellIcon';
 import SettingsIcon from '../components/icons/SettingsIcon';
+import BellIcon from '../components/icons/BellIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
+import AssetListItem from '../components/AssetListItem';
+import FloatingActionButton from '../components/FloatingActionButton';
+import TransactionModal from '../components/modals/TransactionModal';
 import DividendsSummaryCard from '../components/DividendsSummaryCard';
-import PortfolioPieChart from '../components/PortfolioPieChart';
+
+// Icons
+const SortIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+);
+const WalletIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+);
+
+// --- Components ---
+
+const PortfolioSkeleton: React.FC = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
+        {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-20 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]"></div>
+        ))}
+    </div>
+);
 
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
     onRefresh: () => void;
     isRefreshing: boolean;
-}> = ({ setActiveView, onRefresh, isRefreshing }) => {
+    unreadNotificationsCount: number;
+}> = ({ setActiveView, onRefresh, isRefreshing, unreadNotificationsCount }) => {
     const { t } = useI18n();
 
     return (
@@ -34,11 +54,22 @@ const Header: React.FC<{
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
-                <button id="settings-btn" onClick={() => { setActiveView('settings'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
-                    <SettingsIcon className="w-5 h-5" />
-                </button>
                 <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
                     <BellIcon className="w-5 h-5" />
+                    {unreadNotificationsCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-color)] opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--accent-color)] border-2 border-[var(--bg-secondary)]"></span>
+                        </span>
+                    )}
+                </button>
+                <button 
+                    id="settings-btn" 
+                    onClick={() => { setActiveView('settings'); vibrate(); }} 
+                    className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95"
+                    aria-label={t('nav_settings')}
+                >
+                    <SettingsIcon className="w-5 h-5" />
                 </button>
             </div>
         </header>
@@ -122,51 +153,29 @@ const PortfolioSummary: React.FC = () => {
     );
 };
 
-const DiversificationCard: React.FC = () => {
-    const { t } = useI18n();
-    const { assets, preferences } = usePortfolio();
-    
-    const data = useMemo(() => {
-        const segments: Record<string, number> = {};
-        let totalValue = 0;
-        assets.forEach(a => {
-            const val = a.quantity * a.currentPrice;
-            const seg = a.segment || t('outros');
-            segments[seg] = (segments[seg] || 0) + val;
-            totalValue += val;
-        });
-        
-        return Object.entries(segments).map(([name, value]) => ({
-            name,
-            value,
-            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
-        })).sort((a, b) => b.value - a.value);
-    }, [assets, t]);
-
-    if (assets.length === 0) return null;
-
-    return (
-        <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all hover:shadow-md">
-            <h3 className="font-bold text-lg text-[var(--text-primary)] mb-4">{t('diversification')}</h3>
-            <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
-        </div>
-    );
-};
-
 interface PortfolioViewProps {
     setActiveView: (view: View) => void;
     setTransactionFilter: (ticker: string) => void;
     onSelectAsset: (ticker: string) => void;
     addToast: (message: string, type?: ToastMessage['type']) => void;
-    unreadNotificationsCount?: number;
+    unreadNotificationsCount: number;
 }
 
-const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, addToast }) => {
+const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast, unreadNotificationsCount }) => {
     const { t } = useI18n();
-    const { assets, refreshMarketData, isRefreshing: isContextRefreshing } = usePortfolio();
+    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing, addTransaction } = usePortfolio();
+    const [searchQuery, setSearchQuery] = useState('');
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+    const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
+    const [isSortOpen, setIsSortOpen] = useState(false);
+    const [showAddModal, setShowAddModal] = useState(false);
     
     const isRefreshing = isContextRefreshing || isPullRefreshing;
+
+    // Sync sort preference when changed in settings
+    useEffect(() => {
+        setSortOption(preferences.defaultSort || 'valueDesc');
+    }, [preferences.defaultSort]);
 
     // Pull to Refresh Logic
     const touchStartY = useRef(0);
@@ -212,6 +221,36 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, addToast }
         }
     };
 
+    const handleSaveTransaction = (tx: Omit<Transaction, 'id'> & { id?: string }) => {
+        addTransaction({ ...tx, id: String(Date.now()) });
+        addToast(t('toast_transaction_added'), 'success');
+        setShowAddModal(false);
+    };
+    
+    const totalPortfolioValue = useMemo(() => assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0), [assets]);
+    
+    const processedAssets = useMemo(() => {
+        // Filter out assets with no quantity (sold) for the main list
+        let filtered = assets.filter(asset => 
+            asset.quantity > 0.000001 &&
+            asset.ticker.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        return filtered.sort((a, b) => {
+            switch (sortOption) {
+                case 'valueDesc': return (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity);
+                case 'valueAsc': return (a.currentPrice * a.quantity) - (b.currentPrice * a.quantity);
+                case 'tickerAsc': return a.ticker.localeCompare(b.ticker);
+                case 'performanceDesc':
+                    const perfA = a.avgPrice > 0 ? (a.currentPrice - a.avgPrice) / a.avgPrice : 0;
+                    const perfB = b.avgPrice > 0 ? (b.currentPrice - b.avgPrice) / b.avgPrice : 0;
+                    return perfB - perfA;
+                default: return 0;
+            }
+        });
+    }, [assets, searchQuery, sortOption]);
+
+    const hasActiveAssets = assets.some(a => a.quantity > 0);
+
     return (
         <div 
             className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
@@ -231,20 +270,109 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, addToast }
             </div>
 
             <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
+                <Header setActiveView={setActiveView} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} unreadNotificationsCount={unreadNotificationsCount} />
                 
-                <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
-                    <PortfolioSummary />
-                </div>
+                {hasActiveAssets ? (
+                    <>
+                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
+                            <PortfolioSummary />
+                            <div className="mt-6 mx-4">
+                                <DividendsSummaryCard />
+                            </div>
+                        </div>
 
-                <div className="px-4 mt-6 space-y-6 md:max-w-2xl md:mx-auto lg:max-w-3xl">
-                    {/* Income Report Section */}
-                    {assets.length > 0 && <DividendsSummaryCard />}
+                        <div className="px-4 mt-8">
+                            <div className="flex space-x-3 mb-5">
+                                <div className="flex-1 relative">
+                                    <input 
+                                        type="text" 
+                                        placeholder={t('search_asset_placeholder')} 
+                                        value={searchQuery} 
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
+                                        autoCapitalize="characters"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <button 
+                                        id="sort-btn"
+                                        onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
+                                        className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
+                                    >
+                                        <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
+                                    </button>
+                                    {isSortOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
+                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
+                                                <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
+                                                {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
+                                                    <button 
+                                                        key={option}
+                                                        onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }}
+                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}
+                                                    >
+                                                        {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
+                                                        {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
 
-                    {/* Sector Allocation Section */}
-                    {assets.length > 0 && <DiversificationCard />}
-                </div>
+                             <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2">
+                                 {t('my_assets')} 
+                                 <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
+                             </h3>
+                             
+                            {isRefreshing && processedAssets.length === 0 ? (
+                                <PortfolioSkeleton />
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
+                                    {processedAssets.map((asset, index) => (
+                                        <AssetListItem 
+                                            key={asset.ticker}
+                                            asset={asset} 
+                                            totalValue={totalPortfolioValue}
+                                            onClick={() => onSelectAsset(asset.ticker)} 
+                                            style={{ animationDelay: `${index * 50}ms` }}
+                                            privacyMode={privacyMode}
+                                            hideCents={preferences.hideCents}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
+                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
+                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                        </div>
+                        <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
+                        <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
+                        <button
+                            id="add-first-transaction-button"
+                            onClick={() => { setShowAddModal(true); vibrate(); }}
+                            className="mt-8 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3 px-6 rounded-xl shadow-lg shadow-[var(--accent-color)]/30 active:scale-95 transition-all"
+                        >
+                            {t('add_transaction')}
+                        </button>
+                    </div>
+                )}
             </div>
+            
+            {hasActiveAssets && <FloatingActionButton id="fab-add-transaction" onClick={() => { setShowAddModal(true); vibrate(); }} />}
+
+            {showAddModal && (
+                <TransactionModal 
+                    onClose={() => setShowAddModal(false)} 
+                    onSave={handleSaveTransaction}
+                    addToast={addToast}
+                />
+            )}
         </div>
     );
 };

@@ -36,6 +36,9 @@ export interface Asset {
   dividendCAGR?: number; // Crescimento anual composto de dividendos (3 anos)
   capRate?: number; // Cap Rate estimado (para tijolo)
   managementFee?: string; // Taxa de administração
+  
+  // Grounding
+  sources?: string[];
 }
 
 export interface NewsArticle {

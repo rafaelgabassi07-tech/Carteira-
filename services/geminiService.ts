@@ -2,39 +2,59 @@
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
-function getGeminiApiKey(prefs: AppPreferences): string {
-    if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
-        return prefs.geminiApiKey;
+function getGeminiApiKey(): string {
+    // Strictly follow guidelines: Use process.env.API_KEY exclusively.
+    const key = process.env.API_KEY;
+    if (key && key.trim() !== '') {
+        return key;
     }
-    const envApiKey = (import.meta as any).env.VITE_API_KEY;
-    if (envApiKey && envApiKey.trim() !== '') {
-        return envApiKey;
+    // Fallback to import.meta.env for Vite environments if process.env isn't populated
+    const viteKey = (import.meta as any).env?.VITE_API_KEY;
+    if (viteKey && viteKey.trim() !== '') {
+        return viteKey;
     }
-    throw new Error("Chave de API do Gemini não configurada.");
+    throw new Error("Chave de API do Gemini (process.env.API_KEY) não configurada.");
 }
 
-// Helper para limpar JSON vindo de LLMs
+// Helper robusto para limpar JSON vindo de LLMs
 function cleanAndParseJSON(text: string): any {
-    let clean = text.replace(/```json\s*/g, '').replace(/```/g, '').trim();
-    // Remove caracteres invisíveis ou lixo antes do primeiro '{' ou '['
+    if (!text) return [];
+    
+    // 1. Remove Markdown code blocks
+    let clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    
+    // 2. Encontrar o início e fim do JSON válido (Outermost brackets)
     const firstBrace = clean.indexOf('{');
     const firstBracket = clean.indexOf('[');
     
-    if (firstBrace === -1 && firstBracket === -1) throw new Error("JSON invalid format");
+    if (firstBrace === -1 && firstBracket === -1) throw new Error("JSON invalid format: No brackets found");
     
     const start = (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) ? firstBrace : firstBracket;
-    clean = clean.substring(start);
     
-    // Tenta encontrar o fim correto
     const lastBrace = clean.lastIndexOf('}');
     const lastBracket = clean.lastIndexOf(']');
     const end = Math.max(lastBrace, lastBracket);
     
-    if (end !== -1) {
-        clean = clean.substring(0, end + 1);
-    }
+    if (end === -1) throw new Error("JSON invalid format: No closing brackets");
 
-    return JSON.parse(clean);
+    clean = clean.substring(start, end + 1);
+
+    // 3. Tentar parsear
+    try {
+        return JSON.parse(clean);
+    } catch (e) {
+        console.warn("JSON Parse failed, attempting relaxed cleanup...", e);
+        // Fallback: Tentar remover trailing commas (comum em LLMs)
+        // NOTE: Do NOT remove comments with // regex as it breaks URLs (https://)
+        try {
+            // Remove trailing commas before } or ]
+            let relaxed = clean.replace(/,\s*([\]}])/g, '$1');
+            return JSON.parse(relaxed);
+        } catch (e2) {
+            console.error("Fatal JSON parse error", clean);
+            throw new Error("Falha fatal no parsing do JSON.");
+        }
+    }
 }
 
 export interface NewsFilter {
@@ -50,7 +70,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     
     let apiKey: string;
     try {
-        apiKey = getGeminiApiKey(prefs);
+        apiKey = getGeminiApiKey();
     } catch (error) {
         console.warn("News fetch skipped (No Key):", error);
         return emptyReturn;
@@ -64,7 +84,9 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         searchContext = `focado nos ativos: ${tickers}, e no mercado geral de FIIs`;
     }
     if (filter.query) {
-        searchContext += `. Tópico específico: ${filter.query}`;
+        // Sanitize query to prevent prompt injection
+        const safeQuery = filter.query.replace(/[^\w\sà-úÀ-Ú.,-]/g, '').trim();
+        searchContext += `. Tópico específico: "${safeQuery}"`;
     }
 
     const prompt = `
@@ -130,10 +152,10 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 }
 
-export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string): Promise<{ price: number, change: number } | null> {
+export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string): Promise<{ price: number, change: number, sources: string[] } | null> {
     let apiKey: string;
     try {
-        apiKey = getGeminiApiKey(prefs);
+        apiKey = getGeminiApiKey();
     } catch { return null; }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -153,8 +175,18 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
         
         const data = cleanAndParseJSON(response.text || "{}");
         
+        // Extract grounding sources for compliance
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+        const sources = (groundingChunks as any[])
+            .map((c: any) => c.web?.uri)
+            .filter((uri: any): uri is string => typeof uri === 'string' && uri.trim() !== '');
+        
         if (typeof data.price === 'number') {
-            return { price: data.price, change: data.changePercent || 0 };
+            return { 
+                price: data.price, 
+                change: data.changePercent || 0,
+                sources: [...new Set(sources)] // Unique sources
+            };
         }
         return null;
     } catch (e) {
@@ -191,7 +223,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     let apiKey: string;
     try {
-        apiKey = getGeminiApiKey(prefs);
+        apiKey = getGeminiApiKey();
     } catch (error: any) {
         console.warn("Advanced data fetch skipped:", error.message);
         return emptyReturn;
@@ -264,9 +296,23 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         const textResponse = response.text || "{}";
         const bytesReceived = new Blob([textResponse]).size;
         
-        let data = {};
+        // Extract Grounding Source URLs
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+        const sourceUrls = (groundingChunks as any[])
+            .map((c: any) => c.web?.uri)
+            .filter((uri: any): uri is string => typeof uri === 'string' && uri.trim() !== '');
+        // Remove duplicates
+        const uniqueSources = [...new Set(sourceUrls)];
+
+        let data: Record<string, any> = {};
         try {
             data = cleanAndParseJSON(textResponse);
+            // Attach sources to each asset data object for this chunk
+            for (const key in data) {
+                if (data.hasOwnProperty(key)) {
+                    data[key].sources = uniqueSources;
+                }
+            }
         } catch (e) {
             console.error("Failed to parse Gemini chunk:", e);
         }
@@ -312,7 +358,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                 dividendCAGR: typeof assetData.dividendCAGR === 'number' ? assetData.dividendCAGR : undefined,
                 capRate: typeof assetData.capRate === 'number' ? assetData.capRate : undefined,
                 managementFee: typeof assetData.managementFee === 'string' ? assetData.managementFee : undefined,
-                dividendsHistory: cleanDividends.length > 0 ? cleanDividends : undefined
+                dividendsHistory: cleanDividends.length > 0 ? cleanDividends : undefined,
+                sources: Array.isArray(assetData.sources) ? assetData.sources : []
             };
         }
     }

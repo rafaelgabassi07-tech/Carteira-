@@ -46,14 +46,24 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
         
         const range = maxVal - minVal;
         
-        // Add headroom/footroom for aesthetics
-        const paddingPercent = 0.1; // 10%
-        let effectiveMin = minVal - (range * paddingPercent);
-        let effectiveMax = maxVal + (range * paddingPercent);
+        // Add dynamic padding to prevent flat lines
+        // If range is 0 (all values same) or very small, force a +/- 10% scale
+        // This ensures the line has breathing room
+        let effectiveRange = range;
+        if (range === 0 || (range / maxVal < 0.01)) { // Less than 1% variation
+             effectiveRange = maxVal * 0.1 || 10;
+        }
+        
+        const paddingValue = effectiveRange * 0.20; // 20% padding
+
+        let effectiveMin = minVal - paddingValue;
+        let effectiveMax = maxVal + paddingValue;
         
         // Avoid negative scales unless real debt exists
         if (effectiveMin < 0 && minVal >= 0) effectiveMin = 0;
-        if (range === 0) { effectiveMin = maxVal * 0.9; effectiveMax = maxVal * 1.1; }
+        
+        // Handle pure zero case
+        if (effectiveMax === 0) effectiveMax = 100;
 
         return { min: effectiveMin, max: effectiveMax };
     }, [data]);
@@ -64,6 +74,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
     };
     
     const getY = (value: number) => {
+        // Prevent division by zero
         if (max === min) return height / 2;
         const percent = (value - min) / (max - min);
         return (height - padding.bottom) - (percent * chartHeight);

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useI18n } from '../../contexts/I18nContext';
@@ -71,7 +72,6 @@ const ChangelogCard: React.FC<{
 };
 
 // --- Main Modal Component ---
-// FIX: Added updateAvailable and onUpdate to the props to match usage in SettingsView.
 interface UpdateCheckModalProps {
     onClose: () => void;
     updateAvailable?: boolean;
@@ -121,15 +121,35 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({ onClose, updateAvai
                 ) : (
                     <>
                         <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-6 border border-[var(--border-color)] flex flex-col md:flex-row md:items-center gap-4 animate-fade-in-up">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-12 h-12 flex-shrink-0 bg-[var(--accent-color)]/10 text-[var(--accent-color)] rounded-full flex items-center justify-center`}>
-                                    <CheckCircleIcon className="w-7 h-7" />
+                            {updateAvailable ? (
+                                <>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-12 h-12 flex-shrink-0 bg-[var(--accent-color)]/10 text-[var(--accent-color)] rounded-full flex items-center justify-center`}>
+                                            <DownloadIcon className="w-6 h-6 animate-bounce" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg">{t('new_version_available')}</h3>
+                                            <p className="text-xs text-[var(--text-secondary)]">Patch disponível para instalação.</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => { if(onUpdate) onUpdate(); }}
+                                        className="ml-auto w-full md:w-auto px-6 py-3 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold rounded-xl shadow-lg hover:opacity-90 active:scale-95 transition-all"
+                                    >
+                                        {t('update_available_action')}
+                                    </button>
+                                </>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 flex-shrink-0 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center`}>
+                                        <CheckCircleIcon className="w-7 h-7" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg">{t('you_are_up_to_date')}</h3>
+                                        <p className="text-xs text-[var(--text-secondary)]">{t('version')} 1.7.0 • {t('channel_stable')}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-lg">{t('you_are_up_to_date')}</h3>
-                                    <p className="text-xs text-[var(--text-secondary)]">{t('version')} 1.7.0 • {t('channel_stable')}</p>
-                                </div>
-                            </div>
+                            )}
                         </div>
 
                         <div className="flex-1 overflow-y-auto pr-1 no-scrollbar pb-safe space-y-3">

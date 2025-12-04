@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -37,6 +36,71 @@ const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   
+  // --- PWA Update Logic ---
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const waitingWorkerRef = useRef<ServiceWorker | null>(null);
+
+  const handleUpdateApp = useCallback(() => {
+    if (waitingWorkerRef.current) {
+        waitingWorkerRef.current.postMessage({ type: 'SKIP_WAITING' });
+        setUpdateAvailable(false); // Hide the toast immediately
+    }
+  }, []);
+
+  useEffect(() => {
+      if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('./sw.js').then(registration => {
+              registration.onupdatefound = () => {
+                  const installingWorker = registration.installing;
+                  if (installingWorker) {
+                      installingWorker.onstatechange = () => {
+                          if (installingWorker.state === 'installed') {
+                              if (navigator.serviceWorker.controller) {
+                                  console.log('New content is available for update.');
+                                  waitingWorkerRef.current = registration.waiting;
+                                  setUpdateAvailable(true);
+                              }
+                          }
+                      };
+                  }
+              };
+          });
+
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+              if (!refreshing) {
+                  window.location.reload();
+                  refreshing = true;
+              }
+          });
+      }
+  }, []);
+
+  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
+    const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
+    setToast(newToast);
+    if (duration > 0) {
+        setTimeout(() => {
+            setToast(t => (t?.id === newToast.id ? null : t));
+        }, duration);
+    }
+  }, []);
+
+  useEffect(() => {
+      if (updateAvailable) {
+          addToast(
+              t('new_version_available'),
+              'info',
+              {
+                  label: t('update_available_action'),
+                  onClick: handleUpdateApp,
+              },
+              0 // 0 duration means the toast stays until actioned
+          );
+      }
+  }, [updateAvailable, addToast, handleUpdateApp, t]);
+  // --- End PWA Update Logic ---
+  
   // PWA Deep Linking & Share Target Handler
   useEffect(() => {
       const params = new URLSearchParams(window.location.search);
@@ -50,16 +114,6 @@ const App: React.FC = () => {
           // If coming from Shortcut
           setActiveView(viewParam as View);
       }
-  }, []);
-
-  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
-    const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
-    setToast(newToast);
-    if (duration > 0) {
-        setTimeout(() => {
-            setToast(t => (t?.id === newToast.id ? null : t));
-        }, duration);
-    }
   }, []);
 
   useEffect(() => {
@@ -131,7 +185,7 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
       case 'noticias': return <NewsView addToast={addToast} />;
-      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
+      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} updateAvailable={updateAvailable} onUpdateApp={handleUpdateApp} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
       case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
