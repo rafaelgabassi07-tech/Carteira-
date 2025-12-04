@@ -374,7 +374,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             </button>
         </div>
 
-        {loading && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{Array.from({length: 4}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({length: 6}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
         
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-8 rounded-2xl text-center">
@@ -389,7 +389,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         {!loading && !error && (
           <div className="flex-1">
             {displayedNews.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {displayedNews.map((article, index) => (
                   <div 
                       key={`${article.title}-${index}`} 
@@ -404,13 +404,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                       />
                   </div>
                   ))}
-                  {activeTab === 'favorites' && (
-                      <div className="col-span-full text-center pt-6 pb-8">
-                          <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:text-red-500 hover:underline uppercase tracking-wider transition-colors">
-                              {t('clear_favorites')}
-                          </button>
-                      </div>
-                  )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">

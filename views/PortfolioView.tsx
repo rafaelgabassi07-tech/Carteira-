@@ -1,8 +1,9 @@
 
-import React, { useMemo, useState, useRef } from 'react';
-import type { ToastMessage } from '../types';
+import React, { useState, useMemo, useRef } from 'react';
+import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
+import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
@@ -118,7 +119,7 @@ const PortfolioSummary: React.FC = () => {
 
                 <div className="border-t border-[var(--border-color)]/50 my-5"></div>
 
-                <div className={`grid grid-cols-2 gap-y-5 gap-x-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                <div className={`grid grid-cols-2 lg:grid-cols-4 gap-y-5 gap-x-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
                     <Metric label={t('total_invested')}>
                         <p className="text-[var(--text-primary)]"><CountUp end={summary.totalInvested} formatter={format} /></p>
                     </Metric>
@@ -216,7 +217,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
 
     return (
         <div 
-            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
+            className="pb-24 lg:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar"
             ref={containerRef}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -232,19 +233,19 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-7xl mx-auto w-full">
                 <Header setActiveView={setActiveView} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
                 
                 {assets.length > 0 ? (
                     <>
                         {/* Dashboard Grid Container - Controls Padding Uniformly */}
-                        <div className="md:max-w-2xl md:mx-auto lg:max-w-4xl px-4 py-4 space-y-4">
+                        <div className="md:mx-auto lg:max-w-none px-4 py-4 space-y-4">
                             
                             {/* Summary Card */}
                             <PortfolioSummary />
                             
                             {/* Stats Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                                 <DividendsSummaryCard />
                                 
                                 {/* Sector Allocation Card */}
