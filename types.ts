@@ -25,6 +25,17 @@ export interface Asset {
   lastDividend?: number; // Último valor pago
   lastUpdated?: number; // Timestamp da última atualização bem sucedida (Preço)
   lastFundamentalUpdate?: number; // Timestamp da última atualização de dados fundamentais (Gemini)
+  
+  // Novos campos de Análise Avançada
+  netWorth?: string;
+  vpPerShare?: number;
+  businessDescription?: string;
+  riskAssessment?: string; // "Baixo", "Médio", "Alto" com breve explicação
+  strengths?: string[]; // Pontos fortes
+  weaknesses?: string[]; // Pontos de atenção
+  dividendCAGR?: number; // Crescimento anual composto de dividendos (3 anos)
+  capRate?: number; // Cap Rate estimado (para tijolo)
+  managementFee?: string; // Taxa de administração
 }
 
 export interface NewsArticle {

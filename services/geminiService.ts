@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
@@ -117,7 +118,27 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 }
 
-export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ data: Record<string, { dy?: number; pvp?: number; assetType?: string; administrator?: string; vacancyRate?: number; lastDividend?: number; netWorth?: string; shareholders?: number; vpPerShare?: number; businessDescription?: string; dividendsHistory?: DividendHistoryEvent[] }>, stats: { bytesSent: number, bytesReceived: number } }> {
+export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ 
+    data: Record<string, { 
+        dy?: number; 
+        pvp?: number; 
+        assetType?: string; 
+        administrator?: string; 
+        vacancyRate?: number; 
+        lastDividend?: number; 
+        netWorth?: string; 
+        shareholders?: number; 
+        vpPerShare?: number; 
+        businessDescription?: string; 
+        riskAssessment?: string;
+        strengths?: string[];
+        dividendCAGR?: number;
+        capRate?: number;
+        managementFee?: string;
+        dividendsHistory?: DividendHistoryEvent[] 
+    }>, 
+    stats: { bytesSent: number, bytesReceived: number } 
+}> {
     const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (tickers.length === 0) return emptyReturn;
 
@@ -136,16 +157,18 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     // Prompt Aprimorado para Análise Fundamentalista Completa
     const prompt = `
-      ROLE: Strict Financial Auditor & Analyst.
-      TASK: Retrieve rigorous financial data for these Brazilian FIIs: ${tickersString}.
+      ROLE: Senior Real Estate Fund (FII) Analyst.
+      TASK: Perform a deep fundamental analysis for these Brazilian FIIs: ${tickersString}.
       CURRENT_DATE: ${today}.
       
       RULES FOR SEARCH:
-      1. Use 'googleSearch' to find exact data from official sources (B3, StatusInvest, ClubeFII, FundsExplorer).
-      2. For 'assetType', map to exact categories: "Tijolo", "Papel", "Fiagro", "FOF", "Infra" or "Híbrido".
-      3. 'businessDescription': A strictly concise 1-sentence summary (max 180 chars) describing the fund's core thesis.
-      4. 'netWorth': Total Patrimônio Líquido formatted (e.g. "R$ 2.5B").
-      5. 'vacancyRate': Physical vacancy percentage (0 if not applicable).
+      1. Use 'googleSearch' to find exact data from official sources (B3, RI, StatusInvest, ClubeFII).
+      2. 'businessDescription': Concise 1-sentence summary of the investment thesis.
+      3. 'riskAssessment': "Low", "Medium" or "High" followed by a 3-word reason (e.g., "High - High Vacancy Risk").
+      4. 'strengths': Array of 2 short key strengths (e.g. "Prime Location", "Long Contracts").
+      5. 'dividendCAGR': 3-Year Compound Annual Growth Rate of dividends (approximate % float).
+      6. 'capRate': Estimated Capitalization Rate (%) for Brick funds. Null for Paper/FOF.
+      7. 'managementFee': formatted string (e.g. "1.20% a.a.").
       
       RULES FOR DIVIDENDS:
       1. Fetch the last 6 dividends.
@@ -159,14 +182,19 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
       {
         "dy": number (12m yield % value only, e.g. 12.5),
         "pvp": number (e.g. 1.03),
-        "assetType": string,
+        "assetType": "Tijolo" | "Papel" | "Fiagro" | "FOF" | "Infra" | "Híbrido",
         "administrator": string,
-        "vacancyRate": number,
-        "lastDividend": number (value of the most recent confirmed/paid dividend per share),
-        "netWorth": string,
-        "shareholders": number (integer count),
-        "vpPerShare": number (Valor Patrimonial por Cota),
+        "vacancyRate": number (physical vacancy %),
+        "lastDividend": number (value of most recent),
+        "netWorth": string (e.g. "R$ 2.5B"),
+        "shareholders": number (integer),
+        "vpPerShare": number,
         "businessDescription": string,
+        "riskAssessment": string,
+        "strengths": string[],
+        "dividendCAGR": number,
+        "capRate": number,
+        "managementFee": string,
         "dividendsHistory": [
            { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number, "isProvisioned": boolean }
         ]
@@ -228,6 +256,11 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                     shareholders: typeof assetData.shareholders === 'number' ? assetData.shareholders : undefined,
                     vpPerShare: typeof assetData.vpPerShare === 'number' ? assetData.vpPerShare : undefined,
                     businessDescription: typeof assetData.businessDescription === 'string' ? assetData.businessDescription : undefined,
+                    riskAssessment: typeof assetData.riskAssessment === 'string' ? assetData.riskAssessment : undefined,
+                    strengths: Array.isArray(assetData.strengths) ? assetData.strengths : [],
+                    dividendCAGR: typeof assetData.dividendCAGR === 'number' ? assetData.dividendCAGR : undefined,
+                    capRate: typeof assetData.capRate === 'number' ? assetData.capRate : undefined,
+                    managementFee: typeof assetData.managementFee === 'string' ? assetData.managementFee : undefined,
                     dividendsHistory: cleanDividends.length > 0 ? cleanDividends : undefined
                 };
             }

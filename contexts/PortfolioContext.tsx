@@ -127,7 +127,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const now = Date.now();
       const currentData = marketDataRef.current[ticker.toUpperCase()];
       
-      // Use STALE_TIME instead of CACHE_TTL for smarter refreshing
+      // Strict Stale Time Check
       if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
@@ -135,7 +135,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           
           // CONDITIONAL FUNDAMENTAL FETCH (Saves Gemini Tokens)
           let advancedData = {};
-          // Only fetch fundamentals/dividends if missing or older than 24h (STALE_TIME.FUNDAMENTALS)
+          // Only fetch fundamentals/dividends if missing or older than 24h
           const isFundamentalsStale = !currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
           const hasMissingDividends = !currentData?.dividendsHistory || currentData.dividendsHistory.length === 0;
 
@@ -228,15 +228,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
-          // Always fetch Brapi (Quotes are dynamic)
           const promises: Promise<any>[] = [fetchBrapiQuotes(preferences, tickers, lite)];
           
-          // Only fetch Gemini (Fundamentals & Dividends) if we need to (stale or never fetched)
-          // We check the FIRST asset to decide for batch (optimization)
+          // Only fetch Gemini (Fundamentals & Dividends) if we need to
           const firstAsset = marketDataRef.current[tickers[0].toUpperCase()];
           const fundamentalsStale = !firstAsset?.lastFundamentalUpdate || (now - firstAsset.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
           
-          // Also check if any asset is missing dividendsHistory
           const anyMissingDividends = tickers.some(t => {
               const data = marketDataRef.current[t.toUpperCase()];
               return !data?.dividendsHistory || data.dividendsHistory.length === 0;
@@ -246,7 +243,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               console.log("CONTEXT: Fetching fresh fundamentals/dividends via Gemini...");
               promises.push(fetchAdvancedAssetData(preferences, tickers));
           } else {
-              // Push null so indices match in Promise.all
               promises.push(Promise.resolve(null));
           }
 
@@ -269,7 +265,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                           ...prevData, 
                           ...newData,
                           priceHistory: newData.priceHistory?.length > 0 ? newData.priceHistory : prevData.priceHistory || [],
-                          // NOTE: Brapi service no longer returns dividends, so we preserve existing or rely on Gemini
                           dividendsHistory: prevData.dividendsHistory || [], 
                           lastUpdated: now 
                       };
@@ -334,10 +329,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const histMap = new Map<string, DividendHistoryEvent>();
           (data.dividendsHistory || []).forEach((d: DividendHistoryEvent) => histMap.set(d.exDate, d));
           
-          // INTELLIGENT SECTOR FALLBACK
-          // 1. API Data (Gemini)
-          // 2. Static Known Data
-          // 3. Default "Outros"
           let segment = data.assetType || data.sector;
           if (!segment || segment === 'Outros') {
               segment = STATIC_FII_SECTORS[ticker.toUpperCase()];
@@ -353,7 +344,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               shareholders: data.shareholders, yieldOnCost: avgPrice > 0 ? ((curPrice * ((data.dy||0)/100))/avgPrice)*100 : 0,
               nextPaymentDate: data.nextPaymentDate, lastDividend: data.lastDividend,
               lastUpdated: data.lastUpdated,
-              lastFundamentalUpdate: data.lastFundamentalUpdate
+              lastFundamentalUpdate: data.lastFundamentalUpdate,
+              // Map new fields safely
+              netWorth: data.netWorth,
+              vpPerShare: data.vpPerShare,
+              businessDescription: data.businessDescription,
+              riskAssessment: data.riskAssessment,
+              strengths: data.strengths,
+              dividendCAGR: data.dividendCAGR,
+              capRate: data.capRate,
+              managementFee: data.managementFee
           };
       }).filter(a => a.quantity > 0.000001);
   }, [sourceTransactions, sourceMarketData]);
@@ -364,14 +364,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       initialLoadDone.current = true;
       
       const now = Date.now();
-      // Only force refresh if data is actually stale (older than 15 mins) or empty
       const isStale = !lastSync || (now - lastSync > STALE_TIME.MARKET_DATA);
 
       if (isStale) {
           console.log("CONTEXT: Data stale or missing, refreshing...");
           refreshMarketData(true, true, false); 
-      } else {
-          console.log("CONTEXT: Data fresh, skipping initial network request.");
       }
     }
   }, [sourceTransactions.length, isDemoMode, isRefreshing, refreshMarketData, lastSync]);
@@ -385,7 +382,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (incompleteAssets.length > 0 && navigator.onLine) {
           const timer = setTimeout(() => {
-              // Try to repair incomplete assets, but force=false to respect stale times if just fetched
               refreshMarketData(false, true, false);
           }, 5000);
           return () => clearTimeout(timer);
@@ -407,19 +403,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 const trulyNew = newNotifications.filter(n => !existingIds.has(n.id));
                 if (trulyNew.length > 0) {
                     setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
-                    if (Notification.permission === 'granted' && navigator.serviceWorker) {
-                        navigator.serviceWorker.ready.then(registration => {
-                            trulyNew.forEach(n => {
-                                registration.showNotification(n.title, {
-                                    body: n.description,
-                                    icon: '/logo.svg',
-                                    badge: '/logo.svg',
-                                    tag: n.relatedTicker || 'general',
-                                    data: { url: '/' }
-                                });
-                            });
-                        });
-                    }
                     return [...trulyNew, ...prev];
                 }
                 return prev;
@@ -494,6 +477,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return relevantMonths.map(key => {
           const [year, month] = key.split('-').map(Number);
+          // Fix timezone offset for date display
           const date = new Date(year, month - 1, 15); 
           const monthStr = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
           return {
