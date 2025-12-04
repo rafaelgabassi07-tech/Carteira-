@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { View } from '../App';
 import LayoutGridIcon from './icons/LayoutGridIcon';
@@ -6,6 +7,7 @@ import TransactionIcon from './icons/TransactionIcon';
 import NewsIcon from './icons/NewsIcon';
 import SettingsIcon from './icons/SettingsIcon';
 import UserIcon from './icons/UserIcon';
+import GlobeIcon from './icons/GlobeIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
@@ -67,6 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
         </div>
         <SidebarItem label={t('nav_portfolio')} view="dashboard" icon={<LayoutGridIcon />} isActive={activeView === 'dashboard'} onClick={() => handleNavClick('dashboard')} />
         <SidebarItem label={t('nav_analysis')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
+        <SidebarItem label={t('nav_market')} view="mercado" icon={<GlobeIcon />} isActive={activeView === 'mercado'} onClick={() => handleNavClick('mercado')} />
         <SidebarItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
         <SidebarItem label={t('nav_news')} view="noticias" icon={<NewsIcon />} isActive={activeView === 'noticias'} onClick={() => handleNavClick('noticias')} />
         

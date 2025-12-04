@@ -7,6 +7,7 @@ export const ptBR = {
     nav_analysis: 'Carteira',
     nav_news: 'Notícias',
     nav_settings: 'Configurações',
+    nav_market: 'Mercado',
     refresh_prices: 'Atualizar Preços',
     back: 'Voltar',
     error: 'Erro',
