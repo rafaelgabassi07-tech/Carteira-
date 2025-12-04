@@ -12,7 +12,7 @@ type Period = '7d' | '30d' | '6m' | '1y' | 'all';
 
 // --- Hook de Lógica de Negócios ---
 const usePatrimonyLogic = (portfolioEvolution: any, assets: any[]) => {
-    const [period, setPeriod] = useState<Period>('30d');
+    const [period, setPeriod] = useState<Period>('7d');
 
     // 1. Métricas Atuais (Snapshot do momento)
     const currentMetrics = useMemo(() => {
