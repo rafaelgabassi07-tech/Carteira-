@@ -14,8 +14,9 @@ export const CACHE_TTL = {
 
 // Stale Time (Quanto tempo consideramos os dados "frescos" antes de pedir novos)
 export const STALE_TIME = {
-    PRICES: 5 * 60 * 1000, // 5 Minutos
-    MARKET_DATA: 10 * 60 * 1000, // 10 Minutos para dados fundamentais
+    PRICES: 5 * 60 * 1000, // 5 Minutos (Refresh manual)
+    MARKET_DATA: 15 * 60 * 1000, // 15 Minutos (Polling de preço)
+    FUNDAMENTALS: 24 * 60 * 60 * 1000, // 24 Horas (Dados como DY, P/VP, Setor - Gemini)
 };
 
 // --- FONTS ---

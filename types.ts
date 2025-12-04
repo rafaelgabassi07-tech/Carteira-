@@ -22,7 +22,8 @@ export interface Asset {
   yieldOnCost?: number;
   nextPaymentDate?: string; // Data real de pagamento (YYYY-MM-DD)
   lastDividend?: number; // Último valor pago
-  lastUpdated?: number; // Timestamp da última atualização bem sucedida
+  lastUpdated?: number; // Timestamp da última atualização bem sucedida (Preço)
+  lastFundamentalUpdate?: number; // Timestamp da última atualização de dados fundamentais (Gemini)
 }
 
 export interface NewsArticle {
