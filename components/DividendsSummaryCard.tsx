@@ -24,6 +24,7 @@ interface PayerData {
     count: number;
     invested: number;
     roi: number; // (Total Recebido / Total Investido) * 100
+    monthlyAverage: number; // Nova métrica
 }
 
 interface DividendStats {
@@ -35,6 +36,8 @@ interface DividendStats {
     globalROI: number;
     bestMonth: { total: number; month: string };
     averageIncome: number;
+    yoyGrowth: number | null; // Crescimento vs Ano Anterior
+    currentYearTotal: number;
 }
 
 type SortMode = 'total' | 'roi';
@@ -43,27 +46,20 @@ type SortMode = 'total' | 'roi';
 const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): DividendStats => {
     return useMemo(() => {
         let totalReceived = 0;
-        let totalInvestedGlobal = 0; // Soma de todas as compras já feitas
+        let totalInvestedGlobal = 0;
         const monthlyAggregation: Record<string, number> = {}; 
         const payerAggregation: Record<string, { total: number, count: number, invested: number }> = {};
 
-        // 1. Identificar universo de ativos (Atuais + Vendidos)
         const allTickers = Array.from(new Set(transactions.map(t => t.ticker)));
 
         allTickers.forEach((ticker) => {
-            // Tenta pegar dados do contexto de ativos (pode ter dados da API Gemini)
-            // Se não encontrar (ativo vendido), tentamos reconstruir o histórico básico se possível, 
-            // mas sem o dividendHistory da API, não conseguimos calcular o passado de ativos vendidos que não estão mais no cache.
-            // *Nota*: O ideal seria persistir o histórico de dividendos de ativos vendidos, mas aqui usamos o que temos no 'assets'.
             const assetData = assets.find(a => a.ticker === ticker);
             const history = assetData?.dividendsHistory || [];
             
-            // Filtra transações deste ativo e ordena por data
             const assetTxs = transactions
                 .filter(t => t.ticker === ticker)
                 .sort((a, b) => a.date.localeCompare(b.date));
 
-            // Calcula total investido (Soma de compras) para ROI
             let assetTotalInvested = 0;
             assetTxs.forEach(tx => {
                 if (tx.type === 'Compra') {
@@ -74,34 +70,25 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
 
             if (history.length === 0 || assetTxs.length === 0) return;
 
-            // Processa cada dividendo histórico
             history.forEach((div: DividendHistoryEvent) => {
-                // Otimização: Se o dividendo é anterior à primeira compra, ignora
                 if (div.exDate < assetTxs[0].date) return;
 
-                // Calcula posição (quantidade) na data EX
                 let qtyOwnedAtExDate = 0;
                 for (const tx of assetTxs) {
-                    // Se a transação ocorreu DEPOIS da data ex, ela não conta para este dividendo
                     if (tx.date > div.exDate) break; 
-                    
                     if (tx.type === 'Compra') qtyOwnedAtExDate += tx.quantity;
                     else if (tx.type === 'Venda') qtyOwnedAtExDate -= tx.quantity;
                 }
                 
-                // Evita quantidades negativas por erro de dados
                 qtyOwnedAtExDate = Math.max(0, qtyOwnedAtExDate);
 
                 if (qtyOwnedAtExDate > 0) {
                     const amount = qtyOwnedAtExDate * div.value;
                     totalReceived += amount;
 
-                    // Agregação Mensal (YYYY-MM)
-                    // Usa paymentDate para regime de caixa
                     const monthKey = div.paymentDate.substring(0, 7); 
                     monthlyAggregation[monthKey] = (monthlyAggregation[monthKey] || 0) + amount;
 
-                    // Agregação por Pagador
                     if (!payerAggregation[ticker]) {
                         payerAggregation[ticker] = { total: 0, count: 0, invested: assetTotalInvested };
                     }
@@ -111,10 +98,9 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             });
         });
 
-        // 2. Formatar Dados Mensais
+        // Formatar Dados Mensais
         const monthlyData = Object.keys(monthlyAggregation).sort().map(key => {
             const [year, month] = key.split('-').map(Number);
-            // Cria data UTC para evitar problemas de fuso
             const date = new Date(year, month - 1, 15);
             return {
                 isoDate: key,
@@ -124,21 +110,32 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             };
         });
 
-        // 3. Formatar Dados de Pagadores + ROI
+        // Formatar Dados de Pagadores
         const payersData = Object.entries(payerAggregation).map(([ticker, data]) => ({ 
             ticker, 
             ...data,
-            roi: data.invested > 0 ? (data.total / data.invested) * 100 : 0
+            roi: data.invested > 0 ? (data.total / data.invested) * 100 : 0,
+            monthlyAverage: data.count > 0 ? data.total / data.count : 0
         }));
 
-        // 4. Métricas Finais
+        // Métricas Finais
         const now = new Date();
-        const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const currentYear = now.getFullYear();
+        const currentMonthKey = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const currentMonthValue = monthlyAggregation[currentMonthKey] || 0;
         const globalROI = totalInvestedGlobal > 0 ? (totalReceived / totalInvestedGlobal) * 100 : 0;
         
         const bestMonth = monthlyData.reduce((max, curr) => curr.total > max.total ? curr : max, { total: 0, month: '-' });
         const averageIncome = monthlyData.length > 0 ? totalReceived / monthlyData.length : 0;
+
+        // Cálculo Year-over-Year (YoY)
+        const thisYearTotal = monthlyData.filter(d => d.year === currentYear).reduce((acc, curr) => acc + curr.total, 0);
+        const lastYearTotal = monthlyData.filter(d => d.year === currentYear - 1).reduce((acc, curr) => acc + curr.total, 0);
+        
+        let yoyGrowth: number | null = null;
+        if (lastYearTotal > 0) {
+            yoyGrowth = ((thisYearTotal - lastYearTotal) / lastYearTotal) * 100;
+        }
 
         return { 
             totalReceived, 
@@ -148,7 +145,9 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             totalInvestedGlobal, 
             globalROI,
             bestMonth,
-            averageIncome
+            averageIncome,
+            yoyGrowth,
+            currentYearTotal: thisYearTotal
         };
     }, [transactions, assets]);
 };
@@ -165,7 +164,7 @@ const stringToColor = (str: string) => {
 
 // --- Sub-Components ---
 
-const StatCard: React.FC<{ label: string; value: React.ReactNode; subtext?: string; icon?: React.ReactNode; variant?: 'gold' | 'default' }> = ({ label, value, subtext, icon, variant = 'default' }) => (
+const StatCard: React.FC<{ label: string; value: React.ReactNode; subtext?: React.ReactNode; icon?: React.ReactNode; variant?: 'gold' | 'default' }> = ({ label, value, subtext, icon, variant = 'default' }) => (
     <div className={`p-4 rounded-xl border flex flex-col justify-between h-full shadow-sm transition-all ${variant === 'gold' ? 'bg-[var(--bg-primary)] border-yellow-500/20 shadow-[0_0_15px_-3px_rgba(234,179,8,0.1)]' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
         <div className="flex justify-between items-start mb-2">
             <span className={`text-[10px] uppercase font-bold tracking-wider ${variant === 'gold' ? 'text-amber-500' : 'text-[var(--text-secondary)]'}`}>{label}</span>
@@ -175,14 +174,13 @@ const StatCard: React.FC<{ label: string; value: React.ReactNode; subtext?: stri
             <div className={`text-lg font-bold tracking-tight ${variant === 'gold' ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]'}`}>
                 {value}
             </div>
-            {subtext && <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5 truncate opacity-70">{subtext}</p>}
+            {subtext && <div className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5 truncate opacity-70">{subtext}</div>}
         </div>
     </div>
 );
 
 const MonthlyHeatmap: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
     const { formatCurrency } = useI18n();
-    // Pega os últimos 12 meses, preenchendo se necessário (opcional, aqui mostramos o histórico real)
     const recentData = data.slice(-12); 
     const maxVal = Math.max(...recentData.map(d => d.total), 1);
 
@@ -192,17 +190,14 @@ const MonthlyHeatmap: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
             
             {recentData.map((d, i) => {
                 const heightPercent = (d.total / maxVal) * 100;
-                // Animação stagger baseada no índice
                 const delay = i * 50; 
                 
                 return (
                     <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                        {/* Floating Tooltip */}
                         <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] text-[10px] py-1.5 px-2.5 rounded-lg whitespace-nowrap pointer-events-none border border-[var(--border-color)] z-20 font-bold shadow-xl translate-y-2 group-hover:translate-y-0 transform">
                             {d.month}: <span className="text-[var(--accent-color)]">{formatCurrency(d.total)}</span>
                         </div>
                         
-                        {/* Bar */}
                         <div 
                             className="w-full bg-[var(--accent-color)]/20 rounded-t-sm transition-all duration-700 hover:bg-[var(--accent-color)] relative overflow-hidden group-hover:shadow-[0_0_10px_rgba(var(--accent-rgb),0.5)]" 
                             style={{ 
@@ -214,7 +209,6 @@ const MonthlyHeatmap: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--accent-color)] opacity-50"></div>
                         </div>
                         
-                        {/* Label */}
                         <span className="text-[9px] text-[var(--text-secondary)] mt-2 font-medium uppercase tracking-wider scale-75 origin-top">{d.month.split('/')[0]}</span>
                     </div>
                 );
@@ -256,9 +250,7 @@ const PayerListItem: React.FC<{
                 <div className="flex flex-col min-w-0">
                     <span className="font-bold text-sm text-[var(--text-primary)] leading-tight">{payer.ticker}</span>
                     <span className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1">
-                        {payer.count}x 
-                        <span className="w-0.5 h-0.5 bg-[var(--text-secondary)] rounded-full"></span>
-                        Retorno: <span className={payer.roi >= 100 ? "text-[var(--green-text)] font-bold" : ""}>{payer.roi.toFixed(1)}%</span>
+                        Média: {formatCurrency(payer.monthlyAverage)}/mês
                     </span>
                 </div>
             </div>
@@ -266,6 +258,9 @@ const PayerListItem: React.FC<{
             <div className="text-right z-10 relative pl-2">
                 <span className="font-bold text-sm text-[var(--text-primary)] block">
                     {formatCurrency(payer.total)}
+                </span>
+                <span className={`text-[10px] font-medium ${payer.roi >= 100 ? "text-[var(--green-text)]" : "text-[var(--text-secondary)]"}`}>
+                    ROI: {payer.roi.toFixed(1)}%
                 </span>
             </div>
         </div>
@@ -302,6 +297,11 @@ const DividendsDetailModal: React.FC<{
                         label="Total Recebido" 
                         value={<CountUp end={stats.totalReceived} formatter={formatCurrency} />} 
                         variant="gold"
+                        subtext={stats.yoyGrowth !== null ? (
+                            <span className={stats.yoyGrowth >= 0 ? 'text-green-500' : 'text-red-500'}>
+                                {stats.yoyGrowth >= 0 ? '▲' : '▼'} {Math.abs(stats.yoyGrowth).toFixed(1)}% vs Ano Anterior
+                            </span>
+                        ) : "Histórico iniciando"}
                         icon={<span className="text-lg font-serif italic font-bold">$</span>}
                     />
                     <StatCard 
@@ -367,7 +367,6 @@ const DividendsSummaryCard: React.FC = () => {
     const { assets, transactions, privacyMode } = usePortfolio();
     const [showModal, setShowModal] = useState(false);
 
-    // Call the heavy logic hook
     const stats = useDividendCalculations(transactions, assets);
 
     const handleClick = () => {
@@ -396,6 +395,13 @@ const DividendsSummaryCard: React.FC = () => {
                             <div className={`text-3xl font-black tracking-tight text-[var(--text-primary)] ${privacyMode ? 'blur-md' : ''}`}>
                                 <CountUp end={stats.totalReceived} formatter={formatCurrency} />
                             </div>
+                            
+                            {/* Growth Badge */}
+                            {stats.yoyGrowth !== null && !privacyMode && (
+                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold mt-1 ${stats.yoyGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                                    {stats.yoyGrowth >= 0 ? '▲' : '▼'} {Math.abs(stats.yoyGrowth).toFixed(0)}% vs Ano Anterior
+                                </div>
+                            )}
                         </div>
                         <div className="bg-[var(--bg-primary)] p-2.5 rounded-xl border border-[var(--border-color)] shadow-sm text-amber-500 group-hover:text-amber-400 transition-colors">
                             <TrendingUpIcon className="w-5 h-5" />
