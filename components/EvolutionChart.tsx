@@ -13,280 +13,217 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
     const [tooltip, setTooltip] = useState<{ point: PortfolioEvolutionPoint, x: number, y: number, index: number } | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dimensions, setDimensions] = useState({ width: 300, height: 288 });
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     
-    // Stable ID for gradient to prevent re-rendering flicker
-    const gradientId = useMemo(() => `marketValueGradient-${Math.random().toString(36).substr(2, 9)}`, []);
+    const gradientId = useMemo(() => `evoGradient-${Math.random().toString(36).substr(2, 9)}`, []);
 
     useLayoutEffect(() => {
         const container = containerRef.current;
         if (!container) return;
         
-        const updateDimensions = () => {
-             if (container) {
-                 const { width, height } = container.getBoundingClientRect();
-                 if (width > 0 && height > 0) {
-                     setDimensions({ width, height });
-                 }
+        const observer = new ResizeObserver(entries => {
+             for (const entry of entries) {
+                 const { width, height } = entry.contentRect;
+                 setDimensions({ width, height });
              }
-        };
-
-        const observer = new ResizeObserver(updateDimensions);
+        });
         observer.observe(container);
-        updateDimensions();
         return () => observer.disconnect();
     }, []);
     
     const { width, height } = dimensions;
-    const padding = { top: 30, right: 10, bottom: 25, left: 45 };
+    const padding = { top: 20, right: 0, bottom: 20, left: 0 }; // Full width chart approach
     const chartWidth = Math.max(0, width - padding.left - padding.right);
     const chartHeight = Math.max(0, height - padding.top - padding.bottom);
 
+    // Dynamic Scale Calculation
     const { min, max } = useMemo(() => {
+        if (data.length === 0) return { min: 0, max: 100 };
+        
         const allValues = data.flatMap(d => [d.marketValue, d.invested]);
-        if (allValues.length === 0) return { min: 0, max: 100 };
-
-        const maxVal = Math.max(...allValues);
-        const minVal = Math.min(...allValues); 
+        let maxVal = Math.max(...allValues);
+        let minVal = Math.min(...allValues); 
         
         const range = maxVal - minVal;
         
-        // If flat line (range 0), create artificial range
-        if (range === 0) {
-            return { min: maxVal * 0.95, max: maxVal * 1.05 };
-        }
-
-        // Add 10% padding top/bottom for "breathing room"
-        let effectiveMin = minVal - (range * 0.1);
-        let effectiveMax = maxVal + (range * 0.1);
+        // Add headroom/footroom for aesthetics
+        const paddingPercent = 0.1; // 10%
+        let effectiveMin = minVal - (range * paddingPercent);
+        let effectiveMax = maxVal + (range * paddingPercent);
         
-        if (effectiveMin < 0 || chartType === 'bar') effectiveMin = 0;
+        // Avoid negative scales unless real debt exists
+        if (effectiveMin < 0 && minVal >= 0) effectiveMin = 0;
+        if (range === 0) { effectiveMin = maxVal * 0.9; effectiveMax = maxVal * 1.1; }
 
         return { min: effectiveMin, max: effectiveMax };
-    }, [data, chartType]);
-
-    const yTicks = useMemo(() => {
-        const numTicks = 4;
-        const step = (max - min) / (numTicks - 1);
-        return Array.from({ length: numTicks }, (_, i) => min + i * step);
-    }, [min, max]);
-    
-    // Bar logic
-    const barSlotWidth = data.length > 0 ? chartWidth / data.length : 0;
-    const barWidth = Math.max(4, Math.min(barSlotWidth * 0.6, 40));
+    }, [data]);
 
     const getX = (index: number) => {
-        if (chartType === 'line') {
-            return padding.left + (index / (data.length - 1 || 1)) * chartWidth;
-        }
-        return padding.left + index * barSlotWidth + (barSlotWidth - barWidth) / 2;
+        if (data.length <= 1) return padding.left;
+        return padding.left + (index / (data.length - 1)) * chartWidth;
     };
     
     const getY = (value: number) => {
+        if (max === min) return height / 2;
         const percent = (value - min) / (max - min);
         return (height - padding.bottom) - (percent * chartHeight);
     };
 
-    const handleMouseMove = (event: { clientX: number, clientY: number }) => {
+    const handleMouseMove = (event: React.MouseEvent | React.TouchEvent) => {
         if (!svgRef.current || data.length === 0) return;
         const rect = svgRef.current.getBoundingClientRect();
-        const x = event.clientX - rect.left;
         
-        let index = -1;
-        
-        if (chartType === 'line') {
-            const relativeX = x - padding.left;
-            const progress = Math.max(0, Math.min(1, relativeX / chartWidth));
-            index = Math.round(progress * (data.length - 1));
+        let clientX;
+        if ('touches' in event) {
+            clientX = event.touches[0].clientX;
         } else {
-            index = Math.floor((x - padding.left) / barSlotWidth);
+            clientX = (event as React.MouseEvent).clientX;
         }
+
+        const x = clientX - rect.left;
+        
+        // Find closest point index
+        const relativeX = Math.max(0, Math.min(chartWidth, x - padding.left));
+        const progress = relativeX / chartWidth;
+        const index = Math.round(progress * (data.length - 1));
 
         if (index >= 0 && index < data.length) {
             const pointData = data[index];
-            const highestVal = Math.max(pointData.marketValue, pointData.invested);
-            const tooltipY = getY(highestVal);
-            const tooltipX = getX(index) + (chartType === 'bar' ? barWidth / 2 : 0);
+            // Tooltip Y follows the Market Value line
+            const tooltipY = getY(pointData.marketValue);
+            const tooltipX = getX(index);
             
             setTooltip({ point: pointData, x: tooltipX, y: tooltipY, index });
-        } else {
-            setTooltip(null);
         }
     };
-    
-    let tooltipTransform = 'translate(-50%, -100%)';
-    let arrowLeft = '50%';
-    
-    if (tooltip) {
-        const threshold = width * 0.25;
-        if (tooltip.x < threshold) {
-            tooltipTransform = 'translate(-15%, -100%)';
-            arrowLeft = '15%';
-        } else if (tooltip.x > width - threshold) {
-            tooltipTransform = 'translate(-85%, -100%)';
-            arrowLeft = '85%';
-        }
-    }
 
-    if (data.length === 0) {
-        return (
-            <div ref={containerRef} className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-xs">
-                <p>Sem dados para exibir.</p>
-            </div>
-        );
-    }
+    if (width === 0 || data.length === 0) return <div ref={containerRef} className="w-full h-full" />;
 
-    // Line Chart Path Generation with precision optimization
-    const createPath = (key: 'marketValue' | 'invested') => {
-        return data.map((d, i) => `${getX(i).toFixed(1)},${getY(d[key]).toFixed(1)}`).join(' ');
-    };
+    // Generate Paths
+    const marketPath = data.map((d, i) => `${getX(i).toFixed(1)},${getY(d.marketValue).toFixed(1)}`).join(' ');
+    const investedPath = data.map((d, i) => `${getX(i).toFixed(1)},${getY(d.invested).toFixed(1)}`).join(' ');
+    const areaPath = `${getX(0)},${height} ${marketPath} ${getX(data.length - 1)},${height}`;
 
-    const createAreaPath = (key: 'marketValue' | 'invested') => {
-        const line = createPath(key);
-        return `${getX(0).toFixed(1)},${height - padding.bottom} ${line} ${getX(data.length - 1).toFixed(1)},${height - padding.bottom}`;
-    };
-
-    const variation = tooltip ? (tooltip.point.marketValue - tooltip.point.invested) : 0;
+    const spread = tooltip ? tooltip.point.marketValue - tooltip.point.invested : 0;
 
     return (
-        <div ref={containerRef} className="relative w-full h-full">
+        <div ref={containerRef} className="relative w-full h-full select-none">
             <svg 
                 ref={svgRef} 
                 viewBox={`0 0 ${width} ${height}`} 
-                onMouseMove={(e) => handleMouseMove(e)} 
-                onMouseLeave={() => setTooltip(null)} 
-                onTouchStart={(e) => {
-                    const touch = e.touches[0];
-                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
-                }}
-                onTouchMove={(e) => {
-                    const touch = e.touches[0];
-                    if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
-                }}
-                className="w-full h-full cursor-crosshair"
-                shapeRendering="geometricPrecision"
+                className="w-full h-full cursor-crosshair overflow-visible"
+                onMouseMove={handleMouseMove}
+                onMouseLeave={() => setTooltip(null)}
+                onTouchStart={handleMouseMove}
+                onTouchMove={handleMouseMove}
             >
                 <defs>
                     <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--accent-color)" stopOpacity={0.4} />
+                        <stop offset="0%" stopColor="var(--accent-color)" stopOpacity={0.3} />
                         <stop offset="100%" stopColor="var(--accent-color)" stopOpacity={0} />
                     </linearGradient>
                 </defs>
 
-                {/* Y-Axis Grid & Labels */}
-                {yTicks.map((tick, i) => {
-                    const y = getY(tick);
-                    return (
-                        <g key={i}>
-                            <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="2 2" />
-                            <text x={padding.left - 8} y={y + 3} textAnchor="end" fontSize="9" fill="var(--text-secondary)">
-                                {tick >= 1000 ? `${(tick/1000).toFixed(0)}k` : tick.toFixed(0)}
-                            </text>
-                        </g>
-                    )
-                })}
-                
-                {/* X-Axis Labels */}
-                {data.map((d, i) => {
-                    const skip = Math.ceil(data.length / (width / 50)); 
-                    if (i % skip !== 0 && i !== data.length - 1) return null;
-                    const x = getX(i) + (chartType === 'bar' ? barWidth / 2 : 0);
-                    
-                    return (
-                        <text key={i} x={x} y={height - 5} textAnchor="middle" fontSize="9" fill="var(--text-secondary)">
-                            {d.month.split('/')[0]}
-                        </text>
-                    );
-                })}
-                
-                {/* Chart Visualization */}
-                {chartType === 'line' ? (
-                    <>
-                        <polygon points={createAreaPath('marketValue')} fill={`url(#${gradientId})`} />
-                        
-                        <polyline 
-                            points={createPath('invested')} 
-                            fill="none" 
-                            stroke="var(--text-secondary)" 
-                            strokeWidth="1.5" 
-                            strokeDasharray="4 4"
-                            opacity="0.7"
-                        />
+                {/* --- Grid Lines (Minimalist) --- */}
+                <line x1={0} y1={getY(min)} x2={width} y2={getY(min)} stroke="var(--border-color)" strokeDasharray="4 4" strokeWidth="1" opacity="0.3" />
+                <line x1={0} y1={getY(max)} x2={width} y2={getY(max)} stroke="var(--border-color)" strokeDasharray="4 4" strokeWidth="1" opacity="0.3" />
 
-                        <polyline 
-                            points={createPath('marketValue')} 
-                            fill="none" 
-                            stroke="var(--accent-color)" 
+                {/* --- Charts --- */}
+                
+                {/* 1. Market Value Area */}
+                <path d={areaPath} fill={`url(#${gradientId})`} />
+
+                {/* 2. Invested Line (Dashed) */}
+                <path 
+                    d={`M${investedPath}`} 
+                    fill="none" 
+                    stroke="var(--text-secondary)" 
+                    strokeWidth="1.5" 
+                    strokeDasharray="4 4" 
+                    opacity="0.6" 
+                />
+
+                {/* 3. Market Value Line (Solid, Prominent) */}
+                <path 
+                    d={`M${marketPath}`} 
+                    fill="none" 
+                    stroke="var(--accent-color)" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                />
+
+                {/* --- Interaction --- */}
+                {tooltip && (
+                    <g>
+                        {/* Vertical Indicator Line */}
+                        <line 
+                            x1={tooltip.x} y1={padding.top} 
+                            x2={tooltip.x} y2={height} 
+                            stroke="var(--border-color)" 
+                            strokeWidth="1" 
+                        />
+                        
+                        {/* Invested Dot */}
+                        <circle 
+                            cx={tooltip.x} cy={getY(tooltip.point.invested)} 
+                            r="3" 
+                            fill="var(--bg-secondary)" 
+                            stroke="var(--text-secondary)" 
                             strokeWidth="2" 
                         />
-                        
-                        {tooltip && (
-                            <g>
-                                <circle cx={tooltip.x} cy={getY(tooltip.point.invested)} r="3" fill="var(--bg-secondary)" stroke="var(--text-secondary)" strokeWidth="1.5" />
-                                <circle cx={tooltip.x} cy={getY(tooltip.point.marketValue)} r="4" fill="var(--bg-secondary)" stroke="var(--accent-color)" strokeWidth="2" />
-                                <line x1={tooltip.x} y1={padding.top} x2={tooltip.x} y2={height - padding.bottom} stroke="var(--border-color)" strokeWidth="1" strokeDasharray="2 2" />
-                            </g>
-                        )}
-                    </>
-                ) : (
-                    data.map((d, i) => {
-                        const x = getX(i);
-                        const investedY = getY(d.invested);
-                        const marketY = getY(d.marketValue);
-                        
-                        const investedH = Math.max(0, (height - padding.bottom) - investedY);
-                        const marketH = Math.max(0, (height - padding.bottom) - marketY);
-                        const gain = d.marketValue - d.invested;
-                        
-                        return (
-                            <g key={i} opacity={tooltip && tooltip.index !== i ? 0.4 : 1} className="transition-opacity duration-200">
-                                <rect x={x} y={investedY} width={barWidth} height={investedH} fill="var(--text-secondary)" fillOpacity="0.2" rx={2} />
-                                {gain >= 0 ? (
-                                    <rect x={x} y={marketY} width={barWidth} height={marketH} fill="var(--accent-color)" rx={2} />
-                                ) : (
-                                    <rect x={x} y={marketY} width={barWidth} height={marketH} fill="var(--red-text)" opacity="0.8" rx={2} />
-                                )}
-                            </g>
-                        );
-                    })
+
+                        {/* Market Value Dot (Active) */}
+                        <circle 
+                            cx={tooltip.x} cy={getY(tooltip.point.marketValue)} 
+                            r="5" 
+                            fill="var(--accent-color)" 
+                            stroke="var(--bg-secondary)" 
+                            strokeWidth="2" 
+                            className="animate-pulse"
+                        />
+                    </g>
                 )}
             </svg>
-            
+
+            {/* --- HTML Tooltip (Better z-index handling) --- */}
             {tooltip && (
                 <div 
-                    className="absolute bg-[var(--bg-secondary)] border border-[var(--border-color)] p-3 rounded-lg text-xs shadow-xl pointer-events-none transition-transform duration-100 z-10 whitespace-nowrap backdrop-blur-md"
+                    className="absolute z-20 pointer-events-none transition-transform duration-75"
                     style={{ 
                         left: tooltip.x, 
-                        top: Math.min(tooltip.y, getY(tooltip.point.invested)) - 10, 
-                        transform: tooltipTransform
+                        top: 0, 
+                        transform: `translateX(${tooltip.x > width * 0.6 ? '-105%' : '5%'}) translateY(${Math.min(Math.max(tooltip.y - 60, 0), height - 120)}px)` 
                     }}
                 >
-                    <p className="text-center font-bold text-[var(--text-primary)] mb-2">{tooltip.point.month}</p>
-                    
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]" />
-                        <span className="text-[var(--text-secondary)]">{t('patrimony')}</span>
-                        <span className="font-bold text-sm ml-auto">{formatCurrency(tooltip.point.marketValue)}</span>
-                    </div>
+                    <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-md border border-[var(--border-color)] rounded-xl shadow-xl p-3 text-xs w-48">
+                        <p className="font-bold text-[var(--text-primary)] mb-2 border-b border-[var(--border-color)] pb-1">
+                            {new Date(tooltip.point.dateISO).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                        
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="text-[var(--text-secondary)] flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)]"></span>
+                                Patrimônio
+                            </span>
+                            <span className="font-bold text-[var(--text-primary)]">{formatCurrency(tooltip.point.marketValue)}</span>
+                        </div>
 
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-[var(--text-secondary)] opacity-50" />
-                        <span className="text-[var(--text-secondary)]">{t('invested_amount')}</span>
-                        <span className="font-bold text-sm ml-auto text-[var(--text-secondary)]">{formatCurrency(tooltip.point.invested)}</span>
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-[var(--text-secondary)] flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-secondary)] opacity-50"></span>
+                                Investido
+                            </span>
+                            <span className="font-medium text-[var(--text-secondary)]">{formatCurrency(tooltip.point.invested)}</span>
+                        </div>
+
+                        <div className={`flex justify-between items-center pt-2 border-t border-[var(--border-color)] ${spread >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                            <span className="font-bold uppercase text-[9px] tracking-wider">Resultado</span>
+                            <span className="font-bold">
+                                {spread >= 0 ? '+' : ''}{formatCurrency(spread)}
+                            </span>
+                        </div>
                     </div>
-                    
-                    <div className="border-t border-[var(--border-color)] my-2 opacity-50"></div>
-                    
-                    <div className="flex items-center gap-3">
-                        <span className="text-[var(--text-secondary)] font-bold">Resultado</span>
-                        <span className={`font-bold text-sm ml-auto ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                            {formatCurrency(variation)}
-                        </span>
-                    </div>
-                    <div 
-                        className="absolute top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)] transition-all duration-100"
-                        style={{ left: arrowLeft, transform: 'translateX(-50%)' }}
-                    ></div>
                 </div>
             )}
         </div>
