@@ -112,40 +112,40 @@ const DividendsDetailModal: React.FC<{
     const otherPayers = payersData.slice(3);
 
     return (
-        <Modal title="Relatório de Renda" onClose={onClose} type="slide-up">
-            <div className="pb-safe">
+        <Modal title="Relatório de Renda" onClose={onClose} type="slide-up" fullScreen={true}>
+            <div className="flex flex-col min-h-full pb-24">
                 {/* Summary Header */}
-                <div className="flex flex-col items-center justify-center py-6 mb-6 bg-gradient-to-b from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-3xl border border-[var(--border-color)] shadow-sm relative overflow-hidden">
+                <div className="flex flex-col items-center justify-center py-8 mb-6 bg-gradient-to-b from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-3xl border border-[var(--border-color)] shadow-sm relative overflow-hidden shrink-0">
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
                     <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1 bg-[var(--bg-tertiary-hover)] px-2 py-0.5 rounded-full border border-[var(--border-color)]">
                         Total Acumulado
                     </span>
-                    <p className="text-4xl font-black text-[var(--text-primary)] tracking-tight mt-2">
+                    <p className="text-5xl font-black text-[var(--text-primary)] tracking-tight mt-2">
                         <CountUp end={totalReceived} formatter={formatCurrency} />
                     </p>
-                    <div className="flex items-center gap-2 mt-3 text-xs text-[var(--text-secondary)]">
+                    <div className="flex items-center gap-2 mt-4 text-xs text-[var(--text-secondary)]">
                         <span>Média Mensal: <b className="text-[var(--text-primary)]">{formatCurrency(averageIncome)}</b></span>
                     </div>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] mb-6">
+                <div className="flex p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] mb-6 shrink-0 sticky top-0 z-20 shadow-md">
                     <button 
                         onClick={() => { setActiveTab('ranking'); vibrate(); }}
-                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${activeTab === 'ranking' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        className={`flex-1 py-3 text-xs font-bold rounded-lg transition-all ${activeTab === 'ranking' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
                         Ranking de Ativos
                     </button>
                     <button 
                         onClick={() => { setActiveTab('evolution'); vibrate(); }}
-                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${activeTab === 'evolution' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        className={`flex-1 py-3 text-xs font-bold rounded-lg transition-all ${activeTab === 'evolution' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                     >
                         Evolução Mensal
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="animate-fade-in min-h-[300px]">
+                <div className="animate-fade-in flex-1">
                     {activeTab === 'ranking' ? (
                         <div className="space-y-6">
                             {/* Podium (Only if we have at least 3 payers) */}
@@ -171,19 +171,19 @@ const DividendsDetailModal: React.FC<{
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)]">
-                            <div className="flex items-center justify-between mb-6">
+                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] h-full min-h-[400px] flex flex-col">
+                            <div className="flex items-center justify-between mb-6 shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div className="p-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] rounded-lg">
-                                        <CalendarIcon className="w-4 h-4"/>
+                                        <CalendarIcon className="w-5 h-5"/>
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-sm text-[var(--text-primary)]">Últimos 12 Meses</h3>
+                                        <h3 className="font-bold text-lg text-[var(--text-primary)]">Últimos 12 Meses</h3>
                                         <p className="text-[10px] text-[var(--text-secondary)]">Tendência de renda</p>
                                     </div>
                                 </div>
                             </div>
-                            <div className="h-64 w-full">
+                            <div className="flex-1 w-full min-h-[300px]">
                                 <BarChart data={chartData} />
                             </div>
                         </div>
@@ -210,9 +210,6 @@ const DividendsSummaryCard: React.FC = () => {
         const allTickers = Array.from(new Set(transactions.map((t: Transaction) => t.ticker)));
 
         allTickers.forEach((ticker: string) => {
-            // Find asset data (relies on context having fetched/cached data even for sold assets if possible)
-            // Fallback: If asset is completely sold and not in `assets` array, we might miss data unless persisted.
-            // Current `assets` state contains all assets with logic.
             const asset = assets.find(a => a.ticker === ticker);
             const history = asset?.dividendsHistory || [];
             
