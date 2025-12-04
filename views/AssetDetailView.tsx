@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
@@ -49,12 +49,20 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showAllHistory, setShowAllHistory] = useState(false);
     
+    // Protection against infinite loops
+    const lastFetchAttempt = useRef(0);
+    
     const asset = getAssetByTicker(ticker);
 
     useEffect(() => {
         const checkAndLoad = async () => {
-            const isStale = !asset?.lastUpdated || (Date.now() - asset.lastUpdated > 5 * 60 * 1000);
-            if (isStale && (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0)) {
+            const now = Date.now();
+            // Only auto-refresh if data is very stale (5 mins) and we haven't tried recently (30s)
+            const isStale = !asset?.lastUpdated || (now - asset.lastUpdated > 5 * 60 * 1000);
+            const canRetry = (now - lastFetchAttempt.current > 30000);
+
+            if (isStale && canRetry && (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0)) {
+                lastFetchAttempt.current = now;
                 setIsRefreshing(true);
                 try {
                     await refreshSingleAsset(ticker, true);
@@ -64,12 +72,13 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             }
         };
         checkAndLoad();
-    }, [ticker, refreshSingleAsset, asset?.lastUpdated]); 
+    }, [ticker, refreshSingleAsset, asset?.lastUpdated, asset?.dividendsHistory]); 
 
     const handleRefresh = useCallback(async () => {
         if (isRefreshing) return;
         vibrate();
         setIsRefreshing(true);
+        lastFetchAttempt.current = Date.now();
         try {
             await refreshSingleAsset(ticker, true);
         } finally {
@@ -139,8 +148,8 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--border-color)]">
-                    <IndicatorItem label={t('quantity')} value={asset.quantity.toString()} />
-                    <IndicatorItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} />
+                    <IndicatorItem label={t('quantity')} value={asset?.quantity.toString() || '0'} />
+                    <IndicatorItem label={t('avg_price')} value={formatCurrency(asset?.avgPrice || 0)} />
                 </div>
             </div>
 
@@ -151,46 +160,48 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     <h3 className="font-bold text-sm text-[var(--text-primary)] uppercase tracking-wide">Indicadores Chave</h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                    {/* Valuation Group */}
-                    <GroupHeader title="Preço & Valuation" />
-                    <IndicatorItem label="Cotação Atual" value={formatCurrency(asset.currentPrice)} />
-                    <div className="flex flex-col p-2">
-                        <div className="flex justify-between items-end">
-                            <span className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wide opacity-80">P/VP</span>
-                            <span className="text-sm font-bold text-[var(--text-primary)]">{asset.pvp?.toFixed(2) || '-'}</span>
+                {asset && (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        {/* Valuation Group */}
+                        <GroupHeader title="Preço & Valuation" />
+                        <IndicatorItem label="Cotação Atual" value={formatCurrency(asset.currentPrice)} />
+                        <div className="flex flex-col p-2">
+                            <div className="flex justify-between items-end">
+                                <span className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wide opacity-80">P/VP</span>
+                                <span className="text-sm font-bold text-[var(--text-primary)]">{asset.pvp?.toFixed(2) || '-'}</span>
+                            </div>
+                            {asset.pvp && (
+                                <ProgressBar 
+                                    value={asset.pvp * 100} 
+                                    max={150} 
+                                    colorClass={asset.pvp < 1 ? 'bg-[var(--green-text)]' : (asset.pvp > 1.2 ? 'bg-[var(--red-text)]' : 'bg-yellow-500')} 
+                                />
+                            )}
                         </div>
-                        {asset.pvp && (
-                            <ProgressBar 
-                                value={asset.pvp * 100} 
-                                max={150} 
-                                colorClass={asset.pvp < 1 ? 'bg-[var(--green-text)]' : (asset.pvp > 1.2 ? 'bg-[var(--red-text)]' : 'bg-yellow-500')} 
-                            />
-                        )}
-                    </div>
 
-                    {/* Income Group */}
-                    <GroupHeader title="Renda & Dividendos" />
-                    <IndicatorItem label="Dividend Yield (12m)" value={`${asset.dy?.toFixed(2) || '-'}%`} />
-                    <IndicatorItem label="Yield on Cost" value={`${asset.yieldOnCost?.toFixed(2) || '-'}%`} subtext={<span className="text-[9px] text-[var(--text-secondary)] opacity-70">Pessoal</span>} />
-                    <IndicatorItem label="Último Rendimento" value={formatCurrency(asset.lastDividend || 0)} />
-                    <IndicatorItem label="Próx. Pagamento" value={asset.nextPaymentDate ? new Date(asset.nextPaymentDate).toLocaleDateString(locale, {day:'2-digit', month:'short'}) : '-'} />
+                        {/* Income Group */}
+                        <GroupHeader title="Renda & Dividendos" />
+                        <IndicatorItem label="Dividend Yield (12m)" value={`${asset.dy?.toFixed(2) || '-'}%`} />
+                        <IndicatorItem label="Yield on Cost" value={`${asset.yieldOnCost?.toFixed(2) || '-'}%`} subtext={<span className="text-[9px] text-[var(--text-secondary)] opacity-70">Pessoal</span>} />
+                        <IndicatorItem label="Último Rendimento" value={formatCurrency(asset.lastDividend || 0)} />
+                        <IndicatorItem label="Próx. Pagamento" value={asset.nextPaymentDate ? new Date(asset.nextPaymentDate).toLocaleDateString(locale, {day:'2-digit', month:'short'}) : '-'} />
 
-                    {/* Quality Group */}
-                    <GroupHeader title="Qualidade & Liquidez" />
-                    <div className="flex flex-col p-2">
-                        <div className="flex justify-between items-end">
-                            <span className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wide opacity-80">Vacância Física</span>
-                            <span className="text-sm font-bold text-[var(--text-primary)]">{asset.vacancyRate !== undefined ? `${asset.vacancyRate}%` : '-'}</span>
+                        {/* Quality Group */}
+                        <GroupHeader title="Qualidade & Liquidez" />
+                        <div className="flex flex-col p-2">
+                            <div className="flex justify-between items-end">
+                                <span className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wide opacity-80">Vacância Física</span>
+                                <span className="text-sm font-bold text-[var(--text-primary)]">{asset.vacancyRate !== undefined ? `${asset.vacancyRate}%` : '-'}</span>
+                            </div>
+                            {asset.vacancyRate !== undefined && (
+                                <ProgressBar value={asset.vacancyRate} max={30} colorClass="bg-[var(--red-text)]" inverse />
+                            )}
                         </div>
-                        {asset.vacancyRate !== undefined && (
-                            <ProgressBar value={asset.vacancyRate} max={30} colorClass="bg-[var(--red-text)]" inverse />
-                        )}
+                        <IndicatorItem label="Liquidez Diária" value={asset.liquidity ? `R$ ${(asset.liquidity/1000000).toFixed(1)}M` : '-'} />
+                        <IndicatorItem label="Nº Cotistas" value={asset.shareholders ? `${(asset.shareholders/1000).toFixed(0)}k` : '-'} />
+                        <IndicatorItem label="Gestão" value={asset.administrator || '-'} />
                     </div>
-                    <IndicatorItem label="Liquidez Diária" value={asset.liquidity ? `R$ ${(asset.liquidity/1000000).toFixed(1)}M` : '-'} />
-                    <IndicatorItem label="Nº Cotistas" value={asset.shareholders ? `${(asset.shareholders/1000).toFixed(0)}k` : '-'} />
-                    <IndicatorItem label="Gestão" value={asset.administrator || '-'} />
-                </div>
+                )}
             </div>
 
             <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] font-bold py-3.5 rounded-xl border border-[var(--border-color)] hover:bg-[var(--accent-color)]/10 hover:border-[var(--accent-color)] active:scale-[0.98] transition-all shadow-sm">

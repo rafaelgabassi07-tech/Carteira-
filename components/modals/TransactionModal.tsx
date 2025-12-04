@@ -22,25 +22,52 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
 
     const [type, setType] = useState<TransactionType>(transaction?.type || 'Compra');
     const [ticker, setTicker] = useState(transaction?.ticker || initialTicker || '');
+    
+    // States as string to handle inputs with comma/dot
     const [quantity, setQuantity] = useState(transaction?.quantity?.toString() || '');
     const [price, setPrice] = useState(transaction?.price?.toString() || '');
     const [costs, setCosts] = useState(transaction?.costs?.toString() || '');
+    
     const [date, setDate] = useState(transaction?.date || getTodayISODate());
     const [errors, setErrors] = useState<Record<string, string>>({});
 
+    // Helper to parse localized string to float safe
+    const parseLocalFloat = (val: string) => {
+        if (!val) return 0;
+        // Replace comma with dot for parsing
+        return parseFloat(val.replace(',', '.')) || 0;
+    };
+
+    // Helper to handle input change allowing only valid characters
+    const handleNumberInput = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value;
+        // Allow digits, one comma or one dot.
+        val = val.replace(/[^0-9,.]/g, '');
+        // Prevent multiple separators
+        if ((val.match(/[.,]/g) || []).length > 1) return;
+        setter(val);
+    };
+
     const totalValue = useMemo(() => {
-        const q = parseFloat(quantity) || 0;
-        const p = parseFloat(price) || 0;
-        const c = parseFloat(costs) || 0;
+        const q = parseLocalFloat(quantity);
+        const p = parseLocalFloat(price);
+        const c = parseLocalFloat(costs);
         return type === 'Compra' ? q * p + c : q * p - c;
     }, [quantity, price, costs, type]);
 
     const validate = (): boolean => {
         const newErrors: Record<string, string> = {};
         if (!ticker || ticker.trim().length < 4) newErrors.ticker = t('validation_ticker_required');
-        if (!quantity || isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0) newErrors.quantity = t('validation_quantity_positive');
-        if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) newErrors.price = t('validation_price_positive');
-        if (costs && parseFloat(costs) < 0) newErrors.costs = t('validation_costs_positive');
+        
+        const qVal = parseLocalFloat(quantity);
+        if (!quantity || qVal <= 0) newErrors.quantity = t('validation_quantity_positive');
+        
+        const pVal = parseLocalFloat(price);
+        if (!price || pVal <= 0) newErrors.price = t('validation_price_positive');
+        
+        const cVal = parseLocalFloat(costs);
+        if (costs && cVal < 0) newErrors.costs = t('validation_costs_positive');
+        
         if (!date) newErrors.date = t('validation_date_required');
         
         setErrors(newErrors);
@@ -51,9 +78,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
         if (!isEditMode && ticker.length >= 4 && !price) {
             const asset = getAssetByTicker(ticker.toUpperCase());
             if (asset && asset.currentPrice > 0) {
-                setPrice(asset.currentPrice.toFixed(2));
+                setPrice(asset.currentPrice.toFixed(2).replace('.', ',')); // Format for BR input
                 vibrate();
-                addToast(`Preço atual (${asset.currentPrice.toFixed(2)}) preenchido!`, 'info');
+                addToast(`Preço atual (${formatCurrency(asset.currentPrice)}) preenchido!`, 'info');
             }
         }
     };
@@ -66,10 +93,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
             const finalTx: Omit<Transaction, 'id'> & { id?: string } = {
                 ticker: ticker.toUpperCase().trim(),
                 type,
-                quantity: parseFloat(quantity),
-                price: parseFloat(price),
+                quantity: parseLocalFloat(quantity),
+                price: parseLocalFloat(price),
                 date,
-                costs: parseFloat(costs) || 0,
+                costs: parseLocalFloat(costs),
             };
             if(isEditMode && transaction) finalTx.id = transaction.id;
             
@@ -102,7 +129,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
                         value={ticker}
                         onChange={(e) => setTicker(e.target.value)}
                         onBlur={handleTickerBlur}
-                        autoFocus 
+                        autoFocus={!isEditMode}
                         className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.ticker ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
                         autoCapitalize="characters" 
                         placeholder="MXRF11" 
@@ -112,19 +139,24 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('quantity')}</label>
-                        <input value={quantity} onChange={e => setQuantity(e.target.value)} type="number" inputMode="decimal" step="1" min="0.0001" required className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
+                        <input 
+                            value={quantity} 
+                            onChange={handleNumberInput(setQuantity)} 
+                            type="text" 
+                            inputMode="decimal"
+                            placeholder="0"
+                            className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.quantity ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
+                        />
                         {errors.quantity && <p className="text-xs text-red-400 mt-1">{errors.quantity}</p>}
                     </div>
                     <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('price_per_share')}</label>
                         <input 
                             value={price}
-                            onChange={(e) => setPrice(e.target.value)}
-                            type="number" 
-                            inputMode="decimal" 
-                            step="0.01" 
-                            min="0.01" 
-                            required 
+                            onChange={handleNumberInput(setPrice)}
+                            type="text" 
+                            inputMode="decimal"
+                            placeholder="0,00"
                             className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.price ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
                         />
                         {errors.price && <p className="text-xs text-red-400 mt-1">{errors.price}</p>}
@@ -138,7 +170,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ onClose, onSave, on
                     </div>
                     <div>
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1 block">{t('costs_fees')}</label>
-                        <input value={costs} onChange={e => setCosts(e.target.value)} type="number" inputMode="decimal" step="0.01" min="0" className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.costs ? 'border-red-500' : 'border-[var(--border-color)]'}`} />
+                        <input 
+                            value={costs} 
+                            onChange={handleNumberInput(setCosts)} 
+                            type="text" 
+                            inputMode="decimal"
+                            placeholder="0,00"
+                            className={`w-full bg-[var(--bg-primary)] border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all ${errors.costs ? 'border-red-500' : 'border-[var(--border-color)]'}`} 
+                        />
                         {errors.costs && <p className="text-xs text-red-400 mt-1">{errors.costs}</p>}
                     </div>
                  </div>
