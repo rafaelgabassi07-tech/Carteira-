@@ -8,7 +8,7 @@ import CalendarIcon from './icons/CalendarIcon';
 import Modal from './modals/Modal';
 import { vibrate } from '../utils';
 import ChevronRightIcon from './icons/ChevronRightIcon';
-import FilterIcon from './icons/FilterIcon';
+import SparklesIcon from './icons/SparklesIcon';
 import type { DividendHistoryEvent, Transaction, Asset } from '../types';
 
 // --- Types ---
@@ -17,6 +17,7 @@ interface MonthlyData {
     total: number;
     year: number;
     isoDate: string; // YYYY-MM
+    isProjected?: boolean;
 }
 
 interface PayerData {
@@ -24,8 +25,9 @@ interface PayerData {
     total: number;
     count: number;
     invested: number;
-    roi: number; // (Total Recebido / Total Investido) * 100
+    roi: number; 
     monthlyAverage: number; 
+    nextPayment?: string;
 }
 
 interface DividendStats {
@@ -33,15 +35,16 @@ interface DividendStats {
     monthlyData: MonthlyData[];
     payersData: PayerData[];
     currentMonthValue: number;
-    totalInvestedGlobal: number;
-    globalROI: number;
-    bestMonth: { total: number; month: string };
+    currentMonthName: string;
+    currentMonthPaid: number; // Já caiu na conta
+    currentMonthProvisioned: number; // Vai cair
     averageIncome: number;
-    yoyGrowth: number | null; 
-    currentYearTotal: number;
+    bestMonth: { total: number; month: string };
+    globalROI: number;
+    magicNumberCount: number; // Quantas "cotas base 10" dá pra comprar com a média
 }
 
-type SortMode = 'total' | 'roi';
+type SortMode = 'total' | 'roi' | 'date';
 
 // --- Logic Hook ---
 const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): DividendStats => {
@@ -49,7 +52,15 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         let totalReceived = 0;
         let totalInvestedGlobal = 0;
         const monthlyAggregation: Record<string, number> = {}; 
-        const payerAggregation: Record<string, { total: number, count: number, invested: number }> = {};
+        const payerAggregation: Record<string, { total: number, count: number, invested: number, nextPayment?: string }> = {};
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonthIdx = now.getMonth();
+        const currentMonthKey = `${currentYear}-${String(currentMonthIdx + 1).padStart(2, '0')}`;
+        
+        let currentMonthPaid = 0;
+        let currentMonthProvisioned = 0;
 
         const allTickers = Array.from(new Set(transactions.map(t => t.ticker)));
 
@@ -72,6 +83,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             if (history.length === 0 || assetTxs.length === 0) return;
 
             history.forEach((div: DividendHistoryEvent) => {
+                // Check eligibility based on ex-date
                 if (div.exDate < assetTxs[0].date) return;
 
                 let qtyOwnedAtExDate = 0;
@@ -87,28 +99,53 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                     const amount = qtyOwnedAtExDate * div.value;
                     totalReceived += amount;
 
+                    // Normalizar Mês de Pagamento
+                    const payDate = new Date(div.paymentDate);
+                    // Ajuste de fuso horário simples para garantir mês correto
+                    payDate.setMinutes(payDate.getMinutes() + payDate.getTimezoneOffset());
+                    
                     const monthKey = div.paymentDate.substring(0, 7); 
                     monthlyAggregation[monthKey] = (monthlyAggregation[monthKey] || 0) + amount;
 
+                    // Dados do Mês Atual
+                    if (monthKey === currentMonthKey) {
+                        if (div.isProvisioned || payDate > now) {
+                            currentMonthProvisioned += amount;
+                        } else {
+                            currentMonthPaid += amount;
+                        }
+                    }
+
                     if (!payerAggregation[ticker]) {
-                        payerAggregation[ticker] = { total: 0, count: 0, invested: assetTotalInvested };
+                        payerAggregation[ticker] = { total: 0, count: 0, invested: assetTotalInvested, nextPayment: undefined };
                     }
                     payerAggregation[ticker].total += amount;
                     payerAggregation[ticker].count += 1;
+                    
+                    // Track next payment date for sorting
+                    if (div.isProvisioned || payDate >= now) {
+                        const existingNext = payerAggregation[ticker].nextPayment;
+                        if (!existingNext || div.paymentDate < existingNext) {
+                            payerAggregation[ticker].nextPayment = div.paymentDate;
+                        }
+                    }
                 }
             });
         });
 
-        const monthlyData = Object.keys(monthlyAggregation).sort().map(key => {
-            const [year, month] = key.split('-').map(Number);
-            const date = new Date(year, month - 1, 15);
-            return {
+        // Fill gaps for last 12 months chart
+        const monthlyData: MonthlyData[] = [];
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            monthlyData.push({
                 isoDate: key,
-                month: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''),
-                total: monthlyAggregation[key],
-                year
-            };
-        });
+                month: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
+                year: d.getFullYear(),
+                total: monthlyAggregation[key] || 0,
+                isProjected: key > currentMonthKey
+            });
+        }
 
         const payersData = Object.entries(payerAggregation).map(([ticker, data]) => ({ 
             ticker, 
@@ -117,34 +154,31 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             monthlyAverage: data.count > 0 ? data.total / data.count : 0
         }));
 
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        const currentMonthKey = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const currentMonthValue = monthlyAggregation[currentMonthKey] || 0;
         const globalROI = totalInvestedGlobal > 0 ? (totalReceived / totalInvestedGlobal) * 100 : 0;
-        
         const bestMonth = monthlyData.reduce((max, curr) => curr.total > max.total ? curr : max, { total: 0, month: '-' });
-        const averageIncome = monthlyData.length > 0 ? totalReceived / monthlyData.length : 0;
-
-        const thisYearTotal = monthlyData.filter(d => d.year === currentYear).reduce((acc, curr) => acc + curr.total, 0);
-        const lastYearTotal = monthlyData.filter(d => d.year === currentYear - 1).reduce((acc, curr) => acc + curr.total, 0);
         
-        let yoyGrowth: number | null = null;
-        if (lastYearTotal > 0) {
-            yoyGrowth = ((thisYearTotal - lastYearTotal) / lastYearTotal) * 100;
-        }
+        // Average excluding zeros for better realism
+        const activeMonths = Object.values(monthlyAggregation).filter(v => v > 0);
+        const averageIncome = activeMonths.length > 0 ? activeMonths.reduce((a,b)=>a+b,0) / activeMonths.length : 0;
+
+        // "Magic Number" Insight: How many ~10 BRL shares can I buy?
+        const magicNumberCount = Math.floor(averageIncome / 10);
+
+        const monthName = new Date().toLocaleDateString('pt-BR', { month: 'long' });
 
         return { 
             totalReceived, 
             monthlyData, 
             payersData, 
-            currentMonthValue, 
-            totalInvestedGlobal, 
-            globalROI,
-            bestMonth,
+            currentMonthValue,
+            currentMonthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+            currentMonthPaid,
+            currentMonthProvisioned,
             averageIncome,
-            yoyGrowth,
-            currentYearTotal: thisYearTotal
+            bestMonth,
+            globalROI,
+            magicNumberCount
         };
     }, [transactions, assets]);
 };
@@ -163,54 +197,61 @@ const stringToColor = (str: string) => {
 
 // --- Sub-Components ---
 
-const MetricCard: React.FC<{ title: string; value: React.ReactNode; subtext?: string; icon?: React.ReactNode }> = ({ title, value, subtext, icon }) => (
-    <div className="bg-[var(--bg-primary)] p-4 rounded-xl border border-[var(--border-color)] flex flex-col justify-between h-full">
+const MetricCard: React.FC<{ title: string; value: React.ReactNode; subtext?: React.ReactNode; icon?: React.ReactNode; accent?: boolean }> = ({ title, value, subtext, icon, accent }) => (
+    <div className={`p-4 rounded-xl border flex flex-col justify-between h-full ${accent ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-transparent' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
         <div className="flex justify-between items-start mb-2">
-            <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{title}</span>
-            {icon && <div className="text-[var(--accent-color)] opacity-80">{icon}</div>}
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${accent ? 'opacity-80' : 'text-[var(--text-secondary)]'}`}>{title}</span>
+            {icon && <div className={accent ? 'text-white' : 'text-[var(--accent-color)] opacity-80'}>{icon}</div>}
         </div>
         <div>
-            <div className="text-lg font-bold text-[var(--text-primary)] leading-none">{value}</div>
-            {subtext && <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-medium">{subtext}</div>}
+            <div className="text-lg font-bold leading-none">{value}</div>
+            {subtext && <div className={`text-[10px] mt-1.5 font-medium ${accent ? 'opacity-90' : 'text-[var(--text-secondary)]'}`}>{subtext}</div>}
         </div>
     </div>
 );
 
-const MonthlyBarChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
+const MonthlyBarChart: React.FC<{ data: MonthlyData[]; avg: number }> = ({ data, avg }) => {
     const { formatCurrency } = useI18n();
-    const recentData = data.slice(-12); 
-    const maxVal = Math.max(...recentData.map(d => d.total), 1);
+    const maxVal = Math.max(...data.map(d => d.total), avg * 1.2, 1);
 
     return (
-        <div className="flex items-end gap-2 h-40 w-full pt-6 pb-2">
-            {recentData.length === 0 && <div className="w-full text-center text-xs text-[var(--text-secondary)] self-center">Sem dados recentes</div>}
-            
-            {recentData.map((d, i) => {
-                const heightPercent = (d.total / maxVal) * 100;
-                const delay = i * 50; 
-                
-                return (
-                    <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-20">
-                            {formatCurrency(d.total)}
+        <div className="relative h-40 w-full pt-6 pb-2">
+            {/* Avg Line */}
+            {avg > 0 && (
+                <div className="absolute left-0 right-0 border-t border-dashed border-[var(--text-secondary)] opacity-30 z-0 flex items-end" style={{ bottom: `${(avg / maxVal) * 100}%` }}>
+                    <span className="text-[9px] text-[var(--text-secondary)] -mt-4 bg-[var(--bg-secondary)] px-1">Média</span>
+                </div>
+            )}
+
+            <div className="flex items-end gap-2 h-full w-full relative z-10">
+                {data.map((d, i) => {
+                    const heightPercent = (d.total / maxVal) * 100;
+                    const delay = i * 50; 
+                    const isCurrent = i === data.length - 1;
+                    
+                    return (
+                        <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-primary)] border border-[var(--border-color)] text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-20">
+                                {formatCurrency(d.total)}
+                            </div>
+                            
+                            <div 
+                                className={`w-full rounded-t-sm transition-all duration-300 relative overflow-hidden ${isCurrent ? 'bg-[var(--accent-color)]' : 'bg-[var(--text-secondary)] opacity-30'}`}
+                                style={{ 
+                                    height: `${Math.max(heightPercent, 4)}%`,
+                                    animation: `grow-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards`,
+                                    animationDelay: `${delay}ms`
+                                }}
+                            >
+                            </div>
+                            <span className={`text-[9px] mt-2 font-bold uppercase tracking-wider ${isCurrent ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)]'}`}>
+                                {d.month}
+                            </span>
                         </div>
-                        
-                        <div 
-                            className="w-full rounded-t-md transition-all duration-300 bg-[var(--accent-color)] opacity-60 group-hover:opacity-100 relative overflow-hidden" 
-                            style={{ 
-                                height: `${Math.max(heightPercent, 2)}%`,
-                                transformOrigin: 'bottom',
-                                animation: `grow-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards`,
-                                animationDelay: `${delay}ms`
-                            }}
-                        >
-                             <div className="absolute bottom-0 left-0 right-0 h-full bg-gradient-to-t from-black/20 to-transparent"></div>
-                        </div>
-                        <span className="text-[9px] text-[var(--text-secondary)] mt-2 font-bold uppercase tracking-wider">{d.month.split('/')[0]}</span>
-                    </div>
-                );
-            })}
+                    );
+                })}
+            </div>
         </div>
     );
 };
@@ -219,7 +260,7 @@ const PayerRow: React.FC<{
     payer: PayerData; 
     rank: number;
 }> = ({ payer, rank }) => {
-    const { formatCurrency } = useI18n();
+    const { formatCurrency, locale } = useI18n();
     const iconBg = stringToColor(payer.ticker);
     
     return (
@@ -231,7 +272,9 @@ const PayerRow: React.FC<{
                 </div>
                 <div className="flex flex-col">
                     <span className="font-bold text-sm text-[var(--text-primary)]">{payer.ticker}</span>
-                    <span className="text-[10px] text-[var(--text-secondary)]">Méd: {formatCurrency(payer.monthlyAverage)}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)]">
+                        {payer.nextPayment ? `Pgto: ${new Date(payer.nextPayment).toLocaleDateString(locale, {day:'2-digit', month:'2-digit'})}` : `Méd: ${formatCurrency(payer.monthlyAverage)}`}
+                    </span>
                 </div>
             </div>
             
@@ -256,6 +299,11 @@ const DividendsDetailModal: React.FC<{
     const sortedPayers = useMemo(() => {
         return [...stats.payersData].sort((a, b) => {
             if (sortMode === 'total') return b.total - a.total;
+            if (sortMode === 'date') {
+                if (!a.nextPayment) return 1;
+                if (!b.nextPayment) return -1;
+                return a.nextPayment.localeCompare(b.nextPayment);
+            }
             return b.roi - a.roi;
         });
     }, [stats.payersData, sortMode]);
@@ -267,69 +315,51 @@ const DividendsDetailModal: React.FC<{
                 {/* 1. Key Metrics Grid */}
                 <div className="grid grid-cols-2 gap-3 px-2">
                     <MetricCard 
-                        title="Total Acumulado" 
+                        title="Acumulado" 
                         value={<CountUp end={stats.totalReceived} formatter={formatCurrency} />} 
-                        icon={<TrendingUpIcon className="w-4 h-4"/>}
-                    />
-                    <MetricCard 
-                        title="Retorno s/ Custo" 
-                        value={`${stats.globalROI.toFixed(1)}%`} 
-                        subtext="Yield on Cost Global"
+                        subtext="Total Histórico"
                     />
                     <MetricCard 
                         title="Média Mensal" 
                         value={formatCurrency(stats.averageIncome)} 
                         subtext="Últimos 12 meses"
+                        icon={<TrendingUpIcon className="w-4 h-4"/>}
                     />
-                    <MetricCard 
-                        title="Melhor Mês" 
-                        value={formatCurrency(stats.bestMonth.total)} 
-                        subtext={stats.bestMonth.month}
-                        icon={<CalendarIcon className="w-4 h-4"/>}
-                    />
+                    <div className="col-span-2">
+                        <MetricCard 
+                            title="Poder de Reinvestimento" 
+                            value={`${stats.magicNumberCount} cotas base`}
+                            subtext="Estimativa de compra mensal (base R$ 10) apenas com rendimentos."
+                            icon={<SparklesIcon className="w-4 h-4"/>}
+                            accent
+                        />
+                    </div>
                 </div>
 
                 {/* 2. Evolution Chart */}
                 <div className="px-2">
                     <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)]">
                         <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Evolução (12 Meses)</h3>
-                            {stats.yoyGrowth !== null && (
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stats.yoyGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-                                    {stats.yoyGrowth > 0 ? '+' : ''}{stats.yoyGrowth.toFixed(0)}% vs Ano Anterior
-                                </span>
-                            )}
+                            <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Evolução Recente</h3>
+                            <span className="text-[10px] font-bold bg-[var(--bg-primary)] px-2 py-0.5 rounded-full text-[var(--text-secondary)]">12 Meses</span>
                         </div>
-                        <MonthlyBarChart data={stats.monthlyData} />
+                        <MonthlyBarChart data={stats.monthlyData} avg={stats.averageIncome} />
                     </div>
                 </div>
 
                 {/* 3. Breakdown List */}
                 <div className="flex-1 px-2 pb-10">
                     <div className="flex justify-between items-center mb-3 px-2">
-                        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Origem dos Proventos</h3>
+                        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Detalhamento</h3>
                         
                         <div className="flex bg-[var(--bg-primary)] p-0.5 rounded-lg border border-[var(--border-color)]">
-                            <button 
-                                onClick={() => {setSortMode('total'); vibrate();}} 
-                                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${sortMode === 'total' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
-                            >
-                                Valor
-                            </button>
-                            <button 
-                                onClick={() => {setSortMode('roi'); vibrate();}} 
-                                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${sortMode === 'roi' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
-                            >
-                                Retorno
-                            </button>
+                            <button onClick={() => {setSortMode('total'); vibrate();}} className={`px-2 py-1 text-[9px] font-bold rounded transition-all ${sortMode === 'total' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>Valor</button>
+                            <button onClick={() => {setSortMode('roi'); vibrate();}} className={`px-2 py-1 text-[9px] font-bold rounded transition-all ${sortMode === 'roi' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>Retorno</button>
+                            <button onClick={() => {setSortMode('date'); vibrate();}} className={`px-2 py-1 text-[9px] font-bold rounded transition-all ${sortMode === 'date' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}><CalendarIcon className="w-3 h-3"/></button>
                         </div>
                     </div>
 
                     <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] p-2">
-                        <div className="flex justify-between px-4 py-2 text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider border-b border-[var(--border-color)] mb-2">
-                            <span>Ativo</span>
-                            <span>Total / Retorno</span>
-                        </div>
                         {sortedPayers.length > 0 ? (
                             sortedPayers.map((payer, index) => (
                                 <PayerRow key={payer.ticker} payer={payer} rank={index + 1} />
@@ -356,35 +386,63 @@ const DividendsSummaryCard: React.FC = () => {
 
     if (stats.totalReceived === 0) return null;
 
+    // Calcular progresso do mês (Pago vs Total Provisionado)
+    const monthProgress = stats.currentMonthValue > 0 
+        ? (stats.currentMonthPaid / stats.currentMonthValue) * 100 
+        : 0;
+
+    const isAboveAverage = stats.currentMonthValue > stats.averageIncome;
+
     return (
         <>
             <div 
                 onClick={() => { vibrate(); setShowModal(true); }}
-                className="bg-[var(--bg-secondary)] p-5 rounded-2xl mx-4 mt-4 border border-[var(--border-color)] shadow-sm cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group animate-fade-in-up"
+                className="bg-[var(--bg-secondary)] p-5 rounded-2xl mx-4 mt-4 border border-[var(--border-color)] shadow-sm cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group animate-fade-in-up relative overflow-hidden"
             >
-                <div className="flex justify-between items-center">
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
+                {/* Background Sparkle */}
+                <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
+                    <SparklesIcon className="w-24 h-24 text-[var(--accent-color)]" />
+                </div>
+
+                <div className="flex justify-between items-start relative z-10">
+                    <div className="flex flex-col gap-1 w-full">
+                        <div className="flex justify-between w-full">
                             <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
-                                <TrendingUpIcon className="w-3.5 h-3.5 text-[var(--accent-color)]" />
-                                Proventos Acumulados
+                                <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+                                {stats.currentMonthName}
                             </span>
+                            
+                            {!privacyMode && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isAboveAverage ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--bg-primary)] text-[var(--text-secondary)]'}`}>
+                                    {isAboveAverage ? 'Acima da média' : 'Abaixo da média'}
+                                </span>
+                            )}
                         </div>
                         
-                        <div className={`text-2xl font-black text-[var(--text-primary)] tracking-tight ${privacyMode ? 'blur-md' : ''}`}>
-                            <CountUp end={stats.totalReceived} formatter={formatCurrency} />
+                        <div className="flex items-baseline gap-2 mt-1">
+                            <div className={`text-2xl font-black text-[var(--text-primary)] tracking-tight ${privacyMode ? 'blur-md' : ''}`}>
+                                <CountUp end={stats.currentMonthValue} formatter={formatCurrency} />
+                            </div>
                         </div>
 
-                        {stats.yoyGrowth !== null && !privacyMode && (
-                            <div className={`text-[10px] font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md w-fit mt-1 ${stats.yoyGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-                                {stats.yoyGrowth >= 0 ? '▲' : '▼'} {Math.abs(stats.yoyGrowth).toFixed(0)}% <span className="text-[var(--text-secondary)] font-medium opacity-70">vs ano anterior</span>
-                            </div>
-                        )}
+                        {/* Barra de Progresso do Mês */}
+                        <div className="mt-3 mb-1 w-full bg-[var(--bg-primary)] h-1.5 rounded-full overflow-hidden flex">
+                            <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${monthProgress}%` }}></div>
+                            <div className="bg-amber-500 h-full transition-all duration-1000 opacity-50" style={{ width: `${100 - monthProgress}%` }}></div>
+                        </div>
+                        <div className="flex justify-between text-[9px] text-[var(--text-secondary)] font-medium uppercase tracking-wide">
+                            <span>Recebido: {privacyMode ? '---' : formatCurrency(stats.currentMonthPaid)}</span>
+                            <span>A Receber: {privacyMode ? '---' : formatCurrency(stats.currentMonthProvisioned)}</span>
+                        </div>
                     </div>
+                </div>
 
-                    <div className="flex items-center text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors">
-                        <ChevronRightIcon className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
-                    </div>
+                <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex justify-between items-center text-[10px] text-[var(--text-secondary)]">
+                    <span className="flex items-center gap-1">
+                        <TrendingUpIcon className="w-3 h-3" /> Total Acumulado: 
+                        <strong className="text-[var(--text-primary)] ml-1">{privacyMode ? '---' : formatCurrency(stats.totalReceived)}</strong>
+                    </span>
+                    <ChevronRightIcon className="w-4 h-4 opacity-50" />
                 </div>
             </div>
 
