@@ -15,7 +15,6 @@ import InfoIcon from '../icons/InfoIcon';
 import PaletteIcon from '../icons/PaletteIcon';
 import SettingsIcon from '../icons/SettingsIcon';
 import TransactionIcon from '../icons/TransactionIcon';
-import UpdateIcon from '../icons/UpdateIcon';
 import LogoutIcon from '../icons/LogoutIcon';
 import ChevronRightIcon from '../icons/ChevronRightIcon';
 import SparklesIcon from '../icons/SparklesIcon';
@@ -39,7 +38,7 @@ const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: strin
 );
 
 
-const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdateModal: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; updateAvailable?: boolean; }> = ({ setScreen, onShowUpdateModal, addToast, updateAvailable }) => {
+const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ setScreen, addToast }) => {
     const { t } = useI18n();
     const { userProfile, resetApp } = usePortfolio();
 
@@ -137,16 +136,6 @@ const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdate
             </div>
 
              <div className="p-2 space-y-2">
-                <button 
-                    onClick={onShowUpdateModal} 
-                    className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold p-3 rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] relative"
-                >
-                    <div className="relative">
-                        <UpdateIcon className="w-4 h-4" />
-                        {updateAvailable && <span className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--accent-color)] rounded-full animate-pulse"></span>}
-                    </div>
-                    {t('check_for_update')}
-                </button>
                 <button onClick={resetApp} className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold text-red-500/80 hover:text-red-500 p-3 rounded-lg hover:bg-red-500/10 transition-colors">
                     <LogoutIcon className="w-4 h-4" />
                     {t('logout')}

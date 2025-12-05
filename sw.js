@@ -1,5 +1,5 @@
-const CACHE_NAME = 'invest-portfolio-cache-v1.9.2'; // Bumped Version for update
-const RUNTIME_CACHE = 'runtime-cache-v1.9.2';
+const CACHE_NAME = 'invest-portfolio-cache-v2.0.0'; // Bumped Version for update
+const RUNTIME_CACHE = 'runtime-cache-v2.0.0';
 
 const urlsToCache = [
   './',
@@ -9,8 +9,9 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', event => {
-  // DO NOT skipWaiting() here. We want the new service worker to wait
-  // for the user to confirm the update via a prompt in the app.
+  // Activate the new service worker immediately for seamless automatic updates.
+  self.skipWaiting(); 
+
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(async cache => {
@@ -119,9 +120,4 @@ self.addEventListener('notificationclick', function(event) {
   );
 });
 
-// Listener to activate the new service worker when the user clicks 'Update'
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
+// Listener to activate the new service worker was removed to restore automatic updates.

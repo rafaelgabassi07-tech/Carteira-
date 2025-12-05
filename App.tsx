@@ -36,41 +36,17 @@ const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   
-  // --- PWA Update Logic ---
-  const [updateAvailable, setUpdateAvailable] = useState(false);
-  const waitingWorkerRef = useRef<ServiceWorker | null>(null);
-
-  const handleUpdateApp = useCallback(() => {
-    if (waitingWorkerRef.current) {
-        waitingWorkerRef.current.postMessage({ type: 'SKIP_WAITING' });
-        setUpdateAvailable(false); // Hide the toast immediately
-    }
-  }, []);
-
+  // --- PWA Update Logic (Simplified for Automatic Updates) ---
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-        // Use a simple, direct path for maximum compatibility in sandboxed environments.
         navigator.serviceWorker.register('./sw.js')
             .then(registration => {
                 console.log('Service Worker registered successfully.');
-                registration.onupdatefound = () => {
-                    const installingWorker = registration.installing;
-                    if (installingWorker) {
-                        installingWorker.onstatechange = () => {
-                            if (installingWorker.state === 'installed') {
-                                if (navigator.serviceWorker.controller) {
-                                    console.log('New content is available for update.');
-                                    waitingWorkerRef.current = registration.waiting;
-                                    setUpdateAvailable(true);
-                                }
-                            }
-                        };
-                    }
-                };
             }).catch(error => {
                 console.error('Service Worker registration failed:', error);
             });
 
+        // This listener fires when the new service worker has taken control.
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (!refreshing) {
@@ -91,19 +67,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-      if (updateAvailable) {
-          addToast(
-              t('new_version_available'),
-              'info',
-              {
-                  label: t('update_available_action'),
-                  onClick: handleUpdateApp,
-              },
-              0 // 0 duration means the toast stays until actioned
-          );
-      }
-  }, [updateAvailable, addToast, handleUpdateApp, t]);
   // --- End PWA Update Logic ---
   
   // PWA Deep Linking & Share Target Handler
@@ -191,7 +154,7 @@ const App: React.FC = () => {
       case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
       case 'mercado': return <MarketView addToast={addToast} />;
       case 'noticias': return <NewsView addToast={addToast} />;
-      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} updateAvailable={updateAvailable} onUpdateApp={handleUpdateApp} />;
+      case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
       case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
