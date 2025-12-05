@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -19,6 +18,9 @@ import NewsView from './NewsView';
 import PortfolioLineChart from '../components/PortfolioLineChart';
 import DividendChart from '../components/DividendChart';
 import type { ToastMessage, Asset } from '../types';
+import ScaleIcon from '../components/icons/ScaleIcon';
+import PercentIcon from '../components/icons/PercentIcon';
+import DollarSignIcon from '../components/icons/DollarSignIcon';
 
 interface MarketViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
@@ -34,38 +36,39 @@ interface MarketResult {
     fundamentals?: Partial<Asset> & { marketSentiment?: 'Bullish' | 'Bearish' | 'Neutral' }; 
 }
 
+// --- Local Icons ---
+const HomeIcon: React.FC<{className?:string}> = ({className}) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>);
+const FileTextIcon: React.FC<{className?:string}> = ({className}) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>);
+const UsersIcon: React.FC<{className?:string}> = ({className}) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
+const AwardIcon: React.FC<{className?:string}> = ({className}) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 17 17 23 15.79 13.88"/></svg>);
+
+
 const MARKET_CATEGORIES = [
-    { title: "Gigantes da Logística", color: "bg-orange-500", tickers: ["HGLG11", "BTLG11", "XPLG11", "VILG11"] },
-    { title: "Shoppings Premium", color: "bg-blue-500", tickers: ["XPML11", "VISC11", "HGBS11", "MALL11"] },
-    { title: "Papel & Recebíveis", color: "bg-emerald-500", tickers: ["MXRF11", "KNCR11", "CPTS11", "IRDM11"] },
-    { title: "Fiagros (Agro)", color: "bg-lime-600", tickers: ["SNAG11", "VGIA11", "KNCA11", "RZAG11"] }
+    { title: "Gigantes da Logística", color: "from-orange-500/10 to-transparent", borderColor: "border-orange-500/30", tickers: ["HGLG11", "BTLG11", "XPLG11", "VILG11"] },
+    { title: "Shoppings Premium", color: "from-blue-500/10 to-transparent", borderColor: "border-blue-500/30", tickers: ["XPML11", "VISC11", "HGBS11", "MALL11"] },
+    { title: "Papel & Recebíveis", color: "from-emerald-500/10 to-transparent", borderColor: "border-emerald-500/30", tickers: ["MXRF11", "KNCR11", "CPTS11", "IRDM11"] },
+    { title: "Fiagros (Agro)", color: "from-lime-600/10 to-transparent", borderColor: "border-lime-600/30", tickers: ["SNAG11", "VGIA11", "KNCA11", "RZAG11"] }
 ];
 
-const StatItem: React.FC<{ label: string; value: React.ReactNode; sub?: string; highlight?: 'green' | 'red' | 'neutral'; className?: string }> = ({ label, value, sub, highlight, className }) => {
-    let textColor = 'text-[var(--text-primary)]';
-    if (highlight === 'green') textColor = 'text-[var(--green-text)]';
-    if (highlight === 'red') textColor = 'text-[var(--red-text)]';
+const StatItem: React.FC<{ label: string; value: React.ReactNode; icon: React.ReactNode; highlight?: 'green' | 'red' | 'neutral' }> = ({ label, value, icon, highlight }) => {
+    let valueColor = 'text-[var(--text-primary)]';
+    if (highlight === 'green') valueColor = 'text-[var(--green-text)]';
+    if (highlight === 'red') valueColor = 'text-[var(--red-text)]';
 
     return (
-        <div className={`flex flex-col p-4 rounded-xl bg-[var(--bg-primary)] justify-center transition-all hover:shadow-md ${className}`}>
-            <div className="flex justify-between items-start mb-1">
-                <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-80">{label}</span>
-                {highlight === 'green' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--green-text)] shadow-[0_0_5px_var(--green-text)]"></div>}
-                {highlight === 'red' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--red-text)] shadow-[0_0_5px_var(--red-text)]"></div>}
+        <div className="bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)] flex items-center gap-3 shadow-sm hover:border-[var(--accent-color)]/30 transition-colors group">
+            <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--bg-secondary)] text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors ${valueColor}`}>{icon}</div>
+            <div className="flex-1 min-w-0">
+                <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-80">{label}</span>
+                <span className={`text-sm font-extrabold truncate block tracking-tight ${valueColor}`}>{value}</span>
             </div>
-            <span className={`text-base font-bold truncate block tracking-tight ${textColor}`}>
-                {value}
-            </span>
-            {sub && <span className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate block font-medium opacity-70">{sub}</span>}
         </div>
     );
 };
 
 const SectionHeader: React.FC<{ title: string, icon?: React.ReactNode }> = ({ title, icon }) => (
-    <div className="flex items-center gap-2 mb-3 mt-6 pb-2 border-b border-[var(--border-color)]/50">
-        <div className="text-[var(--accent-color)] opacity-80">
-            {icon}
-        </div>
+    <div className="col-span-full flex items-center gap-2 mt-4 mb-2 pb-1 border-b border-[var(--border-color)]/50">
+        {icon && <div className="text-[var(--accent-color)] opacity-80">{icon}</div>}
         <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">{title}</h3>
     </div>
 );
@@ -73,12 +76,9 @@ const SectionHeader: React.FC<{ title: string, icon?: React.ReactNode }> = ({ ti
 const FundamentalSkeleton: React.FC = () => (
     <div className="animate-pulse space-y-4 px-1 pb-5">
         <div className="grid grid-cols-2 gap-3">
-            <div className="h-24 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
-            <div className="h-24 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
-            <div className="h-24 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
-            <div className="h-24 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
+            {[1,2,3,4,5,6].map(i => <div key={i} className="h-16 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>)}
         </div>
-        <div className="h-32 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
+        <div className="h-24 bg-[var(--bg-primary)] rounded-xl opacity-50"></div>
     </div>
 );
 
@@ -172,11 +172,11 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
 
     return (
         <div className="h-full flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
-            <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-color)]/50 px-4 pt-4 pb-2 transition-all">
-                <div className="max-w-2xl mx-auto w-full">
+            <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-color)]/50 px-4 pt-safe pt-4 pb-2 transition-all">
+                <div className="max-w-3xl mx-auto w-full">
                     <h1 className="text-xl font-bold mb-4 px-1 flex items-center gap-2"><GlobeIcon className="w-5 h-5 text-[var(--accent-color)]"/> {t('nav_market')}</h1>
                     <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0 shadow-sm">
-                        <button onClick={() => { setViewMode('quotes'); vibrate(); }} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wide ${viewMode === 'quotes' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Cotações</button>
+                        <button onClick={() => { setViewMode('quotes'); vibrate(); }} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wide ${viewMode === 'quotes' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Analise FII</button>
                         <button onClick={() => { setViewMode('news'); vibrate(); }} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wide ${viewMode === 'news' ? 'bg-[var(--bg-primary)] text-[var(--accent-color)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Notícias</button>
                     </div>
                     {viewMode === 'quotes' && (
@@ -189,50 +189,51 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-24 md:pb-6 landscape-pb-6 scroll-smooth">
-                <div className="max-w-2xl mx-auto h-full">
+                <div className="max-w-3xl mx-auto h-full">
                     {viewMode === 'quotes' ? (
                         <div className="animate-fade-in space-y-6">
                             {result && (
                                 <div className="bg-[var(--bg-secondary)] rounded-3xl border border-[var(--border-color)] shadow-2xl animate-fade-in-up overflow-hidden">
-                                    <div className="p-6 bg-gradient-to-br from-[var(--bg-tertiary-hover)] via-[var(--bg-secondary)] to-[var(--bg-secondary)] border-b border-[var(--border-color)] relative">
-                                        <div className="flex justify-between items-start z-10">
+                                    <div className="p-6 bg-gradient-to-br from-[var(--bg-tertiary-hover)]/50 via-[var(--bg-secondary)] to-[var(--bg-secondary)] border-b border-[var(--border-color)] relative">
+                                        <div className="flex justify-between items-start z-10 relative">
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-3"><h2 className="text-4xl font-black text-[var(--text-primary)] tracking-tighter">{result.ticker}</h2>{result.fundamentals?.segment && (<span className="px-2.5 py-1 rounded-full bg-[var(--bg-primary)] border border-[var(--border-color)] text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wide shadow-sm">{result.fundamentals.segment}</span>)}</div>
                                                 <div className="flex items-center gap-2 mt-1"><span className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">{formatCurrency(result.price)}</span><div className={`flex items-center px-2 py-1 rounded-lg ${result.change >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}><span className="text-xs font-bold">{result.change >= 0 ? '▲' : '▼'} {Math.abs(result.change).toFixed(2)}%</span></div></div>
                                             </div>
                                         </div>
-                                        {result.history.length >= 2 && (<div className="h-24 w-full mt-4 -mb-6 opacity-30 mask-image-gradient-b"><PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} /></div>)}
+                                        {result.history.length >= 2 && (<div className="absolute bottom-0 left-0 right-0 h-32 w-full -mb-6 opacity-20 mask-image-gradient-b"><PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} /></div>)}
                                     </div>
                                     <div className="pt-6 animate-fade-in">
                                         {loadingFundamentals ? (<FundamentalSkeleton />) : (
-                                            <div className="px-5 pb-6 space-y-8">
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <StatItem label="Dividend Yield (12m)" value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'} highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? 'green' : 'neutral'} />
-                                                    <StatItem label="P/VP" value={result.fundamentals?.pvp?.toFixed(2) ?? '-'} sub={result.fundamentals?.vpPerShare ? `VP: ${formatCurrency(result.fundamentals.vpPerShare)}` : ''} highlight={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'green' : (result.fundamentals?.pvp && result.fundamentals.pvp > 1.2 ? 'red' : 'neutral')} />
-                                                    <StatItem label="Último Rendimento" value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'} />
-                                                    <StatItem label="Vacância" value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'} highlight={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'red' : 'neutral'} />
+                                            <div className="px-5 pb-6 space-y-4">
+                                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                                                    <SectionHeader title="Valuation" />
+                                                    <StatItem label="P/VP" value={result.fundamentals?.pvp?.toFixed(2) ?? '-'} icon={<ScaleIcon className="w-5 h-5"/>} highlight={result.fundamentals?.pvp && result.fundamentals.pvp < 1 ? 'green' : (result.fundamentals?.pvp && result.fundamentals.pvp > 1.2 ? 'red' : 'neutral')} />
+                                                    <StatItem label="Valor Patrimonial" value={result.fundamentals?.vpPerShare ? formatCurrency(result.fundamentals.vpPerShare) : '-'} icon={<DollarSignIcon className="w-5 h-5"/>} />
+                                                    <div className="col-span-2 lg:col-span-1">
+                                                        <StatItem label="Patrimônio Líquido" value={result.fundamentals?.netWorth ?? '-'} icon={<FileTextIcon className="w-5 h-5"/>} />
+                                                    </div>
+
+                                                    <SectionHeader title="Renda" />
+                                                    <StatItem label="Dividend Yield" value={result.fundamentals?.dy ? `${result.fundamentals.dy.toFixed(2)}%` : '-'} icon={<PercentIcon className="w-5 h-5"/>} highlight={result.fundamentals?.dy && result.fundamentals.dy > 10 ? 'green' : 'neutral'} />
+                                                    <StatItem label="Último Dividendo" value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'} icon={<DollarSignIcon className="w-5 h-5"/>} />
+                                                    <StatItem label="CAGR (3A)" value={result.fundamentals?.dividendCAGR ? `${result.fundamentals.dividendCAGR}%` : '-'} icon={<TrendingUpIcon className="w-5 h-5"/>} highlight={result.fundamentals?.dividendCAGR && result.fundamentals.dividendCAGR > 0 ? 'green' : 'neutral'} />
+                                                    
+                                                    <SectionHeader title="Qualidade" />
+                                                    <StatItem label="Vacância" value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'} icon={<HomeIcon className="w-5 h-5"/>} highlight={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'red' : 'neutral'} />
+                                                    <StatItem label="Nº Cotistas" value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(0)}k` : '-'} icon={<UsersIcon className="w-5 h-5"/>} />
+                                                     <StatItem label="Gestão" value={result.fundamentals?.administrator ?? '-'} icon={<AwardIcon className="w-5 h-5"/>} />
                                                 </div>
+                                                
                                                 {(result.fundamentals?.businessDescription || result.fundamentals?.riskAssessment) && (
-                                                    <div className="bg-[var(--bg-primary)] p-5 rounded-2xl relative overflow-hidden">
-                                                        <div className="flex items-center gap-2 mb-3 z-10"><SparklesIcon className="w-4 h-4 text-[var(--accent-color)]" /><span className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-wider">Insight IA</span></div>
+                                                    <div className="bg-gradient-to-tr from-sky-900/10 via-transparent to-transparent border border-[var(--accent-color)]/20 p-4 rounded-2xl relative mt-6">
+                                                        <div className="absolute -top-2 -left-2 p-1.5 bg-[var(--bg-secondary)] rounded-full border border-[var(--border-color)] shadow-md"><SparklesIcon className="w-4 h-4 text-[var(--accent-color)]" /></div>
                                                         {result.fundamentals?.businessDescription && (<p className="text-xs leading-relaxed text-[var(--text-primary)] font-medium mb-4 z-10">{result.fundamentals.businessDescription}</p>)}
                                                         {result.fundamentals?.riskAssessment && (<div className="flex items-center gap-2 pt-3 border-t border-[var(--border-color)] z-10"><span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Risco:</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${result.fundamentals.riskAssessment.includes('Alto') ? 'bg-red-500/10 text-red-500 border-red-500/20' : (result.fundamentals.riskAssessment.includes('Médio') ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20')}`}>{result.fundamentals.riskAssessment}</span></div>)}
                                                     </div>
                                                 )}
-                                                {expandedDetails && (
-                                                    <div className="animate-fade-in-up space-y-6 pt-2 border-t border-[var(--border-color)]/50">
-                                                        {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 && (<div><SectionHeader title="Histórico de Proventos" icon={<ClockIcon className="w-4 h-4"/>}/><div className="bg-[var(--bg-primary)] p-4 rounded-2xl"><div className="h-56"><DividendChart data={result.fundamentals.dividendsHistory} /></div></div></div>)}
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            <StatItem label="Patrimônio Líq." value={result.fundamentals?.netWorth ?? '-'} />
-                                                            <StatItem label="Nº Cotistas" value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'} />
-                                                            <StatItem label="CAGR Dividendos (3A)" value={result.fundamentals?.dividendCAGR ? `${result.fundamentals.dividendCAGR}%` : '-'} highlight={result.fundamentals?.dividendCAGR && result.fundamentals.dividendCAGR > 0 ? 'green' : 'neutral'} />
-                                                            <StatItem label="Taxa de Adm." value={result.fundamentals?.managementFee ?? '-'} />
-                                                            <StatItem label="Gestão" value={result.fundamentals?.administrator ?? '-'} className="col-span-2" />
-                                                        </div>
-                                                        {result.fundamentals?.strengths && result.fundamentals.strengths.length > 0 && (<div><SectionHeader title="Pontos Fortes" icon={<TrendingUpIcon className="w-4 h-4"/>}/><div className="flex flex-wrap gap-2">{result.fundamentals.strengths.map((s, i) => (<span key={i} className="text-[10px] bg-[var(--bg-primary)] border border-[var(--border-color)] px-3 py-1.5 rounded-lg font-bold text-[var(--text-primary)] shadow-sm">{s}</span>))}</div></div>)}
-                                                    </div>
-                                                )}
-                                                <button onClick={() => setExpandedDetails(!expandedDetails)} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] border border-[var(--border-color)] bg-[var(--bg-primary)] rounded-xl flex items-center justify-center gap-1 hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors">{expandedDetails ? 'Ocultar Detalhes' : 'Ver Análise Completa'}<ChevronRightIcon className={`w-3 h-3 transition-transform duration-300 ${expandedDetails ? '-rotate-90' : 'rotate-90'}`} /></button>
+                                                
+                                                {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 && (<div><SectionHeader title="Histórico de Proventos" icon={<ClockIcon className="w-4 h-4"/>}/><div className="bg-[var(--bg-primary)] p-4 rounded-2xl"><div className="h-56"><DividendChart data={result.fundamentals.dividendsHistory} /></div></div></div>)}
                                             </div>
                                         )}
                                     </div>
@@ -240,7 +241,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 </div>
                             )}
                             {error && (<div className="bg-red-500/10 border border-red-500/20 text-red-400 p-6 rounded-2xl text-center text-sm font-bold animate-fade-in flex flex-col items-center gap-2"><TrashIcon className="w-6 h-6 mb-1 opacity-50"/>{error}</div>)}
-                            {!result && (
+                            {!result && !loading && (
                                 <div className="animate-fade-in space-y-8 mt-4">
                                     {recentSearches.length > 0 && (
                                         <div className="mb-6">
@@ -250,12 +251,16 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                     )}
                                     <div>
                                         <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider px-1 mb-4">Descubra Oportunidades</h3>
-                                        {MARKET_CATEGORIES.map((cat, i) => (
-                                            <div key={i} className="mb-6">
-                                                <div className="flex items-center gap-2 px-1 mb-3"><div className={`w-2 h-2 rounded-full ${cat.color} shadow-[0_0_8px_rgba(0,0,0,0.3)]`}></div><span className="text-sm font-bold text-[var(--text-primary)]">{cat.title}</span></div>
-                                                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">{cat.tickers.map(t => (<button key={t} onClick={() => { setSearchTerm(t); handleSearch(t); }} className="flex-shrink-0 w-32 bg-[var(--bg-secondary)] border border-[var(--border-color)] p-4 rounded-2xl hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all active:scale-95 text-left group shadow-sm"><span className="block font-black text-sm text-[var(--text-primary)] mb-1">{t}</span><span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors font-medium flex items-center gap-1">Ver detalhes <ChevronRightIcon className="w-2.5 h-2.5"/></span></button>))}</div>
-                                            </div>
-                                        ))}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {MARKET_CATEGORIES.map((cat, i) => (
+                                                <div key={i} className={`bg-gradient-to-br ${cat.color} p-5 rounded-2xl border ${cat.borderColor} shadow-sm group hover:shadow-lg transition-shadow`}>
+                                                    <h4 className="font-bold text-sm text-[var(--text-primary)] mb-3">{cat.title}</h4>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {cat.tickers.map(t => (<button key={t} onClick={() => handleSearch(t)} className="text-left text-xs font-bold text-[var(--text-secondary)] bg-[var(--bg-primary)]/50 border border-[var(--border-color)]/50 rounded-lg p-2 hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--accent-color)] transition-all">{t}</button>))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             )}
