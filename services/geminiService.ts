@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
@@ -49,10 +48,12 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
       TASK: Search for recent and impactful news ${searchContext}.
       RULES:
       1. Use googleSearch to find REAL facts from the last 3 days.
-      2. Return EXACTLY 6 items.
-      3. OUTPUT: JSON Array ONLY. No markdown.
+      2. For each item, find a relevant, high-quality, and royalty-free image URL. The image should be landscape-oriented. If no good image is found, return an empty string for imageUrl.
+      3. Return EXACTLY 6 items.
+      4. Summaries must be concise, under 150 characters, and written in Brazilian Portuguese.
+      5. OUTPUT: JSON Array ONLY. No markdown.
       
-      JSON Structure: [{"title":"","summary":"","source":"","date":"YYYY-MM-DD","sentiment":"Positive"|"Neutral"|"Negative"}]
+      JSON Structure: [{"title":"","summary":"","source":"","date":"YYYY-MM-DD","sentiment":"Positive"|"Neutral"|"Negative","imageUrl":""}]
     `;
 
     const bytesSent = new Blob([prompt]).size;
@@ -99,6 +100,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             return {
                 ...article,
                 url,
+                imageUrl: article.imageUrl || `https://source.unsplash.com/random/800x450/?${encodeURIComponent('finance,stock,market,'+article.title.split(' ').slice(0,2).join(','))}`,
                 date: article.date || new Date().toISOString()
             };
         });

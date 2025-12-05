@@ -1,4 +1,3 @@
-
 export const ptBR = {
     // App / Navigation
     main_portfolio: 'Dashboard',
@@ -128,6 +127,7 @@ export const ptBR = {
     clear_cache_confirm: 'Tem certeza que deseja limpar?',
     cache_cleared: 'Cache limpo!',
     no_news_found: 'Nenhuma notícia encontrada.',
+    no_news_found_subtitle: 'Tente atualizar as notícias ou alterar os filtros.',
     no_favorites_title: 'Sem favoritos',
     no_favorites_subtitle: 'Toque na estrela para salvar notícias importantes.',
     

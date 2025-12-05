@@ -10,6 +10,22 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
+const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
+    const { t } = useI18n();
+    const sentimentMap = {
+        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400 border border-green-500/20' },
+        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400 border border-gray-500/20' },
+        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400 border border-red-500/20' },
+    };
+    const sentimentData = sentiment ? sentimentMap[sentiment] : null;
+    if (!sentimentData) return null;
+    return (
+        <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${sentimentData.color}`}>
+            {sentimentData.text}
+        </span>
+    );
+};
+
 const NewsCard: React.FC<{ 
   article: NewsArticle;
   isFavorited: boolean;
@@ -22,39 +38,53 @@ const NewsCard: React.FC<{
       href={article.url} 
       target="_blank" 
       rel="noopener noreferrer" 
-      className="block bg-[var(--bg-secondary)] rounded-2xl p-5 h-full flex flex-col transition-all duration-300 hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-1 shadow-sm hover:shadow-lg group"
+      className="block bg-[var(--bg-secondary)] rounded-2xl h-full flex flex-col transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-xl group border border-[var(--border-color)] overflow-hidden"
     >
-        <div className="flex justify-between items-start mb-3">
-            <div className="flex flex-col pr-4">
-                <h3 className="text-base font-bold leading-tight text-[var(--text-primary)] mb-1.5 group-hover:text-[var(--accent-color)] transition-colors">{article.title}</h3>
-                <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-medium">
-                    <span>{article.source}</span>
-                    <span className="opacity-50">•</span>
-                    <span>{new Date(article.date).toLocaleDateString()}</span>
-                </div>
-            </div>
+        <div className="relative aspect-video w-full overflow-hidden">
+            {article.imageUrl && (
+                <img src={article.imageUrl} alt={article.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
             <button
                 onClick={onToggleFavorite}
-                className={`p-2 -mr-2 -mt-2 rounded-full transition-colors active:scale-90 z-10 ${isFavorited ? 'text-amber-400' : 'text-gray-600 hover:text-amber-400'}`}
+                className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-300 active:scale-90 z-10 bg-black/30 backdrop-blur-sm group-hover:bg-black/50 ${isFavorited ? 'text-amber-400' : 'text-white/70 hover:text-amber-400'}`}
                 aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
             >
                 <StarIcon filled={isFavorited} className="w-5 h-5" />
             </button>
+            <div className="absolute bottom-4 left-4 right-4">
+                 <h3 className="text-base font-bold leading-tight text-white mb-1.5 line-clamp-2 drop-shadow-md group-hover:text-sky-300 transition-colors">{article.title}</h3>
+            </div>
         </div>
         
-        <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2 mt-auto">
-          {article.summary}
-        </p>
+        <div className="p-5 flex flex-col flex-1">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3 flex-1">
+              {article.summary}
+            </p>
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--border-color)]">
+                <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-medium">
+                    <span className="font-bold text-[var(--text-primary)] truncate max-w-[120px]">{article.source}</span>
+                    <span className="opacity-50">•</span>
+                    <span>{new Date(article.date).toLocaleDateString()}</span>
+                </div>
+                 <SentimentBadge sentiment={article.sentiment} />
+            </div>
+        </div>
     </a>
   );
 };
 
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl animate-pulse">
-        <div className="h-5 bg-[var(--bg-tertiary-hover)] rounded w-3/4 mb-3"></div>
-        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/3 mb-6"></div>
-        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-full mb-2"></div>
-        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-2/3"></div>
+    <div className="bg-[var(--bg-secondary)] rounded-2xl animate-pulse overflow-hidden border border-[var(--border-color)]">
+        <div className="bg-[var(--bg-tertiary-hover)] aspect-video w-full"></div>
+        <div className="p-5">
+            <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-full mb-2"></div>
+            <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-2/3 mb-6"></div>
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--border-color)]">
+                <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/3"></div>
+                <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/4"></div>
+            </div>
+        </div>
     </div>
 );
 
@@ -215,7 +245,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       <div className="w-full max-w-7xl mx-auto">
         {!isEmbedded && (
             <div className="mb-4 flex justify-between items-center">
-                 <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{t('market_news')}</h1>
+                 <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2"><NewsIcon className="w-6 h-6 text-[var(--accent-color)]"/>{t('market_news')}</h1>
                  <button 
                     onClick={handleRefresh} 
                     disabled={loading}
@@ -240,22 +270,19 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             />
         </div>
         
-        <div className="flex overflow-x-auto no-scrollbar gap-6 pb-2 mb-4 border-b border-[var(--border-color)]">
+        <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl mb-6 border border-[var(--border-color)] shrink-0 shadow-inner">
             {filterPills.map((pill) => (
                 <button
                     key={pill.id}
                     onClick={() => setActiveFilter(pill.id)}
-                    className={`flex-shrink-0 py-2 text-sm font-bold transition-colors whitespace-nowrap relative ${activeFilter === pill.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 uppercase tracking-wide ${activeFilter === pill.id ? 'bg-[var(--bg-secondary)] text-[var(--accent-color)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                 >
                     {pill.label}
-                    {activeFilter === pill.id && (
-                        <div className="absolute -bottom-px left-0 right-0 h-0.5 bg-[var(--accent-color)] rounded-full animate-grow-x"></div>
-                    )}
                 </button>
             ))}
         </div>
 
-        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({length: 6}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{Array.from({length: 6}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
         
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-8 rounded-2xl text-center">
@@ -270,7 +297,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         {!loading && !error && (
           <div className="flex-1">
             {displayedNews.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {displayedNews.map((article, index) => (
                   <div 
                       key={`${article.title}-${index}`} 
@@ -291,11 +318,15 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">
-                  <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border border-[var(--border-color)]">
-                      <NewsIcon className="w-8 h-8 opacity-30" />
+                  <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-[var(--border-color)]">
+                      {activeFilter === 'favorites' ? <StarIcon className="w-8 h-8 opacity-30"/> : <NewsIcon className="w-8 h-8 opacity-30" />}
                   </div>
-                  <p className="font-bold text-lg text-[var(--text-primary)]">Sem notícias</p>
-                  <p className="text-sm mt-2 max-w-[250px] opacity-70">Tente buscar por outros termos ou ajustar os filtros.</p>
+                  <p className="font-bold text-lg text-[var(--text-primary)]">
+                      {activeFilter === 'favorites' ? t('no_favorites_title') : t('no_news_found')}
+                  </p>
+                  <p className="text-sm mt-2 max-w-[250px] opacity-70">
+                      {activeFilter === 'favorites' ? t('no_favorites_subtitle') : t('no_news_found_subtitle')}
+                  </p>
               </div>
             )}
           </div>
