@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { View, } from '../App';
 import type { AppNotification, NotificationType } from '../types';
@@ -65,10 +64,10 @@ const SwipeableNotificationItem: React.FC<{
     const deleteOpacity = Math.min(Math.abs(offsetX) / 50, 1);
 
     return (
-        <div className="relative overflow-hidden mb-3 h-auto min-h-[90px] group">
+        <div className="relative overflow-hidden group">
             {/* Background Action (Delete) */}
             <div 
-                className="absolute inset-y-0 right-0 bg-red-500 rounded-2xl flex items-center justify-center w-[100px] transition-opacity duration-200 my-0.5"
+                className="absolute inset-y-0 right-0 bg-red-500 rounded-2xl flex items-center justify-center w-[100px] transition-opacity duration-200"
                 style={{ opacity: deleteOpacity }}
             >
                 <div className="flex flex-col items-center text-white font-bold text-[10px] gap-1">
@@ -79,10 +78,10 @@ const SwipeableNotificationItem: React.FC<{
 
             {/* Foreground Content */}
             <div 
-                className={`relative bg-[var(--bg-secondary)] p-4 flex items-start space-x-4 border border-[var(--border-color)] transition-transform duration-200 ease-out active:scale-[0.98] rounded-2xl w-full z-10 ${notification.read ? 'opacity-60' : 'shadow-sm'}`}
+                className={`relative bg-[var(--bg-secondary)] p-4 flex items-start space-x-4 border border-[var(--border-color)] transition-all duration-200 ease-out active:scale-[0.98] rounded-2xl w-full z-10 ${notification.read ? 'opacity-60' : 'shadow-sm'}`}
                 style={{ 
                     transform: `translateX(${offsetX}px)`,
-                    transition: isSwiping ? 'none' : 'transform 0.2s ease-out'
+                    transition: isSwiping ? 'none' : 'transform 0.2s ease-out, opacity 0.3s'
                 }}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -142,8 +141,6 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
         }, 1500); 
         return () => clearTimeout(timer);
     }, [unreadNotificationsCount, markNotificationsAsRead]);
-    
-    const [activeFilter, setActiveFilter] = useState<'all' | NotificationType>('all');
 
     const handleNotificationClick = (notification: AppNotification) => {
         if (notification.relatedTicker) {
@@ -164,31 +161,24 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
     };
 
     const groupedNotifications = useMemo(() => {
-        let visible = activeFilter !== 'all' ? notifications.filter(n => n.type === activeFilter) : notifications;
-        
         const groups: { [key: string]: AppNotification[] } = { today: [], yesterday: [], older: [] };
         const todayDate = new Date().toDateString();
         const yesterdayDate = new Date(Date.now() - 86400000).toDateString();
 
-        for (const n of visible) {
+        for (const n of notifications) {
             const nDate = new Date(n.date).toDateString();
             if (nDate === todayDate) groups.today.push(n);
             else if (nDate === yesterdayDate) groups.yesterday.push(n);
             else groups.older.push(n);
         }
         return groups;
-    }, [notifications, activeFilter]);
+    }, [notifications]);
 
     const groupTitles = { today: t('today'), yesterday: t('yesterday'), older: t('older') };
-    const filters: { id: 'all' | NotificationType; label: string }[] = [
-        { id: 'all', label: t('notif_filter_all') },
-        { id: 'dividend_confirmed', label: 'Proventos' },
-        { id: 'price_alert', label: 'Alertas' },
-    ];
-
+    
     return (
-        <div className="p-4 h-full flex flex-col overflow-x-hidden">
-            <div className="flex items-center justify-between mb-4">
+        <div className="h-full flex flex-col overflow-x-hidden">
+             <div className="flex items-center justify-between p-4 pb-2">
                  <div className="flex items-center">
                     <button onClick={() => setActiveView('dashboard')} className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-all duration-200 active:scale-95" aria-label={t('back')}>
                         <ChevronLeftIcon className="w-6 h-6" />
@@ -197,8 +187,8 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                  </div>
                  <div className="flex space-x-2 items-center">
                     {notifications.length > 0 && (
-                        <button onClick={handleClearAll} className="text-[10px] font-bold text-red-500 hover:text-red-400 px-3 py-1.5 rounded-lg active:scale-95 transition-transform bg-red-500/10 border border-red-500/20">
-                            {t('clear_all')}
+                        <button onClick={handleClearAll} className="p-2 rounded-full text-red-500/80 hover:text-red-500 hover:bg-red-500/10 transition-colors" aria-label={t('clear_all')}>
+                            <TrashIcon className="w-5 h-5" />
                         </button>
                     )}
                     <button onClick={goToSettings} className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors" aria-label="Configurações">
@@ -207,30 +197,24 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                  </div>
             </div>
 
-            <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-1">
-                {filters.map(f => (
-                    <button key={f.id} onClick={() => { setActiveFilter(f.id); vibrate(); }} className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${activeFilter === f.id ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)] shadow-md' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)]'}`}>
-                        {f.label}
-                    </button>
-                ))}
-            </div>
-
             {notifications.length > 0 ? (
-                <div className="space-y-6 pb-24 md:pb-6 overflow-y-auto overflow-x-hidden custom-scrollbar landscape-pb-6">
+                <div className="flex-1 space-y-6 p-4 pb-24 md:pb-6 overflow-y-auto overflow-x-hidden custom-scrollbar landscape-pb-6">
                     {(Object.keys(groupedNotifications) as Array<keyof typeof groupedNotifications>).map(groupKey => 
                         groupedNotifications[groupKey].length > 0 && (
                             <div key={groupKey} className="relative">
-                                <h2 className="text-[10px] font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)]/95 backdrop-blur-md py-2 z-20 px-1 border-b border-[var(--border-color)]/50 w-full">
+                                <h2 className="text-[10px] font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)]/80 backdrop-blur-md py-2 z-20 px-1 border-b border-[var(--border-color)]/50 -mx-1">
                                     {groupTitles[groupKey]}
                                 </h2>
-                                <div className="space-y-1">
-                                    {groupedNotifications[groupKey].map((notification) => (
-                                        <SwipeableNotificationItem 
-                                            key={notification.id}
-                                            notification={notification}
-                                            onClick={handleNotificationClick}
-                                            onDelete={deleteNotification}
-                                        />
+                                <div className="space-y-3">
+                                    {groupedNotifications[groupKey].map((notification, index) => (
+                                        <div className="animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
+                                            <SwipeableNotificationItem 
+                                                key={notification.id}
+                                                notification={notification}
+                                                onClick={handleNotificationClick}
+                                                onDelete={deleteNotification}
+                                            />
+                                        </div>
                                     ))}
                                 </div>
                             </div>
