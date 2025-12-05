@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import type { Transaction, ToastMessage } from '../types';
 import EditIcon from '../components/icons/EditIcon';
@@ -272,8 +273,6 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                 )}
             </div>
             
-            <FloatingActionButton id="fab-add-transaction" onClick={() => { setShowAddModal(true); vibrate(); }} />
-
             {showAddModal && (
                 <Suspense fallback={<div/>}>
                     <TransactionModal 

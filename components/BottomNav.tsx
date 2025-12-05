@@ -6,7 +6,6 @@ import LayoutGridIcon from './icons/LayoutGridIcon';
 import GlobeIcon from './icons/GlobeIcon';
 import NewsIcon from './icons/NewsIcon';
 import TransactionIcon from './icons/TransactionIcon';
-import WalletIcon from './icons/WalletIcon';
 import { vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -55,7 +54,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
     { view: 'dashboard', label: t('nav_portfolio'), icon: <LayoutGridIcon /> },
     { view: 'transacoes', label: t('nav_transactions'), icon: <TransactionIcon /> },
     { view: 'mercado', label: t('nav_market'), icon: <GlobeIcon /> },
-    { view: 'analise', label: t('nav_analysis'), icon: <WalletIcon /> },
+    { view: 'noticias', label: t('nav_news'), icon: <NewsIcon /> },
   ];
 
   return (
