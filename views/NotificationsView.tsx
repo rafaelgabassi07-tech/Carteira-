@@ -10,18 +10,34 @@ import SettingsIcon from '../components/icons/SettingsIcon';
 import TrashIcon from '../components/icons/TrashIcon';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import TrendingUpIcon from '../components/icons/TrendingUpIcon';
+import InfoIcon from '../components/icons/InfoIcon';
+import DollarSignIcon from '../components/icons/DollarSignIcon';
+import AlertTriangleIcon from '../components/icons/AlertTriangleIcon';
 
 const NotificationIcon: React.FC<{ type: NotificationType }> = ({ type }) => {
+    let icon, color;
     switch (type) {
         case 'dividend_confirmed':
-            return <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-500/10 text-emerald-500 font-bold text-lg shadow-sm border border-emerald-500/20">$</div>;
+            icon = <DollarSignIcon className="w-5 h-5"/>;
+            color = 'text-emerald-500';
+            break;
         case 'price_alert':
-            return <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-500/10 text-amber-500 font-bold text-lg shadow-sm border border-amber-500/20">!</div>;
+            icon = <AlertTriangleIcon className="w-5 h-5"/>;
+            color = 'text-amber-500';
+            break;
         case 'milestone':
-            return <div className="w-10 h-10 rounded-full flex items-center justify-center bg-sky-500/10 text-sky-500 shadow-sm border border-sky-500/20"><TrendingUpIcon className="w-5 h-5"/></div>;
+            icon = <TrendingUpIcon className="w-5 h-5"/>;
+            color = 'text-sky-500';
+            break;
         default:
-            return <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400 font-bold text-lg shadow-sm border border-gray-500/20">i</div>;
+            icon = <InfoIcon className="w-5 h-5"/>;
+            color = 'text-gray-400';
     }
+    return (
+        <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center bg-[var(--bg-primary)] border border-[var(--border-color)] ${color}`}>
+            {icon}
+        </div>
+    );
 };
 
 const SwipeableNotificationItem: React.FC<{ 
@@ -64,21 +80,18 @@ const SwipeableNotificationItem: React.FC<{
     const deleteOpacity = Math.min(Math.abs(offsetX) / 50, 1);
 
     return (
-        <div className="relative overflow-hidden group">
+        <div className="relative group">
             {/* Background Action (Delete) */}
             <div 
-                className="absolute inset-y-0 right-0 bg-red-500 rounded-2xl flex items-center justify-center w-[100px] transition-opacity duration-200"
+                className="absolute inset-0 bg-red-500 rounded-2xl flex items-center justify-end px-6 transition-opacity duration-200"
                 style={{ opacity: deleteOpacity }}
             >
-                <div className="flex flex-col items-center text-white font-bold text-[10px] gap-1">
-                    <TrashIcon className="w-5 h-5" />
-                    <span>EXCLUIR</span>
-                </div>
+                <TrashIcon className="w-6 h-6 text-white" />
             </div>
 
             {/* Foreground Content */}
             <div 
-                className={`relative bg-[var(--bg-secondary)] p-4 flex items-start space-x-4 border border-[var(--border-color)] transition-all duration-200 ease-out active:scale-[0.98] rounded-2xl w-full z-10 ${notification.read ? 'opacity-60' : 'shadow-sm'}`}
+                className={`relative bg-[var(--bg-secondary)] p-4 flex items-center gap-4 transition-all duration-200 ease-out active:scale-[0.98] rounded-2xl w-full z-10 ${notification.read ? 'opacity-60' : 'shadow-sm'}`}
                 style={{ 
                     transform: `translateX(${offsetX}px)`,
                     transition: isSwiping ? 'none' : 'transform 0.2s ease-out, opacity 0.3s'
@@ -96,32 +109,23 @@ const SwipeableNotificationItem: React.FC<{
                 <div className="relative flex-shrink-0">
                     <NotificationIcon type={notification.type} />
                     {!notification.read && (
-                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-color)] opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--accent-color)] border-2 border-[var(--bg-secondary)]"></span>
-                        </span>
+                         <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[var(--accent-color)] rounded-full border-2 border-[var(--bg-secondary)]"></span>
                     )}
                 </div>
                 
-                <div className="flex-1 min-w-0 py-0.5">
-                    <div className="flex justify-between items-start mb-1.5">
-                        <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-                            {notification.type.replace('_', ' ')}
-                        </span>
-                        <span className="text-[10px] font-medium text-[var(--text-secondary)] opacity-60">
+                <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                        <p className={`text-sm font-bold truncate ${notification.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{notification.title}</p>
+                        <span className="text-[10px] font-medium text-[var(--text-secondary)] opacity-60 flex-shrink-0 ml-2">
                             {new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </span>
                     </div>
-                    
-                    <p className={`text-sm font-bold truncate mb-1 ${notification.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{notification.title}</p>
-                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">{notification.description}</p>
+                    <p className="text-xs text-[var(--text-secondary)] leading-snug line-clamp-2 mt-0.5">{notification.description}</p>
                     
                     {notification.relatedTicker && (
-                        <div className="flex justify-end mt-2">
-                            <span className="flex items-center text-[var(--accent-color)] text-[9px] font-bold gap-0.5 hover:underline">
-                                VER DETALHES <ChevronRightIcon className="w-2.5 h-2.5" />
-                            </span>
-                        </div>
+                        <span className="flex items-center text-[var(--accent-color)] text-[10px] font-bold gap-0.5 mt-2 hover:underline">
+                            VER ATIVO <ChevronRightIcon className="w-3 h-3" />
+                        </span>
                     )}
                 </div>
             </div>
@@ -202,7 +206,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                     {(Object.keys(groupedNotifications) as Array<keyof typeof groupedNotifications>).map(groupKey => 
                         groupedNotifications[groupKey].length > 0 && (
                             <div key={groupKey} className="relative">
-                                <h2 className="text-[10px] font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)]/80 backdrop-blur-md py-2 z-20 px-1 border-b border-[var(--border-color)]/50 -mx-1">
+                                <h2 className="text-[10px] font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)]/80 backdrop-blur-md py-2 z-20 px-1">
                                     {groupTitles[groupKey]}
                                 </h2>
                                 <div className="space-y-3">

@@ -2,9 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
 import StarIcon from '../components/icons/StarIcon';
-import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import FilterIcon from '../components/icons/FilterIcon';
 import NewsIcon from '../components/icons/NewsIcon';
 import SearchIcon from '../components/icons/SearchIcon';
 import { useI18n } from '../contexts/I18nContext';
@@ -12,116 +10,51 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
-    const { t } = useI18n();
-    const sentimentMap = {
-        Positive: { text: t('sentiment_positive'), color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
-        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/10 text-gray-500 border-gray-500/20' },
-        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/10 text-red-500 border-red-500/20' },
-    };
-    const sentimentData = sentiment ? sentimentMap[sentiment] : null;
-    if (!sentimentData) return null;
-    return (
-        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${sentimentData.color} uppercase tracking-wider`}>
-            {sentimentData.text}
-        </span>
-    );
-};
-
 const NewsCard: React.FC<{ 
   article: NewsArticle;
   isFavorited: boolean;
-  onToggleFavorite: () => void;
-  addToast: (message: string, type?: ToastMessage['type']) => void;
-}> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
+  onToggleFavorite: (e: React.MouseEvent) => void;
+}> = ({ article, isFavorited, onToggleFavorite }) => {
   const { t } = useI18n();
 
-  const handleShare = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    vibrate();
-    const shareData = {
-        title: article.title,
-        text: article.summary,
-        url: article.url || window.location.href,
-    };
-    try {
-        if (navigator.share) {
-            await navigator.share(shareData);
-        } else {
-           addToast(t('toast_share_not_supported'), 'error');
-        }
-    } catch (err) {
-       // User cancellation is not an error
-    }
-  };
-
-  const handleFavorite = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      vibrate(20);
-      onToggleFavorite();
-  }
-
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col group transition-all duration-300 hover:border-[var(--accent-color)]/30 hover:-translate-y-1">
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="flex justify-between items-start mb-2">
-            <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-2 py-0.5 rounded border border-[var(--accent-color)]/20 uppercase tracking-wide">
-                    {article.source}
-                </span>
-                <span className="text-[10px] text-[var(--text-secondary)] opacity-60">
-                    {new Date(article.date).toLocaleDateString()}
-                </span>
+    <a 
+      href={article.url} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className="block bg-[var(--bg-secondary)] rounded-2xl p-5 h-full flex flex-col transition-all duration-300 hover:bg-[var(--bg-tertiary-hover)] hover:-translate-y-1 shadow-sm hover:shadow-lg group"
+    >
+        <div className="flex justify-between items-start mb-3">
+            <div className="flex flex-col pr-4">
+                <h3 className="text-base font-bold leading-tight text-[var(--text-primary)] mb-1.5 group-hover:text-[var(--accent-color)] transition-colors">{article.title}</h3>
+                <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-medium">
+                    <span>{article.source}</span>
+                    <span className="opacity-50">•</span>
+                    <span>{new Date(article.date).toLocaleDateString()}</span>
+                </div>
             </div>
-             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-               <button
-                  onClick={handleShare}
-                  className="p-1.5 rounded-lg text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors active:scale-90"
-                  aria-label={t('share_news')}
-              >
-                  <ShareIcon className="w-4 h-4" />
-              </button>
-              <button
-                  onClick={handleFavorite}
-                  className={`p-1.5 rounded-lg transition-all active:scale-90 ${isFavorited ? 'text-amber-400' : 'text-gray-400 hover:text-amber-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
-                  aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
-              >
-                  <StarIcon filled={isFavorited} className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+                onClick={onToggleFavorite}
+                className={`p-2 -mr-2 -mt-2 rounded-full transition-colors active:scale-90 z-10 ${isFavorited ? 'text-amber-400' : 'text-gray-600 hover:text-amber-400'}`}
+                aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
+            >
+                <StarIcon filled={isFavorited} className="w-5 h-5" />
+            </button>
         </div>
         
-        <a href={article.url} target="_blank" rel="noopener noreferrer" className="block my-2">
-            <h3 className="text-base font-bold leading-snug text-[var(--text-primary)] group-hover:text-[var(--accent-color)] transition-colors">{article.title}</h3>
-        </a>
-        
-        <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3 my-1">
+        <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2 mt-auto">
           {article.summary}
         </p>
-
-        <div className="flex justify-between items-center mt-auto pt-4">
-          <SentimentBadge sentiment={article.sentiment} />
-          {article.url && 
-            <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider transition-colors">
-                {t('view_original')}
-            </a>
-          }
-        </div>
-      </div>
-    </div>
+    </a>
   );
 };
 
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl animate-pulse border border-[var(--border-color)]">
-        <div className="flex justify-between mb-4">
-            <div className="h-4 bg-[var(--bg-primary)] rounded w-20"></div>
-            <div className="h-4 bg-[var(--bg-primary)] rounded w-8"></div>
-        </div>
-        <div className="h-5 bg-[var(--bg-primary)] rounded w-full mb-2"></div>
-        <div className="h-5 bg-[var(--bg-primary)] rounded w-3/4 mb-4"></div>
-        <div className="h-3 bg-[var(--bg-primary)] rounded w-full mb-2"></div>
-        <div className="h-3 bg-[var(--bg-primary)] rounded w-2/3"></div>
+    <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl animate-pulse">
+        <div className="h-5 bg-[var(--bg-tertiary-hover)] rounded w-3/4 mb-3"></div>
+        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/3 mb-6"></div>
+        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-full mb-2"></div>
+        <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-2/3"></div>
     </div>
 );
 
@@ -134,7 +67,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<NewsViewFilter>('recent');
 
@@ -308,14 +240,17 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             />
         </div>
         
-        <div className="flex overflow-x-auto no-scrollbar gap-2 pb-2 mb-4">
+        <div className="flex overflow-x-auto no-scrollbar gap-6 pb-2 mb-4 border-b border-[var(--border-color)]">
             {filterPills.map((pill) => (
                 <button
                     key={pill.id}
                     onClick={() => setActiveFilter(pill.id)}
-                    className={`flex-shrink-0 px-4 py-2 text-xs font-bold rounded-full border transition-all whitespace-nowrap ${activeFilter === pill.id ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-color)] shadow-sm' : 'bg-transparent text-[var(--text-secondary)] border-transparent hover:bg-[var(--bg-primary)]'}`}
+                    className={`flex-shrink-0 py-2 text-sm font-bold transition-colors whitespace-nowrap relative ${activeFilter === pill.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                 >
                     {pill.label}
+                    {activeFilter === pill.id && (
+                        <div className="absolute -bottom-px left-0 right-0 h-0.5 bg-[var(--accent-color)] rounded-full animate-grow-x"></div>
+                    )}
                 </button>
             ))}
         </div>
@@ -343,10 +278,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                       style={{ animationDelay: `${index * 50}ms` }}
                   >
                       <NewsCard 
-                      article={article}
-                      isFavorited={favorites.has(article.title)}
-                      onToggleFavorite={() => handleToggleFavorite(article.title)}
-                      addToast={addToast}
+                          article={article}
+                          isFavorited={favorites.has(article.title)}
+                          onToggleFavorite={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleToggleFavorite(article.title);
+                          }}
                       />
                   </div>
                   ))}
