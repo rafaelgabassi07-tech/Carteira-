@@ -1,5 +1,5 @@
-const CACHE_NAME = 'invest-portfolio-cache-v2.0.0'; // Bumped Version for update
-const RUNTIME_CACHE = 'runtime-cache-v2.0.0';
+const CACHE_NAME = 'invest-portfolio-cache-v2.0.2'; // Bumped Version for update
+const RUNTIME_CACHE = 'runtime-cache-v2.0.2';
 
 const urlsToCache = [
   './',

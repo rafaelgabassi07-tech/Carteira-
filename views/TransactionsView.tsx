@@ -186,7 +186,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
     };
     
     return (
-        <div className="p-4 pt-safe pb-32 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6" id="transactions-view">
+        <div className="p-4 pt-safe pb-32 md:pb-6 landscape-pb-6" id="transactions-view">
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_transactions')}</h1>
                 
@@ -273,18 +273,16 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                 )}
             </div>
             
-            {showAddModal && (
-                <Suspense fallback={<div/>}>
+            <Suspense fallback={<div/>}>
+                {showAddModal && (
                     <TransactionModal 
                         onClose={() => setShowAddModal(false)} 
                         onSave={handleSaveTransaction}
                         addToast={addToast}
                     />
-                </Suspense>
-            )}
+                )}
 
-            {editingTx && (
-                 <Suspense fallback={<div/>}>
+                {editingTx && (
                     <TransactionModal 
                         onClose={() => setEditingTx(null)} 
                         onSave={handleSaveTransaction}
@@ -292,8 +290,8 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                         transaction={editingTx} 
                         addToast={addToast}
                     />
-                </Suspense>
-            )}
+                )}
+            </Suspense>
         </div>
     );
 };

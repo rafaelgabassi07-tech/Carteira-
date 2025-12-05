@@ -332,7 +332,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   return (
     <div 
-        className={isEmbedded ? 'space-y-4' : `p-4 h-full pb-32 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6 pt-2`}
+        className={isEmbedded ? 'space-y-4' : `p-4 h-full pb-32 md:pb-6 flex flex-col landscape-pb-6 pt-2`}
         ref={containerRef}
         onTouchStart={!isEmbedded ? handleTouchStart : undefined}
         onTouchMove={!isEmbedded ? handleTouchMove : undefined}

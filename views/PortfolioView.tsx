@@ -331,7 +331,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
     return (
         <>
             <div 
-                className="pb-32 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
+                className="pb-32 overscroll-contain landscape-pb-6"
                 ref={containerRef}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
