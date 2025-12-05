@@ -188,7 +188,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                     )}
                 </div>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-32 md:pb-6 landscape-pb-6 scroll-smooth">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-24 md:pb-6 landscape-pb-6 scroll-smooth">
                 <div className="max-w-2xl mx-auto h-full">
                     {viewMode === 'quotes' ? (
                         <div className="animate-fade-in space-y-6">
@@ -260,7 +260,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 </div>
                             )}
                         </div>
-                    ) : (<div className="flex-1 animate-fade-in h-full"><NewsView addToast={addToast} /></div>)}
+                    ) : (<div className="flex-1 animate-fade-in h-full"><NewsView addToast={addToast} isEmbedded={true} /></div>)}
                 </div>
             </div>
             {showAddModal && result && (<TransactionModal onClose={() => setShowAddModal(false)} onSave={handleAddTransaction} initialTicker={result.ticker} addToast={addToast} />)}

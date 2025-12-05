@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { View, } from '../App';
 import type { AppNotification, NotificationType } from '../types';
@@ -203,7 +202,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
             </div>
 
             {notifications.length > 0 ? (
-                <div className="flex-1 space-y-6 p-4 pb-32 md:pb-6 overflow-y-auto overflow-x-hidden custom-scrollbar landscape-pb-6">
+                <div className="flex-1 space-y-6 p-4 pb-24 md:pb-6 overflow-y-auto overflow-x-hidden custom-scrollbar landscape-pb-6">
                     {(Object.keys(groupedNotifications) as Array<keyof typeof groupedNotifications>).map(groupKey => 
                         groupedNotifications[groupKey].length > 0 && (
                             <div key={groupKey} className="relative">
