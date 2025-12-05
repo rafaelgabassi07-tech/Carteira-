@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -21,9 +22,8 @@ const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
 const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
 const MarketView = React.lazy(() => import('./views/MarketView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
-const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 
-export type View = 'dashboard' | 'transacoes' | 'mercado' | 'analysis' | 'notificacoes' | 'assetDetail' | 'settings' | 'noticias';
+export type View = 'dashboard' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail' | 'mercado';
 
 const App: React.FC = () => {
   const { preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
@@ -79,7 +79,7 @@ const App: React.FC = () => {
       if (shareParam) {
           // If receiving shared text, go to Market
           setActiveView('mercado');
-      } else if (viewParam && ['dashboard', 'transacoes', 'noticias', 'settings', 'mercado', 'analysis'].includes(viewParam)) {
+      } else if (viewParam && ['dashboard', 'transacoes', 'noticias', 'settings', 'mercado'].includes(viewParam)) {
           // If coming from Shortcut
           setActiveView(viewParam as View);
       }
@@ -158,8 +158,9 @@ const App: React.FC = () => {
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
+      // @google/genai-api-fix: Pass unreadNotificationsCount to PortfolioView to satisfy component props.
       case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
-      case 'analysis': return <AnalysisView addToast={addToast} />;
+      // @google/genai-api-fix: Pass unreadNotificationsCount to PortfolioView to satisfy component props.
       default: return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
     }
   };

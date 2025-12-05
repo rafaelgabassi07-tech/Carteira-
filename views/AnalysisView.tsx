@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -84,7 +85,6 @@ const DiversificationCard: React.FC = () => {
 
 interface AnalysisViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
-    onSelectAsset: (ticker: string) => void;
 }
 
 const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast }) => {

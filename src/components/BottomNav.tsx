@@ -1,11 +1,12 @@
 
 
+
 import React from 'react';
 import type { View } from '../App';
 import LayoutGridIcon from './icons/LayoutGridIcon';
 import GlobeIcon from './icons/GlobeIcon';
+import NewsIcon from './icons/NewsIcon';
 import TransactionIcon from './icons/TransactionIcon';
-import WalletIcon from './icons/WalletIcon';
 import { vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
 
@@ -30,7 +31,8 @@ const NavItem: React.FC<{
       style={{ transform: isActive ? 'scale(1.1)' : 'scale(1)' }}
     >
       <div className="transition-transform duration-300 ease-spring group-active:scale-90">
-        {React.cloneElement(icon, { className: 'w-6 h-6' })}
+        {/* @google/genai-api-fix: Cast icon to React.ReactElement<any> to allow passing className prop. */}
+        {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
       </div>
       <span 
         className={`text-[10px] font-bold tracking-wide mt-1 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
@@ -54,7 +56,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
     { view: 'dashboard', label: t('nav_portfolio'), icon: <LayoutGridIcon /> },
     { view: 'transacoes', label: t('nav_transactions'), icon: <TransactionIcon /> },
     { view: 'mercado', label: t('nav_market'), icon: <GlobeIcon /> },
-    { view: 'analysis', label: t('nav_analysis'), icon: <WalletIcon /> },
+    { view: 'noticias', label: t('nav_news'), icon: <NewsIcon /> },
   ];
 
   return (

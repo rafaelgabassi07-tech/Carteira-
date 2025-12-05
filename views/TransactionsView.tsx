@@ -292,6 +292,7 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
                     />
                 )}
             </Suspense>
+            <FloatingActionButton id="fab-add-transaction" onClick={() => { setShowAddModal(true); vibrate(); }} />
         </div>
     );
 };

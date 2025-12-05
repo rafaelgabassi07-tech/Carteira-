@@ -14,9 +14,6 @@ import AssetListItem from '../components/AssetListItem';
 import DividendsSummaryCard from '../components/DividendsSummaryCard';
 import WalletIcon from '../components/icons/WalletIcon';
 import FloatingActionButton from '../components/FloatingActionButton';
-import PatrimonyEvolutionCard from '../components/PatrimonyEvolutionCard';
-import PortfolioPieChart from '../components/PortfolioPieChart';
-import BarChart from '../components/BarChart';
 
 const TransactionModal = React.lazy(() => import('../components/modals/TransactionModal'));
 
@@ -24,80 +21,6 @@ const TransactionModal = React.lazy(() => import('../components/modals/Transacti
 const SortIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
 );
-
-// --- Sub-Components ---
-const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number; className?: string }> = ({ title, children, action, delay = 0, className = '' }) => (
-    <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${className}`} style={{ animationDelay: `${delay}ms` }}>
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-lg text-[var(--text-primary)]">{title}</h3>
-            {action}
-        </div>
-        {children}
-    </div>
-);
-
-const IncomeCard: React.FC = () => {
-    const { t, formatCurrency } = useI18n();
-    const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
-    
-    const average = useMemo(() => {
-         const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
-         return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
-    }, [monthlyIncome]);
-
-    return (
-        <AnalysisCard title={t('monthly_income')} delay={100}>
-             <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
-                    <span className="font-semibold text-lg text-[var(--green-text)]">
-                        <CountUp end={average} formatter={formatCurrency} />
-                    </span>
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
-                    <span className="font-semibold text-lg text-[var(--green-text)]">
-                        <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
-                    </span>
-                </div>
-            </div>
-             <div className="h-48 w-full">
-                 <BarChart data={monthlyIncome} />
-             </div>
-        </AnalysisCard>
-    );
-};
-
-const DiversificationCard: React.FC = () => {
-    const { t } = useI18n();
-    const { assets, preferences } = usePortfolio();
-    
-    const data = useMemo(() => {
-        const segments: Record<string, number> = {};
-        let totalValue = 0;
-        const activeAssets = assets.filter(a => a.quantity > 0.000001);
-
-        activeAssets.forEach(a => {
-            const val = a.quantity * a.currentPrice;
-            const seg = a.segment || t('outros');
-            segments[seg] = (segments[seg] || 0) + val;
-            totalValue += val;
-        });
-        
-        return Object.entries(segments).map(([name, value]) => ({
-            name,
-            value,
-            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
-        })).sort((a, b) => b.value - a.value);
-    }, [assets, t]);
-
-    return (
-        <AnalysisCard title={t('diversification')} delay={200}>
-            <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
-        </AnalysisCard>
-    );
-};
-
 
 const PortfolioSkeleton: React.FC = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
@@ -159,7 +82,7 @@ const Metric: React.FC<{ label: string; children: React.ReactNode; }> = ({ label
     </div>
 );
 
-const PortfolioSummary: React.FC = () => {
+const PortfolioSummary: React.FC<{ isFlashing: boolean }> = ({ isFlashing }) => {
     const { t, formatCurrency, locale } = useI18n();
     const { assets, privacyMode, preferences, yieldOnCost, projectedAnnualIncome } = usePortfolio();
 
@@ -187,7 +110,7 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
+        <div id="portfolio-summary" className={`bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500 ${isFlashing ? 'animate-flash-accent' : ''}`}>
             {/* Decorative Glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
 
@@ -241,15 +164,25 @@ interface PortfolioViewProps {
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast, unreadNotificationsCount }) => {
     const { t } = useI18n();
-    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing, addTransaction } = usePortfolio();
-    const [activeTab, setActiveTab] = useState<'summary' | 'analysis'>('summary');
+    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing, addTransaction, transactions } = usePortfolio();
     const [searchQuery, setSearchQuery] = useState('');
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
     const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
     const [isSortOpen, setIsSortOpen] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [isFlashing, setIsFlashing] = useState(false);
     
     const isRefreshing = isContextRefreshing || isPullRefreshing;
+    const prevTxCount = useRef(transactions.length);
+
+    useEffect(() => {
+        if (transactions.length !== prevTxCount.current) {
+            setIsFlashing(true);
+            const timer = setTimeout(() => setIsFlashing(false), 700); // Animation duration
+            prevTxCount.current = transactions.length;
+            return () => clearTimeout(timer);
+        }
+    }, [transactions.length]);
 
     useEffect(() => {
         setSortOption(preferences.defaultSort || 'valueDesc');
@@ -352,72 +285,50 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                     
                     {hasActiveAssets ? (
                         <div className="animate-fade-in">
-                            <div className="px-4 mt-4">
-                                <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)]">
-                                    <button onClick={() => setActiveTab('summary')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'summary' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>Resumo</button>
-                                    <button onClick={() => setActiveTab('analysis')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'analysis' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]'}`}>Análise</button>
+                            <div className="animate-fade-in">
+                                <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
+                                    <PortfolioSummary isFlashing={isFlashing} />
+                                    <div className="mt-6 mx-4">
+                                        <DividendsSummaryCard />
+                                    </div>
+                                </div>
+
+                                <div className="px-4 mt-8">
+                                    <div className="flex space-x-3 mb-5">
+                                        <div className="flex-1 relative">
+                                            <input type="text" placeholder={t('search_asset_placeholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all" autoCapitalize="characters" />
+                                        </div>
+                                        <div className="relative">
+                                            <button id="sort-btn" onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }} className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`} >
+                                                <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
+                                            </button>
+                                            {isSortOpen && (
+                                                <>
+                                                    <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
+                                                    <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
+                                                        <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
+                                                        {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
+                                                            <button key={option} onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }} className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`} >
+                                                                {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
+                                                                {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2"> {t('my_assets')} <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span></h3>
+                                    {isRefreshing && processedAssets.length === 0 ? <PortfolioSkeleton /> : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
+                                            {processedAssets.map((asset, index) => (
+                                                <AssetListItem key={asset.ticker} asset={asset} totalValue={totalPortfolioValue} onClick={() => onSelectAsset(asset.ticker)} style={{ animationDelay: `${index * 50}ms` }} privacyMode={privacyMode} hideCents={preferences.hideCents}/>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            
-                            {activeTab === 'summary' && (
-                                <div className="animate-fade-in">
-                                    <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
-                                        <PortfolioSummary />
-                                        <div className="mt-6 mx-4">
-                                            <DividendsSummaryCard />
-                                        </div>
-                                    </div>
-
-                                    <div className="px-4 mt-8">
-                                        <div className="flex space-x-3 mb-5">
-                                            <div className="flex-1 relative">
-                                                <input type="text" placeholder={t('search_asset_placeholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all" autoCapitalize="characters" />
-                                            </div>
-                                            <div className="relative">
-                                                <button id="sort-btn" onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }} className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`} >
-                                                    <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
-                                                </button>
-                                                {isSortOpen && (
-                                                    <>
-                                                        <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
-                                                        <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
-                                                            <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
-                                                            {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
-                                                                <button key={option} onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }} className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`} >
-                                                                    {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
-                                                                    {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2"> {t('my_assets')} <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span></h3>
-                                        {isRefreshing && processedAssets.length === 0 ? <PortfolioSkeleton /> : (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
-                                                {processedAssets.map((asset, index) => (
-                                                    <AssetListItem key={asset.ticker} asset={asset} totalValue={totalPortfolioValue} onClick={() => onSelectAsset(asset.ticker)} style={{ animationDelay: `${index * 50}ms` }} privacyMode={privacyMode} hideCents={preferences.hideCents}/>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'analysis' && (
-                                <div className="animate-fade-in px-4 mt-6">
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <div className="lg:col-span-2">
-                                            <PatrimonyEvolutionCard />
-                                        </div>
-                                        <IncomeCard />
-                                        <DiversificationCard />
-                                    </div>
-                                </div>
-                            )}
-
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
