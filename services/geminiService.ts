@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
@@ -44,27 +45,29 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 
     const prompt = `
-      ROLE: Senior Financial Journalist.
+      ROLE: Expert Financial Analyst specialized in sentiment analysis.
       TASK: Search for recent and impactful news ${searchContext}.
       RULES:
-      1. Use googleSearch to find REAL facts from the last 3 days.
-      2. For each item, find a relevant, high-quality, and royalty-free image URL. The image should be landscape-oriented. If no good image is found, return an empty string for imageUrl.
-      3. Return EXACTLY 6 items.
-      4. Summaries must be concise, under 150 characters, and written in Brazilian Portuguese.
-      5. OUTPUT: JSON Array ONLY. No markdown.
+      1. Use googleSearch to find REAL facts from the last 3 days for the Brazilian market.
+      2. For each news item, provide a sentimentScore from -1.0 (very negative) to 1.0 (very positive), considering the impact on the market/asset.
+      3. Provide a brief, 1-sentence 'sentimentReason' in Brazilian Portuguese explaining the score.
+      4. Find a relevant, high-quality, royalty-free, landscape-oriented image URL. If none, return an empty string.
+      5. Summaries must be concise, under 150 characters, in Brazilian Portuguese.
+      6. Return EXACTLY 6 items.
+      7. OUTPUT: JSON Array ONLY. No markdown.
       
-      JSON Structure: [{"title":"","summary":"","source":"","date":"YYYY-MM-DD","sentiment":"Positive"|"Neutral"|"Negative","imageUrl":""}]
+      JSON Structure: [{"title":"","summary":"","source":"","date":"YYYY-MM-DD","imageUrl":"","sentimentScore":-1.0,"sentimentReason":""}]
     `;
 
     const bytesSent = new Blob([prompt]).size;
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                temperature: 0.4, 
+                temperature: 0.2, 
             }
         });
 

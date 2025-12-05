@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
@@ -11,8 +10,17 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
+// Fix: Changed props from `sentiment` to `sentimentScore` and added logic to derive sentiment category from the score.
+const SentimentBadge: React.FC<{ sentimentScore?: number }> = ({ sentimentScore }) => {
     const { t } = useI18n();
+    const getSentimentFromScore = (score: number | undefined): 'Positive' | 'Neutral' | 'Negative' | null => {
+        if (score === undefined) return null;
+        if (score > 0.2) return 'Positive';
+        if (score < -0.2) return 'Negative';
+        return 'Neutral';
+    };
+    const sentiment = getSentimentFromScore(sentimentScore);
+
     const sentimentMap = {
         Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
         Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400' },
@@ -94,7 +102,8 @@ const NewsCard: React.FC<{
 
         <div className="flex justify-between items-center mt-auto pt-3 border-t border-[var(--border-color)]">
           <div className="flex items-center space-x-3">
-            <SentimentBadge sentiment={article.sentiment} />
+            {/* Fix: Passed `article.sentimentScore` instead of non-existent `article.sentiment`. */}
+            <SentimentBadge sentimentScore={article.sentimentScore} />
              {article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">{t('view_original')}</a> : <span className="text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider opacity-50">{t('view_original')}</span>}
           </div>
           <button onClick={() => setIsExpanded(!isExpanded)} className="text-[var(--accent-color)] text-xs font-bold hover:underline">

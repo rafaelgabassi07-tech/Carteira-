@@ -1,3 +1,4 @@
+
 export const ptBR = {
     // App / Navigation
     main_portfolio: 'Dashboard',
@@ -109,9 +110,11 @@ export const ptBR = {
     realized_gain_loss: 'Lucro/Prejuízo Realizado',
     
     // News View
+    sentiment_very_positive: 'Muito Positivo',
     sentiment_positive: 'Positivo',
     sentiment_neutral: 'Neutro',
     sentiment_negative: 'Negativo',
+    sentiment_very_negative: 'Muito Negativo',
     share_news: 'Compartilhar notícia',
     remove_from_favorites: 'Remover dos favoritos',
     add_to_favorites: 'Adicionar aos favoritos',

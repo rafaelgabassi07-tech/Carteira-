@@ -42,11 +42,12 @@ export interface NewsArticle {
   source: string;
   title: string;
   summary: string;
-  impactAnalysis?: string; 
+  impactAnalysis?: string;
   date: string;
   url?: string;
   imageUrl?: string;
-  sentiment?: 'Positive' | 'Neutral' | 'Negative';
+  sentimentScore?: number; // From -1.0 (very negative) to 1.0 (very positive)
+  sentimentReason?: string; // Brief AI-generated reason for the score
   category?: string;
   impactLevel?: 'High' | 'Medium' | 'Low';
 }

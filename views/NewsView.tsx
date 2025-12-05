@@ -1,26 +1,36 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { NewsArticle, ToastMessage } from '../types';
 import { fetchMarketNews, type NewsFilter } from '../services/geminiService';
 import StarIcon from '../components/icons/StarIcon';
+import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import NewsIcon from '../components/icons/NewsIcon';
-import SearchIcon from '../components/icons/SearchIcon';
+import FilterIcon from '../components/icons/FilterIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
-const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sentiment }) => {
+// Fix: Changed props from `sentiment` to `sentimentScore` and added logic to derive sentiment category from the score.
+const SentimentBadge: React.FC<{ sentimentScore?: number }> = ({ sentimentScore }) => {
     const { t } = useI18n();
+    const getSentimentFromScore = (score: number | undefined): 'Positive' | 'Neutral' | 'Negative' | null => {
+        if (score === undefined) return null;
+        if (score > 0.2) return 'Positive';
+        if (score < -0.2) return 'Negative';
+        return 'Neutral';
+    };
+    const sentiment = getSentimentFromScore(sentimentScore);
+
     const sentimentMap = {
-        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400 border border-green-500/20' },
-        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400 border border-gray-500/20' },
-        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400 border border-red-500/20' },
+        Positive: { text: t('sentiment_positive'), color: 'bg-green-500/20 text-green-400' },
+        Neutral: { text: t('sentiment_neutral'), color: 'bg-gray-500/20 text-gray-400' },
+        Negative: { text: t('sentiment_negative'), color: 'bg-red-500/20 text-red-400' },
     };
     const sentimentData = sentiment ? sentimentMap[sentiment] : null;
     if (!sentimentData) return null;
     return (
-        <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${sentimentData.color}`}>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sentimentData.color}`}>
             {sentimentData.text}
         </span>
     );
@@ -29,76 +39,110 @@ const SentimentBadge: React.FC<{ sentiment: NewsArticle['sentiment'] }> = ({ sen
 const NewsCard: React.FC<{ 
   article: NewsArticle;
   isFavorited: boolean;
-  onToggleFavorite: (e: React.MouseEvent) => void;
-}> = ({ article, isFavorited, onToggleFavorite }) => {
+  onToggleFavorite: () => void;
+  addToast: (message: string, type?: ToastMessage['type']) => void;
+}> = ({ article, isFavorited, onToggleFavorite, addToast }) => {
   const { t } = useI18n();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    vibrate();
+    const shareData = {
+        title: article.title,
+        text: article.summary,
+        url: article.url || window.location.href,
+    };
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+           addToast(t('toast_share_not_supported'), 'error');
+        }
+    } catch (err) {
+       // addToast(t('toast_share_cancelled'), 'info');
+    }
+  };
+
+  const handleFavorite = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      vibrate(20);
+      onToggleFavorite();
+  }
 
   return (
-    <a 
-      href={article.url} 
-      target="_blank" 
-      rel="noopener noreferrer" 
-      className="block bg-[var(--bg-secondary)] rounded-2xl h-full flex flex-col transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-xl group border border-[var(--border-color)] overflow-hidden"
-    >
-        <div className="relative aspect-video w-full overflow-hidden">
-            {article.imageUrl && (
-                <img src={article.imageUrl} alt={article.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-            <button
-                onClick={onToggleFavorite}
-                className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-300 active:scale-90 z-10 bg-black/30 backdrop-blur-sm group-hover:bg-black/50 ${isFavorited ? 'text-amber-400' : 'text-white/70 hover:text-amber-400'}`}
-                aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
-            >
-                <StarIcon filled={isFavorited} className="w-5 h-5" />
-            </button>
-            <div className="absolute bottom-4 left-4 right-4">
-                 <h3 className="text-base font-bold leading-tight text-white mb-1.5 line-clamp-2 drop-shadow-md group-hover:text-sky-300 transition-colors">{article.title}</h3>
+    <div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden relative border border-[var(--border-color)] shadow-sm h-full flex flex-col">
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs text-[var(--accent-color)] font-semibold mb-1">{article.source}</p>
+              <h3 className="text-sm font-bold mr-16 leading-tight">{article.title}</h3>
+            </div>
+             <div className="absolute top-2 right-1 flex flex-row items-center z-10 bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-lg p-0.5">
+               <button
+                  onClick={handleShare}
+                  className="p-2 rounded-full text-gray-400 hover:bg-[var(--bg-tertiary-hover)] hover:text-sky-400 transition-colors active:scale-90"
+                  aria-label={t('share_news')}
+              >
+                  <ShareIcon className="w-4 h-4" />
+              </button>
+              <div className="w-px h-4 bg-[var(--border-color)] mx-0.5"></div>
+              <button
+                  onClick={handleFavorite}
+                  className={`p-2 rounded-full transition-all active:scale-90 ${isFavorited ? 'text-yellow-400 scale-110' : 'text-gray-400 hover:text-yellow-400 hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  aria-label={isFavorited ? t('remove_from_favorites') : t('add_to_favorites')}
+              >
+                  <StarIcon filled={isFavorited} className="w-4 h-4" />
+              </button>
             </div>
         </div>
         
-        <div className="p-5 flex flex-col flex-1">
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3 flex-1">
-              {article.summary}
-            </p>
-            <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--border-color)]">
-                <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-medium">
-                    <span className="font-bold text-[var(--text-primary)] truncate max-w-[120px]">{article.source}</span>
-                    <span className="opacity-50">•</span>
-                    <span>{new Date(article.date).toLocaleDateString()}</span>
-                </div>
-                 <SentimentBadge sentiment={article.sentiment} />
-            </div>
+        <p className={`text-xs text-[var(--text-secondary)] mt-3 transition-[max-height] duration-500 ease-in-out overflow-hidden leading-relaxed ${isExpanded ? 'max-h-96' : 'max-h-14'}`}>
+          {article.summary}
+        </p>
+
+        <div className="flex justify-between items-center mt-auto pt-3 border-t border-[var(--border-color)]">
+          <div className="flex items-center space-x-3">
+            {/* Fix: Passed `article.sentimentScore` instead of non-existent `article.sentiment`. */}
+            <SentimentBadge sentimentScore={article.sentimentScore} />
+             {article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">{t('view_original')}</a> : <span className="text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider opacity-50">{t('view_original')}</span>}
+          </div>
+          <button onClick={() => setIsExpanded(!isExpanded)} className="text-[var(--accent-color)] text-xs font-bold hover:underline">
+                {isExpanded ? t('read_less') : t('read_more')}
+            </button>
         </div>
-    </a>
+      </div>
+    </div>
   );
 };
 
 const NewsCardSkeleton: React.FC = () => (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl animate-pulse overflow-hidden border border-[var(--border-color)]">
-        <div className="bg-[var(--bg-tertiary-hover)] aspect-video w-full"></div>
-        <div className="p-5">
-            <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-full mb-2"></div>
-            <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-2/3 mb-6"></div>
-            <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--border-color)]">
-                <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/3"></div>
-                <div className="h-3 bg-[var(--bg-tertiary-hover)] rounded w-1/4"></div>
-            </div>
+    <div className="bg-[var(--bg-secondary)] p-4 rounded-lg animate-pulse border border-[var(--border-color)]">
+        <div className="h-3 bg-gray-700 rounded w-1/4 mb-3"></div>
+        <div className="h-4 bg-gray-700 rounded w-full mb-2"></div>
+        <div className="h-4 bg-gray-700 rounded w-3/4 mb-4"></div>
+        <div className="h-3 bg-gray-700 rounded w-5/6 mb-2"></div>
+        <div className="h-3 bg-gray-700 rounded w-4/6"></div>
+        <div className="flex justify-between items-center mt-4">
+            <div className="h-3 bg-gray-700 rounded w-1/5"></div>
+            <div className="h-2 bg-gray-700 rounded w-1/3"></div>
         </div>
     </div>
 );
 
-type NewsViewFilter = 'recent' | 'portfolio' | 'favorites';
 
-const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void; isEmbedded?: boolean }> = ({ addToast, isEmbedded = false }) => {
+const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<NewsViewFilter>('recent');
+  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
+  const [sourceFilter, setSourceFilter] = useState('');
 
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try {
@@ -106,6 +150,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch { return new Set(); }
   });
+  
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
   
   const touchStartY = useRef(0);
   const [pullPosition, setPullPosition] = useState(0);
@@ -129,15 +175,23 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     });
   };
 
-  const loadNews = useCallback(async (isRefresh = false) => {
+  const clearFavorites = () => {
+      if (window.confirm(t('clear_cache_confirm'))) {
+          setFavorites(new Set());
+          addToast(t('cache_cleared'), 'success');
+          setActiveTab('all');
+      }
+  }
+
+  const loadNews = useCallback(async (isRefresh = false, currentQuery: string, currentDateRange: 'today' | 'week' | 'month', currentSource: string) => {
     if(!isRefresh) setLoading(true);
     setError(null);
     
     try {
-      const cacheKey = `news_general`;
+      const filterKey = `news_${currentQuery}_${currentDateRange}_${currentSource}`.toLowerCase().replace(/\s+/g, '_');
       
       if (!isRefresh) {
-          const cachedNews = CacheManager.get<NewsArticle[]>(cacheKey, CACHE_TTL.NEWS);
+          const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
           if (cachedNews) {
               setNews(cachedNews);
               setLoading(false);
@@ -146,15 +200,20 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           }
       }
 
-      const filter: NewsFilter = { tickers: assetTickers };
-      const { data: articles, stats } = await fetchMarketNews(preferences, filter);
+      const filter: NewsFilter = {
+          query: currentQuery,
+          tickers: assetTickers,
+          dateRange: currentDateRange,
+          sources: currentSource
+      };
 
+      const { data: articles, stats } = await fetchMarketNews(preferences, filter);
       if (stats && stats.bytesReceived > 0) {
         logApiUsage('gemini', { requests: 1, ...stats });
       }
 
       setNews(articles || []);
-      if(articles && articles.length > 0) CacheManager.set(cacheKey, articles);
+      if(articles && articles.length > 0) CacheManager.set(filterKey, articles);
 
     } catch (err: any) {
       setError(err.message || t('unknown_error'));
@@ -162,12 +221,33 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setLoading(false);
       setPullPosition(0);
     }
-  }, [t, assetTickers, preferences, logApiUsage]);
+  }, [t, assetTickers, addToast, preferences, logApiUsage]);
+  
+  // Create a debounced version of the load function for text inputs
+  const debouncedLoadNews = useCallback(debounce((q: string, d: 'today'|'week'|'month', s: string) => loadNews(true, q, d, s), 800), [loadNews]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(e.target.value);
+      setLoading(true);
+      debouncedLoadNews(e.target.value, dateRange, sourceFilter);
+  };
+
+  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSourceFilter(e.target.value);
+      setLoading(true);
+      debouncedLoadNews(searchQuery, dateRange, e.target.value);
+  };
+
+  const handleDateRangeChange = (range: 'today' | 'week' | 'month') => {
+      setDateRange(range);
+      setLoading(true);
+      loadNews(true, searchQuery, range, sourceFilter);
+  };
   
   const handleRefresh = () => {
     vibrate();
     setLoading(true);
-    loadNews(true);
+    loadNews(true, searchQuery, dateRange, sourceFilter);
   };
   
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -181,7 +261,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           const touchY = e.targetTouches[0].clientY;
           const pullDistance = touchY - touchStartY.current;
           if(pullDistance > 0) {
-              if (!isEmbedded && e.cancelable) e.preventDefault();
+              if (e.cancelable) e.preventDefault();
               setPullPosition(Math.min(pullDistance, 100));
           }
       }
@@ -190,7 +270,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const handleTouchEnd = () => {
       if(pullPosition > 70) {
           setLoading(true);
-          loadNews(true);
+          loadNews(true, searchQuery, dateRange, sourceFilter);
       } else {
           setPullPosition(0);
       }
@@ -198,97 +278,116 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   };
 
   useEffect(() => {
-    loadNews(false); 
+    loadNews(false, '', 'week', ''); // Initial load
   }, [loadNews]);
 
   const displayedNews = useMemo(() => {
-    let filtered = news;
-
-    if (activeFilter === 'favorites') {
-        filtered = news.filter(n => favorites.has(n.title));
-    } else if (activeFilter === 'portfolio' && assetTickers.length > 0) {
-        const portfolioRegex = new RegExp(assetTickers.join('|'), 'i');
-        filtered = news.filter(n => portfolioRegex.test(n.title) || portfolioRegex.test(n.summary));
-    }
-    
-    if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(n => n.title.toLowerCase().includes(query) || n.summary.toLowerCase().includes(query));
-    }
-
-    return filtered;
-  }, [news, activeFilter, favorites, searchQuery, assetTickers]);
-
-  const filterPills: { id: NewsViewFilter, label: string }[] = [
-      { id: 'recent', label: 'Recentes' },
-      { id: 'portfolio', label: 'Minha Carteira' },
-      { id: 'favorites', label: 'Favoritas' },
-  ];
+      return activeTab === 'favorites' 
+        ? news.filter(n => favorites.has(n.title))
+        : news;
+  }, [news, activeTab, favorites]);
 
   return (
     <div 
-        className={`p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6 ${isEmbedded ? 'pt-2' : ''}`}
+        className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6"
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
     >
-      {!isEmbedded && (
-          <div 
-            className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
-            style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
-          >
-            <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
-          </div>
-      )}
+      <div 
+        className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
+        style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
+      >
+        <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
+      </div>
       
       <div className="w-full max-w-7xl mx-auto">
-        {!isEmbedded && (
-            <div className="mb-4 flex justify-between items-center">
-                 <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2"><NewsIcon className="w-6 h-6 text-[var(--accent-color)]"/>{t('market_news')}</h1>
-                 <button 
-                    onClick={handleRefresh} 
-                    disabled={loading}
-                    className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
-                    aria-label={t('refresh_prices')}
-                >
-                    <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
-                </button>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">{t('market_news')}</h1>
+          <div className="flex gap-2">
+               <button 
+                  onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                  className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  aria-label="Filtros"
+              >
+                  <FilterIcon className="w-5 h-5" />
+              </button>
+              <button 
+                  onClick={handleRefresh} 
+                  disabled={loading}
+                  className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
+                  aria-label={t('refresh_prices')}
+              >
+                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+              </button>
+          </div>
+        </div>
+        
+        {/* Filter Panel */}
+        {showFilters && (
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-4">
+                 <div>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Período</label>
+                    <div className="flex bg-[var(--bg-primary)] p-1 rounded-lg border border-[var(--border-color)]">
+                      {(['today', 'week', 'month'] as const).map((r) => (
+                          <button
+                              key={r}
+                              onClick={() => handleDateRangeChange(r)}
+                              className={`flex-1 py-1.5 text-xs font-bold rounded transition-all ${dateRange === r ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                          >
+                              {r === 'today' ? 'Hoje' : r === 'week' ? 'Semana' : 'Mês'}
+                          </button>
+                      ))}
+                    </div>
+                </div>
+                
+                 <div>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Fontes (Opcional)</label>
+                    <input 
+                      type="text"
+                      placeholder="Ex: InfoMoney, Valor, Brazil Journal"
+                      value={sourceFilter}
+                      onChange={handleSourceChange}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors placeholder:text-[var(--text-secondary)]/50"
+                    />
+                </div>
             </div>
         )}
-        
-        <div className="relative group mb-4">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none">
-                <SearchIcon className="w-5 h-5" />
-            </div>
-            <input 
-                type="text"
-                placeholder={t('search_news_placeholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 pl-12 text-sm font-medium focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] transition-all shadow-sm"
-            />
+
+        <div className="mb-4">
+          <input 
+            type="text"
+            placeholder={t('search_news_placeholder')}
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
+          />
         </div>
         
-        <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl mb-6 border border-[var(--border-color)] shrink-0 shadow-inner">
-            {filterPills.map((pill) => (
-                <button
-                    key={pill.id}
-                    onClick={() => setActiveFilter(pill.id)}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 uppercase tracking-wide ${activeFilter === pill.id ? 'bg-[var(--bg-secondary)] text-[var(--accent-color)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                >
-                    {pill.label}
-                </button>
-            ))}
+        <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
+            <button 
+              onClick={() => { setActiveTab('all'); vibrate(); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            >
+                {t('news_tab_all')}
+            </button>
+             <button 
+              onClick={() => { setActiveTab('favorites'); vibrate(); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            >
+                {t('news_tab_favorites')}
+                {favorites.size > 0 && <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] px-1.5 py-0.5 rounded-full text-[9px]">{favorites.size}</span>}
+            </button>
         </div>
 
-        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{Array.from({length: 6}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
         
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-8 rounded-2xl text-center">
-            <p className="font-bold mb-1">{t('error')}</p>
-            <p className="text-sm opacity-80 mb-4">{error}</p>
-            <button onClick={() => loadNews(true)} className="bg-[var(--bg-secondary)] border border-[var(--border-color)] font-bold py-2 px-6 rounded-xl text-xs shadow-sm active:scale-95 transition-transform hover:bg-[var(--bg-tertiary-hover)]">
+          <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
+            <p className="font-bold">{t('error')}</p>
+            <p className="text-sm">{error}</p>
+            <button onClick={() => loadNews(true, searchQuery, dateRange, sourceFilter)} className="mt-4 bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-2 px-4 rounded-lg text-sm">
               {t('try_again')}
             </button>
           </div>
@@ -297,36 +396,42 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
         {!loading && !error && (
           <div className="flex-1">
             {displayedNews.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 landscape-grid-cols-3">
                   {displayedNews.map((article, index) => (
                   <div 
                       key={`${article.title}-${index}`} 
                       className="animate-fade-in-up h-full" 
-                      style={{ animationDelay: `${index * 50}ms` }}
+                      style={{ animationDelay: `${index * 70}ms` }}
                   >
                       <NewsCard 
-                          article={article}
-                          isFavorited={favorites.has(article.title)}
-                          onToggleFavorite={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleToggleFavorite(article.title);
-                          }}
+                      article={article}
+                      isFavorited={favorites.has(article.title)}
+                      onToggleFavorite={() => handleToggleFavorite(article.title)}
+                      addToast={addToast}
                       />
                   </div>
                   ))}
+                  {activeTab === 'favorites' && (
+                      <div className="col-span-full text-center pt-4 pb-8">
+                          <button onClick={clearFavorites} className="text-xs font-bold text-red-400 hover:underline uppercase tracking-wider">
+                              {t('clear_favorites')}
+                          </button>
+                      </div>
+                  )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-64 text-center text-[var(--text-secondary)] animate-fade-in">
-                  <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-[var(--border-color)]">
-                      {activeFilter === 'favorites' ? <StarIcon className="w-8 h-8 opacity-30"/> : <NewsIcon className="w-8 h-8 opacity-30" />}
-                  </div>
-                  <p className="font-bold text-lg text-[var(--text-primary)]">
-                      {activeFilter === 'favorites' ? t('no_favorites_title') : t('no_news_found')}
-                  </p>
-                  <p className="text-sm mt-2 max-w-[250px] opacity-70">
-                      {activeFilter === 'favorites' ? t('no_favorites_subtitle') : t('no_news_found_subtitle')}
-                  </p>
+                  {activeTab === 'favorites' ? (
+                      <>
+                          <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-[var(--border-color)]">
+                              <StarIcon className="w-8 h-8 text-gray-600" />
+                          </div>
+                          <p className="font-bold text-lg">{t('no_favorites_title')}</p>
+                          <p className="text-sm mt-2 max-w-[250px]">{t('no_favorites_subtitle')}</p>
+                      </>
+                  ) : (
+                      <p>{t('no_news_found')}</p>
+                  )}
               </div>
             )}
           </div>
