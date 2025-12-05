@@ -1,5 +1,5 @@
-const CACHE_NAME = 'invest-portfolio-cache-v2.0.2'; // Bumped Version for update
-const RUNTIME_CACHE = 'runtime-cache-v2.0.2';
+const CACHE_NAME = 'invest-portfolio-cache-v2.0.3'; // Bumped Version for update
+const RUNTIME_CACHE = 'runtime-cache-v2.0.3';
 
 const urlsToCache = [
   './',
@@ -9,9 +9,7 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', event => {
-  // Activate the new service worker immediately for seamless automatic updates.
-  self.skipWaiting(); 
-
+  self.skipWaiting(); // Automatic update
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(async cache => {
@@ -119,5 +117,3 @@ self.addEventListener('notificationclick', function(event) {
     })
   );
 });
-
-// Listener to activate the new service worker was removed to restore automatic updates.

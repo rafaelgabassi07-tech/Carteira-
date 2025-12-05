@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -37,17 +39,26 @@ const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   
+  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 4000) => {
+    const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
+    setToast(newToast);
+    if (duration > 0 && !action) { // Only auto-close if no action is required
+        setTimeout(() => {
+            setToast(t => (t?.id === newToast.id ? null : t));
+        }, duration);
+    }
+  }, []);
+
   // --- PWA Update Logic (Simplified for Automatic Updates) ---
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
             .then(registration => {
                 console.log('Service Worker registered successfully.');
             }).catch(error => {
                 console.error('Service Worker registration failed:', error);
             });
 
-        // This listener fires when the new service worker has taken control.
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (!refreshing) {
@@ -58,18 +69,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
-    const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
-    setToast(newToast);
-    if (duration > 0) {
-        setTimeout(() => {
-            setToast(t => (t?.id === newToast.id ? null : t));
-        }, duration);
-    }
-  }, []);
-
-  // --- End PWA Update Logic ---
-  
   // PWA Deep Linking & Share Target Handler
   useEffect(() => {
       const params = new URLSearchParams(window.location.search);

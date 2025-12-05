@@ -1,5 +1,7 @@
 
 
+
+
 import React from 'react';
 import type { MenuScreen } from '../../views/SettingsView';
 import type { ToastMessage } from '../../types';
@@ -22,13 +24,19 @@ import SparklesIcon from '../icons/SparklesIcon';
 import CalculatorIcon from '../icons/CalculatorIcon';
 import BookOpenIcon from '../icons/BookOpenIcon';
 
-const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; isLast?: boolean; }> = ({ icon, title, subtitle, onClick, isLast }) => (
+const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; isLast?: boolean; hasNotification?: boolean; }> = ({ icon, title, subtitle, onClick, isLast, hasNotification }) => (
     <div
         onClick={() => { onClick(); vibrate(); }}
         className={`menu-item flex items-center space-x-4 p-4 hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-200 cursor-pointer active:scale-[0.98] ${!isLast ? 'border-b border-[var(--border-color)]' : ''}`}
     >
-        <div className="menu-icon flex-shrink-0 w-12 h-12 grid place-items-center bg-[var(--bg-primary)] text-[var(--accent-color)] rounded-xl shadow-sm border border-[var(--border-color)]">
+        <div className="menu-icon flex-shrink-0 w-12 h-12 grid place-items-center bg-[var(--bg-primary)] text-[var(--accent-color)] rounded-xl shadow-sm border border-[var(--border-color)] relative">
             {icon}
+            {hasNotification && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-color)] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--accent-color)]"></span>
+                </span>
+            )}
         </div>
         <div className="flex-1 min-w-0">
             <p className="font-bold text-sm truncate text-[var(--text-primary)]">{title}</p>
@@ -38,8 +46,12 @@ const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: strin
     </div>
 );
 
+interface MainMenuProps {
+    setScreen: (screen: MenuScreen) => void;
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+}
 
-const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ setScreen, addToast }) => {
+const MainMenu: React.FC<MainMenuProps> = ({ setScreen, addToast }) => {
     const { t } = useI18n();
     const { userProfile, resetApp } = usePortfolio();
 

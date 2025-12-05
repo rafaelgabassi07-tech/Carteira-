@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import type { View } from '../App';
 import LayoutGridIcon from './icons/LayoutGridIcon';
@@ -30,7 +31,7 @@ const NavItem: React.FC<{
       style={{ transform: isActive ? 'scale(1.1)' : 'scale(1)' }}
     >
       <div className="transition-transform duration-300 ease-spring group-active:scale-90">
-        {React.cloneElement(icon, { className: 'w-6 h-6' })}
+        {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
       </div>
       <span 
         className={`text-[10px] font-bold tracking-wide mt-1 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
