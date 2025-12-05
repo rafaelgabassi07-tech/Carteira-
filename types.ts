@@ -184,7 +184,7 @@ export interface AppPreferences {
   animationSpeed: 'slow' | 'normal' | 'fast' | 'instant';
 
   // General
-  startScreen: 'dashboard' | 'carteira' | 'noticias';
+  startScreen: 'dashboard' | 'carteira' | 'mercado'; // 'noticias' is now inside 'mercado'
   hapticFeedback: boolean;
   vibrationIntensity: 'light' | 'medium' | 'heavy';
   hideCents: boolean;

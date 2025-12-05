@@ -1,4 +1,3 @@
-
 import React from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
@@ -11,10 +10,11 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const { t } = useI18n();
     const { preferences, updatePreferences, deferredPrompt, installPwa } = usePortfolio();
     
+    // FIX: Replaced 'noticias' with 'mercado' and updated the label, as 'noticias' is no longer a valid startScreen option.
     const startScreens: { id: AppPreferences['startScreen'], label: string }[] = [
         { id: 'dashboard', label: t('nav_portfolio') }, // "Dashboard"
         { id: 'carteira', label: t('nav_analysis') }, // "Carteira"
-        { id: 'noticias', label: t('nav_news') },
+        { id: 'mercado', label: t('nav_market') },
     ];
 
     return (

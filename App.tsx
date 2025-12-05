@@ -13,7 +13,6 @@ import type { MenuScreen } from './views/SettingsView';
 
 // Lazy Load Views
 const PortfolioView = React.lazy(() => import('./views/PortfolioView'));
-const NewsView = React.lazy(() => import('./views/NewsView'));
 const SettingsView = React.lazy(() => import('./views/SettingsView'));
 const TransactionsView = React.lazy(() => import('./views/TransactionsView'));
 const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
@@ -23,7 +22,7 @@ const MarketView = React.lazy(() => import('./views/MarketView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
 
 
-export type View = 'dashboard' | 'carteira' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail' | 'mercado';
+export type View = 'dashboard' | 'carteira' | 'transacoes' | 'mercado' | 'settings' | 'notificacoes' | 'assetDetail';
 
 const App: React.FC = () => {
   const { assets, preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
@@ -46,7 +45,7 @@ const App: React.FC = () => {
       if (shareParam) {
           // If receiving shared text, go to Market
           setActiveView('mercado');
-      } else if (viewParam && ['dashboard', 'carteira', 'transacoes', 'noticias', 'settings', 'mercado'].includes(viewParam)) {
+      } else if (viewParam && ['dashboard', 'carteira', 'transacoes', 'settings', 'mercado'].includes(viewParam)) {
           // If coming from Shortcut
           setActiveView(viewParam as View);
       }
@@ -130,7 +129,6 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
-      case 'noticias': return <NewsView addToast={addToast} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;

@@ -1,10 +1,8 @@
-
 import React from 'react';
 import type { View } from '../App';
 import LayoutGridIcon from './icons/LayoutGridIcon';
 import WalletIcon from './icons/WalletIcon';
 import TransactionIcon from './icons/TransactionIcon';
-import NewsIcon from './icons/NewsIcon';
 import SettingsIcon from './icons/SettingsIcon';
 import UserIcon from './icons/UserIcon';
 import GlobeIcon from './icons/GlobeIcon';
@@ -71,7 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
         <SidebarItem label={t('nav_analysis')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
         <SidebarItem label={t('nav_market')} view="mercado" icon={<GlobeIcon />} isActive={activeView === 'mercado'} onClick={() => handleNavClick('mercado')} />
         <SidebarItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
-        <SidebarItem label={t('nav_news')} view="noticias" icon={<NewsIcon />} isActive={activeView === 'noticias'} onClick={() => handleNavClick('noticias')} />
+        {/* FIX: Removed 'noticias' view item as it is not a valid view type. News is part of the Market view. */}
         
         <div className="px-6 py-2 mt-6">
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-50 mb-2">Conta</p>
