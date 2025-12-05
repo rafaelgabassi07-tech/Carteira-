@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -20,15 +17,16 @@ const NewsView = React.lazy(() => import('./views/NewsView'));
 const SettingsView = React.lazy(() => import('./views/SettingsView'));
 const TransactionsView = React.lazy(() => import('./views/TransactionsView'));
 const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
+const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
 const MarketView = React.lazy(() => import('./views/MarketView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
-const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 
-export type View = 'dashboard' | 'transacoes' | 'mercado' | 'analysis' | 'notificacoes' | 'assetDetail' | 'settings' | 'noticias';
+
+export type View = 'dashboard' | 'carteira' | 'transacoes' | 'noticias' | 'settings' | 'notificacoes' | 'assetDetail' | 'mercado';
 
 const App: React.FC = () => {
-  const { preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
+  const { assets, preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
   const { t } = useI18n();
   const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
@@ -39,36 +37,6 @@ const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(!!preferences.appPin);
   const lastVisibleTimestamp = useRef(Date.now());
   
-  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 4000) => {
-    const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
-    setToast(newToast);
-    if (duration > 0 && !action) { // Only auto-close if no action is required
-        setTimeout(() => {
-            setToast(t => (t?.id === newToast.id ? null : t));
-        }, duration);
-    }
-  }, []);
-
-  // --- PWA Update Logic (Simplified for Automatic Updates) ---
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
-            .then(registration => {
-                console.log('Service Worker registered successfully.');
-            }).catch(error => {
-                console.error('Service Worker registration failed:', error);
-            });
-
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!refreshing) {
-                window.location.reload();
-                refreshing = true;
-            }
-        });
-    }
-  }, []);
-
   // PWA Deep Linking & Share Target Handler
   useEffect(() => {
       const params = new URLSearchParams(window.location.search);
@@ -78,10 +46,20 @@ const App: React.FC = () => {
       if (shareParam) {
           // If receiving shared text, go to Market
           setActiveView('mercado');
-      } else if (viewParam && ['dashboard', 'transacoes', 'noticias', 'settings', 'mercado', 'analysis'].includes(viewParam)) {
+      } else if (viewParam && ['dashboard', 'carteira', 'transacoes', 'noticias', 'settings', 'mercado'].includes(viewParam)) {
           // If coming from Shortcut
           setActiveView(viewParam as View);
       }
+  }, []);
+
+  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
+    const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
+    setToast(newToast);
+    if (duration > 0) {
+        setTimeout(() => {
+            setToast(t => (t?.id === newToast.id ? null : t));
+        }, duration);
+    }
   }, []);
 
   useEffect(() => {
@@ -152,14 +130,14 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
-      case 'mercado': return <MarketView addToast={addToast} />;
       case 'noticias': return <NewsView addToast={addToast} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
-      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
-      case 'analysis': return <AnalysisView addToast={addToast} />;
-      default: return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
+      case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
+      case 'mercado': return <MarketView addToast={addToast} />;
+      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
+      default: return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
     }
   };
 
@@ -181,13 +159,12 @@ const App: React.FC = () => {
                         </div>
                     </Suspense>
                 </div>
+                
+                {/* Floating Bottom Nav - Visible on all screens */}
+                <div>
+                    <BottomNav activeView={activeView} setActiveView={handleSetView} />
+                </div>
             </main>
-
-            {/* Floating Bottom Nav - Visible on all screens */}
-            <BottomNav 
-                activeView={activeView} 
-                setActiveView={handleSetView}
-            />
 
             {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
         </div>

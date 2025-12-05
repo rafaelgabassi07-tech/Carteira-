@@ -1,3 +1,4 @@
+
 import { useState, useEffect, Dispatch, SetStateAction, useRef } from 'react';
 import type { Transaction, AppTheme, PortfolioEvolutionPoint } from './types';
 
@@ -118,12 +119,6 @@ export const applyThemeToDocument = (theme: AppTheme) => {
     root.style.setProperty('--accent-color-text', theme.colors.accentText);
     root.style.setProperty('--green-text', theme.colors.greenText);
     root.style.setProperty('--red-text', theme.colors.redText);
-
-    // Update Meta Theme Color for mobile status bar
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', theme.colors.bgPrimary);
-    }
 };
 
 
@@ -219,22 +214,6 @@ export const CacheManager = {
     }
 };
 
-// --- Robust Parsing for Localized Numbers ---
-export const parseLocalFloat = (val: string): number => {
-    if (!val) return 0;
-    // Normalize:
-    // 1. If contains both . and , assume dot is thousands and comma is decimal (Brazilian/European)
-    if (val.indexOf('.') !== -1 && val.indexOf(',') !== -1) {
-         return parseFloat(val.replace(/\./g, '').replace(',', '.'));
-    }
-    // 2. If contains only comma, treat as decimal
-    if (val.indexOf(',') !== -1) {
-         return parseFloat(val.replace(',', '.'));
-    }
-    // 3. Otherwise standard float
-    return parseFloat(val);
-};
-
 const EPSILON = 0.000001;
 
 export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<string, { quantity: number; totalCost: number }> => {
@@ -273,9 +252,13 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
         }
     }
     
-    // NOTE: We return ALL metrics, including zero balances, so that historical performance
-    // and dividends for sold assets can still be calculated by the consumers.
-    return metrics;
+    const activeMetrics: Record<string, { quantity: number; totalCost: number }> = {};
+    for (const [ticker, data] of Object.entries(metrics)) {
+        if (data.quantity > EPSILON) {
+            activeMetrics[ticker] = data;
+        }
+    }
+    return activeMetrics;
 };
 
 // --- Optimized Portfolio Evolution Algorithm (Continuous Timeline) ---

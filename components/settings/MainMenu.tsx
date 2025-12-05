@@ -1,7 +1,4 @@
 
-
-
-
 import React from 'react';
 import type { MenuScreen } from '../../views/SettingsView';
 import type { ToastMessage } from '../../types';
@@ -18,25 +15,20 @@ import InfoIcon from '../icons/InfoIcon';
 import PaletteIcon from '../icons/PaletteIcon';
 import SettingsIcon from '../icons/SettingsIcon';
 import TransactionIcon from '../icons/TransactionIcon';
+import UpdateIcon from '../icons/UpdateIcon';
 import LogoutIcon from '../icons/LogoutIcon';
 import ChevronRightIcon from '../icons/ChevronRightIcon';
 import SparklesIcon from '../icons/SparklesIcon';
 import CalculatorIcon from '../icons/CalculatorIcon';
 import BookOpenIcon from '../icons/BookOpenIcon';
 
-const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; isLast?: boolean; hasNotification?: boolean; }> = ({ icon, title, subtitle, onClick, isLast, hasNotification }) => (
+const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; isLast?: boolean; }> = ({ icon, title, subtitle, onClick, isLast }) => (
     <div
         onClick={() => { onClick(); vibrate(); }}
         className={`menu-item flex items-center space-x-4 p-4 hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-200 cursor-pointer active:scale-[0.98] ${!isLast ? 'border-b border-[var(--border-color)]' : ''}`}
     >
-        <div className="menu-icon flex-shrink-0 w-12 h-12 grid place-items-center bg-[var(--bg-primary)] text-[var(--accent-color)] rounded-xl shadow-sm border border-[var(--border-color)] relative">
+        <div className="menu-icon flex-shrink-0 w-12 h-12 grid place-items-center bg-[var(--bg-primary)] text-[var(--accent-color)] rounded-xl shadow-sm border border-[var(--border-color)]">
             {icon}
-            {hasNotification && (
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-color)] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--accent-color)]"></span>
-                </span>
-            )}
         </div>
         <div className="flex-1 min-w-0">
             <p className="font-bold text-sm truncate text-[var(--text-primary)]">{title}</p>
@@ -46,12 +38,8 @@ const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: strin
     </div>
 );
 
-interface MainMenuProps {
-    setScreen: (screen: MenuScreen) => void;
-    addToast: (message: string, type?: ToastMessage['type']) => void;
-}
 
-const MainMenu: React.FC<MainMenuProps> = ({ setScreen, addToast }) => {
+const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; onShowUpdateModal: () => void; addToast: (message: string, type?: ToastMessage['type']) => void; updateAvailable?: boolean; }> = ({ setScreen, onShowUpdateModal, addToast, updateAvailable }) => {
     const { t } = useI18n();
     const { userProfile, resetApp } = usePortfolio();
 
@@ -149,6 +137,16 @@ const MainMenu: React.FC<MainMenuProps> = ({ setScreen, addToast }) => {
             </div>
 
              <div className="p-2 space-y-2">
+                <button 
+                    onClick={onShowUpdateModal} 
+                    className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold p-3 rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] relative"
+                >
+                    <div className="relative">
+                        <UpdateIcon className="w-4 h-4" />
+                        {updateAvailable && <span className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--accent-color)] rounded-full animate-pulse"></span>}
+                    </div>
+                    {t('check_for_update')}
+                </button>
                 <button onClick={resetApp} className="w-full flex items-center justify-center gap-2 text-center text-xs font-bold text-red-500/80 hover:text-red-500 p-3 rounded-lg hover:bg-red-500/10 transition-colors">
                     <LogoutIcon className="w-4 h-4" />
                     {t('logout')}

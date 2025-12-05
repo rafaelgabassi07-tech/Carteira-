@@ -108,16 +108,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
   }, [deferredPrompt]);
 
-  const updatePreferences = useCallback((p: Partial<AppPreferences>) => setPreferences(prev => ({...prev, ...p})), [setPreferences]);
-
   useEffect(() => {
     const startScreen = preferences.startScreen;
-    // @ts-ignore - Migration for old values from localStorage
-    if (startScreen === 'carteira' || startScreen === 'analise') {
-      updatePreferences({ startScreen: 'analysis' });
+    if (startScreen === 'carteira' as any || startScreen === 'analise' as any) {
+      // @ts-ignore
+      const newScreen = startScreen === 'carteira' ? 'dashboard' : 'carteira';
+      updatePreferences({ startScreen: newScreen });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount to migrate old setting
+  }, []); 
 
   useEffect(() => {
       setUnreadNotificationsCount(notifications.filter(n => !n.read).length);
@@ -206,6 +204,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if(data.preferences) setPreferences(p => ({...p, ...data.preferences}));
   }, [setTransactions, setPreferences]);
 
+  const updatePreferences = useCallback((p: Partial<AppPreferences>) => setPreferences(prev => ({...prev, ...p})), [setPreferences]);
   const updateUserProfile = useCallback((p: Partial<UserProfile>) => setUserProfile(prev => ({...prev, ...p})), [setUserProfile]);
   const setTheme = useCallback((id: string) => setPreferences(p => ({...p, currentThemeId: id})), [setPreferences]);
   const setFont = useCallback((id: string) => setPreferences(p => ({...p, currentFontId: id})), [setPreferences]);
@@ -375,7 +374,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               capRate: data.capRate,
               managementFee: data.managementFee
           };
-      });
+      }).filter(a => a.quantity > 0.000001);
   }, [sourceTransactions, sourceMarketData]);
 
   useEffect(() => {

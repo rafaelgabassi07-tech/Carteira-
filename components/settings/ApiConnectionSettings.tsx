@@ -1,12 +1,10 @@
-
-
 import React, { useState } from 'react';
 import PageHeader from '../PageHeader';
 import type { ToastMessage } from '../../types';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
-import { validateGeminiKey } from '../../services/geminiService';
 import { validateBrapiToken } from '../../services/brapiService';
+import { validateGeminiKey } from '../../services/geminiService';
 import { vibrate } from '../../utils';
 import TrashIcon from '../icons/TrashIcon';
 
@@ -31,18 +29,11 @@ const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: 
     const { t } = useI18n();
     const { preferences, updatePreferences, apiStats, resetApiStats } = usePortfolio();
     
-    const [geminiKey, setGeminiKey] = useState(preferences.geminiApiKey || '');
     const [brapiToken, setBrapiToken] = useState(preferences.brapiToken || '');
-    const [testingGemini, setTestingGemini] = useState(false);
+    const [geminiApiKey, setGeminiApiKey] = useState(preferences.geminiApiKey || '');
+    
     const [testingBrapi, setTestingBrapi] = useState(false);
-
-    const handleTestGemini = async () => {
-        vibrate();
-        setTestingGemini(true);
-        const isValid = await validateGeminiKey(geminiKey);
-        setTestingGemini(false);
-        addToast(isValid ? t('toast_connection_success') : t('toast_connection_failed'), isValid ? 'success' : 'error');
-    };
+    const [testingGemini, setTestingGemini] = useState(false);
 
     const handleTestBrapi = async () => {
         vibrate();
@@ -52,9 +43,17 @@ const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: 
         addToast(isValid ? t('toast_connection_success') : t('toast_connection_failed'), isValid ? 'success' : 'error');
     };
 
+    const handleTestGemini = async () => {
+        vibrate();
+        setTestingGemini(true);
+        const isValid = await validateGeminiKey(geminiApiKey);
+        setTestingGemini(false);
+        addToast(isValid ? t('toast_connection_success') : t('toast_connection_failed'), isValid ? 'success' : 'error');
+    };
+
     const handleSave = () => {
         vibrate(20);
-        updatePreferences({ geminiApiKey: geminiKey, brapiToken });
+        updatePreferences({ brapiToken, geminiApiKey });
         addToast(t('toast_key_saved'), 'success');
         onBack();
     };
@@ -76,12 +75,12 @@ const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: 
                     <p className="text-xs text-[var(--text-secondary)] mb-2">{t('gemini_api_desc')}</p>
                     <input
                         type="password"
-                        value={geminiKey}
-                        onChange={(e) => setGeminiKey(e.target.value)}
+                        value={geminiApiKey}
+                        onChange={(e) => setGeminiApiKey(e.target.value)}
                         placeholder={t('api_key_placeholder')}
                         className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 mt-1 text-sm focus:outline-none focus:border-[var(--accent-color)]"
                     />
-                     <button 
+                        <button 
                         onClick={handleTestGemini} 
                         disabled={testingGemini}
                         className="w-full mt-3 text-sm font-bold text-[var(--accent-color)] hover:underline disabled:opacity-50 disabled:cursor-wait"

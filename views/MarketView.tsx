@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -8,9 +7,11 @@ import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate, usePersistentState } from '../utils';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import PlusIcon from '../components/icons/PlusIcon';
+import NewsIcon from '../components/icons/NewsIcon';
 import GlobeIcon from '../components/icons/GlobeIcon';
 import ClockIcon from '../components/icons/ClockIcon';
 import TrashIcon from '../components/icons/TrashIcon';
+import AnalysisIcon from '../components/icons/AnalysisIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
 import TrendingUpIcon from '../components/icons/TrendingUpIcon';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
@@ -32,7 +33,6 @@ interface MarketResult {
     history: number[];
     min: number;
     max: number;
-    quoteSources?: string[]; // Added for Grounding compliance
     fundamentals?: Partial<Asset> & { marketSentiment?: 'Bullish' | 'Bearish' | 'Neutral' }; 
 }
 
@@ -100,13 +100,9 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     const [showAddModal, setShowAddModal] = useState(false);
     
     const [recentSearches, setRecentSearches] = usePersistentState<string[]>('market_recent_searches', []);
-    const initialLoadDone = useRef(false);
 
     // --- Share Target Logic ---
     useEffect(() => {
-        if (initialLoadDone.current) return;
-        initialLoadDone.current = true;
-
         const params = new URLSearchParams(window.location.search);
         const sharedText = params.get('share_q');
         
@@ -114,19 +110,15 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
             const tickerMatch = sharedText.match(/[A-Za-z]{4}(11|3|4|11B)/);
             const term = tickerMatch ? tickerMatch[0].toUpperCase() : sharedText.trim().toUpperCase();
             
-            if (term.length >= 4) {
-                setSearchTerm(term);
-                // Call search directly instead of relying on state change
-                executeSearch(term);
-            }
+            setSearchTerm(term);
+            handleSearch(term);
             
-            // Clean URL to prevent re-execution on refresh
             const newUrl = window.location.pathname;
             window.history.replaceState({}, '', newUrl);
         }
     }, []);
 
-    const executeSearch = async (term: string) => {
+    const handleSearch = async (term: string) => {
         const cleanTerm = term.trim().toUpperCase();
         if (!cleanTerm || cleanTerm.length < 4) return;
         
@@ -135,8 +127,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         setLoadingFundamentals(true);
         setError(null);
         setResult(null);
-        // Note: setSearchTerm is called by input, but if called programmatically we update it here
-        if (searchTerm !== cleanTerm) setSearchTerm(cleanTerm);
+        setSearchTerm(cleanTerm);
         setExpandedDetails(false);
 
         try {
@@ -184,8 +175,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                         history: [], // Sem histórico no fallback
                         min: geminiQuote.price,
                         max: geminiQuote.price,
-                        fundamentals: undefined,
-                        quoteSources: geminiQuote.sources
+                        fundamentals: undefined
                     };
                 }
             }
@@ -224,8 +214,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 dividendCAGR: fund.dividendCAGR,
                                 capRate: fund.capRate,
                                 managementFee: fund.managementFee,
-                                dividendsHistory: fund.dividendsHistory,
-                                sources: fund.sources
+                                dividendsHistory: fund.dividendsHistory
                             }
                         }) : null);
                     }
@@ -247,12 +236,8 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         }
     };
 
-    const handleSearchClick = () => {
-        executeSearch(searchTerm);
-    }
-
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') executeSearch(searchTerm);
+        if (e.key === 'Enter') handleSearch(searchTerm);
     };
 
     const handleAddTransaction = (tx: any) => {
@@ -269,7 +254,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     return (
         <div className="h-full flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
             {/* Sticky Header with Search */}
-            <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-color)]/50 px-4 pt-safe pb-2 transition-all">
+            <div className="sticky top-0 z-20 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-color)]/50 px-4 pt-4 pb-2 transition-all">
                 <div className="max-w-2xl mx-auto w-full">
                     <h1 className="text-xl font-bold mb-4 px-1 flex items-center gap-2">
                         <GlobeIcon className="w-5 h-5 text-[var(--accent-color)]"/> {t('nav_market')}
@@ -304,7 +289,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-12 pr-14 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] transition-all shadow-sm placeholder:text-[var(--text-secondary)]/40 uppercase tracking-wide"
                             />
                             <button
-                                onClick={handleSearchClick}
+                                onClick={() => handleSearch(searchTerm)}
                                 disabled={loading}
                                 className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] p-1.5 rounded-lg transition-colors disabled:opacity-50 border border-[var(--border-color)]"
                             >
@@ -316,7 +301,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-32 md:pb-6 landscape-pb-6 scroll-smooth">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-24 md:pb-6 landscape-pb-6 scroll-smooth">
                 <div className="max-w-2xl mx-auto h-full">
                     {viewMode === 'quotes' ? (
                         <div className="animate-fade-in space-y-6">
@@ -349,29 +334,8 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                         
                                         {/* Sparkline Overlay */}
                                         {result.history.length >= 2 && (
-                                            <div className="relative h-24 w-full mt-4 -mb-6 opacity-30">
+                                            <div className="h-24 w-full mt-4 -mb-6 opacity-30 mask-image-gradient-b">
                                                 <PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-secondary)] to-transparent pointer-events-none"></div>
-                                            </div>
-                                        )}
-
-                                        {/* Grounding Source Display */}
-                                        {result.quoteSources && result.quoteSources.length > 0 && (
-                                            <div className="mt-4 flex flex-wrap items-center gap-2 opacity-70">
-                                                <div className="flex items-center gap-1">
-                                                    <GlobeIcon className="w-3 h-3 text-[var(--text-secondary)]" />
-                                                    <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase">Fontes:</span>
-                                                </div>
-                                                {result.quoteSources.slice(0, 2).map((src, idx) => {
-                                                    try {
-                                                        const hostname = new URL(src).hostname.replace('www.', '');
-                                                        return (
-                                                            <a key={idx} href={src} target="_blank" rel="noopener noreferrer" className="text-[9px] text-[var(--accent-color)] hover:underline truncate max-w-[120px]">
-                                                                {hostname}
-                                                            </a>
-                                                        );
-                                                    } catch { return null; }
-                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -526,7 +490,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                             </div>
                                             <div className="flex flex-wrap gap-2">
                                                 {recentSearches.map(term => (
-                                                    <button key={term} onClick={() => { setSearchTerm(term); executeSearch(term); }} className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group">
+                                                    <button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group">
                                                         {term} <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">→</span>
                                                     </button>
                                                 ))}
@@ -544,7 +508,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                 </div>
                                                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">
                                                     {cat.tickers.map(t => (
-                                                        <button key={t} onClick={() => { setSearchTerm(t); executeSearch(t); }} className="flex-shrink-0 w-32 bg-[var(--bg-secondary)] border border-[var(--border-color)] p-4 rounded-2xl hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all active:scale-95 text-left group shadow-sm">
+                                                        <button key={t} onClick={() => { setSearchTerm(t); handleSearch(t); }} className="flex-shrink-0 w-32 bg-[var(--bg-secondary)] border border-[var(--border-color)] p-4 rounded-2xl hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all active:scale-95 text-left group shadow-sm">
                                                             <span className="block font-black text-sm text-[var(--text-primary)] mb-1">{t}</span>
                                                             <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors font-medium flex items-center gap-1">
                                                                 Ver detalhes <ChevronRightIcon className="w-2.5 h-2.5"/>

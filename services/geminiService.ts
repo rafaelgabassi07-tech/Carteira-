@@ -1,66 +1,16 @@
 
-
 import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
 function getGeminiApiKey(prefs: AppPreferences): string {
-    // 1. Prioritize user-set key from preferences
     if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
         return prefs.geminiApiKey;
     }
-    // 2. Fallback to Vite environment variable
-    const viteKey = (import.meta as any).env?.VITE_API_KEY;
-    if (viteKey && viteKey.trim() !== '') {
-        return viteKey;
+    const envApiKey = (import.meta as any).env.VITE_API_KEY;
+    if (envApiKey && envApiKey.trim() !== '') {
+        return envApiKey;
     }
-    // 3. Fallback to standard process.env (for other environments)
-    const key = process.env.API_KEY;
-    if (key && key.trim() !== '') {
-        return key;
-    }
-    throw new Error("Chave de API do Gemini (VITE_API_KEY) não configurada.");
-}
-
-
-// Helper robusto para limpar JSON vindo de LLMs
-function cleanAndParseJSON(text: string): any {
-    if (!text) return [];
-    
-    // 1. Remove Markdown code blocks
-    let clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    
-    // 2. Encontrar o início e fim do JSON válido (Outermost brackets)
-    const firstBrace = clean.indexOf('{');
-    const firstBracket = clean.indexOf('[');
-    
-    if (firstBrace === -1 && firstBracket === -1) throw new Error("JSON invalid format: No brackets found");
-    
-    const start = (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) ? firstBrace : firstBracket;
-    
-    const lastBrace = clean.lastIndexOf('}');
-    const lastBracket = clean.lastIndexOf(']');
-    const end = Math.max(lastBrace, lastBracket);
-    
-    if (end === -1) throw new Error("JSON invalid format: No closing brackets");
-
-    clean = clean.substring(start, end + 1);
-
-    // 3. Tentar parsear
-    try {
-        return JSON.parse(clean);
-    } catch (e) {
-        console.warn("JSON Parse failed, attempting relaxed cleanup...", e);
-        // Fallback: Tentar remover trailing commas (comum em LLMs)
-        // NOTE: Do NOT remove comments with // regex as it breaks URLs (https://)
-        try {
-            // Remove trailing commas before } or ]
-            let relaxed = clean.replace(/,\s*([\]}])/g, '$1');
-            return JSON.parse(relaxed);
-        } catch (e2) {
-            console.error("Fatal JSON parse error", clean);
-            throw new Error("Falha fatal no parsing do JSON.");
-        }
-    }
+    throw new Error("Chave de API do Gemini não configurada.");
 }
 
 export interface NewsFilter {
@@ -84,15 +34,14 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
     const ai = new GoogleGenAI({ apiKey });
     
+    // Contexto de busca
     let searchContext = "sobre o Mercado Financeiro e Fundos Imobiliários (FIIs) no Brasil";
     if (filter.tickers && filter.tickers.length > 0) {
         const tickers = filter.tickers.slice(0, 5).join(', ');
         searchContext = `focado nos ativos: ${tickers}, e no mercado geral de FIIs`;
     }
     if (filter.query) {
-        // Sanitize query to prevent prompt injection
-        const safeQuery = filter.query.replace(/[^\w\sà-úÀ-Ú.,-]/g, '').trim();
-        searchContext += `. Tópico específico: "${safeQuery}"`;
+        searchContext += `. Tópico específico: ${filter.query}`;
     }
 
     const prompt = `
@@ -122,11 +71,15 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         const bytesReceived = new Blob([textResponse]).size;
         const stats = { bytesSent, bytesReceived };
 
+        // Limpeza e Parsing do JSON
+        let cleanJson = textResponse;
+        cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        
         let articles: NewsArticle[] = [];
         try {
-            articles = cleanAndParseJSON(textResponse);
+            articles = JSON.parse(cleanJson);
         } catch (e) {
-            console.error("Erro ao fazer parse do JSON de notícias:", e);
+            console.error("Erro ao fazer parse do JSON de notícias:", e, cleanJson);
             return emptyReturn;
         }
 
@@ -158,7 +111,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 }
 
-export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string): Promise<{ price: number, change: number, sources: string[] } | null> {
+export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string): Promise<{ price: number, change: number } | null> {
     let apiKey: string;
     try {
         apiKey = getGeminiApiKey(prefs);
@@ -179,20 +132,11 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
             config: { tools: [{ googleSearch: {} }], temperature: 0 }
         });
         
-        const data = cleanAndParseJSON(response.text || "{}");
-        
-        // Extract grounding sources for compliance
-        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        const sources = (groundingChunks as any[])
-            .map((c: any) => c.web?.uri)
-            .filter((uri: any): uri is string => typeof uri === 'string' && uri.trim() !== '');
+        const cleanJson = response.text?.replace(/^```json\s*/, '').replace(/```$/, '').trim() || "{}";
+        const data = JSON.parse(cleanJson);
         
         if (typeof data.price === 'number') {
-            return { 
-                price: data.price, 
-                change: data.changePercent || 0,
-                sources: [...new Set(sources)] // Unique sources
-            };
+            return { price: data.price, change: data.changePercent || 0 };
         }
         return null;
     } catch (e) {
@@ -201,27 +145,26 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
     }
 }
 
-// Batching Helper
-async function processBatchInChunks(items: string[], batchSize: number, processor: (chunk: string[]) => Promise<any>): Promise<{ mergedData: any, totalStats: { bytesSent: number, bytesReceived: number } }> {
-    let mergedData = {};
-    let totalStats = { bytesSent: 0, bytesReceived: 0 };
-
-    for (let i = 0; i < items.length; i += batchSize) {
-        const chunk = items.slice(i, i + batchSize);
-        try {
-            const result = await processor(chunk);
-            mergedData = { ...mergedData, ...result.data };
-            totalStats.bytesSent += result.stats.bytesSent;
-            totalStats.bytesReceived += result.stats.bytesReceived;
-        } catch (e) {
-            console.error(`Error processing chunk ${i}:`, e);
-        }
-    }
-    return { mergedData, totalStats };
-}
-
 export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: string[]): Promise<{ 
-    data: Record<string, any>, 
+    data: Record<string, { 
+        dy?: number; 
+        pvp?: number; 
+        assetType?: string; 
+        administrator?: string; 
+        vacancyRate?: number; 
+        lastDividend?: number; 
+        netWorth?: string; 
+        shareholders?: number; 
+        vpPerShare?: number; 
+        businessDescription?: string; 
+        riskAssessment?: string;
+        marketSentiment?: 'Bullish' | 'Bearish' | 'Neutral';
+        strengths?: string[];
+        dividendCAGR?: number;
+        capRate?: number;
+        managementFee?: string;
+        dividendsHistory?: DividendHistoryEvent[] 
+    }>, 
     stats: { bytesSent: number, bytesReceived: number } 
 }> {
     const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
@@ -236,60 +179,60 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     }
 
     const ai = new GoogleGenAI({ apiKey });
+
+    const tickersString = tickers.join(', ');
     const today = new Date().toISOString().split('T')[0];
 
-    // Processor function for a single chunk
-    const processChunk = async (chunkTickers: string[]) => {
-        const tickersString = chunkTickers.join(', ');
-        
-        const prompt = `
-          ROLE: Senior Real Estate Fund (FII) Analyst.
-          TASK: Perform a deep fundamental analysis for these Brazilian FIIs: ${tickersString}.
-          CURRENT_DATE: ${today}.
-          
-          RULES FOR SEARCH:
-          1. Use 'googleSearch' to find exact data from official sources (B3, RI, StatusInvest, ClubeFII).
-          2. 'businessDescription': Concise 1-sentence summary of the investment thesis.
-          3. 'riskAssessment': A string starting with "Baixo", "Médio" or "Alto" followed by a dash and a 3-5 word reason.
-          4. 'marketSentiment': Infer based on recent news/price action: "Bullish", "Bearish" or "Neutral".
-          5. 'strengths': JSON Array of 3 short bullet points highlighting key strengths.
-          6. 'dividendCAGR': 3-Year Compound Annual Growth Rate of dividends (approximate % float).
-          7. 'capRate': Estimated Capitalization Rate (%) for Brick funds.
-          
-          RULES FOR DIVIDENDS:
-          1. Fetch the last 6 dividends.
-          2. If Payment Date > Current Date, set "isProvisioned": true.
-          3. Dates MUST be 'YYYY-MM-DD'.
-          4. Value is "R$ per share".
-          
-          OUTPUT: JSON Object ONLY. Keys = Ticker.
-          
-          Structure per Ticker:
-          {
-            "dy": number (12m yield % value only, e.g. 12.5),
-            "pvp": number (e.g. 1.03),
-            "assetType": "Tijolo" | "Papel" | "Fiagro" | "FOF" | "Infra" | "Híbrido",
-            "administrator": string,
-            "vacancyRate": number (physical vacancy %),
-            "lastDividend": number,
-            "netWorth": string,
-            "shareholders": number,
-            "vpPerShare": number,
-            "businessDescription": string,
-            "riskAssessment": string,
-            "marketSentiment": "Bullish" | "Bearish" | "Neutral",
-            "strengths": string[],
-            "dividendCAGR": number,
-            "capRate": number,
-            "managementFee": string,
-            "dividendsHistory": [
-               { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number, "isProvisioned": boolean }
-            ]
-          }
-        `;
+    // Prompt Aprimorado para Análise Fundamentalista Completa
+    const prompt = `
+      ROLE: Senior Real Estate Fund (FII) Analyst.
+      TASK: Perform a deep fundamental analysis for these Brazilian FIIs: ${tickersString}.
+      CURRENT_DATE: ${today}.
+      
+      RULES FOR SEARCH:
+      1. Use 'googleSearch' to find exact data from official sources (B3, RI, StatusInvest, ClubeFII).
+      2. 'businessDescription': Concise 1-sentence summary of the investment thesis.
+      3. 'riskAssessment': A string starting with "Baixo", "Médio" or "Alto" followed by a dash and a 3-5 word reason.
+      4. 'marketSentiment': Infer based on recent news/price action: "Bullish", "Bearish" or "Neutral".
+      5. 'strengths': JSON Array of 3 short bullet points highlighting key strengths.
+      6. 'dividendCAGR': 3-Year Compound Annual Growth Rate of dividends (approximate % float).
+      7. 'capRate': Estimated Capitalization Rate (%) for Brick funds.
+      
+      RULES FOR DIVIDENDS:
+      1. Fetch the last 6 dividends.
+      2. If Payment Date > Current Date, set "isProvisioned": true.
+      3. Dates MUST be 'YYYY-MM-DD'.
+      4. Value is "R$ per share".
+      
+      OUTPUT: JSON Object ONLY. Keys = Ticker.
+      
+      Structure per Ticker:
+      {
+        "dy": number (12m yield % value only, e.g. 12.5),
+        "pvp": number (e.g. 1.03),
+        "assetType": "Tijolo" | "Papel" | "Fiagro" | "FOF" | "Infra" | "Híbrido",
+        "administrator": string,
+        "vacancyRate": number (physical vacancy %),
+        "lastDividend": number,
+        "netWorth": string,
+        "shareholders": number,
+        "vpPerShare": number,
+        "businessDescription": string,
+        "riskAssessment": string,
+        "marketSentiment": "Bullish" | "Bearish" | "Neutral",
+        "strengths": string[],
+        "dividendCAGR": number,
+        "capRate": number,
+        "managementFee": string,
+        "dividendsHistory": [
+           { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number, "isProvisioned": boolean }
+        ]
+      }
+    `;
 
-        const bytesSent = new Blob([prompt]).size;
-        
+    const bytesSent = new Blob([prompt]).size;
+
+    try {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
@@ -301,76 +244,61 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
         const textResponse = response.text || "{}";
         const bytesReceived = new Blob([textResponse]).size;
-        
-        // Extract Grounding Source URLs
-        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        const sourceUrls = (groundingChunks as any[])
-            .map((c: any) => c.web?.uri)
-            .filter((uri: any): uri is string => typeof uri === 'string' && uri.trim() !== '');
-        // Remove duplicates
-        const uniqueSources = [...new Set(sourceUrls)];
 
-        let data: Record<string, any> = {};
+        let cleanJson = textResponse.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        let data;
         try {
-            data = cleanAndParseJSON(textResponse);
-            // Attach sources to each asset data object for this chunk
-            for (const key in data) {
-                if (data.hasOwnProperty(key)) {
-                    data[key].sources = uniqueSources;
-                }
-            }
+            data = JSON.parse(cleanJson);
         } catch (e) {
-            console.error("Failed to parse Gemini chunk:", e);
+            console.error("Failed to parse Gemini asset data JSON:", e);
+            return emptyReturn;
         }
 
-        return { data, stats: { bytesSent, bytesReceived } };
-    };
+        const sanitizedData: Record<string, any> = {};
+        for (const ticker in data) {
+            if (Object.prototype.hasOwnProperty.call(data, ticker)) {
+                const assetData = data[ticker];
+                
+                let cleanDividends: DividendHistoryEvent[] = [];
+                if (Array.isArray(assetData.dividendsHistory)) {
+                    cleanDividends = assetData.dividendsHistory.filter((d: any) => {
+                        return d.exDate && d.paymentDate && typeof d.value === 'number' && !isNaN(d.value);
+                    }).map((d: any) => ({
+                        exDate: d.exDate,
+                        paymentDate: d.paymentDate,
+                        value: d.value,
+                        isProvisioned: !!d.isProvisioned
+                    }));
+                }
 
-    // Process in chunks of 3 to avoid context limits and reduce latency per request
-    const { mergedData, totalStats } = await processBatchInChunks(tickers, 3, processChunk);
-
-    // Sanitize and Validate Data
-    const sanitizedData: Record<string, any> = {};
-    for (const ticker in mergedData) {
-        if (Object.prototype.hasOwnProperty.call(mergedData, ticker)) {
-            const assetData = mergedData[ticker];
-            
-            let cleanDividends: DividendHistoryEvent[] = [];
-            if (Array.isArray(assetData.dividendsHistory)) {
-                cleanDividends = assetData.dividendsHistory.filter((d: any) => {
-                    return d.exDate && d.paymentDate && typeof d.value === 'number' && !isNaN(d.value);
-                }).map((d: any) => ({
-                    exDate: d.exDate,
-                    paymentDate: d.paymentDate,
-                    value: d.value,
-                    isProvisioned: !!d.isProvisioned
-                }));
+                sanitizedData[ticker] = {
+                    dy: typeof assetData.dy === 'number' ? assetData.dy : undefined,
+                    pvp: typeof assetData.pvp === 'number' ? assetData.pvp : undefined,
+                    assetType: typeof assetData.assetType === 'string' ? assetData.assetType : undefined,
+                    administrator: typeof assetData.administrator === 'string' ? assetData.administrator : undefined,
+                    vacancyRate: typeof assetData.vacancyRate === 'number' ? assetData.vacancyRate : undefined,
+                    lastDividend: typeof assetData.lastDividend === 'number' ? assetData.lastDividend : undefined,
+                    netWorth: typeof assetData.netWorth === 'string' ? assetData.netWorth : undefined,
+                    shareholders: typeof assetData.shareholders === 'number' ? assetData.shareholders : undefined,
+                    vpPerShare: typeof assetData.vpPerShare === 'number' ? assetData.vpPerShare : undefined,
+                    businessDescription: typeof assetData.businessDescription === 'string' ? assetData.businessDescription : undefined,
+                    riskAssessment: typeof assetData.riskAssessment === 'string' ? assetData.riskAssessment : undefined,
+                    marketSentiment: typeof assetData.marketSentiment === 'string' ? assetData.marketSentiment : undefined,
+                    strengths: Array.isArray(assetData.strengths) ? assetData.strengths : [],
+                    dividendCAGR: typeof assetData.dividendCAGR === 'number' ? assetData.dividendCAGR : undefined,
+                    capRate: typeof assetData.capRate === 'number' ? assetData.capRate : undefined,
+                    managementFee: typeof assetData.managementFee === 'string' ? assetData.managementFee : undefined,
+                    dividendsHistory: cleanDividends.length > 0 ? cleanDividends : undefined
+                };
             }
-
-            sanitizedData[ticker] = {
-                dy: typeof assetData.dy === 'number' ? assetData.dy : undefined,
-                pvp: typeof assetData.pvp === 'number' ? assetData.pvp : undefined,
-                assetType: typeof assetData.assetType === 'string' ? assetData.assetType : undefined,
-                administrator: typeof assetData.administrator === 'string' ? assetData.administrator : undefined,
-                vacancyRate: typeof assetData.vacancyRate === 'number' ? assetData.vacancyRate : undefined,
-                lastDividend: typeof assetData.lastDividend === 'number' ? assetData.lastDividend : undefined,
-                netWorth: typeof assetData.netWorth === 'string' ? assetData.netWorth : undefined,
-                shareholders: typeof assetData.shareholders === 'number' ? assetData.shareholders : undefined,
-                vpPerShare: typeof assetData.vpPerShare === 'number' ? assetData.vpPerShare : undefined,
-                businessDescription: typeof assetData.businessDescription === 'string' ? assetData.businessDescription : undefined,
-                riskAssessment: typeof assetData.riskAssessment === 'string' ? assetData.riskAssessment : undefined,
-                marketSentiment: typeof assetData.marketSentiment === 'string' ? assetData.marketSentiment : undefined,
-                strengths: Array.isArray(assetData.strengths) ? assetData.strengths : [],
-                dividendCAGR: typeof assetData.dividendCAGR === 'number' ? assetData.dividendCAGR : undefined,
-                capRate: typeof assetData.capRate === 'number' ? assetData.capRate : undefined,
-                managementFee: typeof assetData.managementFee === 'string' ? assetData.managementFee : undefined,
-                dividendsHistory: cleanDividends.length > 0 ? cleanDividends : undefined,
-                sources: Array.isArray(assetData.sources) ? assetData.sources : []
-            };
         }
-    }
 
-    return { data: sanitizedData, stats: totalStats };
+        return { data: sanitizedData, stats: { bytesSent, bytesReceived } };
+
+    } catch (error) {
+        console.error("Gemini Advanced Data Error:", error);
+        return emptyReturn;
+    }
 }
 
 export async function validateGeminiKey(key: string): Promise<boolean> {

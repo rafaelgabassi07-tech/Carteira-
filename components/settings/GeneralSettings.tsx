@@ -13,7 +13,7 @@ const GeneralSettings: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     
     const startScreens: { id: AppPreferences['startScreen'], label: string }[] = [
         { id: 'dashboard', label: t('nav_portfolio') }, // "Dashboard"
-        { id: 'analysis', label: t('nav_analysis') }, // "Carteira"
+        { id: 'carteira', label: t('nav_analysis') }, // "Carteira"
         { id: 'noticias', label: t('nav_news') },
     ];
 
