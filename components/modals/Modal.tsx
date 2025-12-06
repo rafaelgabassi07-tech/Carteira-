@@ -1,4 +1,3 @@
-
 import React from 'react';
 import CloseIcon from '../icons/CloseIcon';
 
@@ -29,7 +28,7 @@ const Modal: React.FC<ModalProps> = ({ title, onClose, children, type = 'slide-u
     const paddingClass = fullScreen ? 'p-5 pt-safe' : 'p-5';
 
     return (
-        <div className={`fixed inset-0 bg-black/75 flex justify-center z-50 backdrop-blur-sm transition-opacity ${positionClass}`}>
+        <div className={`fixed inset-0 bg-black/75 flex justify-center z-[110] backdrop-blur-sm transition-opacity ${positionClass}`}>
             <div className={`bg-[var(--bg-secondary)] text-[var(--text-primary)] flex flex-col ${widthClass} ${roundedClass} ${paddingClass} ${animationClass} shadow-2xl will-change-transform`}>
                 <div className="flex justify-between items-center mb-4 flex-shrink-0">
                     <h2 className="text-xl font-bold">{title}</h2>
