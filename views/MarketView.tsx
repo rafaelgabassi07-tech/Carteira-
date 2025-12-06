@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -189,7 +188,7 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-24 md:pb-6 landscape-pb-6 scroll-smooth">
-                <div className="max-w-2xl mx-auto h-full">
+                <div className="max-w-2xl mx-auto">
                     {viewMode === 'quotes' ? (
                         <div className="animate-fade-in space-y-6">
                             {result && (
