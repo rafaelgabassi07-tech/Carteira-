@@ -10,6 +10,7 @@ import { vibrate } from '../utils';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
 import ClockIcon from '../components/icons/ClockIcon';
+import WalletIcon from '../components/icons/WalletIcon';
 import type { DividendHistoryEvent, Transaction, Asset } from '../types';
 
 // --- Types ---
@@ -155,8 +156,16 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         }
 
         const currentMonthValue = monthlyAggregation[currentMonthKey] || 0;
-        const activeMonths = Object.values(monthlyAggregation).filter(v => v > 0);
-        const averageIncome = activeMonths.length > 0 ? activeMonths.reduce((a,b)=>a+b,0) / activeMonths.length : 0;
+        const totalLast12m = monthlyData.reduce((acc, m) => acc + m.total, 0);
+        
+        // Smarter Average: Average of months since first payment (up to 12)
+        const firstIncomeIndex = monthlyData.findIndex(m => m.total > 0);
+        const monthsDivisor = firstIncomeIndex === -1 ? 1 : Math.max(1, monthlyData.length - firstIncomeIndex);
+        
+        // If portfolio is older than 1 year, we assume stable 12m. 
+        // We can check earliest transaction date for more precision, but this approximation is good for "12m view".
+        const averageIncome = totalLast12m / monthsDivisor;
+
         const yieldOnCost = totalInvestedGlobal > 0 ? (annualForecast / totalInvestedGlobal) * 100 : 0;
 
         return { 
@@ -267,9 +276,9 @@ const PayerRow: React.FC<{ payer: PayerData; rank: number }> = ({ payer, rank })
             {isExpanded && (
                 <div className="px-4 pb-4 animate-fade-in border-t border-[var(--border-color)]">
                     {payer.isProvisioned && payer.projectedAmount && payer.projectedAmount > 0 && (
-                        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-3 rounded-lg my-3 text-xs flex justify-between items-center font-bold">
-                            <span>Valor a Receber:</span>
-                            <span>{formatCurrency(payer.projectedAmount)}</span>
+                        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-3 rounded-lg my-3 flex justify-between items-center shadow-sm">
+                            <span className="text-xs font-bold uppercase tracking-wide">Valor a Receber</span>
+                            <span className="text-sm font-black">{formatCurrency(payer.projectedAmount)}</span>
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-3 mt-3">
@@ -304,19 +313,29 @@ const IncomeReportView: React.FC<IncomeReportViewProps> = ({ onBack }) => {
                         <MetricCard label="Total Acumulado" value={<CountUp end={stats.totalReceived} formatter={formatCurrency} />} icon={<TrendingUpIcon className="w-5 h-5"/>} />
                         <MetricCard label="Mês Atual" value={<CountUp end={stats.currentMonthValue} formatter={formatCurrency} />} icon={<ClockIcon className="w-5 h-5"/>} />
                     </div>
+                    
                     <div className="bg-[var(--bg-secondary)] p-6 rounded-3xl border border-[var(--border-color)] shadow-sm">
                         <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Evolução de Pagamentos</h3>
                         <MonthlyBarChart data={stats.monthlyData} avg={stats.averageIncome} />
                     </div>
+                    
                     <div>
                         <div className="flex items-center justify-between px-1 mb-3">
                             <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Origem dos Proventos</h3>
                         </div>
-                        <div className="space-y-1">
-                            {stats.payersData.map((payer, idx) => (
-                                <PayerRow key={payer.ticker} payer={payer} rank={idx + 1} />
-                            ))}
-                        </div>
+                        {stats.payersData.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center p-12 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] border-dashed opacity-70 animate-fade-in">
+                                <WalletIcon className="w-12 h-12 mb-3 text-[var(--text-secondary)] opacity-50" />
+                                <p className="text-sm font-bold text-[var(--text-secondary)]">Sem histórico de proventos</p>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1 opacity-70 text-center">Adicione ativos pagadores de dividendos à sua carteira.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-1 animate-fade-in-up">
+                                {stats.payersData.map((payer, idx) => (
+                                    <PayerRow key={payer.ticker} payer={payer} rank={idx + 1} />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
