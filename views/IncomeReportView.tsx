@@ -29,6 +29,7 @@ interface PayerData {
     isProvisioned?: boolean;
     yieldOnCost: number;
     averageMonthly: number;
+    projectedAmount?: number;
 }
 
 interface DividendStats {
@@ -90,6 +91,21 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             
             const sortedHistory = [...history].sort((a, b) => b.exDate.localeCompare(a.exDate));
             const latestDividend = sortedHistory[0];
+            let projectedAmount: number | undefined = undefined;
+
+            const nextProvisioned = sortedHistory.find(d => d.isProvisioned);
+            if (nextProvisioned) {
+                let qtyOwned = 0;
+                for (const tx of assetTxs) {
+                    if (tx.date > nextProvisioned.exDate) break;
+                    if (tx.type === 'Compra') qtyOwned += tx.quantity;
+                    else if (tx.type === 'Venda') qtyOwned -= tx.quantity;
+                }
+                qtyOwned = Math.max(0, qtyOwned);
+                if (qtyOwned > 0) {
+                    projectedAmount = qtyOwned * nextProvisioned.value;
+                }
+            }
 
             sortedHistory.forEach((div: DividendHistoryEvent) => {
                 if (div.exDate < assetTxs[0].date) return;
@@ -122,6 +138,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                 isProvisioned: latestDividend?.isProvisioned,
                 yieldOnCost: assetYoC,
                 averageMonthly: count > 0 ? tickerTotalPaid / count : 0,
+                projectedAmount,
             };
         });
 
@@ -145,7 +162,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         return { 
             totalReceived, 
             monthlyData, 
-            payersData: Object.values(payerAggregation).filter(p => p.totalPaid > 0).sort((a,b) => b.totalPaid - a.totalPaid), 
+            payersData: Object.values(payerAggregation).filter(p => p.totalPaid > 0 || p.projectedAmount).sort((a,b) => b.totalPaid - a.totalPaid), 
             currentMonthValue,
             averageIncome,
             annualForecast,
@@ -249,7 +266,13 @@ const PayerRow: React.FC<{ payer: PayerData; rank: number }> = ({ payer, rank })
             </div>
             {isExpanded && (
                 <div className="px-4 pb-4 animate-fade-in border-t border-[var(--border-color)]">
-                    <div className="grid grid-cols-2 gap-3 mt-4">
+                    {payer.isProvisioned && payer.projectedAmount && payer.projectedAmount > 0 && (
+                        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-3 rounded-lg my-3 text-xs flex justify-between items-center font-bold">
+                            <span>Valor a Receber:</span>
+                            <span>{formatCurrency(payer.projectedAmount)}</span>
+                        </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3 mt-3">
                         <DetailItem label="Yield on Cost" value={`${payer.yieldOnCost.toFixed(1)}%`} />
                         <DetailItem label="Média Mensal" value={formatCurrency(payer.averageMonthly)} />
                         <DetailItem label="Próximo Pagamento" value={formatDate(payer.nextPaymentDate)} status={payer.isProvisioned ? 'Futuro' : 'Pago'}/>
@@ -266,7 +289,7 @@ interface IncomeReportViewProps {
 }
 
 const IncomeReportView: React.FC<IncomeReportViewProps> = ({ onBack }) => {
-    const { formatCurrency, t } = useI18n();
+    const { formatCurrency } = useI18n();
     const { assets, transactions } = usePortfolio();
     const stats = useDividendCalculations(transactions, assets);
     
