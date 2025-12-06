@@ -101,17 +101,16 @@ const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValu
     
             {/* Bottom: Allocation bar */}
             <div className="mt-4">
-                <div className="flex justify-between items-center mb-1">
+                <div className="flex justify-between items-center mb-1.5">
                      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Alocação</span>
                      <span className="text-[10px] font-bold text-[var(--text-primary)]">{allocation.toFixed(1)}%</span>
                 </div>
-                <div className="w-full bg-[var(--bg-primary)] rounded-full h-1 overflow-hidden border border-[var(--border-color)]/50">
+                <div className="w-full bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden border border-[var(--border-color)]/30 shadow-inner">
                      <div 
-                        className="h-full rounded-full transition-all duration-1000 ease-out" 
+                        className="h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-[var(--accent-color)]/80 to-[var(--accent-color)]" 
                         style={{ 
                             width: `${Math.max(allocation, 0)}%`,
-                            backgroundColor: isPositive ? 'var(--green-text)' : 'var(--red-text)',
-                            opacity: 0.7
+                            boxShadow: `0 0 8px rgba(var(--accent-rgb), 0.4)`
                         }}
                     />
                 </div>
