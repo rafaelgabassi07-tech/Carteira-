@@ -62,6 +62,17 @@ const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValu
     
     const isPositive = variation >= 0;
 
+    const barColorClass = isPositive
+        ? 'bg-gradient-to-r from-emerald-500/70 to-emerald-500'
+        : 'bg-gradient-to-r from-rose-500/70 to-rose-500';
+
+    const barStyle = {
+        width: `${Math.max(allocation, 0)}%`,
+        boxShadow: isPositive
+            ? '0 0 10px rgb(16 185 129 / 0.4)'
+            : '0 0 10px rgb(244 63 94 / 0.4)',
+    };
+
     return (
         <div 
             onClick={() => { onClick(); vibrate(); }} 
@@ -105,13 +116,10 @@ const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValu
                      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Alocação</span>
                      <span className="text-[10px] font-bold text-[var(--text-primary)]">{allocation.toFixed(1)}%</span>
                 </div>
-                <div className="w-full bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden border border-[var(--border-color)]/30 shadow-inner">
+                <div className="w-full bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden shadow-inner">
                      <div 
-                        className="h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-[var(--accent-color)]/80 to-[var(--accent-color)]" 
-                        style={{ 
-                            width: `${Math.max(allocation, 0)}%`,
-                            boxShadow: `0 0 8px rgba(var(--accent-rgb), 0.4)`
-                        }}
+                        className={`h-full rounded-full transition-all duration-1000 ease-out ${barColorClass}`}
+                        style={barStyle}
                     />
                 </div>
             </div>
