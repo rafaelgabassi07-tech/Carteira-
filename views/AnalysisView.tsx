@@ -173,13 +173,13 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                              </h3>
                              
                             {isRefreshing && processedAssets.length === 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse">
+                                <div className="flex flex-col gap-3 animate-pulse">
                                     {[1, 2, 3, 4].map(i => (
-                                        <div key={i} className="h-20 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]"></div>
+                                        <div key={i} className="h-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)]"></div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
+                                <div className="flex flex-col gap-3">
                                     {processedAssets.map((asset, index) => (
                                         <AssetListItem 
                                             key={asset.ticker}
