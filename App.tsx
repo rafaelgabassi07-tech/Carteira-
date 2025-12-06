@@ -19,10 +19,11 @@ const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
 const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
 const MarketView = React.lazy(() => import('./views/MarketView'));
+const IncomeReportView = React.lazy(() => import('./views/IncomeReportView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
 
 
-export type View = 'dashboard' | 'carteira' | 'transacoes' | 'mercado' | 'settings' | 'notificacoes' | 'assetDetail';
+export type View = 'dashboard' | 'carteira' | 'transacoes' | 'mercado' | 'settings' | 'notificacoes' | 'assetDetail' | 'incomeReport';
 
 const App: React.FC = () => {
   const { assets, preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
@@ -135,6 +136,7 @@ const App: React.FC = () => {
       case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
       case 'mercado': return <MarketView addToast={addToast} />;
       case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
+      case 'incomeReport': return <IncomeReportView onBack={handleBackFromDetail} />;
       default: return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
     }
   };

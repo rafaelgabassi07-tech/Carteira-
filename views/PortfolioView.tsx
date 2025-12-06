@@ -239,7 +239,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, addToast }
 
                 <div className="px-4 mt-6 space-y-6 md:max-w-2xl md:mx-auto lg:max-w-3xl">
                     {/* Income Report Section */}
-                    {assets.length > 0 && <DividendsSummaryCard />}
+                    {assets.length > 0 && <DividendsSummaryCard setActiveView={setActiveView} />}
 
                     {/* Sector Allocation Section */}
                     {assets.length > 0 && <DiversificationCard />}
