@@ -54,7 +54,7 @@ function extractAndParseJSON(text: string): any {
         return JSON.parse(text);
     } catch (e) {
         console.error("Failed to parse JSON from Gemini response:", e);
-        console.debug("Raw text:", text);
+        // console.debug("Raw text:", text);
         return null;
     }
 }
@@ -185,14 +185,14 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const tickerStr = tickers.join(", ");
     const today = new Date().toISOString().split('T')[0];
 
-    const prompt = `Realize uma análise fundamentalista precisa para os ativos: [${tickerStr}]. Data de referência: ${today}.
-    Use a ferramenta googleSearch obrigatoriamente para buscar dados RECENTES de DY, P/VP, Vacância, Último Provento e Histórico de Dividendos.
+    const prompt = `Analise os dados fundamentalistas para os ativos: [${tickerStr}]. Data de hoje: ${today}.
+    Use a ferramenta googleSearch para buscar dados RECENTES de DY, P/VP, Vacância e Histórico de Dividendos.
     
-    Retorne a resposta ESTRITAMENTE como um JSON cru (sem markdown) seguindo esta estrutura exata:
+    Primeiro, colete os dados. DEPOIS, retorne um JSON seguindo EXATAMENTE este formato:
     {
       "assets": [
         {
-          "ticker": "AAAA11",
+          "ticker": "XXXX11",
           "dy": 10.5,
           "pvp": 0.98,
           "assetType": "Tijolo|Papel|Fiagro|Infra|FOF",
@@ -204,7 +204,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
           "vpPerShare": 100.50,
           "businessDescription": "Resumo curto...",
           "riskAssessment": "Baixo/Médio/Alto - Motivo",
-          "strengths": ["Ponto forte 1", "Ponto forte 2"],
+          "strengths": ["Ponto forte 1"],
           "weaknesses": ["Ponto fraco 1"],
           "dividendCAGR": 5.2,
           "managementFee": "1.2% a.a.",
@@ -214,7 +214,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         }
       ]
     }
-    Se um dado não for encontrado, use null.`;
+    
+    Se um dado numérico não for encontrado, use null (não use zero se não for zero).`;
 
     try {
         const response = await ai.models.generateContent({
@@ -222,7 +223,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                // Removed responseSchema to prevent conflict with Google Search tool
+                // Removed responseSchema to prevent conflict with Google Search tool and allow text processing
             }
         });
 
