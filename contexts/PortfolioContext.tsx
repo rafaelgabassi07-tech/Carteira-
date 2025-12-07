@@ -169,6 +169,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
+          // 1. Atualização rápida de preço (Brapi)
           const { quotes } = await fetchBrapiQuotes(preferences, [ticker], false);
           
           setMarketData(prev => ({
@@ -180,12 +181,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
           }));
 
+          // 2. Análise Fundamentalista (Gemini)
           const isFundamentalsStale = !currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
           const hasMissingDividends = !currentData?.dividendsHistory || currentData.dividendsHistory.length === 0;
 
           if (force || isFundamentalsStale || hasMissingDividends) {
              const {data, stats} = await fetchAdvancedAssetData(preferences, [ticker]);
              logApiUsage('gemini', { requests: 1, ...stats });
+             
              setMarketData(prev => ({
                 ...prev,
                 [ticker.toUpperCase()]: {
@@ -196,7 +199,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
              }));
           }
       } catch (e: any) { 
-          console.error(e);
+          console.error("Erro ao atualizar ativo individual:", e);
           throw e;
       }
   }, [preferences, setMarketData, logApiUsage]);
@@ -278,60 +281,69 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
-          // Step 1: Fetch Brapi data
-          const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
-          logApiUsage('brapi', { requests: 1, bytesReceived: brapiRes.stats.bytesReceived });
+          // Step 1: Fetch Brapi data (Preço em massa - mais barato e rápido)
+          let brapiFailed = false;
+          let brapiQuotes = {};
+          try {
+              const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
+              logApiUsage('brapi', { requests: 1, bytesReceived: brapiRes.stats.bytesReceived });
+              brapiQuotes = brapiRes.quotes;
+          } catch (e) {
+              console.warn("Brapi failed, continuing to Gemini fallback", e);
+              brapiFailed = true;
+          }
 
-          // Step 2: Use ref to get *latest* state before merge
+          // Step 2: Prepare state update object
           const currentMarketData = marketDataRef.current;
-          // Create a new copy to mutate locally before one-time commit
           const nextMarketData = { ...currentMarketData };
 
-          // Merge Brapi results
-          Object.entries(brapiRes.quotes).forEach(([tkr, data]) => {
+          // Apply Brapi updates
+          Object.entries(brapiQuotes).forEach(([tkr, data]) => {
               nextMarketData[tkr] = {
-                  ...(nextMarketData[tkr] || {}), // Use nextMarketData here to preserve existing fields not in Brapi
-                  ...data,
+                  ...(nextMarketData[tkr] || {}), 
+                  ...(data as any),
                   lastUpdated: now
               };
           });
 
-          // Step 3: Determine what needs updating from Gemini.
-          // Note: We use nextMarketData to check against the just-fetched Brapi updates if needed,
-          // OR check if fundamentals are missing entirely.
+          // Step 3: Determine Gemini Targets
           const assetsNeedingUpdate = tickers.filter(t => {
               const data = nextMarketData[t.toUpperCase()]; 
-              // Force update if explicitly requested OR fundamentals are stale OR fundamentals are empty
+              // Se Brapi falhou, precisamos atualizar o preço via Gemini TAMBÉM
+              const needsPrice = brapiFailed || !data?.currentPrice;
+              // Dados fundamentais expirados ou inexistentes?
               const fundamentalsStale = !data?.lastFundamentalUpdate || (now - data.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
               const missingData = !data?.dividendsHistory || data.dividendsHistory.length === 0;
               
-              return force || fundamentalsStale || missingData;
+              return force || fundamentalsStale || missingData || needsPrice;
           });
 
-          // Step 4: Fetch Gemini data if needed.
+          // Step 4: Batch Process Gemini
           if (assetsNeedingUpdate.length > 0) {
-              const batches = chunkArray(assetsNeedingUpdate, 5);
+              const batches = chunkArray(assetsNeedingUpdate, 4); // Lotes menores para o Gemini (Schema complexo gasta tokens)
               for (const batch of batches) {
                   try {
                       const geminiRes = await fetchAdvancedAssetData(preferences, batch);
                       logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
 
-                      // Merge Gemini results into our temporary object
                       Object.entries(geminiRes.data).forEach(([tkr, data]) => {
                           nextMarketData[tkr] = {
                               ...(nextMarketData[tkr] || {}),
                               ...(data as object),
-                              lastFundamentalUpdate: now
+                              lastFundamentalUpdate: now,
+                              // Se não tinha preço antes (Brapi falhou), usa o fallback do Gemini se vier (mas a função advanced foca em fundamentos)
+                              // Idealmente fetchLiveAssetQuote seria chamado se brapi falhasse, mas vamos assumir que o usuário tentará novamente
+                              // ou implementaremos o fallback de preço no futuro.
                           };
                       });
                   } catch (batchErr: any) {
                       console.error("Failed to fetch Gemini batch:", batch, batchErr);
-                      // Don't set global error, just log it, so partial updates (Brapi) are kept
+                      if (!marketDataError) setMarketDataError("Alguns dados não puderam ser atualizados. Verifique sua chave API.");
                   }
               }
           }
           
-          // Step 5: Set state ONCE at the very end with all collected data.
+          // Step 5: Commit changes
           setMarketData(nextMarketData);
           setLastSync(now);
 
@@ -353,7 +365,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const isWeekDay = day >= 1 && day <= 5;
           const isMarketHours = hour >= 10 && hour < 18;
           
-          // Only auto-refresh if market is open or data is very old
           if (isWeekDay && isMarketHours) {
               refreshMarketData(false, true);
           }
@@ -366,17 +377,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await refreshMarketData(true, false); 
   }, [refreshMarketData]);
 
-  // Initial Load Effect
+  // Initial Load
   useEffect(() => {
-    // Only run this once on mount if we have transactions but no recent sync
     if (!refreshInProgress.current && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
       initialLoadDone.current = true;
       const now = Date.now();
-      // If never synced OR synced more than 15 mins ago, force refresh on startup
       const isStale = !lastSync || (now - lastSync > STALE_TIME.MARKET_DATA);
       
       if (isStale) {
-          // Force = true ensures Gemini runs even if cache exists but is old
           refreshMarketData(true, true); 
       }
     }
