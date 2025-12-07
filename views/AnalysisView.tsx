@@ -3,14 +3,87 @@ import React, { useState, useMemo, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import PatrimonyEvolutionCard from '../components/PatrimonyEvolutionCard';
-import AssetListItem from '../components/AssetListItem';
+import PortfolioPieChart from '../components/PortfolioPieChart';
+import BarChart from '../components/BarChart';
+import CountUp from '../components/CountUp';
+import { vibrate } from '../utils';
 import RefreshIcon from '../components/icons/RefreshIcon';
+import AssetListItem from '../components/AssetListItem';
 import SortIcon from '../components/icons/SortIcon';
 import WalletIcon from '../components/icons/WalletIcon';
 import SearchIcon from '../components/icons/SearchIcon';
 import CloseIcon from '../components/icons/CloseIcon';
-import { vibrate } from '../utils';
 import type { ToastMessage, SortOption } from '../types';
+
+const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number; className?: string }> = ({ title, children, action, delay = 0, className = '' }) => (
+    <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${className}`} style={{ animationDelay: `${delay}ms` }}>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-lg text-[var(--text-primary)]">{title}</h3>
+            {action}
+        </div>
+        {children}
+    </div>
+);
+
+const IncomeCard: React.FC = () => {
+    const { t, formatCurrency } = useI18n();
+    const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
+    
+    const average = useMemo(() => {
+         const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
+         return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
+    }, [monthlyIncome]);
+
+    return (
+        <AnalysisCard title={t('income_report_title')} delay={100}>
+            <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
+                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                        <CountUp end={average} formatter={formatCurrency} />
+                    </span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
+                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                        <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
+                    </span>
+                </div>
+            </div>
+             <div className="h-48 w-full">
+                 <BarChart data={monthlyIncome} />
+             </div>
+        </AnalysisCard>
+    );
+};
+
+const DiversificationCard: React.FC = () => {
+    const { t } = useI18n();
+    const { assets, preferences } = usePortfolio();
+    
+    const data = useMemo(() => {
+        const segments: Record<string, number> = {};
+        let totalValue = 0;
+        assets.forEach(a => {
+            const val = a.quantity * a.currentPrice;
+            const seg = a.segment || t('outros');
+            segments[seg] = (segments[seg] || 0) + val;
+            totalValue += val;
+        });
+        
+        return Object.entries(segments).map(([name, value]) => ({
+            name,
+            value,
+            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
+        })).sort((a, b) => b.value - a.value);
+    }, [assets, t]);
+
+    return (
+        <AnalysisCard title={t('diversification')} delay={200}>
+            <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
+        </AnalysisCard>
+    );
+};
 
 interface AnalysisViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
@@ -125,8 +198,12 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                     </button>
                 </div>
                 
-                <div className="w-full">
-                    <PatrimonyEvolutionCard />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div className="lg:col-span-2">
+                        <PatrimonyEvolutionCard />
+                    </div>
+                    <IncomeCard />
+                    <DiversificationCard />
                 </div>
 
                 {/* Assets List Section */}
@@ -205,7 +282,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                                             onClick={() => onSelectAsset(asset.ticker)} 
                                             style={{ animationDelay: `${index * 50}ms` }}
                                             hideCents={preferences.hideCents}
-                                            privacyMode={false} // Analysis view generally doesn't hide values by default or inherits global privacy if we wanted
+                                            privacyMode={false}
                                         />
                                     ))}
                                 </div>
