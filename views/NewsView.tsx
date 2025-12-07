@@ -6,6 +6,8 @@ import StarIcon from '../components/icons/StarIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import FilterIcon from '../components/icons/FilterIcon';
+import SearchIcon from '../components/icons/SearchIcon';
+import CloseIcon from '../components/icons/CloseIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { CacheManager, vibrate, debounce } from '../utils';
@@ -130,12 +132,8 @@ const NewsCardSkeleton: React.FC = () => (
     </div>
 );
 
-interface NewsViewProps {
-    addToast: (message: string, type?: ToastMessage['type']) => void;
-    isEmbedded?: boolean;
-}
 
-const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => {
+const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void; isEmbedded?: boolean}> = ({ addToast, isEmbedded }) => {
   const { t } = useI18n();
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
@@ -195,7 +193,7 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
       const filterKey = `news_${currentQuery}_${currentDateRange}_${currentSource}`.toLowerCase().replace(/\s+/g, '_');
       
       if (!isRefresh) {
-          const cachedNews = await CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
+          const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
           if (cachedNews) {
               setNews(cachedNews);
               setLoading(false);
@@ -252,6 +250,13 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
     vibrate();
     setLoading(true);
     loadNews(true, searchQuery, dateRange, sourceFilter);
+  };
+  
+  const clearSearch = () => {
+      vibrate(5);
+      setSearchQuery('');
+      setLoading(true);
+      debouncedLoadNews('', dateRange, sourceFilter);
   };
   
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -359,14 +364,25 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
             </div>
         )}
 
-        <div className="mb-4">
+        <div className="mb-4 relative group">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none">
+              <SearchIcon className="w-5 h-5" />
+          </div>
           <input 
             type="text"
             placeholder={t('search_news_placeholder')}
             value={searchQuery}
             onChange={handleSearchChange}
-            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-12 pr-12 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-4 focus:ring-[var(--accent-color)]/10 transition-all shadow-sm placeholder:text-[var(--text-secondary)]/50"
           />
+          {searchQuery && (
+              <button 
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors active:scale-90"
+              >
+                  <CloseIcon className="w-4 h-4" />
+              </button>
+          )}
         </div>
         
         <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">

@@ -1,55 +1,72 @@
 
-import React, { useMemo, useRef, useState } from 'react';
-import type { ToastMessage } from '../types';
+import React, { useState, useMemo, useRef } from 'react';
+import type { Asset, ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
+import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
-import SettingsIcon from '../components/icons/SettingsIcon';
-import WalletIcon from '../components/icons/WalletIcon';
 import CountUp from '../components/CountUp';
-import PortfolioPieChart from '../components/PortfolioPieChart';
-import DividendsSummaryCard from '../components/DividendsSummaryCard';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
+import AssetListItem from '../components/AssetListItem'; // Reusing the component properly
+
+// Icons
+const EyeIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+);
+const EyeOffIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+);
+const SortIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+);
+const WalletIcon: React.FC<{className?:string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+);
+
+// --- Components ---
+
+const PortfolioSkeleton: React.FC = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
+        {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)]"></div>
+        ))}
+    </div>
+);
 
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
+    onShare: () => void;
     onRefresh: () => void;
     isRefreshing: boolean;
     unreadNotificationsCount?: number;
-}> = ({ setActiveView, onRefresh, isRefreshing, unreadNotificationsCount }) => {
+}> = ({ setActiveView, onShare, onRefresh, isRefreshing, unreadNotificationsCount }) => {
     const { t } = useI18n();
+    const { privacyMode, togglePrivacyMode } = usePortfolio();
 
     return (
-        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300">
+        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)]/50 transition-all duration-300">
             <div className="flex flex-col">
-                <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">Invest</h1>
-                <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
+                <h1 className="text-xl font-black tracking-tight text-[var(--text-primary)] leading-tight flex items-center gap-1">
+                    Invest
+                    <span className="w-1.5 h-1.5 bg-[var(--accent-color)] rounded-full animate-pulse mt-1"></span>
+                </h1>
+                <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-widest opacity-80">{t('main_portfolio')}</p>
             </div>
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center gap-2">
                 <button 
                     id="refresh-btn" 
                     onClick={() => { onRefresh(); vibrate(); }} 
-                    className={`p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-90 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
+                    className={`p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-90 border border-transparent hover:border-[var(--border-color)] ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
-                
-                <button 
-                    onClick={() => { setActiveView('settings'); vibrate(); }} 
-                    className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-90" 
-                    aria-label="Configurações"
-                >
-                    <SettingsIcon className="w-5 h-5" />
+                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-transparent hover:border-[var(--border-color)]" aria-label="Toggle Privacy">
+                     {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                 </button>
-
-                <button 
-                    id="notifications-btn" 
-                    onClick={() => { setActiveView('notificacoes'); vibrate(); }} 
-                    className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95"
-                >
+                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95 border border-transparent hover:border-[var(--border-color)]">
                     <BellIcon className="w-5 h-5" />
                     {unreadNotificationsCount && unreadNotificationsCount > 0 ? (
                         <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[var(--bg-primary)]"></span>
@@ -61,9 +78,9 @@ const Header: React.FC<{
 };
 
 const Metric: React.FC<{ label: string; children: React.ReactNode; }> = ({ label, children }) => (
-    <div>
-        <h3 className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-0.5">{label}</h3>
-        <div className="font-semibold text-lg">{children}</div>
+    <div className="flex flex-col">
+        <h3 className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1 opacity-70">{label}</h3>
+        <div className="font-bold text-lg tracking-tight">{children}</div>
     </div>
 );
 
@@ -86,7 +103,7 @@ const PortfolioSummary: React.FC = () => {
     
     const unrealizedGain = summary.currentValue - summary.totalInvested;
     const unrealizedGainPercent = summary.totalInvested > 0 ? (unrealizedGain / summary.totalInvested) * 100 : 0;
-    const today = new Date().toLocaleDateString(locale, { day: '2-digit', month: 'short' });
+    const today = new Date().toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 
     const format = (val: number) => {
         let formatted = formatCurrency(val);
@@ -95,35 +112,42 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
-            {/* Decorative Glow */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
+        <div id="portfolio-summary" className="relative p-6 rounded-[28px] mx-4 mt-6 overflow-hidden group shadow-2xl shadow-[var(--accent-color)]/5 transition-all duration-500 border border-[var(--border-color)]">
+            {/* Background Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[var(--bg-secondary)] via-[var(--bg-secondary)] to-[var(--bg-tertiary-hover)] opacity-90"></div>
+            
+            {/* Subtle Noise/Glow Effect */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-[var(--accent-color)] opacity-[0.07] blur-[80px] rounded-full pointer-events-none"></div>
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500 opacity-[0.05] blur-[80px] rounded-full pointer-events-none"></div>
 
             <div className="relative z-10">
-                <div className="flex justify-between items-start mb-1">
-                     <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('my_portfolio')}</h2>
-                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] border border-[var(--border-color)]">{today}</span>
+                <div className="flex justify-between items-start mb-2">
+                     <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-80">{t('my_portfolio')}</h2>
+                     <span className="text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-primary)]/50 backdrop-blur-sm px-2 py-0.5 rounded-full border border-[var(--border-color)]">{today}</span>
                 </div>
                 
-                <div className={`mt-2 mb-1 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
-                    <p className="text-4xl font-bold tracking-tight mb-1 text-[var(--text-primary)]">
+                <div className={`mt-3 mb-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                    <p className="text-[2.75rem] font-black tracking-tighter mb-1 text-[var(--text-primary)] leading-none">
                         <CountUp end={summary.currentValue} formatter={format} />
                     </p>
-                    <p className={`text-sm font-semibold flex items-center gap-1 ${unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                        {unrealizedGain >= 0 ? '▲' : '▼'}
-                        <CountUp end={Math.abs(unrealizedGain)} formatter={format} /> 
-                        <span className="opacity-80">({unrealizedGainPercent.toFixed(2)}%)</span>
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border ${unrealizedGain >= 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-500'}`}>
+                            <span className="text-xs font-bold">{unrealizedGain >= 0 ? '▲' : '▼'} {unrealizedGainPercent.toFixed(2)}%</span>
+                        </div>
+                        <p className={`text-sm font-semibold ${unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                            {unrealizedGain >= 0 ? '+' : ''} <CountUp end={Math.abs(unrealizedGain)} formatter={format} /> 
+                        </p>
+                    </div>
                 </div>
 
-                <div className="border-t border-[var(--border-color)]/50 my-5"></div>
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-[var(--border-color)] to-transparent my-6 opacity-60"></div>
 
-                <div className={`grid grid-cols-2 gap-y-5 gap-x-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                <div className={`grid grid-cols-2 gap-y-6 gap-x-4 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
                     <Metric label={t('total_invested')}>
                         <p className="text-[var(--text-primary)]"><CountUp end={summary.totalInvested} formatter={format} /></p>
                     </Metric>
                     <Metric label={t('yield_on_cost')}>
-                        <p className="text-[var(--accent-color)]"><CountUp end={yieldOnCost} decimals={2} />%</p>
+                        <p className="text-[var(--accent-color)] drop-shadow-sm"><CountUp end={yieldOnCost} decimals={2} />%</p>
                     </Metric>
                     <Metric label={t('projected_annual_income')}>
                         <p className="text-[var(--text-primary)]"><CountUp end={projectedAnnualIncome} formatter={format} /></p>
@@ -146,9 +170,12 @@ interface PortfolioViewProps {
 }
 
 const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast, unreadNotificationsCount }) => {
-    const { t } = useI18n();
-    const { assets, refreshMarketData, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
+    const { t, formatCurrency } = useI18n();
+    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
+    const [searchQuery, setSearchQuery] = useState('');
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+    const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
+    const [isSortOpen, setIsSortOpen] = useState(false);
     
     const isRefreshing = isContextRefreshing || isPullRefreshing;
 
@@ -195,28 +222,46 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             setIsPullRefreshing(false);
         }
     };
+
+    const handleShare = async () => {
+        const totalValue = assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0);
+        const shareData = {
+            title: t('share_portfolio_title'),
+            text: t('share_portfolio_text', { value: formatCurrency(totalValue) }),
+            url: window.location.origin,
+        };
+        try {
+            if (navigator.share) await navigator.share(shareData);
+            else {
+                await navigator.clipboard.writeText(shareData.text);
+                addToast('Copiado para área de transferência!', 'success');
+            }
+        } catch (err) {
+            // User cancelled
+        }
+    };
     
-    // Calculate Sector Data for Pie Chart
-    const sectorData = useMemo(() => {
-        const segments: Record<string, number> = {};
-        let totalValue = 0;
-        assets.forEach(a => {
-            const val = a.quantity * a.currentPrice;
-            const seg = a.segment || 'Outros';
-            segments[seg] = (segments[seg] || 0) + val;
-            totalValue += val;
+    const totalPortfolioValue = useMemo(() => assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0), [assets]);
+    
+    const processedAssets = useMemo(() => {
+        let filtered = assets.filter(asset => asset.ticker.toLowerCase().includes(searchQuery.toLowerCase()));
+        return filtered.sort((a, b) => {
+            switch (sortOption) {
+                case 'valueDesc': return (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity);
+                case 'valueAsc': return (a.currentPrice * a.quantity) - (b.currentPrice * a.quantity);
+                case 'tickerAsc': return a.ticker.localeCompare(b.ticker);
+                case 'performanceDesc':
+                    const perfA = a.avgPrice > 0 ? (a.currentPrice - a.avgPrice) / a.avgPrice : 0;
+                    const perfB = b.avgPrice > 0 ? (b.currentPrice - b.avgPrice) / b.avgPrice : 0;
+                    return perfB - perfA;
+                default: return 0;
+            }
         });
-        
-        return Object.entries(segments).map(([name, value]) => ({
-            name,
-            value,
-            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
-        })).sort((a, b) => b.value - a.value);
-    }, [assets]);
+    }, [assets, searchQuery, sortOption]);
 
     return (
         <div 
-            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
+            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6 scroll-smooth"
             ref={containerRef}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -233,33 +278,85 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             </div>
 
             <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} unreadNotificationsCount={unreadNotificationsCount} />
+                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} unreadNotificationsCount={unreadNotificationsCount} />
                 
                 {assets.length > 0 ? (
-                    <div className="space-y-6">
+                    <>
                         <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
                             <PortfolioSummary />
                         </div>
 
-                        {/* Income Report Section */}
-                        <div className="px-4">
-                             <DividendsSummaryCard setActiveView={setActiveView} />
-                        </div>
-
-                        {/* Sector Allocation Section */}
-                        <div className="px-4 pb-6">
-                            <h3 className="font-bold text-lg mb-3 px-1">{t('diversification')}</h3>
-                            <div className="bg-[var(--bg-secondary)] rounded-2xl p-4 border border-[var(--border-color)] shadow-sm">
-                                <PortfolioPieChart data={sectorData} goals={preferences.segmentGoals || {}} />
+                        <div className="px-4 mt-8">
+                            <div className="flex space-x-3 mb-5">
+                                <div className="flex-1 relative">
+                                    <input 
+                                        type="text" 
+                                        placeholder={t('search_asset_placeholder')} 
+                                        value={searchQuery} 
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-3 pl-4 pr-10 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 focus:border-[var(--accent-color)] transition-all shadow-sm placeholder:text-[var(--text-secondary)]/50"
+                                        autoCapitalize="characters"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <button 
+                                        id="sort-btn"
+                                        onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
+                                        className={`h-full px-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors shadow-sm ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/20 border-[var(--accent-color)]' : ''}`}
+                                    >
+                                        <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
+                                    </button>
+                                    {isSortOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
+                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl shadow-xl z-40 overflow-hidden animate-scale-in origin-top-right glass-card">
+                                                <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
+                                                {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
+                                                    <button 
+                                                        key={option}
+                                                        onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }}
+                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center font-medium ${sortOption === option ? 'text-[var(--accent-color)] bg-[var(--accent-color)]/10 font-bold' : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                                                    >
+                                                        {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
+                                                        {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
+
+                             <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2 text-[var(--text-primary)]">
+                                 {t('my_assets')} 
+                                 <span className="text-[10px] font-bold bg-[var(--bg-secondary)] px-2 py-0.5 rounded-full text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
+                             </h3>
+                             
+                            {isRefreshing && processedAssets.length === 0 ? (
+                                <PortfolioSkeleton />
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2 pb-6">
+                                    {processedAssets.map((asset, index) => (
+                                        <AssetListItem 
+                                            key={asset.ticker}
+                                            asset={asset} 
+                                            totalValue={totalPortfolioValue}
+                                            onClick={() => onSelectAsset(asset.ticker)} 
+                                            style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
+                                            privacyMode={privacyMode}
+                                            hideCents={preferences.hideCents}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    </div>
+                    </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
-                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
+                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-xl shadow-[var(--accent-color)]/5">
                             <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
                         </div>
-                        <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
+                        <h2 className="text-2xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
                         <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
                     </div>
                 )}

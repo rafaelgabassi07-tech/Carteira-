@@ -7,6 +7,8 @@ import AssetListItem from '../components/AssetListItem';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import SortIcon from '../components/icons/SortIcon';
 import WalletIcon from '../components/icons/WalletIcon';
+import SearchIcon from '../components/icons/SearchIcon';
+import CloseIcon from '../components/icons/CloseIcon';
 import { vibrate } from '../utils';
 import type { ToastMessage, SortOption } from '../types';
 
@@ -68,6 +70,11 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
             setIsPullRefreshing(false);
         }
     };
+    
+    const clearSearch = () => {
+        vibrate(5);
+        setSearchQuery('');
+    };
 
     const totalPortfolioValue = useMemo(() => assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0), [assets]);
     
@@ -127,21 +134,32 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                     {assets.length > 0 ? (
                         <>
                             <div className="flex space-x-3 mb-5">
-                                <div className="flex-1 relative">
+                                <div className="flex-1 relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none">
+                                        <SearchIcon className="w-5 h-5" />
+                                    </div>
                                     <input 
                                         type="text" 
                                         placeholder={t('search_asset_placeholder')} 
                                         value={searchQuery} 
                                         onChange={e => setSearchQuery(e.target.value)}
-                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
+                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-12 pr-12 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-4 focus:ring-[var(--accent-color)]/10 transition-all shadow-sm placeholder:text-[var(--text-secondary)]/50 uppercase tracking-wide"
                                         autoCapitalize="characters"
                                     />
+                                    {searchQuery && (
+                                        <button 
+                                            onClick={clearSearch}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors active:scale-90"
+                                        >
+                                            <CloseIcon className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="relative">
                                     <button 
                                         id="sort-btn"
                                         onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
-                                        className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
+                                        className={`h-full px-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-4 ring-[var(--accent-color)]/10 border-[var(--accent-color)]' : ''}`}
                                     >
                                         <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
                                     </button>

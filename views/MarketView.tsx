@@ -16,6 +16,7 @@ import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import SearchIcon from '../components/icons/SearchIcon';
 import AlertTriangleIcon from '../components/icons/AlertTriangleIcon';
 import StarIcon from '../components/icons/StarIcon';
+import CloseIcon from '../components/icons/CloseIcon';
 import TransactionModal from '../components/modals/TransactionModal';
 import NewsView from './NewsView';
 import PortfolioLineChart from '../components/PortfolioLineChart';
@@ -88,6 +89,7 @@ const FundamentalSkeleton: React.FC = () => (
 const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     const { t, formatCurrency } = useI18n();
     const { preferences, addTransaction } = usePortfolio();
+    const inputRef = useRef<HTMLInputElement>(null);
     
     const [viewMode, setViewMode] = useState<'quotes' | 'news'>('quotes');
     const [expandedDetails, setExpandedDetails] = useState(false);
@@ -133,6 +135,9 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         setExpandedDetails(false);
         setSuggestions([]);
         setShowSuggestions(false);
+        
+        // Esconde teclado em mobile
+        if (inputRef.current) inputRef.current.blur();
 
         try {
             let marketData: MarketResult | null = null;
@@ -188,6 +193,16 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         }
     };
 
+    const handleClearSearch = () => {
+        vibrate(5);
+        setSearchTerm('');
+        setResult(null);
+        setError(null);
+        setSuggestions([]);
+        setShowSuggestions(false);
+        if (inputRef.current) inputRef.current.focus();
+    };
+
     const handleSuggestionClick = (ticker: string) => {
         setSearchTerm(ticker);
         handleSearch(ticker);
@@ -223,8 +238,14 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                     </div>
                     {viewMode === 'quotes' && (
                         <div className="relative group mb-2">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none"><SearchIcon className="w-5 h-5" /></div>
+                            {/* Search Icon */}
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none z-10">
+                                <SearchIcon className="w-5 h-5" />
+                            </div>
+                            
+                            {/* Enhanced Input */}
                             <input 
+                                ref={inputRef}
                                 type="text" 
                                 value={searchTerm} 
                                 onChange={handleInputChange} 
@@ -232,18 +253,38 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                                 onKeyDown={handleKeyDown} 
                                 placeholder="PESQUISAR ATIVO (EX: HGLG11)" 
-                                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-12 pr-14 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] transition-all shadow-sm placeholder:text-[var(--text-secondary)]/40 uppercase tracking-wide" 
+                                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-12 pr-24 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-4 focus:ring-[var(--accent-color)]/10 transition-all shadow-sm placeholder:text-[var(--text-secondary)]/40 uppercase tracking-wide" 
                             />
-                            <button onClick={() => handleSearch(searchTerm)} disabled={loading} className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] p-1.5 rounded-lg transition-colors disabled:opacity-50 border border-[var(--border-color)]">{loading ? <RefreshIcon className="w-5 h-5 animate-spin text-[var(--accent-color)]" /> : <ChevronRightIcon className="w-5 h-5" />}</button>
+                            
+                            {/* Right Actions */}
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                {searchTerm && !loading && (
+                                    <button 
+                                        onClick={handleClearSearch}
+                                        className="p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors active:scale-90"
+                                        aria-label="Limpar busca"
+                                    >
+                                        <CloseIcon className="w-4 h-4" />
+                                    </button>
+                                )}
+                                
+                                <button 
+                                    onClick={() => handleSearch(searchTerm)} 
+                                    disabled={loading || searchTerm.length < 4} 
+                                    className={`p-2 rounded-xl transition-all border border-[var(--border-color)] ${loading ? 'bg-[var(--bg-tertiary-hover)] cursor-wait' : 'bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary-hover)] active:scale-95 text-[var(--text-primary)]'}`}
+                                >
+                                    {loading ? <RefreshIcon className="w-4 h-4 animate-spin text-[var(--accent-color)]" /> : <ChevronRightIcon className="w-4 h-4" />}
+                                </button>
+                            </div>
                             
                             {/* Autocomplete Dropdown */}
                             {showSuggestions && suggestions.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in-up">
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in-up origin-top ring-1 ring-black/5">
                                     {suggestions.map((ticker, index) => (
                                         <button
                                             key={ticker}
                                             onClick={() => handleSuggestionClick(ticker)}
-                                            className="w-full text-left px-4 py-3 hover:bg-[var(--bg-tertiary-hover)] text-sm font-bold text-[var(--text-primary)] border-b border-[var(--border-color)] last:border-0 transition-colors flex justify-between items-center group"
+                                            className="w-full text-left px-4 py-3.5 hover:bg-[var(--bg-tertiary-hover)] text-sm font-bold text-[var(--text-primary)] border-b border-[var(--border-color)] last:border-0 transition-colors flex justify-between items-center group"
                                         >
                                             {ticker}
                                             <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">

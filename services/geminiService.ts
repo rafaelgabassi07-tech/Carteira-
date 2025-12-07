@@ -267,9 +267,11 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         if (!data) return emptyReturn;
 
         const sanitizedData: Record<string, any> = {};
-        for (const ticker in data) {
-            if (Object.prototype.hasOwnProperty.call(data, ticker)) {
-                const assetData = data[ticker];
+        for (const rawTicker in data) {
+            if (Object.prototype.hasOwnProperty.call(data, rawTicker)) {
+                // Ensure Ticker key is UPPERCASE to match app state
+                const ticker = rawTicker.toUpperCase();
+                const assetData = data[rawTicker];
                 
                 let cleanDividends: DividendHistoryEvent[] = [];
                 if (Array.isArray(assetData.dividendsHistory)) {

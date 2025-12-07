@@ -1,10 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Transaction, ToastMessage } from '../types';
+import type { Transaction, TransactionType, ToastMessage } from '../types';
 import FloatingActionButton from '../components/FloatingActionButton';
 import TransactionModal from '../components/modals/TransactionModal';
 import EditIcon from '../components/icons/EditIcon';
 import TrashIcon from '../components/icons/TrashIcon';
+import SearchIcon from '../components/icons/SearchIcon';
+import CloseIcon from '../components/icons/CloseIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
@@ -184,20 +186,38 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
         }
     };
     
+    const clearSearch = () => {
+        vibrate(5);
+        setSearchQuery('');
+    };
+
     return (
         <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6" id="transactions-view">
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_transactions')}</h1>
                 
                 <div className="mb-4 space-y-3">
-                    <input 
-                        type="text" 
-                        placeholder={t('search_by_ticker_placeholder')}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
-                        autoCapitalize="characters"
-                    />
+                    <div className="relative group">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none">
+                            <SearchIcon className="w-5 h-5" />
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder={t('search_by_ticker_placeholder')}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-12 pr-12 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-4 focus:ring-[var(--accent-color)]/10 transition-all shadow-sm placeholder:text-[var(--text-secondary)]/50 uppercase tracking-wide"
+                            autoCapitalize="characters"
+                        />
+                        {searchQuery && (
+                            <button 
+                                onClick={clearSearch}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors active:scale-90"
+                            >
+                                <CloseIcon className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
                     
                     <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                          <select 

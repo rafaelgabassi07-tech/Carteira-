@@ -89,15 +89,15 @@ const PatrimonyEvolutionCard: React.FC = () => {
     if (assets.length === 0) return null;
 
     return (
-        <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mb-6 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all hover:shadow-md">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 mb-6 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all hover:shadow-lg hover:-translate-y-0.5 duration-300">
             
             {/* Header: Título e Seletor */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-[var(--accent-color)]/10 rounded-lg text-[var(--accent-color)]">
+                    <div className="p-2.5 bg-[var(--accent-color)]/10 rounded-xl text-[var(--accent-color)]">
                         <TrendingUpIcon className="w-5 h-5" />
                     </div>
-                    <h3 className="font-bold text-lg text-[var(--text-primary)]">{t('evolution_of_patrimony')}</h3>
+                    <h3 className="font-bold text-lg text-[var(--text-primary)] tracking-tight">{t('evolution_of_patrimony')}</h3>
                 </div>
 
                 <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--border-color)] overflow-x-auto no-scrollbar">

@@ -65,6 +65,15 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     notificationChannels: { push: true, email: false }, geminiApiKey: null, brapiToken: null, autoBackup: false, betaFeatures: false, devMode: false
 };
 
+// Helper function to chunk array
+const chunkArray = <T,>(array: T[], size: number): T[][] => {
+    const chunked: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+        chunked.push(array.slice(i, i + size));
+    }
+    return chunked;
+};
+
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // State Management - Now backed by IndexedDB via new usePersistentState
   const [transactions, setTransactions] = usePersistentState<Transaction[]>('transactions', []);
@@ -270,7 +279,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
-          // 1. Fetch Rápido (Brapi)
+          // 1. Fetch Rápido (Brapi) - Handles large lists well via single endpoint if needed, or loops
           const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
           
           setMarketData(prev => {
@@ -302,21 +311,32 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           });
 
           if (assetsNeedingUpdate.length > 0) {
-              const geminiRes = await fetchAdvancedAssetData(preferences, assetsNeedingUpdate);
+              // CHUNK REQUESTS: Gemini context window/limit protection
+              // Splits into chunks of 5 tickers to ensure higher quality responses and avoid timeouts
+              const batches = chunkArray(assetsNeedingUpdate, 5);
               
-              if (geminiRes.data && Object.keys(geminiRes.data).length > 0) {
-                  setMarketData(prev => {
-                      const next = { ...prev };
-                      logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
-                      Object.entries(geminiRes.data).forEach(([tkr, data]) => {
-                          next[tkr] = { 
-                              ...(next[tkr] || {}), 
-                              ...(data as object),
-                              lastFundamentalUpdate: now
-                          };
-                      });
-                      return next;
-                  });
+              for (const batch of batches) {
+                  try {
+                      const geminiRes = await fetchAdvancedAssetData(preferences, batch);
+                      if (geminiRes.data && Object.keys(geminiRes.data).length > 0) {
+                          setMarketData(prev => {
+                              const next = { ...prev };
+                              logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
+                              Object.entries(geminiRes.data).forEach(([tkr, data]) => {
+                                  next[tkr] = { 
+                                      ...(next[tkr] || {}), 
+                                      ...(data as object),
+                                      lastFundamentalUpdate: now
+                                  };
+                              });
+                              return next;
+                          });
+                      }
+                      // Small delay between batches to be polite to the API
+                      await new Promise(resolve => setTimeout(resolve, 500));
+                  } catch (batchErr) {
+                      console.error("Failed to fetch batch:", batch, batchErr);
+                  }
               }
           }
 

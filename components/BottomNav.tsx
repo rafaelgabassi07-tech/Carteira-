@@ -27,23 +27,27 @@ const NavItem: React.FC<{
     >
       <div 
         className={`relative z-10 transition-all duration-300 ease-spring transform ${
-          isActive ? '-translate-y-1 scale-110 text-[var(--accent-color)]' : 'text-[var(--text-secondary)] group-active:scale-95'
+          isActive 
+            ? '-translate-y-1 text-[var(--accent-color)] drop-shadow-[0_0_8px_rgba(var(--accent-rgb),0.4)]' 
+            : 'text-[var(--text-secondary)] group-active:scale-90 opacity-70 group-hover:opacity-100'
         }`}
       >
         {React.cloneElement(icon, { className: 'w-6 h-6', strokeWidth: isActive ? 2.5 : 2 })}
       </div>
       
       <span 
-        className={`absolute bottom-2 text-[10px] font-bold tracking-wide transition-all duration-300 ${
-          isActive ? 'opacity-100 translate-y-0 text-[var(--text-primary)]' : 'opacity-0 translate-y-2'
+        className={`absolute bottom-3 text-[10px] font-bold tracking-wide transition-all duration-300 ${
+          isActive 
+            ? 'opacity-100 translate-y-0 text-[var(--text-primary)]' 
+            : 'opacity-0 translate-y-2'
         }`}
       >
           {label}
       </span>
       
-      {/* Active Glow Indicator */}
+      {/* Active Indicator Dot */}
       {isActive && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-[var(--accent-color)]/10 rounded-full blur-md -z-0 animate-pulse"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 w-8 h-8 bg-[var(--accent-color)]/10 rounded-full blur-md -z-0 pointer-events-none"></div>
       )}
     </button>
   );
@@ -63,7 +67,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
   return (
     <div className="fixed bottom-6 left-4 right-4 z-[100] flex justify-center pointer-events-none">
         <div 
-          className="pointer-events-auto h-[68px] w-full max-w-[380px] bg-[var(--bg-secondary)]/90 backdrop-blur-xl border border-[var(--border-color)] rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex items-center justify-between px-2 overflow-hidden ring-1 ring-white/5"
+          className="pointer-events-auto h-[72px] w-full max-w-[380px] bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-color)] rounded-[32px] shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-between px-2 overflow-hidden ring-1 ring-white/5 transition-transform duration-300 hover:scale-[1.01]"
           style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
           <NavItem label={t('nav_portfolio')} view="dashboard" icon={<LayoutGridIcon />} isActive={activeView === 'dashboard'} onClick={() => handleNavClick('dashboard')} />
