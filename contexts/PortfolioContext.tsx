@@ -26,8 +26,7 @@ interface PortfolioContextType {
   apiStats: AppStats;
   notifications: AppNotification[];
   unreadNotificationsCount: number;
-  deferredPrompt: any; // PWA Install Prompt
-  // Actions
+  deferredPrompt: any;
   addTransaction: (t: Transaction) => void;
   updateTransaction: (t: Transaction) => void;
   deleteTransaction: (id: string) => void;
@@ -57,7 +56,6 @@ interface PortfolioContextType {
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
 
-// Defaults
 const DEFAULT_PREFERENCES: AppPreferences = {
     accentColor: 'blue', systemTheme: 'system', visualStyle: 'premium', fontSize: 'medium', compactMode: false,
     currentThemeId: 'default-dark', currentFontId: 'inter', showCurrencySymbol: true, reduceMotion: false, animationSpeed: 'normal',
@@ -67,7 +65,6 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     notificationChannels: { push: true, email: false }, geminiApiKey: null, brapiToken: null, autoBackup: false, betaFeatures: false, devMode: false
 };
 
-// Helper function to chunk array
 const chunkArray = <T,>(array: T[], size: number): T[][] => {
     const chunked: T[][] = [];
     for (let i = 0; i < array.length; i += size) {
@@ -93,12 +90,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   const initialLoadDone = useRef(false);
   const refreshInProgress = useRef(false);
-  
-  // FIX: This ref is crucial to get the latest marketData inside the useCallback without causing re-renders.
+  // CRITICAL FIX: Ensure marketDataRef is always up to date
   const marketDataRef = useRef(marketData);
+
   useEffect(() => { marketDataRef.current = marketData; }, [marketData]);
 
-  // PWA Install Event Listener
   useEffect(() => {
       const handleBeforeInstallPrompt = (e: any) => {
           e.preventDefault();
@@ -131,7 +127,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       yieldOnCost,
       projectedAnnualIncome
   } = usePortfolioCalculations(sourceTransactions, sourceMarketData);
-
 
   useEffect(() => {
       setUnreadNotificationsCount(notifications.filter(n => !n.read).length);
@@ -169,7 +164,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
-          // 1. Atualização rápida de preço (Brapi)
           const { quotes } = await fetchBrapiQuotes(preferences, [ticker], false);
           
           setMarketData(prev => ({
@@ -181,7 +175,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               }
           }));
 
-          // 2. Análise Fundamentalista (Gemini)
           const isFundamentalsStale = !currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
           const hasMissingDividends = !currentData?.dividendsHistory || currentData.dividendsHistory.length === 0;
 
@@ -263,109 +256,117 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUnreadNotificationsCount(0);
   }, [setNotifications]);
 
+  // --- REFACTORED ROBUST DATA FETCHING ---
   const refreshMarketData = useCallback(async (force = false, silent = false) => {
-      if (refreshInProgress.current) return;
-
-      const now = Date.now();
-      if (!force && lastSync && now - lastSync < STALE_TIME.MARKET_DATA) {
+      if (refreshInProgress.current) {
+          console.log("Update already in progress, skipping.");
           return;
       }
 
       const tickers = Array.from(new Set(sourceTransactions.map(t => t.ticker.toUpperCase())));
-      if (tickers.length === 0) {
-          return;
-      }
+      if (tickers.length === 0) return;
 
       refreshInProgress.current = true;
       if (!silent) setIsRefreshing(true);
       setMarketDataError(null);
 
+      const now = Date.now();
+
       try {
-          // Step 1: Fetch Brapi data (Preço em massa - mais barato e rápido)
+          // --- Phase 1: Prices (Brapi) - Independent execution ---
           let brapiFailed = false;
           let brapiQuotes = {};
+          
           try {
               const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
               logApiUsage('brapi', { requests: 1, bytesReceived: brapiRes.stats.bytesReceived });
               brapiQuotes = brapiRes.quotes;
-          } catch (e) {
-              console.warn("Brapi failed, continuing to Gemini fallback", e);
+              
+              // Immediate Partial State Update for Prices
+              setMarketData(prev => {
+                  const updated = { ...prev };
+                  Object.entries(brapiRes.quotes).forEach(([tkr, data]) => {
+                      updated[tkr] = { 
+                          ...(updated[tkr] || {}), 
+                          ...(data as any),
+                          lastUpdated: now 
+                      };
+                  });
+                  return updated;
+              });
+
+          } catch (e: any) {
+              console.warn("Brapi update failed:", e);
               brapiFailed = true;
+              if (force) setMarketDataError("Falha na atualização de preços Brapi. " + (e.message || ""));
           }
 
-          // Step 2: Prepare state update object
+          // --- Phase 2: Fundamentals (Gemini) - Independent execution ---
+          
+          // Get fresh state from ref to decide what to update
           const currentMarketData = marketDataRef.current;
-          const nextMarketData = { ...currentMarketData };
-
-          // Apply Brapi updates
-          Object.entries(brapiQuotes).forEach(([tkr, data]) => {
-              nextMarketData[tkr] = {
-                  ...(nextMarketData[tkr] || {}), 
-                  ...(data as any),
-                  lastUpdated: now
-              };
-          });
-
-          // Step 3: Determine Gemini Targets
+          
           const assetsNeedingUpdate = tickers.filter(t => {
-              const data = nextMarketData[t.toUpperCase()]; 
-              // Se Brapi falhou, precisamos atualizar o preço via Gemini TAMBÉM
-              const needsPrice = brapiFailed || !data?.currentPrice;
-              // Dados fundamentais expirados ou inexistentes?
-              const fundamentalsStale = !data?.lastFundamentalUpdate || (now - data.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
-              const missingData = !data?.dividendsHistory || data.dividendsHistory.length === 0;
+              const data = currentMarketData[t.toUpperCase()];
               
-              return force || fundamentalsStale || missingData || needsPrice;
+              // Always try to fetch if Brapi failed to at least get a price approximation via Google Search
+              if (brapiFailed || !data?.currentPrice) return true;
+              
+              if (force) return true;
+              
+              // Check Stale Time for Fundamentals (usually 24h)
+              const fundamentalsStale = !data?.lastFundamentalUpdate || (now - data.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
+              const missingDividends = !data?.dividendsHistory || data.dividendsHistory.length === 0;
+              
+              return fundamentalsStale || missingDividends;
           });
 
-          // Step 4: Batch Process Gemini
           if (assetsNeedingUpdate.length > 0) {
-              const batches = chunkArray(assetsNeedingUpdate, 4); // Lotes menores para o Gemini (Schema complexo gasta tokens)
+              // Batch processing to avoid token limits or timeouts
+              const batches = chunkArray(assetsNeedingUpdate, 4); // Process 4 assets at a time
+              
               for (const batch of batches) {
                   try {
                       const geminiRes = await fetchAdvancedAssetData(preferences, batch);
                       logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
 
-                      Object.entries(geminiRes.data).forEach(([tkr, data]) => {
-                          nextMarketData[tkr] = {
-                              ...(nextMarketData[tkr] || {}),
-                              ...(data as object),
-                              lastFundamentalUpdate: now,
-                              // Se não tinha preço antes (Brapi falhou), usa o fallback do Gemini se vier (mas a função advanced foca em fundamentos)
-                              // Idealmente fetchLiveAssetQuote seria chamado se brapi falhasse, mas vamos assumir que o usuário tentará novamente
-                              // ou implementaremos o fallback de preço no futuro.
-                          };
+                      // Incrementally update state per batch
+                      setMarketData(prev => {
+                          const updated = { ...prev };
+                          Object.entries(geminiRes.data).forEach(([tkr, data]) => {
+                              updated[tkr] = {
+                                  ...(updated[tkr] || {}),
+                                  ...(data as object),
+                                  lastFundamentalUpdate: now
+                              };
+                          });
+                          return updated;
                       });
-                  } catch (batchErr: any) {
-                      console.error("Failed to fetch Gemini batch:", batch, batchErr);
-                      if (!marketDataError) setMarketDataError("Alguns dados não puderam ser atualizados. Verifique sua chave API.");
+                  } catch (e: any) {
+                      console.error("Gemini Batch Failed:", batch, e);
+                      // Don't stop the whole process, just log this batch failure
+                      if (!brapiFailed) setMarketDataError("Alguns dados fundamentais falharam.");
                   }
               }
           }
           
-          // Step 5: Commit changes
-          setMarketData(nextMarketData);
           setLastSync(now);
 
       } catch (e: any) {
-          console.error("General Refresh Error:", e);
-          setMarketDataError(e.message || "Erro de conexão ao atualizar dados.");
+          console.error("Critical refresh error:", e);
+          setMarketDataError(e.message || "Erro crítico na atualização.");
       } finally {
           refreshInProgress.current = false;
           setIsRefreshing(false);
       }
-  }, [lastSync, sourceTransactions, preferences, setMarketData, setLastSync, logApiUsage]);
+  }, [sourceTransactions, preferences, setMarketData, setLastSync, logApiUsage]);
 
   useEffect(() => {
       const checkAndRefresh = () => {
           if (document.hidden) return;
           const now = new Date();
-          const day = now.getDay();
-          const hour = now.getHours();
-          const isWeekDay = day >= 1 && day <= 5;
-          const isMarketHours = hour >= 10 && hour < 18;
-          
-          if (isWeekDay && isMarketHours) {
+          // Auto-refresh during market hours on weekdays
+          if (now.getDay() >= 1 && now.getDay() <= 5 && now.getHours() >= 10 && now.getHours() < 18) {
               refreshMarketData(false, true);
           }
       };
@@ -377,41 +378,22 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await refreshMarketData(true, false); 
   }, [refreshMarketData]);
 
-  // Initial Load
+  // Initial Load Strategy: Be Aggressive if data is missing or empty
   useEffect(() => {
     if (!refreshInProgress.current && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
       initialLoadDone.current = true;
-      const now = Date.now();
-      const isStale = !lastSync || (now - lastSync > STALE_TIME.MARKET_DATA);
       
-      if (isStale) {
+      const missingData = sourceTransactions.some(t => {
+          const data = marketDataRef.current[t.ticker.toUpperCase()];
+          return !data || !data.currentPrice || !data.dividendsHistory;
+      });
+
+      if (missingData) {
+          console.log("Initial Load: Missing data detected, forcing refresh.");
           refreshMarketData(true, true); 
       }
     }
-  }, [sourceTransactions.length, isDemoMode, refreshMarketData, lastSync]);
-
-  const currentPatrimony = useMemo(() => {
-    return assets.reduce((acc, a) => acc + a.quantity * a.currentPrice, 0);
-  }, [assets]);
-
-  useEffect(() => {
-    if (isDemoMode) return;
-    const timeoutId = setTimeout(() => {
-        const newNotifications = generateNotifications(assets, currentPatrimony);
-        if (newNotifications.length > 0) {
-            setNotifications(prev => {
-                const existingIds = new Set(prev.map(n => n.id));
-                const trulyNew = newNotifications.filter(n => !existingIds.has(n.id));
-                if (trulyNew.length > 0) {
-                    setUnreadNotificationsCount(prevCount => prevCount + trulyNew.length);
-                    return [...trulyNew, ...prev];
-                }
-                return prev;
-            });
-        }
-    }, 1000);
-    return () => clearTimeout(timeoutId);
-  }, [currentPatrimony, isDemoMode, assets, setNotifications]); 
+  }, [sourceTransactions.length, isDemoMode, refreshMarketData]);
 
   const getAssetByTicker = useCallback((ticker: string) => {
       return assets.find(a => a.ticker === ticker);
