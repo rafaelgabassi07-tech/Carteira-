@@ -1,24 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="mainGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#334155;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1" />
     </linearGradient>
   </defs>
   
-  <!-- Background for App Icon -->
-  <rect x="0" y="0" width="512" height="512" rx="128" fill="#09090b" />
+  <!-- Background for App Icon (Dark Elegant) -->
+  <rect x="0" y="0" width="512" height="512" rx="115" fill="#09090b" />
   
-  <!-- Symbol: Stylized "I" / Growth Arrow -->
-  <g transform="translate(136, 86)">
-    <!-- The Stem (Base of I) -->
-    <rect x="20" y="140" width="80" height="200" rx="40" fill="url(#mainGrad)" />
+  <!-- Symbol: Abstract 'I' / Growth Chart -->
+  <g transform="translate(136, 126)">
+    <!-- Left Bar (Base) -->
+    <rect x="0" y="110" width="100" height="150" rx="16" fill="url(#accentGrad)" opacity="0.7" />
     
-    <!-- The Growth Dot/Arrow (Top of I) -->
-    <path d="M60 0 L180 0 A 40 40 0 0 1 220 40 L220 100 A 40 40 0 0 1 180 140 L120 140 L60 80 Z" fill="#ffffff" />
-    <circle cx="180" cy="40" r="15" fill="#3b82f6" opacity="0.0" /> <!-- Spacer/Balance -->
-    
-    <!-- Accent shape connecting -->
-    <path d="M100 140 L100 240 L180 160 Z" fill="url(#mainGrad)" opacity="0.5" />
+    <!-- Right Bar (Growth) -->
+    <rect x="140" y="0" width="100" height="260" rx="16" fill="url(#accentGrad)" />
   </g>
 </svg>
