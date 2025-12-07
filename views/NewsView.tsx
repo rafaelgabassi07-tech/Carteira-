@@ -130,8 +130,12 @@ const NewsCardSkeleton: React.FC = () => (
     </div>
 );
 
+interface NewsViewProps {
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+    isEmbedded?: boolean;
+}
 
-const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
+const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => {
   const { t } = useI18n();
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
@@ -191,7 +195,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       const filterKey = `news_${currentQuery}_${currentDateRange}_${currentSource}`.toLowerCase().replace(/\s+/g, '_');
       
       if (!isRefresh) {
-          // Changed to await as CacheManager.get is now async
           const cachedNews = await CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
           if (cachedNews) {
               setNews(cachedNews);
@@ -214,7 +217,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       }
 
       setNews(articles || []);
-      if(articles && articles.length > 0) await CacheManager.set(filterKey, articles);
+      if(articles && articles.length > 0) CacheManager.set(filterKey, articles);
 
     } catch (err: any) {
       setError(err.message || t('unknown_error'));
@@ -290,7 +293,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   return (
     <div 
-        className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6"
+        className={`h-full flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6 ${isEmbedded ? 'p-0 pb-0' : 'p-4 pb-24 md:pb-6'}`}
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -304,7 +307,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       </div>
       
       <div className="w-full max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
+        <div className={`flex justify-between items-center mb-4 ${isEmbedded ? 'hidden' : ''}`}>
           <h1 className="text-2xl font-bold">{t('market_news')}</h1>
           <div className="flex gap-2">
                <button 

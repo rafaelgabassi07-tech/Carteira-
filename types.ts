@@ -32,7 +32,7 @@ export interface Asset {
   businessDescription?: string;
   riskAssessment?: string; // "Baixo", "Médio", "Alto" com breve explicação
   strengths?: string[]; // Pontos fortes
-  weaknesses?: string[]; // Pontos de atenção
+  weaknesses?: string[]; // Pontos de atenção / Contras
   dividendCAGR?: number; // Crescimento anual composto de dividendos (3 anos)
   capRate?: number; // Cap Rate estimado (para tijolo)
   managementFee?: string; // Taxa de administração
@@ -191,7 +191,6 @@ export interface AppPreferences {
   hideCents: boolean;
 
   // Security
-  privacyOnStart: boolean;
   appPin: string | null;
 
   // Data & Transactions

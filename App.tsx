@@ -151,8 +151,8 @@ const App: React.FC = () => {
             <OfflineBanner />
             
             {/* Main Content Area */}
-            <main className="flex-1 relative w-full h-full flex flex-col min-w-0">
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+            <main className="flex-1 relative w-full h-full flex flex-col min-w-0 overflow-hidden">
+                <div className="flex-1 relative h-full w-full">
                     <Suspense fallback={<LoadingSpinner />}>
                         <div key={activeView} className="animate-page-enter h-full w-full">
                             {renderView()}

@@ -47,6 +47,27 @@ export const STATIC_FII_SECTORS: Record<string, string> = {
     'JURO11': 'Infra', 'BDIF11': 'Infra', 'XPID11': 'Infra', 'CPTI11': 'Infra', 'KDIF11': 'Infra'
 };
 
+// Lista expandida para Autocomplete
+export const KNOWN_TICKERS = [
+    // FIIs Populares
+    ...Object.keys(STATIC_FII_SECTORS),
+    'ALMI11', 'ARRI11', 'BARI11', 'BBFI11', 'BBPO11', 'BBRC11', 'BCIA11', 'BCRI11', 'BLMG11', 'BRCR11',
+    'BTAL11', 'BTRA11', 'CACR11', 'CARE11', 'CBOP11', 'CXCO11', 'DEVA11', 'DRIT11', 'EQIR11', 'FIIB11',
+    'FLMA11', 'GAME11', 'GCRI11', 'GGRC11', 'GSFI11', 'HAAK11', 'HCRI11', 'HCTR11', 'HFOF11', 'HGBS11',
+    'HGCR11', 'HGFF11', 'HGLG11', 'HGPO11', 'HGRE11', 'HGRU11', 'HSLG11', 'HSML11', 'HTMX11', 'HUSC11',
+    'IRDM11', 'JFLL11', 'JSAF11', 'JSRE11', 'KFOF11', 'KINP11', 'KISU11', 'KNCR11', 'KNHY11', 'KNIP11',
+    'KNRI11', 'KNSC11', 'LUGG11', 'LVBI11', 'MALL11', 'MAXR11', 'MBRF11', 'MCCI11', 'MFII11', 'MGFF11',
+    'MORE11', 'MXRF11', 'NCHB11', 'ONEF11', 'OUJP11', 'PATL11', 'PLCR11', 'PORD11', 'PQDP11', 'PVBI11',
+    'QAGR11', 'RBED11', 'RBFF11', 'RBHG11', 'RBRF11', 'RBRL11', 'RBRP11', 'RBRR11', 'RBRY11', 'RBVA11',
+    'RECR11', 'RECT11', 'RELG11', 'RMAI11', 'RNGO11', 'SARE11', 'SDIL11', 'SNAG11', 'SNCI11', 'SNFF11',
+    'SPTW11', 'TGAR11', 'TORD11', 'TRXF11', 'URPR11', 'VCJR11', 'VGHF11', 'VGIA11', 'VGIP11', 'VGIR11',
+    'VILG11', 'VINO11', 'VISC11', 'VIUR11', 'VSLH11', 'VTLT11', 'XPCI11', 'XPCM11', 'XPHT11', 'XPIN11',
+    'XPLG11', 'XPML11', 'XPPR11', 'XPSF11',
+    // Ações Populares (Bônus)
+    'PETR4', 'VALE3', 'ITUB4', 'BBDC4', 'BBAS3', 'WEGE3', 'MGLU3', 'VIIA3', 'RENT3', 'JBSS3', 'SUZB3', 
+    'GGBR4', 'CSNA3', 'BPAC11', 'ELET3', 'ITSA4', 'ABEV3', 'HAPV3', 'B3SA3', 'RDOR3', 'RADL3', 'PRIO3'
+].sort();
+
 // --- FONTS ---
 export const APP_FONTS: AppFont[] = [
     {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -13,11 +14,14 @@ import SparklesIcon from '../components/icons/SparklesIcon';
 import TrendingUpIcon from '../components/icons/TrendingUpIcon';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import SearchIcon from '../components/icons/SearchIcon';
+import AlertTriangleIcon from '../components/icons/AlertTriangleIcon';
+import StarIcon from '../components/icons/StarIcon';
 import TransactionModal from '../components/modals/TransactionModal';
 import NewsView from './NewsView';
 import PortfolioLineChart from '../components/PortfolioLineChart';
 import DividendChart from '../components/DividendChart';
 import type { ToastMessage, Asset } from '../types';
+import { KNOWN_TICKERS } from '../constants';
 
 interface MarketViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
@@ -60,9 +64,9 @@ const StatItem: React.FC<{ label: string; value: React.ReactNode; sub?: string; 
     );
 };
 
-const SectionHeader: React.FC<{ title: string, icon?: React.ReactNode }> = ({ title, icon }) => (
-    <div className="flex items-center gap-2 mb-3 mt-6 pb-2 border-b border-[var(--border-color)]/50">
-        <div className="text-[var(--accent-color)] opacity-80">
+const SectionHeader: React.FC<{ title: string, icon?: React.ReactNode, className?: string }> = ({ title, icon, className = '' }) => (
+    <div className={`flex items-center gap-2 mb-3 pb-2 border-b border-[var(--border-color)]/50 ${className}`}>
+        <div className="opacity-80">
             {icon}
         </div>
         <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">{title}</h3>
@@ -94,8 +98,11 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
     const [result, setResult] = useState<MarketResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     
     const [recentSearches, setRecentSearches] = usePersistentState<string[]>('market_recent_searches', []);
+    const [favorites, setFavorites] = usePersistentState<string[]>('market_favorites', []);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -124,6 +131,8 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         setResult(null);
         setSearchTerm(cleanTerm);
         setExpandedDetails(false);
+        setSuggestions([]);
+        setShowSuggestions(false);
 
         try {
             let marketData: MarketResult | null = null;
@@ -165,7 +174,41 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         }
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSearch(searchTerm); };
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value.toUpperCase();
+        setSearchTerm(val);
+        
+        if (val.length >= 2) {
+            const filtered = KNOWN_TICKERS.filter(t => t.startsWith(val)).slice(0, 5);
+            setSuggestions(filtered);
+            setShowSuggestions(filtered.length > 0);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    };
+
+    const handleSuggestionClick = (ticker: string) => {
+        setSearchTerm(ticker);
+        handleSearch(ticker);
+    };
+
+    const toggleFavorite = (ticker: string) => {
+        vibrate();
+        setFavorites(prev => {
+            if (prev.includes(ticker)) return prev.filter(t => t !== ticker);
+            return [...prev, ticker];
+        });
+    };
+
+    const isFavorite = result ? favorites.includes(result.ticker) : false;
+
+    const handleKeyDown = (e: React.KeyboardEvent) => { 
+        if (e.key === 'Enter') {
+            setShowSuggestions(false);
+            handleSearch(searchTerm); 
+        }
+    };
     const handleAddTransaction = (tx: any) => { addTransaction({ ...tx, id: String(Date.now()) }); addToast(t('toast_transaction_added'), 'success'); setShowAddModal(false); };
     const clearRecent = () => { vibrate(); setRecentSearches([]); };
 
@@ -181,8 +224,35 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                     {viewMode === 'quotes' && (
                         <div className="relative group mb-2">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none"><SearchIcon className="w-5 h-5" /></div>
-                            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value.toUpperCase())} onKeyDown={handleKeyDown} placeholder="PESQUISAR ATIVO (EX: HGLG11)" className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-12 pr-14 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] transition-all shadow-sm placeholder:text-[var(--text-secondary)]/40 uppercase tracking-wide" />
+                            <input 
+                                type="text" 
+                                value={searchTerm} 
+                                onChange={handleInputChange} 
+                                onFocus={() => { if(searchTerm.length >= 2) setShowSuggestions(true); }}
+                                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                onKeyDown={handleKeyDown} 
+                                placeholder="PESQUISAR ATIVO (EX: HGLG11)" 
+                                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-12 pr-14 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] transition-all shadow-sm placeholder:text-[var(--text-secondary)]/40 uppercase tracking-wide" 
+                            />
                             <button onClick={() => handleSearch(searchTerm)} disabled={loading} className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] p-1.5 rounded-lg transition-colors disabled:opacity-50 border border-[var(--border-color)]">{loading ? <RefreshIcon className="w-5 h-5 animate-spin text-[var(--accent-color)]" /> : <ChevronRightIcon className="w-5 h-5" />}</button>
+                            
+                            {/* Autocomplete Dropdown */}
+                            {showSuggestions && suggestions.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in-up">
+                                    {suggestions.map((ticker, index) => (
+                                        <button
+                                            key={ticker}
+                                            onClick={() => handleSuggestionClick(ticker)}
+                                            className="w-full text-left px-4 py-3 hover:bg-[var(--bg-tertiary-hover)] text-sm font-bold text-[var(--text-primary)] border-b border-[var(--border-color)] last:border-0 transition-colors flex justify-between items-center group"
+                                        >
+                                            {ticker}
+                                            <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">
+                                                <ChevronRightIcon className="w-3 h-3" />
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -196,9 +266,18 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                     <div className="p-6 bg-gradient-to-br from-[var(--bg-tertiary-hover)] via-[var(--bg-secondary)] to-[var(--bg-secondary)] border-b border-[var(--border-color)] relative">
                                         <div className="flex justify-between items-start z-10">
                                             <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-3"><h2 className="text-4xl font-black text-[var(--text-primary)] tracking-tighter">{result.ticker}</h2>{result.fundamentals?.segment && (<span className="px-2.5 py-1 rounded-full bg-[var(--bg-primary)] border border-[var(--border-color)] text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wide shadow-sm">{result.fundamentals.segment}</span>)}</div>
+                                                <div className="flex items-center gap-3">
+                                                    <h2 className="text-4xl font-black text-[var(--text-primary)] tracking-tighter">{result.ticker}</h2>
+                                                    {result.fundamentals?.segment && (<span className="px-2.5 py-1 rounded-full bg-[var(--bg-primary)] border border-[var(--border-color)] text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wide shadow-sm">{result.fundamentals.segment}</span>)}
+                                                </div>
                                                 <div className="flex items-center gap-2 mt-1"><span className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">{formatCurrency(result.price)}</span><div className={`flex items-center px-2 py-1 rounded-lg ${result.change >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}><span className="text-xs font-bold">{result.change >= 0 ? '▲' : '▼'} {Math.abs(result.change).toFixed(2)}%</span></div></div>
                                             </div>
+                                            <button 
+                                                onClick={() => toggleFavorite(result.ticker)}
+                                                className={`p-3 rounded-full transition-all active:scale-90 border ${isFavorite ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-[var(--bg-primary)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                                            >
+                                                <StarIcon filled={isFavorite} className="w-6 h-6" />
+                                            </button>
                                         </div>
                                         {result.history.length >= 2 && (<div className="h-24 w-full mt-4 -mb-6 opacity-30 mask-image-gradient-b"><PortfolioLineChart data={result.history} isPositive={result.change >= 0} simpleMode={true} /></div>)}
                                     </div>
@@ -220,7 +299,42 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                 )}
                                                 {expandedDetails && (
                                                     <div className="animate-fade-in-up space-y-6 pt-2 border-t border-[var(--border-color)]/50">
-                                                        {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 && (<div><SectionHeader title="Histórico de Proventos" icon={<ClockIcon className="w-4 h-4"/>}/><div className="bg-[var(--bg-primary)] p-4 rounded-2xl"><div className="h-56"><DividendChart data={result.fundamentals.dividendsHistory} /></div></div></div>)}
+                                                        {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 && (<div><SectionHeader title="Histórico de Proventos" className="mt-6" icon={<ClockIcon className="w-4 h-4 text-[var(--accent-color)]"/>}/><div className="bg-[var(--bg-primary)] p-4 rounded-2xl"><div className="h-56"><DividendChart data={result.fundamentals.dividendsHistory} /></div></div></div>)}
+                                                        
+                                                        {/* Pros & Cons Section */}
+                                                        {((result.fundamentals?.strengths && result.fundamentals.strengths.length > 0) || (result.fundamentals?.weaknesses && result.fundamentals.weaknesses.length > 0)) && (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                {/* Pros */}
+                                                                {result.fundamentals?.strengths && result.fundamentals.strengths.length > 0 && (
+                                                                    <div className="bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/10">
+                                                                        <SectionHeader title="Pontos Fortes" className="!mt-0 !mb-2 !border-emerald-500/20" icon={<TrendingUpIcon className="w-4 h-4 text-emerald-500"/>} />
+                                                                        <ul className="space-y-2">
+                                                                            {result.fundamentals.strengths.map((s, i) => (
+                                                                                <li key={i} className="text-[11px] text-[var(--text-primary)] font-medium flex items-start gap-2">
+                                                                                    <span className="text-emerald-500 font-bold mt-0.5">✓</span>
+                                                                                    <span className="leading-snug opacity-90">{s}</span>
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
+                                                                {/* Cons */}
+                                                                {result.fundamentals?.weaknesses && result.fundamentals.weaknesses.length > 0 && (
+                                                                    <div className="bg-rose-500/5 p-4 rounded-2xl border border-rose-500/10">
+                                                                        <SectionHeader title="Pontos de Atenção" className="!mt-0 !mb-2 !border-rose-500/20" icon={<AlertTriangleIcon className="w-4 h-4 text-rose-500"/>} />
+                                                                        <ul className="space-y-2">
+                                                                            {result.fundamentals.weaknesses.map((w, i) => (
+                                                                                <li key={i} className="text-[11px] text-[var(--text-primary)] font-medium flex items-start gap-2">
+                                                                                    <span className="text-rose-500 font-bold mt-0.5">!</span>
+                                                                                    <span className="leading-snug opacity-90">{w}</span>
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
                                                         <div className="grid grid-cols-2 gap-3">
                                                             <StatItem label="Patrimônio Líq." value={result.fundamentals?.netWorth ?? '-'} />
                                                             <StatItem label="Nº Cotistas" value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'} />
@@ -228,7 +342,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                             <StatItem label="Taxa de Adm." value={result.fundamentals?.managementFee ?? '-'} />
                                                             <StatItem label="Gestão" value={result.fundamentals?.administrator ?? '-'} className="col-span-2" />
                                                         </div>
-                                                        {result.fundamentals?.strengths && result.fundamentals.strengths.length > 0 && (<div><SectionHeader title="Pontos Fortes" icon={<TrendingUpIcon className="w-4 h-4"/>}/><div className="flex flex-wrap gap-2">{result.fundamentals.strengths.map((s, i) => (<span key={i} className="text-[10px] bg-[var(--bg-primary)] border border-[var(--border-color)] px-3 py-1.5 rounded-lg font-bold text-[var(--text-primary)] shadow-sm">{s}</span>))}</div></div>)}
                                                     </div>
                                                 )}
                                                 <button onClick={() => setExpandedDetails(!expandedDetails)} className="w-full py-3 text-xs font-bold text-[var(--text-secondary)] border border-[var(--border-color)] bg-[var(--bg-primary)] rounded-xl flex items-center justify-center gap-1 hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors">{expandedDetails ? 'Ocultar Detalhes' : 'Ver Análise Completa'}<ChevronRightIcon className={`w-3 h-3 transition-transform duration-300 ${expandedDetails ? '-rotate-90' : 'rotate-90'}`} /></button>
@@ -247,6 +360,21 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                             <div className="flex flex-wrap gap-2">{recentSearches.map(term => (<button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group">{term} <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">→</span></button>))}</div>
                                         </div>
                                     )}
+                                    
+                                    {favorites.length > 0 && (
+                                        <div className="mb-6">
+                                            <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider px-1 mb-4 flex items-center gap-2"><StarIcon filled className="w-3.5 h-3.5 text-yellow-500"/> Meus Favoritos</h3>
+                                            <div className="flex flex-wrap gap-2">
+                                                {favorites.map(term => (
+                                                    <button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group border-yellow-500/20">
+                                                        {term} 
+                                                        <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">→</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div>
                                         <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider px-1 mb-4">Descubra Oportunidades</h3>
                                         {MARKET_CATEGORIES.map((cat, i) => (

@@ -13,7 +13,6 @@ interface PortfolioContextType {
   dividends: Dividend[];
   preferences: AppPreferences;
   isDemoMode: boolean;
-  privacyMode: boolean;
   yieldOnCost: number;
   projectedAnnualIncome: number;
   portfolioEvolution: Record<string, PortfolioEvolutionPoint[]>;
@@ -36,14 +35,12 @@ interface PortfolioContextType {
   setTheme: (id: string) => void;
   setFont: (id: string) => void;
   updateUserProfile: (p: Partial<UserProfile>) => void;
-  refreshMarketData: (force?: boolean, silent?: boolean, lite?: boolean) => Promise<void>;
+  refreshMarketData: (force?: boolean, silent?: boolean) => Promise<void>;
   refreshAllData: () => Promise<void>;
   refreshSingleAsset: (ticker: string, force?: boolean) => Promise<void>;
   getAssetByTicker: (ticker: string) => Asset | undefined;
   getAveragePriceForTransaction: (t: Transaction) => number;
   setDemoMode: (e: boolean) => void;
-  setPrivacyMode: React.Dispatch<React.SetStateAction<boolean>>;
-  togglePrivacyMode: () => void;
   resetApp: () => void;
   clearCache: (key?: string) => void;
   logApiUsage: (api: 'gemini'|'brapi', stats: any) => void;
@@ -60,7 +57,7 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(undefin
 const DEFAULT_PREFERENCES: AppPreferences = {
     accentColor: 'blue', systemTheme: 'system', visualStyle: 'premium', fontSize: 'medium', compactMode: false,
     currentThemeId: 'default-dark', currentFontId: 'inter', showCurrencySymbol: true, reduceMotion: false, animationSpeed: 'normal',
-    startScreen: 'dashboard', hapticFeedback: true, vibrationIntensity: 'medium', hideCents: false, privacyOnStart: false, appPin: null,
+    startScreen: 'dashboard', hapticFeedback: true, vibrationIntensity: 'medium', hideCents: false, appPin: null,
     defaultBrokerage: 0, csvSeparator: ',', decimalPrecision: 2, defaultSort: 'valueDesc', dateFormat: 'dd/mm/yyyy',
     priceAlertThreshold: 5, globalIncomeGoal: 1000, segmentGoals: {}, dndEnabled: false, dndStart: '22:00', dndEnd: '07:00',
     notificationChannels: { push: true, email: false }, geminiApiKey: null, brapiToken: null, autoBackup: false, betaFeatures: false, devMode: false
@@ -72,7 +69,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [preferences, setPreferences] = usePersistentState<AppPreferences>('app_preferences', DEFAULT_PREFERENCES);
   const [userProfile, setUserProfile] = usePersistentState<UserProfile>('user_profile', MOCK_USER_PROFILE);
   const [isDemoMode, setIsDemoMode] = useState(false);
-  const [privacyMode, setPrivacyMode] = usePersistentState('privacy_mode', false);
   const [marketData, setMarketData] = usePersistentState<Record<string, any>>('market_data', {});
   const [lastSync, setLastSync] = usePersistentState<number | null>('last_sync', null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -152,30 +148,40 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const now = Date.now();
       const currentData = marketDataRef.current[ticker.toUpperCase()];
       
+      // Se não for forçado e o dado for recente (< 5 min), ignora
       if(!force && currentData && currentData.lastUpdated && (now - currentData.lastUpdated < STALE_TIME.PRICES)) return;
 
       try {
+          // 1. Fetch Rápido (Brapi)
           const { quotes } = await fetchBrapiQuotes(preferences, [ticker], false);
           
-          let advancedData = {};
-          const isFundamentalsStale = !currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
-          const hasMissingDividends = !currentData?.dividendsHistory || currentData.dividendsHistory.length === 0;
-
-          if (force || isFundamentalsStale || hasMissingDividends) {
-             const adv = await fetchAdvancedAssetData(preferences, [ticker]);
-             advancedData = adv.data;
-          }
-          
+          // Atualiza estado IMEDIATAMENTE com o preço
           setMarketData(prev => ({
               ...prev,
               [ticker.toUpperCase()]: {
                   ...(prev[ticker.toUpperCase()] || {}),
                   ...(quotes[ticker.toUpperCase()] || {}),
-                  ...(advancedData[ticker.toUpperCase()] || {}),
                   lastUpdated: now,
-                  lastFundamentalUpdate: Object.keys(advancedData).length > 0 ? now : (prev[ticker.toUpperCase()]?.lastFundamentalUpdate || 0)
               }
           }));
+
+          // 2. Verifica se precisa de IA (Gemini)
+          const isFundamentalsStale = !currentData || !currentData.lastFundamentalUpdate || (now - currentData.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
+          const hasMissingDividends = !currentData?.dividendsHistory || currentData.dividendsHistory.length === 0;
+
+          if (force || isFundamentalsStale || hasMissingDividends) {
+             // Background update para fundamentos
+             fetchAdvancedAssetData(preferences, [ticker]).then(adv => {
+                 setMarketData(prev => ({
+                    ...prev,
+                    [ticker.toUpperCase()]: {
+                        ...(prev[ticker.toUpperCase()] || {}),
+                        ...(adv.data[ticker.toUpperCase()] || {}),
+                        lastFundamentalUpdate: now
+                    }
+                 }));
+             });
+          }
       } catch (e) { console.error(e); }
   }, [preferences, setMarketData]);
   
@@ -209,7 +215,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const updateUserProfile = useCallback((p: Partial<UserProfile>) => setUserProfile(prev => ({...prev, ...p})), [setUserProfile]);
   const setTheme = useCallback((id: string) => setPreferences(p => ({...p, currentThemeId: id})), [setPreferences]);
   const setFont = useCallback((id: string) => setPreferences(p => ({...p, currentFontId: id})), [setPreferences]);
-  const togglePrivacyMode = useCallback(() => setPrivacyMode(p => !p), [setPrivacyMode]);
   
   const resetApp = useCallback(async () => {
       if(window.confirm("Resetar App?")) { 
@@ -223,13 +228,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const clearCache = useCallback(async (key?: string) => {
       if(key === 'all') { 
-          // Clear only cache keys from IDB
-          // Since we share one store, iterating is safer, but 'all' here usually means market data reset
           setMarketData({}); 
           setLastSync(null); 
-          // Also clear specific cache entries managed by CacheManager
-          // We can add a specialized method in CacheManager if needed, 
-          // or assume setMarketData({}) is enough for app logic.
       } else if (key) {
           await CacheManager.clear(key);
       }
@@ -249,10 +249,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUnreadNotificationsCount(0);
   }, [setNotifications]);
 
-  const refreshMarketData = useCallback(async (force = false, silent = false, lite = false) => {
+  // --- REFRESH LOGIC ---
+  const refreshMarketData = useCallback(async (force = false, silent = false) => {
       if(refreshInProgress.current) return;
       
       const now = Date.now();
+      // Se não for forçado e a última sync foi recente (< 15 min), não faz nada
       if(!force && lastSync && now - lastSync < STALE_TIME.MARKET_DATA) return; 
 
       const tickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
@@ -263,70 +265,61 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
-          const promises: Promise<any>[] = [fetchBrapiQuotes(preferences, tickers, lite)];
+          // 1. Fetch Rápido (Brapi)
+          const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
           
-          const firstAsset = marketDataRef.current[tickers[0].toUpperCase()];
-          const fundamentalsStale = !firstAsset?.lastFundamentalUpdate || (now - firstAsset.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
-          
-          const anyMissingDividends = tickers.some(t => {
-              const data = marketDataRef.current[t.toUpperCase()];
-              return !data?.dividendsHistory || data.dividendsHistory.length === 0;
-          });
-
-          if (!lite && (force || fundamentalsStale || anyMissingDividends)) {
-              console.log("CONTEXT: Fetching fresh fundamentals/dividends via Gemini...");
-              promises.push(fetchAdvancedAssetData(preferences, tickers));
-          } else {
-              promises.push(Promise.resolve(null));
-          }
-
-          const results = await Promise.allSettled(promises);
-          const brapiRes = results[0];
-          const geminiRes = results[1];
-
           setMarketData(prev => {
               const next = { ...prev };
-              let hasChanges = false;
+              logApiUsage('brapi', { requests: tickers.length, bytesReceived: brapiRes.stats.bytesReceived });
               
-              if(brapiRes.status === 'fulfilled') {
-                  const res = brapiRes.value;
-                  logApiUsage('brapi', { requests: tickers.length, bytesReceived: res.stats.bytesReceived });
-                  Object.entries(res.quotes).forEach(([tkr, data]) => {
-                      const prevData = next[tkr] || {};
-                      const newData = data as any;
-                      
-                      next[tkr] = { 
-                          ...prevData, 
-                          ...newData,
-                          priceHistory: newData.priceHistory?.length > 0 ? newData.priceHistory : prevData.priceHistory || [],
-                          dividendsHistory: prevData.dividendsHistory || [], 
-                          lastUpdated: now 
-                      };
-                      hasChanges = true;
-                  });
-              }
-
-              if(geminiRes && geminiRes.status === 'fulfilled' && geminiRes.value) {
-                  const res = geminiRes.value as { data: any; stats: { bytesSent: number; bytesReceived: number } };
-                  logApiUsage('gemini', { requests: 1, ...res.stats as any });
-                  Object.entries(res.data).forEach(([tkr, data]) => {
-                      next[tkr] = { 
-                          ...(next[tkr] || {}), 
-                          ...(data as object),
-                          lastFundamentalUpdate: now
-                      };
-                      hasChanges = true;
-                  });
-              }
-              
-              return hasChanges ? next : prev;
+              Object.entries(brapiRes.quotes).forEach(([tkr, data]) => {
+                  const prevData = next[tkr] || {};
+                  const newData = data as any;
+                  
+                  next[tkr] = { 
+                      ...prevData, 
+                      ...newData,
+                      priceHistory: newData.priceHistory?.length > 0 ? newData.priceHistory : prevData.priceHistory || [],
+                      dividendsHistory: prevData.dividendsHistory || [], 
+                      lastUpdated: now 
+                  };
+              });
+              return next;
           });
           setLastSync(now);
+
+          // 2. Análise Fundamentalista em Background (Gemini) se necessário
+          const assetsNeedingUpdate = tickers.filter(t => {
+              const data = marketDataRef.current[t.toUpperCase()];
+              const fundamentalsStale = !data?.lastFundamentalUpdate || (now - data.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS); // 24h
+              const missingData = !data?.dividendsHistory || data.dividendsHistory.length === 0;
+              return force || fundamentalsStale || missingData;
+          });
+
+          if (assetsNeedingUpdate.length > 0) {
+              const geminiRes = await fetchAdvancedAssetData(preferences, assetsNeedingUpdate);
+              
+              if (geminiRes.data && Object.keys(geminiRes.data).length > 0) {
+                  setMarketData(prev => {
+                      const next = { ...prev };
+                      logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
+                      Object.entries(geminiRes.data).forEach(([tkr, data]) => {
+                          next[tkr] = { 
+                              ...(next[tkr] || {}), 
+                              ...(data as object),
+                              lastFundamentalUpdate: now
+                          };
+                      });
+                      return next;
+                  });
+              }
+          }
+
       } catch(e: any) {
           setMarketDataError(e.message);
       } finally {
           refreshInProgress.current = false;
-          if(!silent) setIsRefreshing(false);
+          setIsRefreshing(false);
       }
   }, [lastSync, sourceTransactions, preferences, setMarketData, setLastSync, logApiUsage]);
 
@@ -341,7 +334,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const isOnline = navigator.onLine;
 
           if (isWeekDay && isMarketHours && isOnline) {
-              refreshMarketData(true, true, true);
+              // Auto-refresh: Silencioso
+              refreshMarketData(true, true);
           }
       };
       const intervalId = setInterval(checkAndRefresh, 10 * 60 * 1000); // 10 minutes
@@ -349,7 +343,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [refreshMarketData]);
 
   const refreshAllData = useCallback(async () => {
-      await refreshMarketData(true, false, false); 
+      await refreshMarketData(true, false); 
   }, [refreshMarketData]);
 
   const assets = useMemo(() => {
@@ -393,14 +387,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     // Only trigger initial load if we have data and it's stale
-    // The usePersistentState hook handles loading, so 'transactions' might be [] initially then populated.
-    // We check transactions.length > 0 to ensure we don't try fetching for an empty portfolio unless intended.
     if (!refreshInProgress.current && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
       initialLoadDone.current = true;
       const now = Date.now();
       const isStale = !lastSync || (now - lastSync > STALE_TIME.MARKET_DATA);
       if (isStale) {
-          refreshMarketData(true, true, false); 
+          refreshMarketData(true, true); 
       }
     }
   }, [sourceTransactions.length, isDemoMode, refreshMarketData, lastSync]);
@@ -525,20 +517,20 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [sourceTransactions]);
 
   const value = useMemo(() => ({
-      assets, transactions: sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
+      assets, transactions: sourceTransactions, dividends, preferences, isDemoMode,
       yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount, deferredPrompt,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
-      setDemoMode: setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
+      setDemoMode: setIsDemoMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
       deleteNotification, clearAllNotifications, installPwa
   }), [
-      assets, sourceTransactions, dividends, preferences, isDemoMode, privacyMode,
+      assets, sourceTransactions, dividends, preferences, isDemoMode,
       yieldOnCost, projectedAnnualIncome, portfolioEvolution, monthlyIncome, lastSync, isRefreshing, marketDataError, userProfile, apiStats, notifications, unreadNotificationsCount, deferredPrompt,
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
-      setIsDemoMode, setPrivacyMode, togglePrivacyMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
+      setIsDemoMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
       deleteNotification, clearAllNotifications, installPwa
   ]);
 

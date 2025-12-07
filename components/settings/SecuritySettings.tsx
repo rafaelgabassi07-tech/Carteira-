@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import PageHeader from '../PageHeader';
 import ToggleSwitch from '../ToggleSwitch';
@@ -153,14 +154,6 @@ const SecuritySettings: React.FC<{ onBack: () => void; addToast: (message: strin
         <div>
             <PageHeader title={t('security')} onBack={onBack} helpText={t('help_security')} />
             <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] space-y-4">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <p className="font-bold">{t('privacy_on_start')}</p>
-                        <p className="text-xs text-[var(--text-secondary)]">{preferences.privacyOnStart ? t('enabled') : t('disabled')}</p>
-                    </div>
-                    <ToggleSwitch enabled={preferences.privacyOnStart} setEnabled={(val) => updatePreferences({ privacyOnStart: val })} />
-                </div>
-                
                 <div className="flex justify-between items-center">
                     <div>
                         <p className="font-bold">{t('biometric_login')}</p>

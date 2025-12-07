@@ -17,9 +17,8 @@ interface AnalysisViewProps {
 
 const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) => {
     const { t } = useI18n();
-    const { refreshMarketData, isRefreshing: isContextRefreshing, assets, preferences, privacyMode } = usePortfolio();
+    const { refreshMarketData, isRefreshing: isContextRefreshing, assets, preferences } = usePortfolio();
     
-    // State moved from PortfolioView
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
     const [isSortOpen, setIsSortOpen] = useState(false);
@@ -123,7 +122,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                     <PatrimonyEvolutionCard />
                 </div>
 
-                {/* Assets List Section (Moved from PortfolioView) */}
+                {/* Assets List Section */}
                 <div className="mt-8">
                     {assets.length > 0 ? (
                         <>
@@ -187,7 +186,6 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                                             totalValue={totalPortfolioValue}
                                             onClick={() => onSelectAsset(asset.ticker)} 
                                             style={{ animationDelay: `${index * 50}ms` }}
-                                            privacyMode={privacyMode}
                                             hideCents={preferences.hideCents}
                                         />
                                     ))}

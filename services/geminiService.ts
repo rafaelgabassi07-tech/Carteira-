@@ -13,6 +13,42 @@ function getGeminiApiKey(prefs: AppPreferences): string {
     throw new Error("Chave de API do Gemini não configurada.");
 }
 
+// Helper robusto para extrair JSON de respostas de LLMs
+function extractJSON(text: string): any {
+    if (!text) return null;
+    
+    // 1. Tenta remover blocos de código markdown
+    let clean = text.replace(/```json\s*/g, '').replace(/```/g, '').trim();
+    
+    // 2. Tenta parse direto
+    try {
+        return JSON.parse(clean);
+    } catch (e) {
+        // 3. Tenta encontrar limites de Array [...]
+        const startArr = clean.indexOf('[');
+        const endArr = clean.lastIndexOf(']');
+        if (startArr !== -1 && endArr !== -1 && endArr > startArr) {
+            try {
+                return JSON.parse(clean.substring(startArr, endArr + 1));
+            } catch (e2) {}
+        }
+        
+        // 4. Tenta encontrar limites de Objeto {...}
+        const startObj = clean.indexOf('{');
+        const endObj = clean.lastIndexOf('}');
+        if (startObj !== -1 && endObj !== -1 && endObj > startObj) {
+             try {
+                const obj = JSON.parse(clean.substring(startObj, endObj + 1));
+                // Se esperava array mas veio objeto, encapsula
+                return Array.isArray(obj) ? obj : [obj];
+             } catch (e3) {}
+        }
+        
+        console.warn("Falha ao extrair JSON da resposta:", text.substring(0, 100) + "...");
+        return null;
+    }
+}
+
 export interface NewsFilter {
     tickers?: string[];
     dateRange?: 'today' | 'week' | 'month';
@@ -45,29 +81,38 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
 
     const prompt = `
-      ROLE: Expert Financial Analyst specialized in sentiment analysis.
-      TASK: Search for recent and impactful news ${searchContext}.
-      RULES:
-      1. Use googleSearch to find REAL facts from the last 3 days for the Brazilian market.
-      2. For each news item, provide a sentimentScore from -1.0 (very negative) to 1.0 (very positive), considering the impact on the market/asset.
-      3. Provide a brief, 1-sentence 'sentimentReason' in Brazilian Portuguese explaining the score.
-      4. Find a relevant, high-quality, royalty-free, landscape-oriented image URL. If none, return an empty string.
-      5. Summaries must be concise, under 150 characters, in Brazilian Portuguese.
-      6. Return EXACTLY 6 items.
-      7. OUTPUT: JSON Array ONLY. No markdown.
+      ROLE: Financial News Aggregator & Analyst.
+      TASK: Search for the latest and most relevant news ${searchContext}.
       
-      JSON Structure: [{"title":"","summary":"","source":"","date":"YYYY-MM-DD","imageUrl":"","sentimentScore":-1.0,"sentimentReason":""}]
+      REQUIREMENTS:
+      1. Use 'googleSearch' to find REAL facts from the last 3 days.
+      2. Focus on: Dividends, earnings, market moves, and economic indicators (Brazil).
+      3. Language: Brazilian Portuguese (pt-BR).
+      4. RETURN FORMAT: A Raw JSON Array. Do not wrap in markdown if possible.
+      
+      JSON SCHEMA per item:
+      {
+        "title": "Headline (max 80 chars)",
+        "summary": "Concise summary (max 150 chars)",
+        "source": "Publisher Name",
+        "date": "YYYY-MM-DD",
+        "imageUrl": "URL of a relevant image if available",
+        "sentimentScore": 0.5, // Float from -1.0 (negative) to 1.0 (positive)
+        "sentimentReason": "Brief reason for sentiment"
+      }
+      
+      Return approximately 6 items.
     `;
 
     const bytesSent = new Blob([prompt]).size;
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
+            model: "gemini-2.5-flash", // Flash is faster and stricter with JSON tasks
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                temperature: 0.2, 
+                temperature: 0.1, 
             }
         });
 
@@ -75,17 +120,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         const bytesReceived = new Blob([textResponse]).size;
         const stats = { bytesSent, bytesReceived };
 
-        // Limpeza e Parsing do JSON
-        let cleanJson = textResponse;
-        cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/```$/, '').trim();
-        
-        let articles: NewsArticle[] = [];
-        try {
-            articles = JSON.parse(cleanJson);
-        } catch (e) {
-            console.error("Erro ao fazer parse do JSON de notícias:", e, cleanJson);
-            return emptyReturn;
-        }
+        let articles: NewsArticle[] = extractJSON(textResponse) || [];
 
         if (!Array.isArray(articles)) return emptyReturn;
 
@@ -94,6 +129,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
         articles = articles.map((article, index) => {
             let url = `https://www.google.com/search?q=${encodeURIComponent(article.title + " " + article.source)}`;
+            // Tentativa de vincular a fonte real do grounding
             if (index < webChunks.length) {
                 url = webChunks[index].web!.uri;
                 if ((!article.source || article.source === 'Fonte Desconhecida') && webChunks[index].web!.title) {
@@ -103,7 +139,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             return {
                 ...article,
                 url,
-                imageUrl: article.imageUrl || `https://source.unsplash.com/random/800x450/?${encodeURIComponent('finance,stock,market,'+article.title.split(' ').slice(0,2).join(','))}`,
+                imageUrl: article.imageUrl || `https://source.unsplash.com/random/800x450/?${encodeURIComponent('finance,stock,market,'+ (article.title ? article.title.split(' ')[0] : ''))}`,
                 date: article.date || new Date().toISOString()
             };
         });
@@ -127,7 +163,6 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
         TASK: Find the CURRENT real-time price and today's percentage change for the asset "${ticker}" (B3/Brazil).
         USE TOOL: googleSearch.
         OUTPUT: JSON only: { "price": number, "changePercent": number }.
-        Example: { "price": 10.50, "changePercent": 0.45 }
     `;
 
     try {
@@ -137,10 +172,9 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
             config: { tools: [{ googleSearch: {} }], temperature: 0 }
         });
         
-        const cleanJson = response.text?.replace(/^```json\s*/, '').replace(/```$/, '').trim() || "{}";
-        const data = JSON.parse(cleanJson);
+        const data = extractJSON(response.text || "{}");
         
-        if (typeof data.price === 'number') {
+        if (data && typeof data.price === 'number') {
             return { price: data.price, change: data.changePercent || 0 };
         }
         return null;
@@ -165,6 +199,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         riskAssessment?: string;
         marketSentiment?: 'Bullish' | 'Bearish' | 'Neutral';
         strengths?: string[];
+        weaknesses?: string[];
         dividendCAGR?: number;
         capRate?: number;
         managementFee?: string;
@@ -188,50 +223,28 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const tickersString = tickers.join(', ');
     const today = new Date().toISOString().split('T')[0];
 
-    // Prompt Aprimorado para Análise Fundamentalista Completa
     const prompt = `
       ROLE: Senior Real Estate Fund (FII) Analyst.
       TASK: Perform a deep fundamental analysis for these Brazilian FIIs: ${tickersString}.
       CURRENT_DATE: ${today}.
       
       RULES FOR SEARCH:
-      1. Use 'googleSearch' to find exact data from official sources (B3, RI, StatusInvest, ClubeFII).
-      2. 'businessDescription': Concise 1-sentence summary of the investment thesis.
-      3. 'riskAssessment': A string starting with "Baixo", "Médio" or "Alto" followed by a dash and a 3-5 word reason.
-      4. 'marketSentiment': Infer based on recent news/price action: "Bullish", "Bearish" or "Neutral".
-      5. 'strengths': JSON Array of 3 short bullet points highlighting key strengths.
-      6. 'dividendCAGR': 3-Year Compound Annual Growth Rate of dividends (approximate % float).
-      7. 'capRate': Estimated Capitalization Rate (%) for Brick funds.
+      1. Use 'googleSearch' to find exact data from official sources.
+      2. 'businessDescription': Concise 1-sentence summary.
+      3. 'riskAssessment': "Baixo", "Médio", "Alto" - reason.
+      4. 'marketSentiment': "Bullish", "Bearish", "Neutral".
+      5. 'strengths'/'weaknesses': Arrays of 3 short strings.
       
-      RULES FOR DIVIDENDS:
-      1. Fetch the last 6 dividends.
-      2. If Payment Date > Current Date, set "isProvisioned": true.
-      3. Dates MUST be 'YYYY-MM-DD'.
-      4. Value is "R$ per share".
-      
-      OUTPUT: JSON Object ONLY. Keys = Ticker.
+      OUTPUT: JSON Object ONLY (Keys = Ticker).
       
       Structure per Ticker:
       {
-        "dy": number (12m yield % value only, e.g. 12.5),
-        "pvp": number (e.g. 1.03),
-        "assetType": "Tijolo" | "Papel" | "Fiagro" | "FOF" | "Infra" | "Híbrido",
-        "administrator": string,
-        "vacancyRate": number (physical vacancy %),
-        "lastDividend": number,
-        "netWorth": string,
-        "shareholders": number,
-        "vpPerShare": number,
-        "businessDescription": string,
-        "riskAssessment": string,
-        "marketSentiment": "Bullish" | "Bearish" | "Neutral",
-        "strengths": string[],
-        "dividendCAGR": number,
-        "capRate": number,
-        "managementFee": string,
-        "dividendsHistory": [
-           { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number, "isProvisioned": boolean }
-        ]
+        "dy": number, "pvp": number, "assetType": "Tijolo"|"Papel"|...,
+        "administrator": string, "vacancyRate": number, "lastDividend": number,
+        "netWorth": string, "shareholders": number, "vpPerShare": number,
+        "businessDescription": string, "riskAssessment": string, "marketSentiment": string,
+        "strengths": [], "weaknesses": [], "dividendCAGR": number, "capRate": number, "managementFee": string,
+        "dividendsHistory": [ { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": number, "isProvisioned": boolean } ]
       }
     `;
 
@@ -250,14 +263,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
         const textResponse = response.text || "{}";
         const bytesReceived = new Blob([textResponse]).size;
 
-        let cleanJson = textResponse.replace(/^```json\s*/, '').replace(/```$/, '').trim();
-        let data;
-        try {
-            data = JSON.parse(cleanJson);
-        } catch (e) {
-            console.error("Failed to parse Gemini asset data JSON:", e);
-            return emptyReturn;
-        }
+        const data = extractJSON(textResponse);
+        if (!data) return emptyReturn;
 
         const sanitizedData: Record<string, any> = {};
         for (const ticker in data) {
@@ -290,6 +297,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                     riskAssessment: typeof assetData.riskAssessment === 'string' ? assetData.riskAssessment : undefined,
                     marketSentiment: typeof assetData.marketSentiment === 'string' ? assetData.marketSentiment : undefined,
                     strengths: Array.isArray(assetData.strengths) ? assetData.strengths : [],
+                    weaknesses: Array.isArray(assetData.weaknesses) ? assetData.weaknesses : [],
                     dividendCAGR: typeof assetData.dividendCAGR === 'number' ? assetData.dividendCAGR : undefined,
                     capRate: typeof assetData.capRate === 'number' ? assetData.capRate : undefined,
                     managementFee: typeof assetData.managementFee === 'string' ? assetData.managementFee : undefined,

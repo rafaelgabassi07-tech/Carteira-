@@ -68,7 +68,7 @@ const usePatrimonyLogic = (portfolioEvolution: any, assets: any[]) => {
 
 const PatrimonyEvolutionCard: React.FC = () => {
     const { t, formatCurrency } = useI18n();
-    const { portfolioEvolution, assets, privacyMode } = usePortfolio();
+    const { portfolioEvolution, assets } = usePortfolio();
     
     // Utilizando o Hook refatorado
     const { period, setPeriod, currentMetrics, chartData, periodDelta } = usePatrimonyLogic(portfolioEvolution, assets);
@@ -114,7 +114,7 @@ const PatrimonyEvolutionCard: React.FC = () => {
             </div>
 
             {/* Métricas Principais */}
-            <div className={`grid grid-cols-2 gap-4 mb-6 ${privacyMode ? 'blur-sm select-none opacity-50' : ''}`}>
+            <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
                     <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mb-1 flex items-center gap-1">
                         {t('net_worth')}
@@ -143,7 +143,7 @@ const PatrimonyEvolutionCard: React.FC = () => {
 
             {/* Informação Contextual do Período */}
             {periodDelta && (
-                <div className={`flex items-center gap-2 mb-4 text-xs px-3 py-2 rounded-lg bg-[var(--bg-primary)]/50 border border-[var(--border-color)]/50 max-w-fit ${privacyMode ? 'blur-sm' : ''}`}>
+                <div className="flex items-center gap-2 mb-4 text-xs px-3 py-2 rounded-lg bg-[var(--bg-primary)]/50 border border-[var(--border-color)]/50 max-w-fit">
                     <span className="text-[var(--text-secondary)]">No período selecionado:</span>
                     <span className={`font-bold ${periodDelta.value >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
                         {periodDelta.value >= 0 ? '+' : ''}{formatCurrency(periodDelta.value)} ({periodDelta.percent.toFixed(2)}%)
@@ -152,7 +152,7 @@ const PatrimonyEvolutionCard: React.FC = () => {
             )}
             
             {/* Gráfico */}
-            <div className={`h-64 w-full relative ${privacyMode ? 'opacity-20 blur-sm pointer-events-none' : ''}`}>
+            <div className="h-64 w-full relative">
                 {chartData.length > 1 ? (
                     <EvolutionChart data={chartData} chartType="line" />
                 ) : (

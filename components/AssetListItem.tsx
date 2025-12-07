@@ -9,7 +9,6 @@ interface AssetListItemProps {
     totalValue: number;
     onClick: () => void;
     style?: React.CSSProperties;
-    privacyMode: boolean;
     hideCents: boolean;
 }
 
@@ -46,7 +45,7 @@ const Sparkline: React.FC<{ data: { date: string, price: number }[]; color: stri
     );
 };
 
-const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValue, onClick, style, privacyMode, hideCents }) => {
+const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValue, onClick, style, hideCents }) => {
     const { t, formatCurrency } = useI18n();
     const currentValue = asset.quantity * asset.currentPrice;
     const totalInvested = asset.quantity * asset.avgPrice;
@@ -65,13 +64,6 @@ const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValu
     const barColorClass = isPositive
         ? 'bg-gradient-to-r from-emerald-500/70 to-emerald-500'
         : 'bg-gradient-to-r from-rose-500/70 to-rose-500';
-
-    const barStyle = {
-        width: `${Math.max(allocation, 0)}%`,
-        boxShadow: isPositive
-            ? '0 0 10px rgb(16 185 129 / 0.4)'
-            : '0 0 10px rgb(244 63 94 / 0.4)',
-    };
 
     return (
         <div 
@@ -102,7 +94,7 @@ const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValu
                 </div>
                 
                 {/* Right side: Value and Variation */}
-                <div className={`text-right flex-shrink-0 min-w-[80px] transition-all duration-300 ${privacyMode ? 'blur-md select-none' : ''}`}>
+                <div className="text-right flex-shrink-0 min-w-[80px] transition-all duration-300">
                     <p className="font-bold text-sm text-[var(--text-primary)] tracking-tight">{format(currentValue)}</p>
                     <div className={`text-xs font-semibold mt-0.5 ${isPositive ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
                         {isPositive ? '▲' : '▼'} {Math.abs(variationPercent).toFixed(2)}%
@@ -119,7 +111,7 @@ const AssetListItemComponent: React.FC<AssetListItemProps> = ({ asset, totalValu
                 <div className="w-full bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden shadow-inner">
                      <div 
                         className={`h-full rounded-full transition-all duration-1000 ease-out ${barColorClass}`}
-                        style={barStyle}
+                        style={{ width: `${Math.max(allocation, 0)}%` }}
                     />
                 </div>
             </div>

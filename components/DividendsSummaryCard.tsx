@@ -15,7 +15,7 @@ interface DividendsSummaryCardProps {
 
 const DividendsSummaryCard: React.FC<DividendsSummaryCardProps> = ({ setActiveView }) => {
     const { formatCurrency } = useI18n();
-    const { privacyMode, monthlyIncome, projectedAnnualIncome } = usePortfolio();
+    const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
 
     const { currentMonthValue, averageIncome, currentMonthName } = useMemo(() => {
         const now = new Date();
@@ -50,7 +50,7 @@ const DividendsSummaryCard: React.FC<DividendsSummaryCardProps> = ({ setActiveVi
                         <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-color)]" />
                         Renda de {currentMonthName}
                     </span>
-                    <div className={`text-3xl font-black text-[var(--text-primary)] tracking-tight ${privacyMode ? 'blur-md' : ''}`}>
+                    <div className="text-3xl font-black text-[var(--text-primary)] tracking-tight">
                         <CountUp end={currentMonthValue} formatter={formatCurrency} />
                     </div>
                 </div>
@@ -61,7 +61,7 @@ const DividendsSummaryCard: React.FC<DividendsSummaryCardProps> = ({ setActiveVi
             <div className="mt-auto pt-4 border-t border-[var(--border-color)]/50 grid grid-cols-2 gap-4">
                 <div>
                     <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase block mb-0.5">Média Mensal</span>
-                    <span className={`text-sm font-bold text-[var(--text-primary)] ${privacyMode ? 'blur-sm' : ''}`}>
+                    <span className="text-sm font-bold text-[var(--text-primary)]">
                         <CountUp end={averageIncome} formatter={formatCurrency} />
                     </span>
                 </div>
@@ -69,7 +69,7 @@ const DividendsSummaryCard: React.FC<DividendsSummaryCardProps> = ({ setActiveVi
                     <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase block flex items-center justify-end gap-1 mb-0.5">
                         Previsão Anual <SparklesIcon className="w-2.5 h-2.5 text-[var(--accent-color)]"/>
                     </span>
-                    <span className={`text-sm font-bold text-[var(--accent-color)] ${privacyMode ? 'blur-sm' : ''}`}>
+                    <span className="text-sm font-bold text-[var(--accent-color)]">
                         <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
                     </span>
                 </div>
