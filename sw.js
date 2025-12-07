@@ -1,16 +1,17 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v1.9.0'; // Bumped Version
-const RUNTIME_CACHE = 'runtime-cache-v1.9.0';
+const CACHE_NAME = 'invest-portfolio-cache-v2.0.0'; // Major Bump to force refresh
+const RUNTIME_CACHE = 'runtime-cache-v2.0.0';
 
+// Remove index.html from pre-cache to allow Network-First strategy to take precedence for the entry point
+// This is critical for seeing GitHub updates immediately.
 const urlsToCache = [
-  '/',
-  '/index.html',
+  '/', // Often maps to index.html but handled differently by some servers
   '/manifest.json',
   '/logo.svg'
 ];
 
 self.addEventListener('install', event => {
-  self.skipWaiting();
+  self.skipWaiting(); // Force activation immediately
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(async cache => {
@@ -53,24 +54,31 @@ self.addEventListener('fetch', event => {
         return; // Let the browser handle the request.
     }
 
-    // 2. App Navigation: Network-first, fallback to cache for offline SPA support.
-    if (event.request.mode === 'navigate') {
+    // 2. App Navigation & HTML: Network-first, fallback to cache for offline SPA support.
+    // This ensures we always get the latest index.html if online.
+    if (event.request.mode === 'navigate' || event.request.destination === 'document') {
         event.respondWith(
             (async () => {
                 try {
+                    // Force network fetch
                     const networkResponse = await fetch(event.request);
+                    // Update cache with new version
+                    if (networkResponse && networkResponse.status === 200) {
+                         const cache = await caches.open(CACHE_NAME);
+                         cache.put(event.request, networkResponse.clone());
+                    }
                     return networkResponse;
                 } catch (error) {
                     console.log('Fetch failed; returning offline page from cache.', error);
                     const cachedResponse = await caches.match('/index.html');
-                    return cachedResponse;
+                    return cachedResponse || caches.match('/');
                 }
             })()
         );
         return;
     }
 
-    // 3. Static Assets: Cache-first, fallback to network.
+    // 3. Static Assets (JS/CSS/Images): Cache-first, fallback to network.
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
             if (cachedResponse) {

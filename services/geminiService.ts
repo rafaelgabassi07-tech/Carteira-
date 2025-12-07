@@ -17,34 +17,37 @@ function getGeminiApiKey(prefs: AppPreferences): string {
 function extractJSON(text: string): any {
     if (!text) return null;
     
-    // 1. Tenta remover blocos de código markdown
+    // Remove markdown code blocks
     let clean = text.replace(/```json\s*/g, '').replace(/```/g, '').trim();
     
-    // 2. Tenta parse direto
+    // Tenta encontrar o primeiro { ou [ e o último } ou ]
+    const firstBrace = clean.indexOf('{');
+    const firstBracket = clean.indexOf('[');
+    let start = -1;
+    
+    // Determina onde começa o JSON
+    if (firstBrace !== -1 && firstBracket !== -1) {
+        start = Math.min(firstBrace, firstBracket);
+    } else if (firstBrace !== -1) {
+        start = firstBrace;
+    } else if (firstBracket !== -1) {
+        start = firstBracket;
+    }
+
+    if (start !== -1) {
+        const lastBrace = clean.lastIndexOf('}');
+        const lastBracket = clean.lastIndexOf(']');
+        const end = Math.max(lastBrace, lastBracket);
+        
+        if (end > start) {
+            clean = clean.substring(start, end + 1);
+        }
+    }
+
     try {
         return JSON.parse(clean);
     } catch (e) {
-        // 3. Tenta encontrar limites de Array [...]
-        const startArr = clean.indexOf('[');
-        const endArr = clean.lastIndexOf(']');
-        if (startArr !== -1 && endArr !== -1 && endArr > startArr) {
-            try {
-                return JSON.parse(clean.substring(startArr, endArr + 1));
-            } catch (e2) {}
-        }
-        
-        // 4. Tenta encontrar limites de Objeto {...}
-        const startObj = clean.indexOf('{');
-        const endObj = clean.lastIndexOf('}');
-        if (startObj !== -1 && endObj !== -1 && endObj > startObj) {
-             try {
-                const obj = JSON.parse(clean.substring(startObj, endObj + 1));
-                // Se esperava array mas veio objeto, encapsula
-                return Array.isArray(obj) ? obj : [obj];
-             } catch (e3) {}
-        }
-        
-        console.warn("Falha ao extrair JSON da resposta:", text.substring(0, 100) + "...");
+        console.warn("Falha crítica ao extrair JSON:", text.substring(0, 100) + "...");
         return null;
     }
 }
@@ -101,7 +104,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash", // Flash is faster and stricter with JSON tasks
+            model: "gemini-2.5-flash", 
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],

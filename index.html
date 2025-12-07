@@ -5,6 +5,11 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="manifest" href="/manifest.json" />
     
+    <!-- Cache Control: Force Network Check for index.html to ensure Github Updates are seen -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <!-- PWA / Mobile Settings -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#09090b" />
@@ -230,7 +235,28 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+             // Handle updates
+             registration.onupdatefound = () => {
+                const installingWorker = registration.installing;
+                if (installingWorker == null) {
+                   return;
+                }
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed') {
+                    if (navigator.serviceWorker.controller) {
+                      // New update available
+                      console.log('New content is available; please refresh.');
+                      // Optional: Trigger a toast here via a custom event
+                    } else {
+                      console.log('Content is cached for offline use.');
+                    }
+                  }
+                };
+             };
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
         });
       }
     </script>

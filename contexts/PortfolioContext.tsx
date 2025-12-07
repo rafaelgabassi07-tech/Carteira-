@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, DividendHistoryEvent, AppStats, AppNotification, PortfolioEvolutionPoint, MonthlyIncome } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
@@ -277,28 +278,33 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setMarketDataError(null);
 
       try {
-          // Step 1: Fetch Brapi data, store locally.
+          // Step 1: Fetch Brapi data
           const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
           logApiUsage('brapi', { requests: 1, bytesReceived: brapiRes.stats.bytesReceived });
 
-          // Step 2: Create a temporary mutable object for all updates, using the ref for current data.
+          // Step 2: Use ref to get *latest* state before merge
           const currentMarketData = marketDataRef.current;
+          // Create a new copy to mutate locally before one-time commit
           const nextMarketData = { ...currentMarketData };
 
           // Merge Brapi results
           Object.entries(brapiRes.quotes).forEach(([tkr, data]) => {
               nextMarketData[tkr] = {
-                  ...(currentMarketData[tkr] || {}),
+                  ...(nextMarketData[tkr] || {}), // Use nextMarketData here to preserve existing fields not in Brapi
                   ...data,
                   lastUpdated: now
               };
           });
 
-          // Step 3: Use the temporary object to determine what needs updating from Gemini.
+          // Step 3: Determine what needs updating from Gemini.
+          // Note: We use nextMarketData to check against the just-fetched Brapi updates if needed,
+          // OR check if fundamentals are missing entirely.
           const assetsNeedingUpdate = tickers.filter(t => {
-              const data = nextMarketData[t.toUpperCase()]; // Use the new temporary data
+              const data = nextMarketData[t.toUpperCase()]; 
+              // Force update if explicitly requested OR fundamentals are stale OR fundamentals are empty
               const fundamentalsStale = !data?.lastFundamentalUpdate || (now - data.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
               const missingData = !data?.dividendsHistory || data.dividendsHistory.length === 0;
+              
               return force || fundamentalsStale || missingData;
           });
 
@@ -320,7 +326,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       });
                   } catch (batchErr: any) {
                       console.error("Failed to fetch Gemini batch:", batch, batchErr);
-                      setMarketDataError(`Falha ao buscar dados de ${batch.join(', ')}.`);
+                      // Don't set global error, just log it, so partial updates (Brapi) are kept
                   }
               }
           }
@@ -330,7 +336,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setLastSync(now);
 
       } catch (e: any) {
-          setMarketDataError(e.message);
+          console.error("General Refresh Error:", e);
+          setMarketDataError(e.message || "Erro de conexão ao atualizar dados.");
       } finally {
           refreshInProgress.current = false;
           setIsRefreshing(false);
@@ -345,9 +352,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const hour = now.getHours();
           const isWeekDay = day >= 1 && day <= 5;
           const isMarketHours = hour >= 10 && hour < 18;
-          const isOnline = navigator.onLine;
-
-          if (isWeekDay && isMarketHours && isOnline) {
+          
+          // Only auto-refresh if market is open or data is very old
+          if (isWeekDay && isMarketHours) {
               refreshMarketData(false, true);
           }
       };
@@ -359,12 +366,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await refreshMarketData(true, false); 
   }, [refreshMarketData]);
 
+  // Initial Load Effect
   useEffect(() => {
+    // Only run this once on mount if we have transactions but no recent sync
     if (!refreshInProgress.current && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
       initialLoadDone.current = true;
       const now = Date.now();
+      // If never synced OR synced more than 15 mins ago, force refresh on startup
       const isStale = !lastSync || (now - lastSync > STALE_TIME.MARKET_DATA);
+      
       if (isStale) {
+          // Force = true ensures Gemini runs even if cache exists but is old
           refreshMarketData(true, true); 
       }
     }
