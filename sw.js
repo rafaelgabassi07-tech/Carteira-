@@ -26,66 +26,6 @@ self.addEventListener('install', event => {
   );
 });
 
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-
-  // Skip external requests not related to our assets
-  if (!url.origin.includes(self.location.origin)) {
-      return; 
-  }
-
-  // API calls shouldn't be cached by SW
-  if (url.pathname.startsWith('/api') || url.pathname.includes('brapi') || url.pathname.includes('generativelanguage')) {
-      return;
-  }
-
-  // Navigation Fallback (SPA Support for Offline)
-  // If requesting a page (HTML), try network, then cache, then fallback to /index.html
-  if (event.request.mode === 'navigate') {
-      event.respondWith(
-          fetch(event.request)
-              .catch(() => {
-                  return caches.match(event.request)
-                      .then(cachedResponse => {
-                          if (cachedResponse) return cachedResponse;
-                          // If not in cache, serve index.html (SPA Entry point)
-                          return caches.match('/index.html');
-                      });
-              })
-      );
-      return;
-  }
-
-  event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-
-        // Cache JS, CSS, JSON and Images dynamically
-        if (
-            url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|json)$/) || 
-            url.pathname.includes('/assets/')
-        ) {
-            const responseToCache = response.clone();
-            caches.open(RUNTIME_CACHE).then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-        }
-
-        return response;
-      }).catch(err => {
-          console.debug('Fetch failed:', err);
-      });
-    })
-  );
-});
-
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME, RUNTIME_CACHE];
   event.waitUntil(
@@ -93,6 +33,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -101,6 +42,57 @@ self.addEventListener('activate', event => {
   );
   event.waitUntil(self.clients.claim());
 });
+
+const API_HOSTS = ['brapi.dev', 'generativelanguage.googleapis.com'];
+
+self.addEventListener('fetch', event => {
+    const url = new URL(event.request.url);
+
+    // 1. API calls are network-only and not handled by the SW.
+    if (API_HOSTS.some(host => url.hostname.includes(host))) {
+        return; // Let the browser handle the request.
+    }
+
+    // 2. App Navigation: Network-first, fallback to cache for offline SPA support.
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            (async () => {
+                try {
+                    const networkResponse = await fetch(event.request);
+                    return networkResponse;
+                } catch (error) {
+                    console.log('Fetch failed; returning offline page from cache.', error);
+                    const cachedResponse = await caches.match('/index.html');
+                    return cachedResponse;
+                }
+            })()
+        );
+        return;
+    }
+
+    // 3. Static Assets: Cache-first, fallback to network.
+    event.respondWith(
+        caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            return fetch(event.request).then(response => {
+                if (!response || response.status !== 200 || response.type !== 'basic') {
+                    return response;
+                }
+
+                const responseToCache = response.clone();
+                caches.open(RUNTIME_CACHE).then(cache => {
+                    cache.put(event.request, responseToCache);
+                });
+
+                return response;
+            });
+        })
+    );
+});
+
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
