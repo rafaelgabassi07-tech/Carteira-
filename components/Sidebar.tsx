@@ -55,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
       <div className="p-8 flex items-center gap-4 mb-2">
         <Logo className="w-10 h-10 rounded-xl shadow-lg shadow-[var(--accent-color)]/20" />
         <div>
-            <h1 className="font-black text-xl text-[var(--text-primary)] tracking-tight leading-none">FII Master</h1>
+            <h1 className="font-black text-xl text-[var(--text-primary)] tracking-tight leading-none">Invest</h1>
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mt-0.5">Portfolio</p>
         </div>
       </div>
@@ -69,7 +69,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
         <SidebarItem label={t('nav_analysis')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
         <SidebarItem label={t('nav_market')} view="mercado" icon={<GlobeIcon />} isActive={activeView === 'mercado'} onClick={() => handleNavClick('mercado')} />
         <SidebarItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
-        {/* FIX: Removed 'noticias' view item as it is not a valid view type. News is part of the Market view. */}
         
         <div className="px-6 py-2 mt-6">
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-50 mb-2">Conta</p>
@@ -89,7 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-[var(--text-primary)] truncate">{userProfile.name || 'Investidor'}</p>
-                <p className="text-[10px] text-[var(--text-secondary)] truncate">{userProfile.email || 'usuario@fiimaster.app'}</p>
+                <p className="text-[10px] text-[var(--text-secondary)] truncate">{userProfile.email || 'usuario@invest.app'}</p>
             </div>
         </div>
       </div>

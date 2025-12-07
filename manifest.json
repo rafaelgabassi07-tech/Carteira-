@@ -1,7 +1,7 @@
 {
-  "name": "FII Master",
-  "short_name": "FII Master",
-  "description": "Gerencie sua carteira de Fundos Imobiliários com inteligência, cotações em tempo real e análise de dividendos.",
+  "name": "Invest",
+  "short_name": "Invest",
+  "description": "Gerencie sua carteira de investimentos com inteligência, cotações em tempo real e análise de dividendos.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

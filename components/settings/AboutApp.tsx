@@ -16,7 +16,7 @@ const AboutApp: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
             <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)]">
                 <div className="flex flex-col items-center text-center my-8">
                     <Logo className="w-20 h-20 mb-4 rounded-2xl shadow-xl shadow-[var(--accent-color)]/20" />
-                    <h1 className="text-2xl font-bold">FII Master</h1>
+                    <h1 className="text-2xl font-bold">Invest</h1>
                     <p className="text-[var(--text-secondary)]">{t('about_app_desc')}</p>
                     <p className="text-xs text-gray-500 mt-2">{t('version')} 1.7.0</p>
                 </div>
@@ -32,7 +32,7 @@ const AboutApp: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     </div>
                 </div>
                 
-                <p className="text-center text-xs text-gray-600 mt-12">{new Date().getFullYear()} © FII Master. {t('all_rights_reserved')}</p>
+                <p className="text-center text-xs text-gray-600 mt-12">{new Date().getFullYear()} © Invest. {t('all_rights_reserved')}</p>
             </div>
             
             {modalContent && (
