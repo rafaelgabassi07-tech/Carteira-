@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Schema } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types';
 
 // --- Configuration & Helpers ---
@@ -18,79 +18,46 @@ function getGeminiApiKey(prefs: AppPreferences): string {
 
 const createClient = (apiKey: string) => new GoogleGenAI({ apiKey });
 
-// --- Schemas (Structured Output) ---
-
-const NewsResponseSchema: Schema = {
-    type: Type.ARRAY,
-    items: {
-        type: Type.OBJECT,
-        properties: {
-            title: { type: Type.STRING },
-            summary: { type: Type.STRING },
-            source: { type: Type.STRING },
-            date: { type: Type.STRING },
-            sentimentScore: { type: Type.NUMBER },
-            sentimentReason: { type: Type.STRING },
-            imageUrl: { type: Type.STRING, nullable: true },
-            url: { type: Type.STRING, nullable: true }
-        },
-        required: ["title", "summary", "source", "sentimentScore"]
-    }
-};
-
-const QuoteResponseSchema: Schema = {
-    type: Type.OBJECT,
-    properties: {
-        price: { type: Type.NUMBER },
-        changePercent: { type: Type.NUMBER }
-    },
-    required: ["price", "changePercent"]
-};
-
-// Advanced Asset Schema
-const AssetFundamentalSchema: Schema = {
-    type: Type.OBJECT,
-    properties: {
-        assets: {
-            type: Type.ARRAY,
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    ticker: { type: Type.STRING },
-                    dy: { type: Type.NUMBER, nullable: true },
-                    pvp: { type: Type.NUMBER, nullable: true },
-                    assetType: { type: Type.STRING, nullable: true },
-                    administrator: { type: Type.STRING, nullable: true },
-                    vacancyRate: { type: Type.NUMBER, nullable: true },
-                    lastDividend: { type: Type.NUMBER, nullable: true },
-                    netWorth: { type: Type.STRING, nullable: true },
-                    shareholders: { type: Type.NUMBER, nullable: true },
-                    vpPerShare: { type: Type.NUMBER, nullable: true },
-                    businessDescription: { type: Type.STRING, nullable: true },
-                    riskAssessment: { type: Type.STRING, nullable: true },
-                    strengths: { type: Type.ARRAY, items: { type: Type.STRING }, nullable: true },
-                    weaknesses: { type: Type.ARRAY, items: { type: Type.STRING }, nullable: true },
-                    dividendCAGR: { type: Type.NUMBER, nullable: true },
-                    managementFee: { type: Type.STRING, nullable: true },
-                    dividendsHistory: {
-                        type: Type.ARRAY,
-                        nullable: true,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                exDate: { type: Type.STRING },
-                                paymentDate: { type: Type.STRING },
-                                value: { type: Type.NUMBER },
-                                isProvisioned: { type: Type.BOOLEAN }
-                            }
-                        }
-                    }
-                },
-                required: ["ticker"]
-            }
+// Helper to extract JSON from Markdown code blocks or raw text
+function extractAndParseJSON(text: string): any {
+    if (!text) return null;
+    try {
+        // 1. Try to find JSON inside ```json ... ``` or just ``` ... ```
+        const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+            return JSON.parse(match[1]);
         }
+        
+        // 2. Try to find the first '{' or '[' and the last '}' or ']'
+        const firstOpen = text.indexOf('{');
+        const firstArray = text.indexOf('[');
+        let start = -1;
+        
+        if (firstOpen !== -1 && firstArray !== -1) start = Math.min(firstOpen, firstArray);
+        else if (firstOpen !== -1) start = firstOpen;
+        else if (firstArray !== -1) start = firstArray;
+
+        const lastClose = text.lastIndexOf('}');
+        const lastArray = text.lastIndexOf(']');
+        let end = -1;
+
+        if (lastClose !== -1 && lastArray !== -1) end = Math.max(lastClose, lastArray);
+        else if (lastClose !== -1) end = lastClose;
+        else if (lastArray !== -1) end = lastArray;
+
+        if (start !== -1 && end !== -1 && end > start) {
+            const jsonStr = text.substring(start, end + 1);
+            return JSON.parse(jsonStr);
+        }
+
+        // 3. Last resort: Try parsing the whole text
+        return JSON.parse(text);
+    } catch (e) {
+        console.error("Failed to parse JSON from Gemini response:", e);
+        console.debug("Raw text:", text);
+        return null;
     }
-};
+}
 
 export interface NewsFilter {
     query?: string;
@@ -111,8 +78,23 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     }
     if (filter.query) context += `. Tópico: ${filter.query}`;
 
-    // Prompt optimized for Structured Output
-    const prompt = `Analista financeiro. Busque notícias recentes sobre: ${context}. Use googleSearch para encontrar fatos reais.`;
+    // Prompt engineered to force JSON output without Schema validation (incompatible with Search)
+    const prompt = `Atue como um jornalista financeiro sênior. Busque notícias recentes e relevantes sobre: ${context}.
+    Use a ferramenta googleSearch para encontrar fatos reais e atualizados.
+    
+    IMPORTANTE: Retorne a resposta ESTRITAMENTE como um array JSON cru. Não use Markdown. Não inclua explicações antes ou depois.
+    O formato deve ser exatamente:
+    [
+      {
+        "title": "Título da notícia",
+        "summary": "Resumo curto",
+        "source": "Fonte",
+        "date": "YYYY-MM-DD",
+        "sentimentScore": 0.5 (número entre -1 negativo e 1 positivo),
+        "sentimentReason": "Motivo do sentimento",
+        "url": "Link original se disponível"
+      }
+    ]`;
 
     try {
         const response = await ai.models.generateContent({
@@ -120,30 +102,28 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                responseMimeType: "application/json",
-                responseSchema: NewsResponseSchema,
+                // Note: responseSchema and responseMimeType are removed to support googleSearch
             }
         });
 
-        // SDK handles JSON parsing for us when responseSchema is used
-        const articles = response.parsed as any[]; // Safe cast due to Schema
         const textData = response.text || "";
+        const articles = extractAndParseJSON(textData);
         
-        // Enhance with Grounding Metadata (URLs)
+        // Enhance with Grounding Metadata (URLs) if JSON url is empty
         const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
         const webChunks = groundingChunks.filter(c => c.web && c.web.uri);
 
         const enhancedArticles = Array.isArray(articles) ? articles.map((art: any, idx: number) => {
             let realUrl = art.url;
-            if (!realUrl && idx < webChunks.length) realUrl = webChunks[idx].web?.uri;
+            if ((!realUrl || realUrl === 'null') && idx < webChunks.length) realUrl = webChunks[idx].web?.uri;
             if (!realUrl) realUrl = `https://www.google.com/search?q=${encodeURIComponent(art.title)}`;
 
             return {
-                title: art.title,
-                summary: art.summary,
+                title: art.title || "Sem título",
+                summary: art.summary || "...",
                 source: art.source || "Gemini News",
                 date: art.date || new Date().toISOString(),
-                sentimentScore: art.sentimentScore || 0,
+                sentimentScore: typeof art.sentimentScore === 'number' ? art.sentimentScore : 0,
                 sentimentReason: art.sentimentReason,
                 url: realUrl,
                 imageUrl: art.imageUrl
@@ -157,7 +137,6 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
     } catch (error) {
         console.error("Gemini News Error:", error);
-        // Ensure error bubbles up to context
         throw error;
     }
 }
@@ -166,7 +145,13 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
     const apiKey = getGeminiApiKey(prefs);
     const ai = createClient(apiKey);
 
-    const prompt = `Preço exato (current price) e variação % hoje de ${ticker} na B3. Use googleSearch.`;
+    const prompt = `Qual é o preço exato (current price) e a variação % hoje do ativo ${ticker} na B3?
+    Use googleSearch para buscar o valor em tempo real.
+    
+    Retorne APENAS um JSON cru no formato:
+    { "price": 10.50, "changePercent": 0.5 }
+    
+    Se não encontrar, retorne null. Não use markdown.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -174,12 +159,11 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                responseMimeType: "application/json",
-                responseSchema: QuoteResponseSchema
             }
         });
 
-        const data = response.parsed as any;
+        const data = extractAndParseJSON(response.text || "");
+        
         if (data && typeof data.price === 'number') {
             return { price: data.price, change: data.changePercent || 0 };
         }
@@ -201,9 +185,36 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const tickerStr = tickers.join(", ");
     const today = new Date().toISOString().split('T')[0];
 
-    const prompt = `Analise fundamentalista para: [${tickerStr}]. Data ref: ${today}.
-    Use googleSearch para buscar dados atualizados de DY, P/VP, Vacância, Último Provento e Histórico de Dividendos.
-    REGRA CRÍTICA: Se não encontrar informação para algum campo ou ativo, retorne null ou array vazio. NÃO pare a execução, NÃO retorne erro.`;
+    const prompt = `Realize uma análise fundamentalista precisa para os ativos: [${tickerStr}]. Data de referência: ${today}.
+    Use a ferramenta googleSearch obrigatoriamente para buscar dados RECENTES de DY, P/VP, Vacância, Último Provento e Histórico de Dividendos.
+    
+    Retorne a resposta ESTRITAMENTE como um JSON cru (sem markdown) seguindo esta estrutura exata:
+    {
+      "assets": [
+        {
+          "ticker": "AAAA11",
+          "dy": 10.5,
+          "pvp": 0.98,
+          "assetType": "Tijolo|Papel|Fiagro|Infra|FOF",
+          "administrator": "Nome Admin",
+          "vacancyRate": 5.0,
+          "lastDividend": 0.85,
+          "netWorth": "R$ 1.5B",
+          "shareholders": 250000,
+          "vpPerShare": 100.50,
+          "businessDescription": "Resumo curto...",
+          "riskAssessment": "Baixo/Médio/Alto - Motivo",
+          "strengths": ["Ponto forte 1", "Ponto forte 2"],
+          "weaknesses": ["Ponto fraco 1"],
+          "dividendCAGR": 5.2,
+          "managementFee": "1.2% a.a.",
+          "dividendsHistory": [
+             { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": 0.85, "isProvisioned": false }
+          ]
+        }
+      ]
+    }
+    Se um dado não for encontrado, use null.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -211,14 +222,13 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                responseMimeType: "application/json",
-                responseSchema: AssetFundamentalSchema,
-                temperature: 0.1
+                // Removed responseSchema to prevent conflict with Google Search tool
             }
         });
 
-        const parsed = response.parsed as any;
         const textData = response.text || "";
+        const parsed = extractAndParseJSON(textData);
+        
         const resultMap: Record<string, any> = {};
         
         if (parsed && Array.isArray(parsed.assets)) {
@@ -259,7 +269,7 @@ export async function validateGeminiKey(key: string): Promise<boolean> {
     if (!key) return false;
     try {
         const ai = createClient(key);
-        // Simple test call
+        // Simple test call without tools to verify key validity
         await ai.models.generateContent({ 
             model: "gemini-2.5-flash", 
             contents: "Hi" 
