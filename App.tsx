@@ -63,10 +63,8 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (marketDataError && !marketDataError.includes("Chave de API")) {
-        if (marketDataError.includes("Falha") || marketDataError.includes("Token")) {
-             addToast(marketDataError, 'error');
-        }
+    if (marketDataError) {
+        addToast(marketDataError, 'error');
     }
   }, [marketDataError, addToast]);
   

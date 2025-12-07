@@ -259,71 +259,76 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [setNotifications]);
 
   const refreshMarketData = useCallback(async (force = false, silent = false) => {
-      if(refreshInProgress.current) return;
-      
-      const now = Date.now();
-      if(!force && lastSync && now - lastSync < STALE_TIME.MARKET_DATA) return; 
+      if (refreshInProgress.current) return;
 
-      const tickers = Array.from(new Set(sourceTransactions.map(t => t.ticker)));
-      if(tickers.length === 0) return;
+      const now = Date.now();
+      if (!force && lastSync && now - lastSync < STALE_TIME.MARKET_DATA) {
+          return;
+      }
+
+      const tickers = Array.from(new Set(sourceTransactions.map(t => t.ticker.toUpperCase())));
+      if (tickers.length === 0) {
+          return;
+      }
 
       refreshInProgress.current = true;
-      if(!silent) setIsRefreshing(true);
+      if (!silent) setIsRefreshing(true);
       setMarketDataError(null);
 
       try {
+          // Step 1: Fetch Brapi data, store locally.
           const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
-          
-          setMarketData(prev => {
-              const next = { ...prev };
-              logApiUsage('brapi', { requests: 1, bytesReceived: brapiRes.stats.bytesReceived });
-              
-              Object.entries(brapiRes.quotes).forEach(([tkr, data]) => {
-                  next[tkr] = { 
-                      ...(prev[tkr] || {}), 
-                      ...data,
-                      lastUpdated: now 
-                  };
-              });
-              return next;
-          });
-          setLastSync(now);
+          logApiUsage('brapi', { requests: 1, bytesReceived: brapiRes.stats.bytesReceived });
 
+          // Step 2: Create a temporary mutable object for all updates.
+          const currentMarketData = marketDataRef.current;
+          const nextMarketData = { ...currentMarketData };
+
+          // Merge Brapi results
+          Object.entries(brapiRes.quotes).forEach(([tkr, data]) => {
+              nextMarketData[tkr] = {
+                  ...(currentMarketData[tkr] || {}),
+                  ...data,
+                  lastUpdated: now
+              };
+          });
+
+          // Step 3: Use the temporary object to determine what needs updating from Gemini.
           const assetsNeedingUpdate = tickers.filter(t => {
-              const data = marketDataRef.current[t.toUpperCase()];
+              const data = nextMarketData[t.toUpperCase()]; // Use the new temporary data
               const fundamentalsStale = !data?.lastFundamentalUpdate || (now - data.lastFundamentalUpdate > STALE_TIME.FUNDAMENTALS);
               const missingData = !data?.dividendsHistory || data.dividendsHistory.length === 0;
               return force || fundamentalsStale || missingData;
           });
 
+          // Step 4: Fetch Gemini data if needed.
           if (assetsNeedingUpdate.length > 0) {
               const batches = chunkArray(assetsNeedingUpdate, 5);
               for (const batch of batches) {
                   try {
                       const geminiRes = await fetchAdvancedAssetData(preferences, batch);
-                      if (geminiRes.data && Object.keys(geminiRes.data).length > 0) {
-                          setMarketData(prev => {
-                              const next = { ...prev };
-                              logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
-                              Object.entries(geminiRes.data).forEach(([tkr, data]) => {
-                                  next[tkr] = { 
-                                      ...(next[tkr] || {}), 
-                                      ...(data as object),
-                                      lastFundamentalUpdate: now
-                                  };
-                              });
-                              return next;
-                          });
-                      }
-                      await new Promise(resolve => setTimeout(resolve, 500));
-                  } catch (batchErr) {
-                      console.error("Failed to fetch batch:", batch, batchErr);
+                      logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
+
+                      // Merge Gemini results into our temporary object
+                      Object.entries(geminiRes.data).forEach(([tkr, data]) => {
+                          nextMarketData[tkr] = {
+                              ...(nextMarketData[tkr] || {}),
+                              ...(data as object),
+                              lastFundamentalUpdate: now
+                          };
+                      });
+                  } catch (batchErr: any) {
+                      console.error("Failed to fetch Gemini batch:", batch, batchErr);
                       setMarketDataError(`Falha ao buscar dados de ${batch.join(', ')}.`);
                   }
               }
           }
+          
+          // Step 5: Set state ONCE at the very end with all collected data.
+          setMarketData(nextMarketData);
+          setLastSync(now);
 
-      } catch(e: any) {
+      } catch (e: any) {
           setMarketDataError(e.message);
       } finally {
           refreshInProgress.current = false;

@@ -60,14 +60,7 @@ export interface NewsFilter {
 export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter): Promise<{ data: NewsArticle[], stats: { bytesSent: number, bytesReceived: number } }> {
     const emptyReturn = { data: [], stats: { bytesSent: 0, bytesReceived: 0 } };
     
-    let apiKey: string;
-    try {
-        apiKey = getGeminiApiKey(prefs);
-    } catch (error) {
-        console.warn("News fetch skipped (No Key):", error);
-        return emptyReturn;
-    }
-
+    const apiKey = getGeminiApiKey(prefs);
     const ai = new GoogleGenAI({ apiKey });
     
     // Contexto de busca
@@ -148,16 +141,12 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
     } catch (error: any) {
         console.error("Gemini News Error:", error);
-        return emptyReturn;
+        throw error;
     }
 }
 
 export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string): Promise<{ price: number, change: number } | null> {
-    let apiKey: string;
-    try {
-        apiKey = getGeminiApiKey(prefs);
-    } catch { return null; }
-
+    const apiKey = getGeminiApiKey(prefs);
     const ai = new GoogleGenAI({ apiKey });
     const prompt = `
         TASK: Find the CURRENT real-time price and today's percentage change for the asset "${ticker}" (B3/Brazil).
@@ -210,14 +199,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const emptyReturn = { data: {}, stats: { bytesSent: 0, bytesReceived: 0 } };
     if (tickers.length === 0) return emptyReturn;
 
-    let apiKey: string;
-    try {
-        apiKey = getGeminiApiKey(prefs);
-    } catch (error: any) {
-        console.warn("Advanced data fetch skipped:", error.message);
-        return emptyReturn;
-    }
-
+    const apiKey = getGeminiApiKey(prefs);
     const ai = new GoogleGenAI({ apiKey });
 
     const tickersString = tickers.join(', ');
@@ -312,7 +294,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
 
     } catch (error) {
         console.error("Gemini Advanced Data Error:", error);
-        return emptyReturn;
+        throw error;
     }
 }
 

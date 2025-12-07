@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import type { MonthlyIncome } from '../types';

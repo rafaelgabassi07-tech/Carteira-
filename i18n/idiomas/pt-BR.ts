@@ -1,3 +1,4 @@
+
 export const ptBR = {
     // App / Navigation
     main_portfolio: 'Dashboard',
