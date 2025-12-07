@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -14,10 +13,10 @@ interface DividendsSummaryCardProps {
 }
 
 const DividendsSummaryCard: React.FC<DividendsSummaryCardProps> = ({ setActiveView }) => {
-    const { formatCurrency } = useI18n();
+    const { t, formatCurrency } = useI18n();
     const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
 
-    const { currentMonthValue, averageIncome, currentMonthName } = useMemo(() => {
+    const { currentMonthValue, averageIncome } = useMemo(() => {
         const now = new Date();
         const currentMonthStr = now.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
         
@@ -28,12 +27,9 @@ const DividendsSummaryCard: React.FC<DividendsSummaryCardProps> = ({ setActiveVi
         const total = relevantMonths.reduce((acc, item) => acc + item.total, 0);
         const avg = relevantMonths.length > 0 ? total / relevantMonths.length : 0;
         
-        const monthName = now.toLocaleDateString('pt-BR', { month: 'long' });
-        
         return {
             currentMonthValue: currentVal,
             averageIncome: avg,
-            currentMonthName: monthName.charAt(0).toUpperCase() + monthName.slice(1)
         };
     }, [monthlyIncome]);
     
@@ -48,7 +44,7 @@ const DividendsSummaryCard: React.FC<DividendsSummaryCardProps> = ({ setActiveVi
                 <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5 mb-1">
                         <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-color)]" />
-                        Renda de {currentMonthName}
+                        {t('income_report_title')}
                     </span>
                     <div className="text-3xl font-black text-[var(--text-primary)] tracking-tight">
                         <CountUp end={currentMonthValue} formatter={formatCurrency} />
