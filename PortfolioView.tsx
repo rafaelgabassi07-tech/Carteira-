@@ -1,71 +1,65 @@
 
-import React, { useState, useMemo, useRef } from 'react';
-import type { Asset, ToastMessage, SortOption } from '../types';
+import React, { useMemo, useRef, useState } from 'react';
+import type { ToastMessage } from '../types';
 import type { View } from '../App';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
+import SettingsIcon from '../components/icons/SettingsIcon';
 import CountUp from '../components/CountUp';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
+import PortfolioPieChart from '../components/PortfolioPieChart';
+import DividendsSummaryCard from '../components/DividendsSummaryCard';
 
 // Icons
-const EyeIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-);
-const EyeOffIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-);
-const SortIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-);
 const WalletIcon: React.FC<{className?:string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
 );
 
 // --- Components ---
 
-const PortfolioSkeleton: React.FC = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-pulse px-4">
-        {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-20 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]"></div>
-        ))}
-    </div>
-);
-
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
     onShare: () => void;
     onRefresh: () => void;
     isRefreshing: boolean;
-}> = ({ setActiveView, onShare, onRefresh, isRefreshing }) => {
+    unreadNotificationsCount?: number;
+}> = ({ setActiveView, onShare, onRefresh, isRefreshing, unreadNotificationsCount }) => {
     const { t } = useI18n();
-    const { privacyMode, togglePrivacyMode } = usePortfolio();
 
     return (
-        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)] transition-all duration-300">
+        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)]/50 transition-all duration-300">
             <div className="flex flex-col">
-                <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">Invest</h1>
-                <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">{t('main_portfolio')}</p>
+                <h1 className="text-xl font-black tracking-tight text-[var(--text-primary)] leading-tight flex items-center gap-1">
+                    Invest
+                    <span className="w-1.5 h-1.5 bg-[var(--accent-color)] rounded-full animate-pulse mt-1"></span>
+                </h1>
+                <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-widest opacity-80">{t('main_portfolio')}</p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
                 <button 
                     id="refresh-btn" 
                     onClick={() => { onRefresh(); vibrate(); }} 
-                    className={`p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
+                    className={`p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-90 border border-transparent hover:border-[var(--border-color)] ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
-                <button id="privacy-toggle" onClick={() => { togglePrivacyMode(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" aria-label="Toggle Privacy">
-                     {privacyMode ? <EyeOffIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
+                <button 
+                    id="settings-btn" 
+                    onClick={() => { setActiveView('settings'); vibrate(); }} 
+                    className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-transparent hover:border-[var(--border-color)]" 
+                    aria-label={t('nav_settings')}
+                >
+                     <SettingsIcon className="w-5 h-5"/>
                 </button>
-                <button id="share-btn" onClick={() => { onShare(); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95">
-                    <ShareIcon className="w-5 h-5" />
-                </button>
-                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95">
+                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95 border border-transparent hover:border-[var(--border-color)]">
                     <BellIcon className="w-5 h-5" />
+                    {unreadNotificationsCount && unreadNotificationsCount > 0 ? (
+                        <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[var(--bg-primary)]"></span>
+                    ) : null}
                 </button>
             </div>
         </header>
@@ -73,9 +67,9 @@ const Header: React.FC<{
 };
 
 const Metric: React.FC<{ label: string; children: React.ReactNode; }> = ({ label, children }) => (
-    <div>
-        <h3 className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-0.5">{label}</h3>
-        <div className="font-semibold text-lg">{children}</div>
+    <div className="flex flex-col">
+        <h3 className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1 opacity-70">{label}</h3>
+        <div className="font-bold text-lg tracking-tight">{children}</div>
     </div>
 );
 
@@ -98,7 +92,7 @@ const PortfolioSummary: React.FC = () => {
     
     const unrealizedGain = summary.currentValue - summary.totalInvested;
     const unrealizedGainPercent = summary.totalInvested > 0 ? (unrealizedGain / summary.totalInvested) * 100 : 0;
-    const today = new Date().toLocaleDateString(locale, { day: '2-digit', month: 'short' });
+    const today = new Date().toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 
     const format = (val: number) => {
         let formatted = formatCurrency(val);
@@ -107,35 +101,42 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div id="portfolio-summary" className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6 rounded-2xl mx-4 mt-4 shadow-lg border border-[var(--border-color)] animate-scale-in relative overflow-hidden group hover:shadow-[var(--accent-color)]/5 transition-all duration-500">
-            {/* Decorative Glow */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)] opacity-5 blur-[50px] rounded-full pointer-events-none"></div>
+        <div id="portfolio-summary" className="relative p-6 rounded-[28px] mx-4 mt-6 overflow-hidden group shadow-2xl shadow-[var(--accent-color)]/5 transition-all duration-500 border border-[var(--border-color)]">
+            {/* Background Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[var(--bg-secondary)] via-[var(--bg-secondary)] to-[var(--bg-tertiary-hover)] opacity-90"></div>
+            
+            {/* Subtle Noise/Glow Effect */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-[var(--accent-color)] opacity-[0.07] blur-[80px] rounded-full pointer-events-none"></div>
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500 opacity-[0.05] blur-[80px] rounded-full pointer-events-none"></div>
 
             <div className="relative z-10">
-                <div className="flex justify-between items-start mb-1">
-                     <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('my_portfolio')}</h2>
-                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] border border-[var(--border-color)]">{today}</span>
+                <div className="flex justify-between items-start mb-2">
+                     <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-80">{t('my_portfolio')}</h2>
+                     <span className="text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-primary)]/50 backdrop-blur-sm px-2 py-0.5 rounded-full border border-[var(--border-color)]">{today}</span>
                 </div>
                 
-                <div className={`mt-2 mb-1 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
-                    <p className="text-4xl font-bold tracking-tight mb-1 text-[var(--text-primary)]">
+                <div className={`mt-3 mb-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                    <p className="text-[2.75rem] font-black tracking-tighter mb-1 text-[var(--text-primary)] leading-none">
                         <CountUp end={summary.currentValue} formatter={format} />
                     </p>
-                    <p className={`text-sm font-semibold flex items-center gap-1 ${unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                        {unrealizedGain >= 0 ? '▲' : '▼'}
-                        <CountUp end={Math.abs(unrealizedGain)} formatter={format} /> 
-                        <span className="opacity-80">({unrealizedGainPercent.toFixed(2)}%)</span>
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border ${unrealizedGain >= 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-500'}`}>
+                            <span className="text-xs font-bold">{unrealizedGain >= 0 ? '▲' : '▼'} {unrealizedGainPercent.toFixed(2)}%</span>
+                        </div>
+                        <p className={`text-sm font-semibold ${unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                            {unrealizedGain >= 0 ? '+' : ''} <CountUp end={Math.abs(unrealizedGain)} formatter={format} /> 
+                        </p>
+                    </div>
                 </div>
 
-                <div className="border-t border-[var(--border-color)]/50 my-5"></div>
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-[var(--border-color)] to-transparent my-6 opacity-60"></div>
 
-                <div className={`grid grid-cols-2 gap-y-5 gap-x-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
+                <div className={`grid grid-cols-2 gap-y-6 gap-x-4 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
                     <Metric label={t('total_invested')}>
                         <p className="text-[var(--text-primary)]"><CountUp end={summary.totalInvested} formatter={format} /></p>
                     </Metric>
                     <Metric label={t('yield_on_cost')}>
-                        <p className="text-[var(--accent-color)]"><CountUp end={yieldOnCost} decimals={2} />%</p>
+                        <p className="text-[var(--accent-color)] drop-shadow-sm"><CountUp end={yieldOnCost} decimals={2} />%</p>
                     </Metric>
                     <Metric label={t('projected_annual_income')}>
                         <p className="text-[var(--text-primary)]"><CountUp end={projectedAnnualIncome} formatter={format} /></p>
@@ -149,65 +150,47 @@ const PortfolioSummary: React.FC = () => {
     );
 };
 
-// Memoized Asset Item
-const AssetListItem = React.memo<{ asset: Asset, totalValue: number, onClick: () => void, style?: React.CSSProperties, privacyMode: boolean, hideCents: boolean }>(({ asset, totalValue, onClick, style, privacyMode, hideCents }) => {
-    const { t, formatCurrency } = useI18n();
-    const currentValue = asset.quantity * asset.currentPrice;
-    const totalInvested = asset.quantity * asset.avgPrice;
-    const variation = currentValue - totalInvested;
-    const allocation = totalValue > 0 ? (currentValue / totalValue) * 100 : 0;
+const DiversificationCard: React.FC = () => {
+    const { t } = useI18n();
+    const { assets, preferences } = usePortfolio();
     
-    const format = (val: number) => {
-        let formatted = formatCurrency(val);
-        if (hideCents) formatted = formatted.replace(/,\d{2}$/, '');
-        return formatted;
-    }
+    const data = useMemo(() => {
+        const segments: Record<string, number> = {};
+        let totalValue = 0;
+        assets.forEach(a => {
+            const val = a.quantity * a.currentPrice;
+            const seg = a.segment || t('outros');
+            segments[seg] = (segments[seg] || 0) + val;
+            totalValue += val;
+        });
+        
+        return Object.entries(segments).map(([name, value]) => ({
+            name,
+            value,
+            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
+        })).sort((a, b) => b.value - a.value);
+    }, [assets, t]);
 
     return (
-        <div onClick={() => { onClick(); vibrate(); }} style={style} className="p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all duration-200 animate-fade-in-up group active:scale-[0.98] shadow-sm h-full flex flex-col justify-between">
-            <div>
-                <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-xl bg-[var(--bg-primary)] flex items-center justify-center font-bold text-sm text-[var(--accent-color)] border border-[var(--border-color)] shadow-inner">
-                            {asset.ticker.substring(0, 4)}
-                        </div>
-                        <div>
-                             <span className="font-bold text-base block leading-tight text-[var(--text-primary)]">{asset.ticker}</span>
-                             <span className="text-xs text-[var(--text-secondary)]">{t('shares', {count: asset.quantity})}</span>
-                        </div>
-                    </div>
-                    <div className={`text-right transition-all duration-300 ${privacyMode ? 'blur-sm select-none opacity-60' : ''}`}>
-                        <p className="font-bold text-base">{format(currentValue)}</p>
-                        <div className={`text-xs font-bold flex items-center justify-end gap-1 ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                            {variation >= 0 ? '+' : ''}{format(variation)}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-                 <div className="flex-1 bg-[var(--bg-primary)] rounded-full h-1.5 overflow-hidden">
-                     <div className="bg-[var(--accent-color)] h-full rounded-full transition-all duration-1000" style={{ width: `${allocation}%` }}></div>
-                </div>
-                <span className="text-[10px] font-semibold text-[var(--text-secondary)] w-10 text-right">{allocation.toFixed(1)}%</span>
-            </div>
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-300" style={{ animationDelay: `200ms` }}>
+            <h3 className="font-bold text-lg text-[var(--text-primary)] mb-4">{t('diversification')}</h3>
+            <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
         </div>
     );
-});
+};
 
 interface PortfolioViewProps {
     setActiveView: (view: View) => void;
     setTransactionFilter: (ticker: string) => void;
     onSelectAsset: (ticker: string) => void;
     addToast: (message: string, type?: ToastMessage['type']) => void;
+    unreadNotificationsCount?: number;
 }
 
-const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast }) => {
+const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast, unreadNotificationsCount }) => {
     const { t, formatCurrency } = useI18n();
-    const { assets, refreshMarketData, privacyMode, preferences, isRefreshing: isContextRefreshing } = usePortfolio();
-    const [searchQuery, setSearchQuery] = useState('');
+    const { assets, refreshMarketData, isRefreshing: isContextRefreshing } = usePortfolio();
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
-    const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
-    const [isSortOpen, setIsSortOpen] = useState(false);
     
     const isRefreshing = isContextRefreshing || isPullRefreshing;
 
@@ -272,28 +255,10 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             // User cancelled
         }
     };
-    
-    const totalPortfolioValue = useMemo(() => assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0), [assets]);
-    
-    const processedAssets = useMemo(() => {
-        let filtered = assets.filter(asset => asset.ticker.toLowerCase().includes(searchQuery.toLowerCase()));
-        return filtered.sort((a, b) => {
-            switch (sortOption) {
-                case 'valueDesc': return (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity);
-                case 'valueAsc': return (a.currentPrice * a.quantity) - (b.currentPrice * a.quantity);
-                case 'tickerAsc': return a.ticker.localeCompare(b.ticker);
-                case 'performanceDesc':
-                    const perfA = a.avgPrice > 0 ? (a.currentPrice - a.avgPrice) / a.avgPrice : 0;
-                    const perfB = b.avgPrice > 0 ? (b.currentPrice - b.avgPrice) / b.avgPrice : 0;
-                    return perfB - perfA;
-                default: return 0;
-            }
-        });
-    }, [assets, searchQuery, sortOption]);
 
     return (
         <div 
-            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6"
+            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6 scroll-smooth"
             ref={containerRef}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -310,7 +275,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             </div>
 
             <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} />
+                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} unreadNotificationsCount={unreadNotificationsCount} />
                 
                 {assets.length > 0 ? (
                     <>
@@ -318,77 +283,19 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                             <PortfolioSummary />
                         </div>
 
-                        <div className="px-4 mt-8">
-                            <div className="flex space-x-3 mb-5">
-                                <div className="flex-1 relative">
-                                    <input 
-                                        type="text" 
-                                        placeholder={t('search_asset_placeholder')} 
-                                        value={searchQuery} 
-                                        onChange={e => setSearchQuery(e.target.value)}
-                                        className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50 transition-all"
-                                        autoCapitalize="characters"
-                                    />
-                                </div>
-                                <div className="relative">
-                                    <button 
-                                        id="sort-btn"
-                                        onClick={() => { setIsSortOpen(!isSortOpen); vibrate(); }}
-                                        className={`h-full px-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] flex items-center justify-center hover:bg-[var(--bg-tertiary-hover)] transition-colors ${isSortOpen ? 'ring-2 ring-[var(--accent-color)]/50' : ''}`}
-                                    >
-                                        <SortIcon className="w-5 h-5 text-[var(--text-secondary)]"/>
-                                    </button>
-                                    {isSortOpen && (
-                                        <>
-                                            <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
-                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
-                                                <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
-                                                {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
-                                                    <button 
-                                                        key={option}
-                                                        onClick={() => { setSortOption(option); setIsSortOpen(false); vibrate(); }}
-                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors flex justify-between items-center ${sortOption === option ? 'text-[var(--accent-color)] font-bold bg-[var(--accent-color)]/10' : 'hover:bg-[var(--bg-tertiary-hover)]'}`}
-                                                    >
-                                                        {t(`sort_${option.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`)}
-                                                        {sortOption === option && <div className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></div>}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
+                        <div className="px-4 mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 pb-6">
+                            <div className="animate-fade-in-up" style={{ animationDelay: `100ms` }}>
+                                <DividendsSummaryCard setActiveView={setActiveView} />
                             </div>
-
-                             <h3 className="font-bold text-lg mb-3 px-1 flex items-center gap-2">
-                                 {t('my_assets')} 
-                                 <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
-                             </h3>
-                             
-                            {isRefreshing && processedAssets.length === 0 ? (
-                                <PortfolioSkeleton />
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[200px] landscape-grid-cols-2">
-                                    {processedAssets.map((asset, index) => (
-                                        <AssetListItem 
-                                            key={asset.ticker}
-                                            asset={asset} 
-                                            totalValue={totalPortfolioValue}
-                                            onClick={() => onSelectAsset(asset.ticker)} 
-                                            style={{ animationDelay: `${index * 50}ms` }}
-                                            privacyMode={privacyMode}
-                                            hideCents={preferences.hideCents}
-                                        />
-                                    ))}
-                                </div>
-                            )}
+                            <DiversificationCard />
                         </div>
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
-                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-lg">
+                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-xl shadow-[var(--accent-color)]/5">
                             <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
                         </div>
-                        <h2 className="text-2xl font-bold mb-2">{t('portfolio_empty_title')}</h2>
+                        <h2 className="text-2xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
                         <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
                     </div>
                 )}
