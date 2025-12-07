@@ -110,8 +110,8 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock, correctPin, all
             {/* Header Content */}
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-xs space-y-8">
                 <div className="flex flex-col items-center">
-                    <div className="mb-6 p-4 bg-[var(--bg-secondary)] rounded-3xl shadow-xl shadow-[var(--accent-color)]/5 border border-[var(--border-color)]">
-                        <Logo className="w-16 h-16" />
+                    <div className="mb-6 p-1 rounded-3xl">
+                        <Logo className="w-20 h-20 text-[var(--text-primary)]" />
                     </div>
                     <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Bem-vindo de volta</h2>
                     <p className="text-[var(--text-secondary)] text-sm mt-1 font-medium">Digite seu PIN para acessar</p>

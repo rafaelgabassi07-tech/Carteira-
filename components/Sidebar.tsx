@@ -52,12 +52,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
   return (
     <div className="flex flex-col h-full w-full">
       {/* Header / Logo */}
-      <div className="p-8 flex items-center gap-4 mb-2">
-        <Logo className="w-10 h-10 rounded-xl shadow-lg shadow-[var(--accent-color)]/20" />
-        <div>
-            <h1 className="font-black text-xl text-[var(--text-primary)] tracking-tight leading-none">Invest</h1>
-            <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mt-0.5">Portfolio</p>
-        </div>
+      <div className="p-8 pb-4 mb-2">
+        <Logo variant="full" className="h-10 w-auto text-[var(--text-primary)]" />
+        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mt-2 pl-1 opacity-70">Portfolio Manager</p>
       </div>
 
       {/* Navigation */}
