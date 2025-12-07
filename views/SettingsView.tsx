@@ -14,7 +14,6 @@ import AppearanceSettings from '../components/settings/AppearanceSettings';
 import GeneralSettings from '../components/settings/GeneralSettings';
 import TransactionSettings from '../components/settings/TransactionSettings';
 import ApiConnectionSettings from '../components/settings/ApiConnectionSettings';
-import UpdateCheckModal from '../components/modals/UpdateCheckModal';
 import GlossaryView from './GlossaryView';
 import CalculatorsView from './CalculatorsView';
 
@@ -23,13 +22,10 @@ export type MenuScreen = 'main' | 'profile' | 'security' | 'notifications' | 'ba
 interface SettingsViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
     initialScreen?: MenuScreen;
-    onUpdateApp?: () => void;
-    updateAvailable?: boolean;
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = 'main', onUpdateApp, updateAvailable }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = 'main' }) => {
     const [screen, setScreen] = useState<MenuScreen>(initialScreen);
-    const [showUpdateModal, setShowUpdateModal] = useState(false);
     const { t } = useI18n();
     
     useEffect(() => {
@@ -39,7 +35,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
     const renderScreen = () => {
         const onBack = () => setScreen('main');
         switch (screen) {
-            case 'main': return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} updateAvailable={updateAvailable} />;
+            case 'main': return <MainMenu setScreen={setScreen} addToast={addToast} />;
             case 'profile': return <UserProfileDetail onBack={onBack} addToast={addToast} />;
             case 'security': return <SecuritySettings onBack={onBack} addToast={addToast} />;
             case 'notifications': return <NotificationSettings onBack={onBack} />;
@@ -51,7 +47,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
             case 'about': return <AboutApp onBack={onBack} />;
             case 'calculators': return <div className="-m-4 h-full"><CalculatorsView onBack={onBack} /></div>;
             case 'glossary': return <div className="-m-4 h-full"><GlossaryView onBack={onBack} /></div>;
-            default: return <MainMenu setScreen={setScreen} onShowUpdateModal={() => setShowUpdateModal(true)} addToast={addToast} updateAvailable={updateAvailable} />;
+            default: return <MainMenu setScreen={setScreen} addToast={addToast} />;
         }
     };
     
@@ -67,13 +63,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ addToast, initialScreen = '
                     {renderScreen()}
                 </div>
              </div>
-            {showUpdateModal && (
-                <UpdateCheckModal 
-                    onClose={() => setShowUpdateModal(false)} 
-                    updateAvailable={updateAvailable}
-                    onUpdate={onUpdateApp}
-                />
-            )}
             <style>{`
                 @keyframes slide-in-right {
                     from { opacity: 0; transform: translateX(20px); }
