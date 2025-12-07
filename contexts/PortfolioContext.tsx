@@ -321,8 +321,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const failedTickers: string[] = [];
 
           if (assetsNeedingUpdate.length > 0) {
-              // Batch processing to avoid token limits or timeouts
-              const batches = chunkArray(assetsNeedingUpdate, 4); // Process 4 assets at a time
+              // Batch processing changed to 1 (Request per Asset) for maximum isolation and stability
+              const batches = chunkArray(assetsNeedingUpdate, 1); 
               
               for (let i = 0; i < batches.length; i++) {
                   const batch = batches[i];
@@ -343,13 +343,13 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                           return updated;
                       });
                   } catch (e: any) {
-                      console.error("Gemini Batch Failed:", batch, e);
+                      console.error("Gemini Asset Failed:", batch, e);
                       failedTickers.push(...batch);
                   }
                   
-                  // Rate limit delay: Wait 1.5s between batches to avoid 429 Too Many Requests
+                  // Rate limit delay: Wait 2.0s between individual asset requests
                   if (i < batches.length - 1) {
-                      await new Promise(resolve => setTimeout(resolve, 1500));
+                      await new Promise(resolve => setTimeout(resolve, 2000));
                   }
               }
           }
