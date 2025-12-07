@@ -166,7 +166,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                                     {isSortOpen && (
                                         <>
                                             <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
-                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass">
+                                            <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-40 overflow-hidden animate-scale-in origin-top-right glass-card">
                                                 <div className="p-3 border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t('sort_by')}</div>
                                                 {(['valueDesc', 'valueAsc', 'tickerAsc', 'performanceDesc'] as SortOption[]).map(option => (
                                                     <button 
@@ -205,6 +205,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset }) 
                                             onClick={() => onSelectAsset(asset.ticker)} 
                                             style={{ animationDelay: `${index * 50}ms` }}
                                             hideCents={preferences.hideCents}
+                                            privacyMode={false} // Analysis view generally doesn't hide values by default or inherits global privacy if we wanted
                                         />
                                     ))}
                                 </div>
