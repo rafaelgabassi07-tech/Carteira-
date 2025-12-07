@@ -6,7 +6,7 @@ import CountUp from '../components/CountUp';
 import TrendingUpIcon from '../components/icons/TrendingUpIcon';
 import CalendarIcon from '../components/icons/CalendarIcon';
 import PageHeader from '../components/PageHeader';
-import { vibrate } from '../utils';
+import { vibrate, fromISODate } from '../utils';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
 import ClockIcon from '../components/icons/ClockIcon';
@@ -62,6 +62,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             const assetData = assets.find(a => a.ticker === ticker);
             if (!assetData) return;
 
+            // Estimativa anual baseada no DY atual (Forward looking simplificado)
             const assetValue = assetData.quantity * assetData.currentPrice;
             const projectedYearly = assetData.dy ? assetValue * (assetData.dy / 100) : 0;
             annualForecast += projectedYearly;
@@ -72,6 +73,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             
             if (assetTxs.length === 0) return;
 
+            // Cálculo do Custo Médio e Total Investido no ativo
             let assetTotalInvested = 0;
             let qtyAtEnd = 0;
             assetTxs.forEach(tx => {
@@ -90,39 +92,56 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             let tickerTotalPaid = 0;
             let count = 0;
             
+            // Ordenar histórico do mais recente para o mais antigo para pegar dados de "Próximo Pagamento"
             const sortedHistory = [...history].sort((a, b) => b.exDate.localeCompare(a.exDate));
             const latestDividend = sortedHistory[0];
-            let projectedAmount: number | undefined = undefined;
+            
+            // Cálculo de Proventos Futuros (Provisionados)
+            let projectedAmount = 0;
+            let hasProvisioned = false;
+            let nextPaymentDate: string | undefined = undefined;
 
-            const nextProvisioned = sortedHistory.find(d => d.isProvisioned);
-            if (nextProvisioned) {
-                let qtyOwned = 0;
-                for (const tx of assetTxs) {
-                    // FIX: Strict check for Ex-Date logic. 
-                    // You must own the asset BEFORE the ex-date. 
-                    // So if transaction is ON or AFTER ex-date, it doesn't count.
-                    if (tx.date >= nextProvisioned.exDate) break;
-                    if (tx.type === 'Compra') qtyOwned += tx.quantity;
-                    else if (tx.type === 'Venda') qtyOwned -= tx.quantity;
-                }
-                qtyOwned = Math.max(0, qtyOwned);
-                if (qtyOwned > 0) {
-                    projectedAmount = qtyOwned * nextProvisioned.value;
-                }
+            // Filtra e soma todos os provisionados
+            const provisionedDividends = sortedHistory.filter(d => d.isProvisioned);
+            if (provisionedDividends.length > 0) {
+                hasProvisioned = true;
+                // Pega a data de pagamento mais próxima entre os provisionados
+                nextPaymentDate = provisionedDividends.sort((a, b) => a.paymentDate.localeCompare(b.paymentDate))[0].paymentDate;
+
+                provisionedDividends.forEach(provDiv => {
+                    let qtyOwned = 0;
+                    for (const tx of assetTxs) {
+                        // Data Com Strict: A transação deve ser MENOR que a Data Com
+                        if (tx.date >= provDiv.exDate) break;
+                        if (tx.type === 'Compra') qtyOwned += tx.quantity;
+                        else if (tx.type === 'Venda') qtyOwned -= tx.quantity;
+                    }
+                    qtyOwned = Math.max(0, qtyOwned);
+                    if (qtyOwned > 0) {
+                        projectedAmount += qtyOwned * provDiv.value;
+                    }
+                });
+            } else if (latestDividend) {
+                nextPaymentDate = latestDividend.paymentDate;
             }
 
+            // Cálculo de Proventos Passados (Pagos)
             sortedHistory.forEach((div: DividendHistoryEvent) => {
+                // Ignora dividendos anteriores à primeira compra
                 if (div.exDate < assetTxs[0].date) return;
+                
+                // Ignora provisionados aqui (já calculados acima)
+                if (div.isProvisioned) return;
+
                 let qtyOwned = 0;
                 for (const tx of assetTxs) {
-                    // FIX: Strict check for Ex-Date logic
                     if (tx.date >= div.exDate) break; 
                     if (tx.type === 'Compra') qtyOwned += tx.quantity;
                     else if (tx.type === 'Venda') qtyOwned -= tx.quantity;
                 }
                 qtyOwned = Math.max(0, qtyOwned);
 
-                if (qtyOwned > 0 && !div.isProvisioned) {
+                if (qtyOwned > 0) {
                     const amount = qtyOwned * div.value;
                     totalReceived += amount;
                     tickerTotalPaid += amount;
@@ -139,14 +158,16 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                 totalPaid: tickerTotalPaid,
                 count,
                 lastExDate: latestDividend?.exDate,
-                nextPaymentDate: latestDividend?.paymentDate,
-                isProvisioned: latestDividend?.isProvisioned,
+                nextPaymentDate: nextPaymentDate,
+                isProvisioned: hasProvisioned,
                 yieldOnCost: assetYoC,
-                averageMonthly: count > 0 ? tickerTotalPaid / count : 0,
+                // Média Mensal baseada no total pago dividido por 12 (anualizado simples) ou histórico disponível se < 1 ano
+                averageMonthly: count > 0 ? tickerTotalPaid / Math.max(1, Math.min(count, 12)) : 0, 
                 projectedAmount,
             };
         });
 
+        // Construção do Gráfico (Últimos 12 meses)
         const monthlyData: MonthlyData[] = [];
         for (let i = 11; i >= 0; i--) {
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -162,7 +183,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         const currentMonthValue = monthlyAggregation[currentMonthKey] || 0;
         const totalLast12m = monthlyData.reduce((acc, m) => acc + m.total, 0);
         
-        // Smarter Average: Average of months since first payment (up to 12)
+        // Média Inteligente: Considera apenas os meses desde o primeiro recebimento (para carteiras novas)
         const firstIncomeIndex = monthlyData.findIndex(m => m.total > 0);
         const monthsDivisor = firstIncomeIndex === -1 ? 1 : Math.max(1, monthlyData.length - firstIncomeIndex);
         
@@ -173,7 +194,7 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         return { 
             totalReceived, 
             monthlyData, 
-            payersData: Object.values(payerAggregation).filter(p => p.totalPaid > 0 || p.projectedAmount).sort((a,b) => b.totalPaid - a.totalPaid), 
+            payersData: Object.values(payerAggregation).filter(p => p.totalPaid > 0 || (p.projectedAmount && p.projectedAmount > 0)).sort((a,b) => b.totalPaid - a.totalPaid), 
             currentMonthValue,
             averageIncome,
             annualForecast,
@@ -238,56 +259,68 @@ const MonthlyBarChart: React.FC<{ data: MonthlyData[]; avg: number }> = ({ data,
 
 const DetailItem: React.FC<{label: string, value: string | React.ReactNode, status?: 'Futuro' | 'Pago'}> = ({label, value, status}) => (
     <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-[var(--border-color)]">
-        <p className="text-[9px] font-bold text-[var(--text-secondary)] uppercase">{label}</p>
-        <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs font-bold text-[var(--text-primary)]">{value}</p>
-            {status && <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${status === 'Futuro' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{status}</span>}
+        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{label}</p>
+        <div className="flex justify-between items-center">
+            <span className="font-bold text-sm text-[var(--text-primary)]">{value}</span>
+            {status && (
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${status === 'Futuro' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
+                    {status}
+                </span>
+            )}
         </div>
     </div>
 );
 
-const PayerRow: React.FC<{ payer: PayerData; rank: number }> = ({ payer, rank }) => {
-    const { formatCurrency, locale } = useI18n();
-    const [isExpanded, setIsExpanded] = useState(false);
+const PayerRow: React.FC<{ payer: PayerData; isExpanded: boolean; onToggle: () => void }> = ({ payer, isExpanded, onToggle }) => {
+    const { formatCurrency } = useI18n();
     
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        const date = new Date(dateStr);
-        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-        return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString(locale, { day: '2-digit', month: 'short' }).replace('.', '');
-    };
-
     return (
-        <div className={`rounded-xl transition-all duration-300 overflow-hidden mb-2 ${isExpanded ? 'bg-[var(--bg-tertiary-hover)] shadow-md' : 'bg-[var(--bg-secondary)]'}`}>
-            <div onClick={() => { vibrate(); setIsExpanded(!isExpanded); }} className="p-4 flex items-center gap-4 cursor-pointer">
+        <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] overflow-hidden transition-all duration-300">
+            <div 
+                onClick={() => { vibrate(); onToggle(); }}
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-[var(--bg-tertiary-hover)]"
+            >
                 <div className="flex items-center gap-3">
-                     <span className="text-xs font-mono text-[var(--text-secondary)] w-5 text-center">{rank}.</span>
-                     <div className="w-10 h-10 rounded-lg bg-[var(--bg-primary)] flex items-center justify-center font-bold text-xs text-[var(--accent-color)] border border-[var(--border-color)]">
-                        {payer.ticker.substring(0,4)}
-                     </div>
+                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-center font-bold text-xs text-[var(--text-primary)]">
+                        {payer.ticker.substring(0, 4)}
+                    </div>
+                    <div>
+                        <span className="font-bold text-sm text-[var(--text-primary)] block">{payer.ticker}</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-medium">
+                            {payer.count} {payer.count === 1 ? 'pagamento' : 'pagamentos'}
+                        </span>
+                    </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm text-[var(--text-primary)]">{payer.ticker}</p>
-                    <p className="text-[10px] text-[var(--text-secondary)] font-medium">Total Recebido</p>
-                </div>
+                
                 <div className="text-right">
-                    <p className="font-bold text-sm text-[var(--text-primary)]">{formatCurrency(payer.totalPaid)}</p>
-                </div>
-                <ChevronRightIcon className={`w-4 h-4 text-[var(--text-secondary)] transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} />
-            </div>
-            {isExpanded && (
-                <div className="px-4 pb-4 animate-fade-in border-t border-[var(--border-color)]">
-                    {payer.isProvisioned && payer.projectedAmount && payer.projectedAmount > 0 && (
-                        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-3 rounded-lg my-3 flex justify-between items-center shadow-sm">
-                            <span className="text-xs font-bold uppercase tracking-wide">Valor a Receber</span>
-                            <span className="text-sm font-black">{formatCurrency(payer.projectedAmount)}</span>
+                    <span className="block font-bold text-sm text-[var(--green-text)]">
+                        +{formatCurrency(payer.totalPaid)}
+                    </span>
+                    {payer.projectedAmount && payer.projectedAmount > 0 ? (
+                        <div className="flex items-center justify-end gap-1 text-[9px] text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded mt-1">
+                            <ClockIcon className="w-2.5 h-2.5" />
+                            +{formatCurrency(payer.projectedAmount)}
                         </div>
+                    ) : (
+                        <span className="text-[10px] text-[var(--text-secondary)]">Total</span>
                     )}
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                        <DetailItem label="Yield on Cost" value={`${payer.yieldOnCost.toFixed(1)}%`} />
+                </div>
+            </div>
+
+            {isExpanded && (
+                <div className="px-4 pb-4 pt-0 border-t border-[var(--border-color)]/50 bg-[var(--bg-primary)]/30 animate-fade-in">
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                        <DetailItem 
+                            label="Próximo" 
+                            value={payer.nextPaymentDate ? fromISODate(payer.nextPaymentDate).toLocaleDateString('pt-BR') : '-'}
+                            status={payer.isProvisioned ? 'Futuro' : undefined}
+                        />
+                        <DetailItem 
+                            label="Última Data Com" 
+                            value={payer.lastExDate ? fromISODate(payer.lastExDate).toLocaleDateString('pt-BR') : '-'} 
+                        />
                         <DetailItem label="Média Mensal" value={formatCurrency(payer.averageMonthly)} />
-                        <DetailItem label="Próximo Pagamento" value={formatDate(payer.nextPaymentDate)} status={payer.isProvisioned ? 'Futuro' : 'Pago'}/>
-                        <DetailItem label="Data Com" value={formatDate(payer.lastExDate)} />
+                        <DetailItem label="Yield on Cost (Est.)" value={`${payer.yieldOnCost.toFixed(2)}%`} />
                     </div>
                 </div>
             )}
@@ -295,47 +328,80 @@ const PayerRow: React.FC<{ payer: PayerData; rank: number }> = ({ payer, rank })
     );
 };
 
-interface IncomeReportViewProps {
-    onBack: () => void;
-}
+// --- Main View ---
+const IncomeReportView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+    const { t, formatCurrency } = useI18n();
+    const { transactions, assets } = usePortfolio();
+    const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
 
-const IncomeReportView: React.FC<IncomeReportViewProps> = ({ onBack }) => {
-    const { formatCurrency } = useI18n();
-    const { assets, transactions } = usePortfolio();
     const stats = useDividendCalculations(transactions, assets);
-    
+
+    const toggleTicker = (ticker: string) => {
+        setExpandedTicker(expandedTicker === ticker ? null : ticker);
+    };
+
     return (
         <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6">
             <div className="max-w-2xl mx-auto">
                 <PageHeader title="Relatório de Renda" onBack={onBack} />
-                <div className="flex flex-col space-y-6">
-                    <div className="grid grid-cols-2 gap-3">
-                        <MetricCard label="Média Mensal" value={<CountUp end={stats.averageIncome} formatter={formatCurrency} />} subValue="Últimos 12 meses" icon={<CalendarIcon className="w-5 h-5"/>} highlight />
-                        <MetricCard label="Previsão Anual" value={<CountUp end={stats.annualForecast} formatter={formatCurrency} />} subValue={`YoC Proj: ${stats.yieldOnCost.toFixed(2)}%`} icon={<SparklesIcon className="w-5 h-5"/>} highlight />
-                        <MetricCard label="Total Acumulado" value={<CountUp end={stats.totalReceived} formatter={formatCurrency} />} icon={<TrendingUpIcon className="w-5 h-5"/>} />
-                        <MetricCard label="Mês Atual" value={<CountUp end={stats.currentMonthValue} formatter={formatCurrency} />} icon={<ClockIcon className="w-5 h-5"/>} />
+
+                {/* Top Metrics Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                    <MetricCard 
+                        label="Renda Média Mensal" 
+                        value={formatCurrency(stats.averageIncome)} 
+                        subValue="Últimos 12 meses"
+                        icon={<CalendarIcon className="w-5 h-5"/>}
+                        highlight
+                    />
+                    <MetricCard 
+                        label="Total Recebido" 
+                        value={formatCurrency(stats.totalReceived)} 
+                        subValue="Desde o início"
+                        icon={<WalletIcon className="w-5 h-5"/>}
+                    />
+                    <MetricCard 
+                        label="Previsão Anual" 
+                        value={formatCurrency(stats.annualForecast)} 
+                        subValue="Baseado no DY atual"
+                        icon={<SparklesIcon className="w-5 h-5"/>}
+                    />
+                    <MetricCard 
+                        label="Yield on Cost" 
+                        value={`${stats.yieldOnCost.toFixed(2)}%`} 
+                        subValue="Retorno sobre investido"
+                        icon={<TrendingUpIcon className="w-5 h-5"/>}
+                    />
+                </div>
+
+                {/* Monthly Chart */}
+                <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] mb-6 shadow-sm">
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-bold text-[var(--text-primary)]">Evolução Mensal</h3>
+                        <span className="text-[10px] font-bold bg-[var(--bg-primary)] border border-[var(--border-color)] px-2 py-1 rounded text-[var(--text-secondary)]">12 Meses</span>
                     </div>
-                    
-                    <div className="bg-[var(--bg-secondary)] p-6 rounded-3xl border border-[var(--border-color)] shadow-sm">
-                        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Evolução de Pagamentos</h3>
-                        <MonthlyBarChart data={stats.monthlyData} avg={stats.averageIncome} />
-                    </div>
-                    
-                    <div>
-                        <div className="flex items-center justify-between px-1 mb-3">
-                            <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Origem dos Proventos</h3>
-                        </div>
-                        {stats.payersData.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center p-12 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] border-dashed opacity-70 animate-fade-in">
-                                <WalletIcon className="w-12 h-12 mb-3 text-[var(--text-secondary)] opacity-50" />
-                                <p className="text-sm font-bold text-[var(--text-secondary)]">Sem histórico de proventos</p>
-                                <p className="text-xs text-[var(--text-secondary)] mt-1 opacity-70 text-center">Adicione ativos pagadores de dividendos à sua carteira.</p>
-                            </div>
+                    <MonthlyBarChart data={stats.monthlyData} avg={stats.averageIncome} />
+                </div>
+
+                {/* Payers List */}
+                <div>
+                    <h3 className="font-bold text-[var(--text-primary)] mb-4 px-1 flex items-center gap-2">
+                        Fontes Pagadoras 
+                        <span className="text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-secondary)] px-2 py-0.5 rounded-full border border-[var(--border-color)]">{stats.payersData.length}</span>
+                    </h3>
+                    <div className="space-y-3">
+                        {stats.payersData.length > 0 ? (
+                            stats.payersData.map(payer => (
+                                <PayerRow 
+                                    key={payer.ticker} 
+                                    payer={payer} 
+                                    isExpanded={expandedTicker === payer.ticker}
+                                    onToggle={() => toggleTicker(payer.ticker)}
+                                />
+                            ))
                         ) : (
-                            <div className="space-y-1 animate-fade-in-up">
-                                {stats.payersData.map((payer, idx) => (
-                                    <PayerRow key={payer.ticker} payer={payer} rank={idx + 1} />
-                                ))}
+                            <div className="text-center py-12 text-[var(--text-secondary)] opacity-60">
+                                Nenhuma renda registrada ainda.
                             </div>
                         )}
                     </div>
