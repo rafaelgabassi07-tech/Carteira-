@@ -1,4 +1,3 @@
-
 export const ptBR = {
     // App / Navigation
     main_portfolio: 'Dashboard',
@@ -108,6 +107,21 @@ export const ptBR = {
     toast_transaction_deleted: 'Transação excluída!',
     confirm_delete_transaction: 'Tem certeza que deseja excluir esta transação?',
     realized_gain_loss: 'Lucro/Prejuízo Realizado',
+
+    // Income Report
+    income_report_title: 'Relatório de Renda',
+    average_income: 'Renda Média Mensal',
+    total_received_all_time: 'Total Recebido (Desde o Início)',
+    annual_forecast: 'Previsão Anual',
+    overall_yoc: 'Yield on Cost Geral',
+    monthly_evolution: 'Evolução Mensal',
+    paying_sources: 'Fontes Pagadoras',
+    average: 'Média',
+    contribution: 'Contribuição',
+    next_payment: 'Próximo Pagamento',
+    last_ex_date: 'Última Data Com',
+    asset_average: 'Média do Ativo',
+    asset_yoc: 'YOC do Ativo (Est.)',
     
     // News View
     sentiment_very_positive: 'Muito Positivo',

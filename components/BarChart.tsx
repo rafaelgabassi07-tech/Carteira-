@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import type { MonthlyIncome } from '../types';
@@ -13,6 +12,8 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 300, height: 200 }); // Default size
+    const gradientId = useMemo(() => `barGradient-${Math.random().toString(36).substr(2, 9)}`, []);
+
 
     useLayoutEffect(() => {
         const container = containerRef.current;
@@ -102,6 +103,13 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                 className="w-full h-full cursor-crosshair"
                 shapeRendering="geometricPrecision"
             >
+                 <defs>
+                    <linearGradient id={gradientId} x1="0" y1="1" x2="0" y2="0">
+                        <stop offset="0%" stopColor="var(--accent-color)" stopOpacity="0.7" />
+                        <stop offset="100%" stopColor="var(--accent-color)" stopOpacity="1" />
+                    </linearGradient>
+                </defs>
+
                 {/* Grid Lines & Y Axis Labels */}
                 {yTicks.map((tick, i) => {
                     const y = height - padding.bottom - (tick / effectiveMaxValue) * (height - padding.top - padding.bottom);
@@ -150,7 +158,7 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                                 y={y}
                                 width={barWidth}
                                 height={Math.max(barHeight, 0)}
-                                fill="var(--accent-color)"
+                                fill={`url(#${gradientId})`}
                                 rx="2"
                                 className="transition-all duration-300 animate-grow-up"
                                 style={{ 
