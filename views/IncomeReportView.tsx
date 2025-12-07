@@ -98,7 +98,10 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
             if (nextProvisioned) {
                 let qtyOwned = 0;
                 for (const tx of assetTxs) {
-                    if (tx.date > nextProvisioned.exDate) break;
+                    // FIX: Strict check for Ex-Date logic. 
+                    // You must own the asset BEFORE the ex-date. 
+                    // So if transaction is ON or AFTER ex-date, it doesn't count.
+                    if (tx.date >= nextProvisioned.exDate) break;
                     if (tx.type === 'Compra') qtyOwned += tx.quantity;
                     else if (tx.type === 'Venda') qtyOwned -= tx.quantity;
                 }
@@ -112,7 +115,8 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
                 if (div.exDate < assetTxs[0].date) return;
                 let qtyOwned = 0;
                 for (const tx of assetTxs) {
-                    if (tx.date > div.exDate) break; 
+                    // FIX: Strict check for Ex-Date logic
+                    if (tx.date >= div.exDate) break; 
                     if (tx.type === 'Compra') qtyOwned += tx.quantity;
                     else if (tx.type === 'Venda') qtyOwned -= tx.quantity;
                 }
@@ -162,8 +166,6 @@ const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): 
         const firstIncomeIndex = monthlyData.findIndex(m => m.total > 0);
         const monthsDivisor = firstIncomeIndex === -1 ? 1 : Math.max(1, monthlyData.length - firstIncomeIndex);
         
-        // If portfolio is older than 1 year, we assume stable 12m. 
-        // We can check earliest transaction date for more precision, but this approximation is good for "12m view".
         const averageIncome = totalLast12m / monthsDivisor;
 
         const yieldOnCost = totalInvestedGlobal > 0 ? (annualForecast / totalInvestedGlobal) * 100 : 0;

@@ -19,7 +19,7 @@
     <!-- Google Fonts Import -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Lora:wght@400;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Lora:wght@400;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -29,6 +29,20 @@
             fontFamily: {
               sans: ['var(--font-family)', 'sans-serif'],
               mono: ['"Roboto Mono"', 'monospace'],
+            },
+            colors: {
+              background: 'var(--bg-primary)',
+              surface: 'var(--bg-secondary)',
+              primary: 'var(--accent-color)',
+            },
+            animation: {
+              'float': 'float 6s ease-in-out infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              }
             },
             screens: {
               'xs': '375px',
@@ -43,75 +57,61 @@
         /* Typography */
         --font-family: 'Inter', system-ui, -apple-system, sans-serif;
         
-        /* Base Colors (RGB for opacity manipulation) */
+        /* Base Colors */
         --bg-primary-rgb: 9, 9, 11;
         --bg-secondary-rgb: 24, 24, 27;
         --accent-rgb: 56, 189, 248;
         
         /* CSS Variables */
-        --bg-primary: rgb(var(--bg-primary-rgb));
-        --bg-secondary: rgb(var(--bg-secondary-rgb));
+        --bg-primary: #09090b;
+        --bg-secondary: #18181b;
         --bg-tertiary-hover: #27272a;
         
         --text-primary: #fafafa;
         --text-secondary: #a1a1aa;
         --border-color: #27272a;
-        --radius: 16px;
+        --radius: 20px;
         
         /* Glass & Effects */
-        --backdrop-blur: 0px;
-        --card-shadow: none;
-        --glass-border: 1px solid var(--border-color);
-        --glass-highlight: none;
+        --backdrop-blur: 16px;
+        --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+        --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
         
         /* Status Colors */
-        --accent-color: rgb(var(--accent-rgb));
+        --accent-color: #38bdf8;
         --accent-color-text: #09090b; 
         --green-text: #4ade80;
         --red-text: #f87171;
         
         /* Layout */
-        --safe-top: env(safe-area-inset-top, 0px);
-        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-top: env(safe-area-inset-top, 20px);
+        --safe-bottom: env(safe-area-inset-bottom, 20px);
+        
+        /* Animation Curves */
+        --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
       }
 
       /* --- THEME CONFIGURATIONS --- */
       
-      /* Simple / Flat Style */
-      [data-style="simple"] {
-          --backdrop-blur: 0px;
-          --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-          --glass-border: 1px solid var(--border-color);
-      }
-      
-      /* Premium / Glass Style */
-      [data-style="premium"] {
-          --backdrop-blur: 20px;
-      }
-
       [data-style="premium"][data-theme="dark"] {
-          --bg-primary-rgb: 10, 10, 12;
-          --bg-secondary-rgb: 28, 28, 32;
-          --bg-primary: #0a0a0c;
-          --bg-secondary: rgba(28, 28, 32, 0.65); 
-          --bg-tertiary-hover: rgba(255, 255, 255, 0.08);
-          --border-color: rgba(255, 255, 255, 0.08);
-          --glass-border: 1px solid rgba(255, 255, 255, 0.08);
-          --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
-          --card-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5);
+          --bg-primary: #050505;
+          --bg-secondary: #121212; 
+          --bg-tertiary-hover: #1e1e1e;
+          --border-color: #262626;
+          --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
       }
 
       [data-style="premium"][data-theme="light"] {
-          --bg-primary-rgb: 245, 247, 250;
-          --bg-secondary-rgb: 255, 255, 255;
-          --bg-primary: #f5f7fa;
-          --bg-secondary: rgba(255, 255, 255, 0.75);
-          --bg-tertiary-hover: rgba(0, 0, 0, 0.04);
-          --border-color: rgba(0, 0, 0, 0.06); 
+          --bg-primary: #f2f4f7;
+          --bg-secondary: #ffffff;
+          --bg-tertiary-hover: #f1f5f9;
+          --border-color: #e2e8f0; 
           --glass-border: 1px solid rgba(255, 255, 255, 0.8);
-          --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
-          --card-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.05);
-          --text-primary: #1e293b; 
+          --card-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+          --text-primary: #0f172a; 
           --text-secondary: #64748b; 
       }
 
@@ -130,15 +130,13 @@
         color: var(--text-primary);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        
-        /* Native App Feel Enhancements */
-        -webkit-tap-highlight-color: transparent; /* Remove gray tap box on Android/iOS */
-        user-select: none; /* Disable text selection for app-like feel */
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
         -webkit-user-select: none;
-        -webkit-touch-callout: none; /* Disable long-press menu on iOS */
+        -webkit-touch-callout: none;
+        transition: background-color 0.3s ease, color 0.3s ease;
       }
 
-      /* Allow text selection on inputs and specific readable areas if needed */
       input, textarea, [contenteditable="true"] {
         user-select: text;
         -webkit-user-select: text;
@@ -146,22 +144,20 @@
       
       /* --- UTILITIES --- */
       .glass {
-          background-color: var(--bg-secondary);
+          background: rgba(var(--bg-secondary-rgb), 0.7);
           backdrop-filter: blur(var(--backdrop-blur));
           -webkit-backdrop-filter: blur(var(--backdrop-blur));
           border: var(--glass-border);
           box-shadow: var(--card-shadow), var(--glass-highlight);
       }
       
-      /* Custom Scrollbar - Desktop Friendly, Mobile Hidden */
       .custom-scrollbar {
         scrollbar-width: thin;
         scrollbar-color: var(--border-color) transparent;
       }
       
       .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 4px;
       }
       .custom-scrollbar::-webkit-scrollbar-track {
         background: transparent;
@@ -169,108 +165,31 @@
       .custom-scrollbar::-webkit-scrollbar-thumb {
         background-color: var(--border-color);
         border-radius: 99px;
-        border: 2px solid transparent;
-        background-clip: content-box;
-      }
-      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background-color: var(--text-secondary);
       }
 
-      /* Hide scrollbar for cleaner mobile UI */
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-      /* Layout Utilities */
       .pt-safe { padding-top: var(--safe-top); }
       .pb-safe { padding-bottom: var(--safe-bottom); }
       
-      /* --- OPTIMIZED ANIMATIONS --- */
-      /* Hardware accelerated easing curve (standard iOS/Material) */
-      :root {
-        --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-        --ease-page: cubic-bezier(0.2, 0.8, 0.2, 1);
-      }
+      /* --- ANIMATIONS --- */
+      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes fade-in-up { from { opacity: 0; transform: translate3d(0, 20px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+      @keyframes scale-in { from { opacity: 0; transform: scale3d(0.95, 0.95, 1); } to { opacity: 1; transform: scale3d(1, 1, 1); } }
+      @keyframes grow-x { from { transform: scale3d(0, 1, 1); } to { transform: scale3d(1, 1, 1); } }
 
-      @keyframes fade-in { 
-        from { opacity: 0; } 
-        to { opacity: 1; } 
-      }
-      
-      @keyframes fade-in-up { 
-        from { opacity: 0; transform: translate3d(0, 15px, 0); } 
-        to { opacity: 1; transform: translate3d(0, 0, 0); } 
-      }
-      
-      @keyframes scale-in { 
-        from { opacity: 0; transform: scale3d(0.96, 0.96, 1); } 
-        to { opacity: 1; transform: scale3d(1, 1, 1); } 
-      }
-      
-      @keyframes grow-up { 
-        from { transform: scale3d(1, 0, 1); } 
-        to { transform: scale3d(1, 1, 1); } 
-      }
+      .animate-fade-in { animation: fade-in 0.4s var(--ease-out-expo) forwards; will-change: opacity; }
+      .animate-fade-in-up { animation: fade-in-up 0.5s var(--ease-out-expo) forwards; will-change: transform, opacity; }
+      .animate-scale-in { animation: scale-in 0.3s var(--ease-spring) forwards; will-change: transform, opacity; }
+      .animate-grow-x { animation: grow-x 0.5s var(--ease-out-expo) forwards; transform-origin: left; }
 
-      @keyframes grow-x { 
-        from { transform: scale3d(0, 1, 1); } 
-        to { transform: scale3d(1, 1, 1); } 
-      }
-
-      @keyframes page-enter {
-        from { opacity: 0; transform: scale3d(0.99, 0.99, 1) translate3d(0, 4px, 0); }
-        to { opacity: 1; transform: scale3d(1, 1, 1) translate3d(0, 0, 0); }
-      }
-      
-      /* Animation Classes with GPU Hints */
-      .animate-fade-in { 
-        animation: fade-in 0.3s ease-out forwards; 
-        will-change: opacity;
-      }
-      
-      .animate-fade-in-up { 
-        animation: fade-in-up 0.5s var(--ease-out-expo) forwards; 
-        will-change: transform, opacity;
-        backface-visibility: hidden;
-      }
-      
-      .animate-scale-in { 
-        animation: scale-in 0.4s var(--ease-out-expo) forwards; 
-        will-change: transform, opacity;
-        backface-visibility: hidden;
-      }
-      
-      .animate-grow-up { 
-        animation: grow-up 0.6s var(--ease-out-expo) forwards; 
-        transform-origin: bottom;
-        will-change: transform;
-      }
-
-      .animate-grow-x {
-        animation: grow-x 0.3s var(--ease-out-expo) forwards; 
-        transform-origin: left;
-        will-change: transform;
-      }
-
-      .animate-page-enter {
-        animation: page-enter 0.4s var(--ease-page) forwards;
-        will-change: transform, opacity;
-      }
-
-      /* Reduce motion preference */
-      @media (prefers-reduced-motion: reduce) {
-        *, ::before, ::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          transition-duration: 0.01ms !important;
-          scroll-behavior: auto !important;
-        }
-      }
-
-      /* Mobile Landscape Specifics */
+      /* Mobile Landscape */
       @media (max-width: 1023px) and (orientation: landscape) {
         .landscape-pb-6 { padding-bottom: 1.5rem !important; }
         .landscape-fab { bottom: 1.5rem !important; right: 1.5rem !important; }
+        .landscape-grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .landscape-grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       }
     </style>
   <script type="importmap">
@@ -290,17 +209,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => {
-              console.log('SW registered:', reg);
-            })
-            .catch(err => {
-              console.debug('Service Worker registration failed (likely preview env):', err);
-            });
-            
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-             window.location.reload();
-          });
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
         });
       }
     </script>

@@ -45,6 +45,8 @@ interface PortfolioContextType {
   clearCache: (key?: string) => void;
   logApiUsage: (api: 'gemini'|'brapi', stats: any) => void;
   resetApiStats: () => void;
+  privacyMode: boolean;
+  togglePrivacyMode: () => void;
   markNotificationsAsRead: () => void;
   deleteNotification: (id: number) => void;
   clearAllNotifications: () => void;
@@ -74,6 +76,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
   const [apiStats, setApiStats] = usePersistentState<AppStats>('api_stats', { gemini: {requests:0, bytesSent:0, bytesReceived:0}, brapi: {requests:0, bytesSent:0, bytesReceived:0} });
+  const [privacyMode, setPrivacyMode] = useState(false);
   const [notifications, setNotifications] = usePersistentState<AppNotification[]>('app-notifications', []);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -132,6 +135,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }));
   }, [setApiStats]);
   const resetApiStats = useCallback(() => setApiStats({ gemini: {requests:0, bytesSent:0, bytesReceived:0}, brapi: {requests:0, bytesSent:0, bytesReceived:0} }), [setApiStats]);
+
+  const togglePrivacyMode = useCallback(() => setPrivacyMode(p => !p), []);
 
   useEffect(() => {
       const theme = APP_THEMES.find(t => t.id === preferences.currentThemeId) || APP_THEMES[0];
@@ -463,7 +468,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               if (div.value <= 0) return;
               let qty = 0;
               for (const tx of txs) {
-                  if (tx.date > div.exDate) break; 
+                  // If transaction is ON or AFTER the Ex-Date, it doesn't count for this dividend
+                  if (tx.date >= div.exDate) break; 
                   if (tx.type === 'Compra') qty += tx.quantity;
                   else qty -= tx.quantity;
               }
@@ -522,7 +528,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
-      setDemoMode: setIsDemoMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
+      setDemoMode: setIsDemoMode, resetApp, clearCache, logApiUsage, resetApiStats, privacyMode, togglePrivacyMode, markNotificationsAsRead,
       deleteNotification, clearAllNotifications, installPwa
   }), [
       assets, sourceTransactions, dividends, preferences, isDemoMode,
@@ -530,7 +536,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addTransaction, updateTransaction, deleteTransaction, importTransactions, restoreData,
       updatePreferences, setTheme, setFont, updateUserProfile,
       refreshMarketData, refreshAllData, refreshSingleAsset, getAssetByTicker, getAveragePriceForTransaction,
-      setIsDemoMode, resetApp, clearCache, logApiUsage, resetApiStats, markNotificationsAsRead,
+      setIsDemoMode, resetApp, clearCache, logApiUsage, resetApiStats, privacyMode, togglePrivacyMode, markNotificationsAsRead,
       deleteNotification, clearAllNotifications, installPwa
   ]);
 

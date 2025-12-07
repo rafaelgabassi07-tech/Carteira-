@@ -307,9 +307,9 @@ const NewsView: React.FC<NewsViewProps> = ({ addToast, isEmbedded = false }) => 
       </div>
       
       <div className="w-full max-w-7xl mx-auto">
-        <div className={`flex justify-between items-center mb-4 ${isEmbedded ? 'hidden' : ''}`}>
-          <h1 className="text-2xl font-bold">{t('market_news')}</h1>
-          <div className="flex gap-2">
+        <div className={`flex justify-between items-center mb-4`}>
+          {!isEmbedded && <h1 className="text-2xl font-bold">{t('market_news')}</h1>}
+          <div className={`flex gap-2 ${isEmbedded ? 'w-full justify-end' : ''}`}>
                <button 
                   onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
                   className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
