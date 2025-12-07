@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -7,138 +8,13 @@ import PageHeader from '../components/PageHeader';
 import { vibrate, fromISODate } from '../utils';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
-import ClockIcon from '../components/icons/ClockIcon';
 import WalletIcon from '../components/icons/WalletIcon';
 import BarChart from '../components/BarChart';
-import type { DividendHistoryEvent, Transaction, Asset } from '../types';
-
-// --- Types ---
-interface MonthlyData {
-    month: string;
-    total: number;
-}
-
-interface PayerData {
-    ticker: string;
-    totalPaid: number;
-    count: number;
-    lastExDate?: string;
-    nextPaymentDate?: string;
-    isProvisioned?: boolean;
-    yieldOnCost: number;
-    averageMonthly: number;
-    projectedAmount: number;
-}
-
-interface DividendStats {
-    totalReceived: number;
-    monthlyData: MonthlyData[];
-    payersData: PayerData[];
-    averageIncome: number;
-    annualForecast: number;
-    yieldOnCost: number;
-}
-
-// --- Logic Hook ---
-const useDividendCalculations = (transactions: Transaction[], assets: Asset[]): DividendStats => {
-    return useMemo(() => {
-        let totalReceived = 0;
-        let totalInvestedGlobal = 0;
-        const annualForecast = assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice * ((a.dy || 0) / 100)), 0);
-        
-        const monthlyAggregation: Record<string, number> = {}; 
-        const payerAggregation: Record<string, Partial<PayerData>> = {};
-        const assetHistories = new Map<string, DividendHistoryEvent[]>();
-        
-        assets.forEach(asset => {
-            const assetTxs = transactions
-                .filter(t => t.ticker === asset.ticker)
-                .sort((a, b) => a.date.localeCompare(b.date));
-
-            if (assetTxs.length === 0) return;
-            
-            // Calculate current total invested for this asset to derive YOC
-            let assetTotalInvested = 0;
-            let qtyAtEnd = 0;
-            assetTxs.forEach(tx => {
-                if (tx.type === 'Compra') {
-                    assetTotalInvested += (tx.quantity * tx.price) + (tx.costs || 0);
-                    qtyAtEnd += tx.quantity;
-                } else {
-                    const avgPrice = qtyAtEnd > 0 ? assetTotalInvested / qtyAtEnd : 0;
-                    const sellQty = Math.min(tx.quantity, qtyAtEnd);
-                    assetTotalInvested -= sellQty * avgPrice;
-                    qtyAtEnd -= sellQty;
-                }
-            });
-            totalInvestedGlobal += Math.max(0, assetTotalInvested);
-            
-            const projectedYearly = asset.dy ? (asset.quantity * asset.currentPrice * (asset.dy / 100)) : 0;
-            const assetYoC = assetTotalInvested > 0 ? (projectedYearly / assetTotalInvested) * 100 : 0;
-            
-            payerAggregation[asset.ticker] = { ticker: asset.ticker, yieldOnCost: assetYoC, totalPaid: 0, count: 0, projectedAmount: 0 };
-            assetHistories.set(asset.ticker, asset.dividendsHistory || []);
-
-            // Process dividends for this asset
-            const history = asset.dividendsHistory || [];
-            history.forEach(div => {
-                let qtyOwnedAtExDate = 0;
-                for (const tx of assetTxs) {
-                    if (tx.date >= div.exDate) break;
-                    if (tx.type === 'Compra') qtyOwnedAtExDate += tx.quantity;
-                    else qtyOwnedAtExDate -= tx.quantity;
-                }
-                
-                qtyOwnedAtExDate = Math.max(0, qtyOwnedAtExDate);
-
-                if (qtyOwnedAtExDate > 0) {
-                    const amount = qtyOwnedAtExDate * div.value;
-                    if (div.isProvisioned) {
-                        payerAggregation[asset.ticker]!.projectedAmount! += amount;
-                    } else {
-                        totalReceived += amount;
-                        payerAggregation[asset.ticker]!.totalPaid! += amount;
-                        payerAggregation[asset.ticker]!.count!++;
-                        const monthKey = div.paymentDate.substring(0, 7); 
-                        monthlyAggregation[monthKey] = (monthlyAggregation[monthKey] || 0) + amount;
-                    }
-                }
-            });
-
-            // Add metadata
-            const sortedHistory = [...history].sort((a,b) => b.exDate.localeCompare(a.exDate));
-            const latestDiv = sortedHistory[0];
-            const provisioned = sortedHistory.filter(d => d.isProvisioned).sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
-
-            if (payerAggregation[asset.ticker]) {
-                payerAggregation[asset.ticker]!.lastExDate = latestDiv?.exDate;
-                payerAggregation[asset.ticker]!.isProvisioned = provisioned.length > 0;
-                payerAggregation[asset.ticker]!.nextPaymentDate = provisioned.length > 0 ? provisioned[0].paymentDate : latestDiv?.paymentDate;
-                const paymentCount = payerAggregation[asset.ticker]!.count!;
-                payerAggregation[asset.ticker]!.averageMonthly = paymentCount > 0 ? payerAggregation[asset.ticker]!.totalPaid! / Math.max(1, Math.min(paymentCount, 12)) : 0;
-            }
-        });
-        
-        const now = new Date();
-        const monthlyData: MonthlyData[] = [];
-        for (let i = 11; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            monthlyData.push({ month: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''), total: monthlyAggregation[key] || 0 });
-        }
-
-        const payersData = Object.values(payerAggregation) as PayerData[];
-        const totalPaidMonths = Object.keys(monthlyAggregation).length;
-        const averageIncome = totalPaidMonths > 0 ? totalReceived / totalPaidMonths : 0;
-        const yieldOnCost = totalInvestedGlobal > 0 ? (annualForecast / totalInvestedGlobal) * 100 : 0;
-
-        return { totalReceived, monthlyData, payersData, averageIncome, annualForecast, yieldOnCost };
-    }, [transactions, assets]);
-};
+import type { PayerData } from '../hooks/usePortfolioCalculations';
 
 
 // --- Sub-components ---
-const SummaryCard: React.FC<Pick<DividendStats, 'averageIncome' | 'totalReceived' | 'annualForecast' | 'yieldOnCost'>> = ({ averageIncome, totalReceived, annualForecast, yieldOnCost }) => {
+const SummaryCard: React.FC<{ averageIncome: number; totalReceived: number; annualForecast: number; yieldOnCost: number; }> = ({ averageIncome, totalReceived, annualForecast, yieldOnCost }) => {
     const { t, formatCurrency } = useI18n();
 
     return (
@@ -228,9 +104,13 @@ const PayerListItem: React.FC<{ payer: PayerData; totalAllPayers: number }> = ({
 // --- Main View ---
 const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const { t } = useI18n();
-    const { transactions, assets } = usePortfolio();
+    const { assets, monthlyIncome, payersData, totalReceived, projectedAnnualIncome, yieldOnCost } = usePortfolio();
     
-    const { totalReceived, monthlyData, payersData, averageIncome, annualForecast, yieldOnCost } = useDividendCalculations(transactions, assets);
+    const averageIncome = useMemo(() => {
+        const relevantMonths = monthlyIncome.filter(m => m.total > 0);
+        const total = relevantMonths.reduce((sum, item) => sum + item.total, 0);
+        return relevantMonths.length > 0 ? total / relevantMonths.length : 0;
+    }, [monthlyIncome]);
     
     const sortedPayers = useMemo(() => {
         return [...payersData].sort((a, b) => b.totalPaid - a.totalPaid);
@@ -252,7 +132,7 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                         <SummaryCard 
                             totalReceived={totalReceived}
                             averageIncome={averageIncome}
-                            annualForecast={annualForecast}
+                            annualForecast={projectedAnnualIncome}
                             yieldOnCost={yieldOnCost}
                         />
 
@@ -264,12 +144,14 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                                 </div>
                             </div>
                             <div className="h-48 w-full relative">
-                                <BarChart data={monthlyData} />
-                                <div className="absolute top-0 left-[45px] right-[10px] h-full pointer-events-none">
-                                    <div className="absolute w-full border-t border-dashed border-[var(--green-text)] opacity-60"
-                                         style={{ bottom: `${(averageIncome / (Math.max(...monthlyData.map(m => m.total)) * 1.2)) * 100}%` }}>
+                                <BarChart data={monthlyIncome} />
+                                {averageIncome > 0 && (
+                                    <div className="absolute top-0 left-[45px] right-[10px] h-full pointer-events-none">
+                                        <div className="absolute w-full border-t border-dashed border-[var(--green-text)] opacity-60"
+                                            style={{ bottom: `${(averageIncome / (Math.max(...monthlyIncome.map(m => m.total), averageIncome) * 1.2)) * 100}%` }}>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
 

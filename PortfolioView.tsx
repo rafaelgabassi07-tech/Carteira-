@@ -7,6 +7,7 @@ import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
 import SettingsIcon from '../components/icons/SettingsIcon';
 import CountUp from '../components/CountUp';
+import FloatingActionButton from '../components/FloatingActionButton';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
@@ -181,7 +182,6 @@ const DiversificationCard: React.FC = () => {
 
 interface PortfolioViewProps {
     setActiveView: (view: View) => void;
-    setTransactionFilter: (ticker: string) => void;
     onSelectAsset: (ticker: string) => void;
     addToast: (message: string, type?: ToastMessage['type']) => void;
     unreadNotificationsCount?: number;
@@ -291,12 +291,15 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                         </div>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
-                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-xl shadow-[var(--accent-color)]/5">
-                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                    <div className="relative h-[80vh]">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center animate-fade-in">
+                            <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-xl shadow-[var(--accent-color)]/5">
+                                <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                            </div>
+                            <h2 className="text-2xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
+                            <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
                         </div>
-                        <h2 className="text-2xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
-                        <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
+                        <FloatingActionButton id="add-first-transaction-button" onClick={() => { setActiveView('transacoes'); vibrate(); }} />
                     </div>
                 )}
             </div>

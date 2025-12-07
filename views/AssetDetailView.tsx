@@ -8,11 +8,13 @@ import AnalysisIcon from '../components/icons/AnalysisIcon';
 import DividendChart from '../components/DividendChart';
 import CountUp from '../components/CountUp';
 import { vibrate } from '../utils';
+import type { ToastMessage } from '../types';
 
 interface AssetDetailViewProps {
     ticker: string;
     onBack: () => void;
     onViewTransactions: (ticker: string) => void;
+    addToast: (message: string, type?: ToastMessage['type']) => void;
 }
 
 // Helper para barras de progresso (P/VP e Vacância)
@@ -42,7 +44,7 @@ const IndicatorItem: React.FC<{ label: string; value: string; subtext?: React.Re
     </div>
 );
 
-const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onViewTransactions }) => {
+const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onViewTransactions, addToast }) => {
     const { t, formatCurrency, locale } = useI18n();
     const { getAssetByTicker, transactions, refreshSingleAsset } = usePortfolio();
     const [activeTab, setActiveTab] = useState('summary');
@@ -54,70 +56,52 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     useEffect(() => {
         const checkAndLoad = async () => {
             const isStale = !asset?.lastUpdated || (Date.now() - asset.lastUpdated > 5 * 60 * 1000);
-            if (isStale && (!asset || !asset.dividendsHistory || asset.dividendsHistory.length === 0)) {
+            if (!asset || isStale || !asset.dividendsHistory || asset.dividendsHistory.length === 0) {
                 setIsRefreshing(true);
                 try {
                     await refreshSingleAsset(ticker, true);
+                } catch(e: any){
+                    addToast(e.message, 'error');
                 } finally {
                     setIsRefreshing(false);
                 }
             }
         };
         checkAndLoad();
-    }, [ticker, refreshSingleAsset, asset?.lastUpdated]); 
+    }, [ticker, refreshSingleAsset, asset, addToast]); 
 
     const handleRefresh = useCallback(async () => {
         if (isRefreshing) return;
         vibrate();
         setIsRefreshing(true);
+        addToast(t('toast_updating_prices'));
         try {
             await refreshSingleAsset(ticker, true);
+            addToast(t('toast_update_success'), 'success');
+        } catch (e: any) {
+            addToast(e.message, 'error');
         } finally {
             setIsRefreshing(false);
         }
-    }, [ticker, refreshSingleAsset, isRefreshing]);
+    }, [ticker, refreshSingleAsset, isRefreshing, addToast, t]);
 
     const assetTransactions = useMemo(() => {
         return transactions.filter(tx => tx.ticker === ticker).sort((a, b) => b.date.localeCompare(a.date));
     }, [transactions, ticker]);
 
-    // Lógica Dividendos
+    // Lógica Dividendos: Consumir dados já processados do contexto
     const fullDividendHistory = useMemo(() => {
-        const history = asset?.dividendsHistory || [];
-        if (history.length === 0) return [];
-        
-        const txs = transactions.filter(t => t.ticker === ticker).sort((a,b) => a.date.localeCompare(b.date));
-        const historySorted = [...history].sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
-
-        if (txs.length === 0) {
-             return historySorted.map(div => ({ ...div, userQuantity: 0, totalReceived: 0, isReceived: false }));
-        }
-
-        const firstPurchaseDate = txs[0].date;
-        let processedHistory = historySorted.map(div => {
-            let qty = 0;
-            for(const tx of txs) {
-                if (tx.date >= div.exDate) break;
-                if (tx.type === 'Compra') qty += tx.quantity;
-                else qty -= tx.quantity;
-            }
-            const userQty = Math.max(0, qty);
-            return { ...div, userQuantity: userQty, totalReceived: userQty * div.value, isReceived: userQty > 0 };
-        });
-
-        if (firstPurchaseDate) {
-            processedHistory = processedHistory.filter(div => div.exDate >= firstPurchaseDate || div.isProvisioned);
-        }
-        return processedHistory;
-    }, [asset?.dividendsHistory, transactions, ticker]);
+        return (asset?.dividendsHistory || []).sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
+    }, [asset?.dividendsHistory]);
 
     // Metrics
     const currentValue = asset ? asset.quantity * asset.currentPrice : 0;
     const totalInvested = asset ? asset.quantity * asset.avgPrice : 0;
     const variation = currentValue - totalInvested;
-    // const variationPercent = totalInvested > 0 ? (variation / totalInvested) * 100 : 0;
 
     if (!asset && !isRefreshing) return <div className="p-8 text-center">{t('asset_not_found')}</div>;
+
+    if (!asset) return null; // or a skeleton loader
 
     const renderSummary = () => (
         <div className="space-y-4 animate-fade-in">
@@ -193,7 +177,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 </div>
             </div>
 
-            <button onClick={() => asset && onViewTransactions(asset.ticker)} className="w-full bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] font-bold py-3.5 rounded-xl border border-[var(--border-color)] hover:bg-[var(--accent-color)]/10 hover:border-[var(--accent-color)] active:scale-[0.98] transition-all shadow-sm">
+            <button onClick={() => onViewTransactions(asset.ticker)} className="w-full bg-[var(--bg-tertiary-hover)] text-[var(--text-primary)] font-bold py-3.5 rounded-xl border border-[var(--border-color)] hover:bg-[var(--accent-color)]/10 hover:border-[var(--accent-color)] active:scale-[0.98] transition-all shadow-sm">
                 {t('view_transactions')}
             </button>
         </div>
@@ -221,9 +205,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
             {fullDividendHistory.length > 0 ? (
                 <>
                     <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-bold text-sm text-[var(--text-primary)]">Histórico de Pagamentos</h3>
-                        </div>
                         <DividendChart data={asset?.dividendsHistory || []} />
                     </div>
                     
@@ -240,10 +221,9 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                                     <span className="text-xs text-[var(--text-secondary)]">Data Com: {new Date(div.exDate).toLocaleDateString(locale, {day:'2-digit', month:'2-digit', year:'2-digit', timeZone:'UTC'})}</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className={`block font-bold ${div.isReceived || div.isProvisioned ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] opacity-50'}`}>
-                                        {formatCurrency(div.totalReceived)}
+                                    <span className={`block font-bold text-[var(--text-primary)]`}>
+                                        {formatCurrency(div.value)} <span className="text-[10px] text-[var(--text-secondary)]">/ cota</span>
                                     </span>
-                                    <span className="text-[10px] text-[var(--text-secondary)]">{formatCurrency(div.value)} / cota</span>
                                 </div>
                             </div>
                         ))}
@@ -285,7 +265,8 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     ))}
                 </div>
                 
-                {activeTab === 'summary' && renderSummary()}
+                {isRefreshing && activeTab === 'summary' && !asset ? <div className="animate-pulse h-96 bg-gray-800 rounded-xl"></div> : null}
+                {activeTab === 'summary' && asset && renderSummary()}
                 {activeTab === 'history' && renderHistory()}
                 {activeTab === 'dividends' && renderDividends()}
             </div>

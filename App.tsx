@@ -52,7 +52,7 @@ const App: React.FC = () => {
       }
   }, []);
 
-  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 3000) => {
+  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', action?: ToastMessage['action'], duration = 4000) => {
     const newToast: ToastMessage = { id: Date.now(), message, type, action, duration };
     setToast(newToast);
     if (duration > 0) {
@@ -129,15 +129,15 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case 'dashboard': return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
+      case 'dashboard': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
       case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
       case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
       case 'mercado': return <MarketView addToast={addToast} />;
-      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} /> : <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
+      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} addToast={addToast} /> : <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} />;
       case 'incomeReport': return <IncomeReportView onBack={handleBackFromDetail} />;
-      default: return <PortfolioView setActiveView={handleSetView} setTransactionFilter={setTransactionFilter} onSelectAsset={handleSelectAsset} addToast={addToast} />;
+      default: return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} />;
     }
   };
 
@@ -154,7 +154,7 @@ const App: React.FC = () => {
             <main className="flex-1 relative w-full h-full flex flex-col min-w-0 overflow-hidden">
                 <div className="flex-1 relative h-full w-full">
                     <Suspense fallback={<LoadingSpinner />}>
-                        <div key={activeView} className="animate-page-enter h-full w-full">
+                        <div key={activeView} className="h-full w-full">
                             {renderView()}
                         </div>
                     </Suspense>
