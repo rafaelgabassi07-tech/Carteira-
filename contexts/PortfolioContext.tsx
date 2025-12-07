@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, DividendHistoryEvent, AppStats, AppNotification, PortfolioEvolutionPoint, MonthlyIncome } from '../types';
 import { fetchAdvancedAssetData } from '../services/geminiService';
@@ -93,6 +92,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   const initialLoadDone = useRef(false);
   const refreshInProgress = useRef(false);
+  
+  // FIX: This ref is crucial to get the latest marketData inside the useCallback without causing re-renders.
   const marketDataRef = useRef(marketData);
   useEffect(() => { marketDataRef.current = marketData; }, [marketData]);
 
@@ -280,7 +281,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
           logApiUsage('brapi', { requests: 1, bytesReceived: brapiRes.stats.bytesReceived });
 
-          // Step 2: Create a temporary mutable object for all updates.
+          // Step 2: Create a temporary mutable object for all updates, using the ref for current data.
           const currentMarketData = marketDataRef.current;
           const nextMarketData = { ...currentMarketData };
 
