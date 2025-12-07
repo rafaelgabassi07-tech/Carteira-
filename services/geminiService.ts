@@ -202,7 +202,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const today = new Date().toISOString().split('T')[0];
 
     const prompt = `Analise fundamentalista para: [${tickerStr}]. Data ref: ${today}.
-    Use googleSearch para DY, P/VP, Vacância, Último Provento, Histórico Dividendos.`;
+    Use googleSearch para buscar dados atualizados de DY, P/VP, Vacância, Último Provento e Histórico de Dividendos.
+    REGRA CRÍTICA: Se não encontrar informação para algum campo ou ativo, retorne null ou array vazio. NÃO pare a execução, NÃO retorne erro.`;
 
     try {
         const response = await ai.models.generateContent({

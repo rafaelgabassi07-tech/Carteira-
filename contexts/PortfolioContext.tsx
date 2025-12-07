@@ -275,12 +275,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
           // --- Phase 1: Prices (Brapi) - Independent execution ---
           let brapiFailed = false;
-          let brapiQuotes = {};
           
           try {
               const brapiRes = await fetchBrapiQuotes(preferences, tickers, false);
               logApiUsage('brapi', { requests: 1, bytesReceived: brapiRes.stats.bytesReceived });
-              brapiQuotes = brapiRes.quotes;
               
               // Immediate Partial State Update for Prices
               setMarketData(prev => {
@@ -298,7 +296,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           } catch (e: any) {
               console.warn("Brapi update failed:", e);
               brapiFailed = true;
-              if (force) setMarketDataError("Falha na atualização de preços Brapi. " + (e.message || ""));
           }
 
           // --- Phase 2: Fundamentals (Gemini) - Independent execution ---
@@ -321,11 +318,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               return fundamentalsStale || missingDividends;
           });
 
+          const failedTickers: string[] = [];
+
           if (assetsNeedingUpdate.length > 0) {
               // Batch processing to avoid token limits or timeouts
               const batches = chunkArray(assetsNeedingUpdate, 4); // Process 4 assets at a time
               
-              for (const batch of batches) {
+              for (let i = 0; i < batches.length; i++) {
+                  const batch = batches[i];
                   try {
                       const geminiRes = await fetchAdvancedAssetData(preferences, batch);
                       logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
@@ -344,13 +344,27 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       });
                   } catch (e: any) {
                       console.error("Gemini Batch Failed:", batch, e);
-                      // Don't stop the whole process, just log this batch failure
-                      if (!brapiFailed) setMarketDataError("Alguns dados fundamentais falharam.");
+                      failedTickers.push(...batch);
+                  }
+                  
+                  // Rate limit delay: Wait 1.5s between batches to avoid 429 Too Many Requests
+                  if (i < batches.length - 1) {
+                      await new Promise(resolve => setTimeout(resolve, 1500));
                   }
               }
           }
           
           setLastSync(now);
+
+          // Unified Error Reporting
+          if (failedTickers.length > 0) {
+              const msg = brapiFailed 
+                ? `Falha parcial. Fundamentos não atualizados para: ${failedTickers.join(', ')}`
+                : `Dados fundamentais falharam para: ${failedTickers.join(', ')}`;
+              setMarketDataError(msg);
+          } else if (brapiFailed) {
+              setMarketDataError("Falha na atualização de preços (Brapi).");
+          }
 
       } catch (e: any) {
           console.error("Critical refresh error:", e);
