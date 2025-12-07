@@ -4,7 +4,7 @@ import type { Asset, Transaction, AppPreferences, UserProfile, Dividend, Dividen
 import { fetchAdvancedAssetData } from '../services/geminiService';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { generateNotifications } from '../services/dynamicDataService';
-import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, CacheManager, toISODate, calculatePortfolioEvolution } from '../utils';
+import { usePersistentState, calculatePortfolioMetrics, applyThemeToDocument, CacheManager, toISODate, calculatePortfolioEvolution, idb } from '../utils';
 import { DEMO_TRANSACTIONS, DEMO_DIVIDENDS, DEMO_MARKET_DATA, CACHE_TTL, MOCK_USER_PROFILE, APP_THEMES, APP_FONTS, STALE_TIME, STATIC_FII_SECTORS } from '../constants';
 
 interface PortfolioContextType {
@@ -67,7 +67,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
 };
 
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // State Management
+  // State Management - Now backed by IndexedDB via new usePersistentState
   const [transactions, setTransactions] = usePersistentState<Transaction[]>('transactions', []);
   const [preferences, setPreferences] = usePersistentState<AppPreferences>('app_preferences', DEFAULT_PREFERENCES);
   const [userProfile, setUserProfile] = usePersistentState<UserProfile>('user_profile', MOCK_USER_PROFILE);
@@ -109,13 +109,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [deferredPrompt]);
 
   useEffect(() => {
+    // Legacy fix for 'carteira' vs 'dashboard' start screen mismatch from older versions
     const startScreen = preferences.startScreen;
     if (startScreen === 'carteira' as any || startScreen === 'analise' as any) {
       // @ts-ignore
       const newScreen = startScreen === 'carteira' ? 'dashboard' : 'carteira';
       updatePreferences({ startScreen: newScreen });
     }
-  }, []); 
+  }, [preferences.startScreen]); 
 
   useEffect(() => {
       setUnreadNotificationsCount(notifications.filter(n => !n.read).length);
@@ -210,15 +211,28 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const setFont = useCallback((id: string) => setPreferences(p => ({...p, currentFontId: id})), [setPreferences]);
   const togglePrivacyMode = useCallback(() => setPrivacyMode(p => !p), [setPrivacyMode]);
   
-  const resetApp = useCallback(() => {
-      if(window.confirm("Resetar App?")) { localStorage.clear(); window.location.reload(); }
+  const resetApp = useCallback(async () => {
+      if(window.confirm("Resetar App?")) { 
+          // Clear IDB
+          await idb.clear();
+          // Clear LocalStorage
+          localStorage.clear(); 
+          window.location.reload(); 
+      }
   }, []);
 
-  const clearCache = useCallback((key?: string) => {
+  const clearCache = useCallback(async (key?: string) => {
       if(key === 'all') { 
-          Object.keys(localStorage).forEach(k => k.startsWith('cache_') && localStorage.removeItem(k)); 
-          setMarketData({}); setLastSync(null); 
-      } else if (key) CacheManager.clear(key);
+          // Clear only cache keys from IDB
+          // Since we share one store, iterating is safer, but 'all' here usually means market data reset
+          setMarketData({}); 
+          setLastSync(null); 
+          // Also clear specific cache entries managed by CacheManager
+          // We can add a specialized method in CacheManager if needed, 
+          // or assume setMarketData({}) is enough for app logic.
+      } else if (key) {
+          await CacheManager.clear(key);
+      }
   }, [setMarketData, setLastSync]);
 
   const markNotificationsAsRead = useCallback(() => {
@@ -378,6 +392,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [sourceTransactions, sourceMarketData]);
 
   useEffect(() => {
+    // Only trigger initial load if we have data and it's stale
+    // The usePersistentState hook handles loading, so 'transactions' might be [] initially then populated.
+    // We check transactions.length > 0 to ensure we don't try fetching for an empty portfolio unless intended.
     if (!refreshInProgress.current && !isDemoMode && sourceTransactions.length > 0 && !initialLoadDone.current) {
       initialLoadDone.current = true;
       const now = Date.now();

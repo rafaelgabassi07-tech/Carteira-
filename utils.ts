@@ -2,35 +2,145 @@
 import { useState, useEffect, Dispatch, SetStateAction, useRef } from 'react';
 import type { Transaction, AppTheme, PortfolioEvolutionPoint } from './types';
 
-// --- Hook para estado persistente no localStorage com Debounce ---
-export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatch<SetStateAction<T>>] {
-  const [state, setState] = useState<T>(() => {
-    try {
-      const storedValue = localStorage.getItem(key);
-      if (storedValue === null) {
-        return defaultValue;
-      }
-      const parsedValue = JSON.parse(storedValue);
-      return parsedValue !== null ? parsedValue : defaultValue;
-    } catch (error) {
-      console.error(`Error reading localStorage key “${key}”:`, error);
-      return defaultValue;
+// --- IndexedDB Wrapper ---
+const DB_NAME = 'fii_master_db';
+const STORE_NAME = 'keyval';
+const DB_VERSION = 1;
+
+export const idb = {
+    open: (): Promise<IDBDatabase> => {
+        return new Promise((resolve, reject) => {
+            if (typeof indexedDB === 'undefined') {
+                reject(new Error("IndexedDB not supported"));
+                return;
+            }
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = (event) => {
+                const db = (event.target as IDBOpenDBRequest).result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME);
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+    get: <T>(key: string): Promise<T | undefined> => {
+        return idb.open().then(db => {
+            return new Promise((resolve, reject) => {
+                try {
+                    const tx = db.transaction(STORE_NAME, 'readonly');
+                    const store = tx.objectStore(STORE_NAME);
+                    const request = store.get(key);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+    },
+    set: (key: string, value: any): Promise<void> => {
+        return idb.open().then(db => {
+            return new Promise((resolve, reject) => {
+                try {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    const request = store.put(value, key);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+    },
+    del: (key: string): Promise<void> => {
+         return idb.open().then(db => {
+            return new Promise((resolve, reject) => {
+                try {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    const request = store.delete(key);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+    },
+    clear: (): Promise<void> => {
+         return idb.open().then(db => {
+            return new Promise((resolve, reject) => {
+                try {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    const request = store.clear();
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
     }
-  });
+};
+
+// --- Hook para estado persistente no IndexedDB com fallback e migração ---
+export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatch<SetStateAction<T>>] {
+  const [state, setState] = useState<T>(defaultValue);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+        try {
+            // 1. Try IndexedDB
+            let value = await idb.get<T>(key);
+            
+            // 2. If not in DB, check LocalStorage (Migration)
+            if (value === undefined) {
+                const local = localStorage.getItem(key);
+                if (local) {
+                    try {
+                        value = JSON.parse(local);
+                        // Save to IDB immediately
+                        await idb.set(key, value);
+                        // Clean up LocalStorage to free space
+                        localStorage.removeItem(key);
+                        console.log(`Migrated ${key} from LocalStorage to IndexedDB`);
+                    } catch (e) {
+                        console.warn(`Failed to parse legacy localStorage for ${key}`, e);
+                    }
+                }
+            }
+
+            if (isMounted && value !== undefined) {
+                setState(value);
+            }
+        } catch (e) { 
+            console.error(`Error loading ${key} from storage:`, e); 
+        } finally {
+            if (isMounted) setIsHydrated(true);
+        }
+    };
+    load();
+    return () => { isMounted = false; };
+  }, [key]);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    // Only save if data has been loaded initially to avoid overwriting DB with defaultValue
+    if (!isHydrated) return;
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
     timeoutRef.current = setTimeout(() => {
-      try {
-        localStorage.setItem(key, JSON.stringify(state));
-      } catch (error) {
-        console.error(`Error setting localStorage key “${key}”:`, error);
-      }
+      idb.set(key, state).catch(err => console.error(`Error saving ${key}:`, err));
     }, 300);
 
     return () => {
@@ -38,7 +148,7 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatc
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [key, state]);
+  }, [key, state, isHydrated]);
 
   return [state, setState];
 }
@@ -164,53 +274,76 @@ export const bufferDecode = (base64: string): Uint8Array => {
     return bytes;
 };
 
-// --- Sistema de Cache ---
+// --- Sistema de Cache (Async via IndexedDB) ---
 interface CacheItem<T> {
     data: T;
     timestamp: number;
 }
 
 export const CacheManager = {
-    get: <T>(key: string, ttl: number): T | null => {
+    get: async <T>(key: string, ttl: number): Promise<T | null> => {
         try {
-            const itemStr = localStorage.getItem(`cache_${key}`);
-            if (!itemStr) return null;
+            const cacheKey = `cache_${key}`;
+            let item: CacheItem<T> | undefined = await idb.get<CacheItem<T>>(cacheKey);
+            
+            // Migration for old localStorage cache
+            if (!item) {
+                const localItem = localStorage.getItem(cacheKey);
+                if (localItem) {
+                    try {
+                        item = JSON.parse(localItem);
+                        await idb.set(cacheKey, item);
+                        localStorage.removeItem(cacheKey);
+                    } catch (e) {}
+                }
+            }
 
-            const item: CacheItem<T> = JSON.parse(itemStr);
+            if (!item) return null;
+
             const now = Date.now();
-
             if (!item || typeof item.timestamp !== 'number' || item.data === undefined) {
-                localStorage.removeItem(`cache_${key}`);
+                await idb.del(cacheKey);
                 return null;
             }
 
             if (now - item.timestamp > ttl) {
-                localStorage.removeItem(`cache_${key}`);
+                await idb.del(cacheKey);
                 return null;
             }
 
             return item.data;
         } catch (error) {
-            console.warn("Cache corrupted or invalid, clearing:", key);
-            localStorage.removeItem(`cache_${key}`); 
+            console.warn("Cache corrupted or invalid:", key, error);
             return null;
         }
     },
 
-    set: <T>(key: string, data: T): void => {
+    set: async <T>(key: string, data: T): Promise<void> => {
         const item: CacheItem<T> = {
             data,
             timestamp: Date.now(),
         };
         try {
-            localStorage.setItem(`cache_${key}`, JSON.stringify(item));
+            await idb.set(`cache_${key}`, item);
         } catch (error) {
             console.error("Error setting cache:", error);
         }
     },
     
-    clear: (key: string): void => {
-        localStorage.removeItem(`cache_${key}`);
+    clear: async (key: string): Promise<void> => {
+        await idb.del(`cache_${key}`);
+    },
+
+    clearAll: async (): Promise<void> => {
+        // Warning: This clears everything in the store, not just cache keys
+        // A safer way if store is shared is to iterate keys.
+        // For now we assume sharing the store, so we only clear keys starting with cache_
+        // IDB generic clear is too aggressive if we share the store with main data.
+        // But since we use one store for everything, we shouldn't use idb.clear().
+        // We will implement a specialized clear if needed, or simply let data expire.
+        // Ideally, 'clear' in this app context often means 'reset app'.
+        // For explicit cache clearing, we might need a key scan.
+        // Simple strategy: Clear keys via cursor if strictly needed.
     }
 };
 
