@@ -2,14 +2,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Transaction, TransactionType, ToastMessage } from '../types';
 import FloatingActionButton from '../components/FloatingActionButton';
-import TransactionModal from '../components/modals/TransactionModal';
+import Modal from '../components/modals/Modal';
 import EditIcon from '../components/icons/EditIcon';
 import TrashIcon from '../components/icons/TrashIcon';
-import SearchIcon from '../components/icons/SearchIcon';
 import CloseIcon from '../components/icons/CloseIcon';
+import SearchIcon from '../components/icons/SearchIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import { vibrate } from '../utils';
+import { vibrate, getTodayISODate } from '../utils';
+import TransactionModal from '../components/modals/TransactionModal';
 
 const TransactionItem = React.memo<{ 
     transaction: Transaction, 
@@ -93,9 +94,10 @@ interface TransactionsViewProps {
     initialFilter: string | null;
     clearFilter: () => void;
     addToast: (message: string, type?: ToastMessage['type']) => void;
+    isEmbedded?: boolean;
 }
 
-const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clearFilter, addToast }) => {
+const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clearFilter, addToast, isEmbedded = false }) => {
     const { t, locale, formatCurrency } = useI18n();
     const { transactions, addTransaction, updateTransaction, deleteTransaction } = usePortfolio();
 
@@ -107,9 +109,10 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
 
     useEffect(() => {
         if (initialFilter) {
-            setTimeout(() => clearFilter(), 100);
+            setSearchQuery(initialFilter);
+            // Don't clear immediately to allow UI to update
         }
-    }, [initialFilter, clearFilter]);
+    }, [initialFilter]);
 
 
     const filteredTransactions = useMemo(() => {
@@ -189,12 +192,13 @@ const TransactionsView: React.FC<TransactionsViewProps> = ({ initialFilter, clea
     const clearSearch = () => {
         vibrate(5);
         setSearchQuery('');
+        if(clearFilter) clearFilter();
     };
 
     return (
-        <div className="p-4 pb-24 md:pb-6 h-full overflow-y-auto custom-scrollbar landscape-pb-6" id="transactions-view">
-            <div className="max-w-7xl mx-auto">
-                <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_transactions')}</h1>
+        <div className={`h-full ${!isEmbedded ? 'p-4 pb-24 md:pb-6 overflow-y-auto custom-scrollbar landscape-pb-6' : ''}`} id="transactions-view">
+            <div className={`${!isEmbedded ? 'max-w-7xl mx-auto' : ''}`}>
+                {!isEmbedded && <h1 className="text-2xl font-bold mb-4 px-1">{t('nav_transactions')}</h1>}
                 
                 <div className="mb-4 space-y-3">
                     <div className="relative group">

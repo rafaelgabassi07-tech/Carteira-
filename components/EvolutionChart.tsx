@@ -21,14 +21,25 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
         const container = containerRef.current;
         if (!container) return;
         
+        let animationFrameId: number;
+
         const observer = new ResizeObserver(entries => {
              for (const entry of entries) {
-                 const { width, height } = entry.contentRect;
-                 setDimensions({ width, height });
+                 // Wrap update in rAF to prevent layout thrashing
+                 if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                 
+                 animationFrameId = requestAnimationFrame(() => {
+                     const { width, height } = entry.contentRect;
+                     setDimensions({ width, height });
+                 });
              }
         });
         observer.observe(container);
-        return () => observer.disconnect();
+        
+        return () => {
+            observer.disconnect();
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        };
     }, []);
     
     const { width, height } = dimensions;

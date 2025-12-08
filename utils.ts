@@ -253,6 +253,12 @@ export const fromISODate = (dateString: string): Date => {
     return new Date(year, month - 1, day, 12, 0, 0);
 };
 
+// --- Financial Math Utility ---
+// Fixes floating point issues (e.g., 0.1 + 0.2 = 0.300000004)
+export const safeFloat = (value: number): number => {
+    return Math.round(value * 10000) / 10000;
+};
+
 // --- WebAuthn Buffer Encoding/Decoding for Biometrics ---
 export const bufferEncode = (buffer: ArrayBuffer): string => {
     const bytes = new Uint8Array(buffer);
@@ -335,15 +341,6 @@ export const CacheManager = {
     },
 
     clearAll: async (): Promise<void> => {
-        // Warning: This clears everything in the store, not just cache keys
-        // A safer way if store is shared is to iterate keys.
-        // For now we assume sharing the store, so we only clear keys starting with cache_
-        // IDB generic clear is too aggressive if we share the store with main data.
-        // But since we use one store for everything, we shouldn't use idb.clear().
-        // We will implement a specialized clear if needed, or simply let data expire.
-        // Ideally, 'clear' in this app context often means 'reset app'.
-        // For explicit cache clearing, we might need a key scan.
-        // Simple strategy: Clear keys via cursor if strictly needed.
     }
 };
 
@@ -368,14 +365,14 @@ export const calculatePortfolioMetrics = (transactions: Transaction[]): Record<s
 
         if (tx.type === 'Compra') {
             const cost = (tx.quantity * tx.price) + (tx.costs || 0);
-            position.totalCost += cost;
-            position.quantity += tx.quantity;
+            position.totalCost = safeFloat(position.totalCost + cost);
+            position.quantity = safeFloat(position.quantity + tx.quantity);
         } else if (tx.type === 'Venda') {
             const sellQuantity = Math.min(tx.quantity, position.quantity);
             if (position.quantity > EPSILON) {
                 const avgPrice = position.totalCost / position.quantity;
-                position.totalCost -= sellQuantity * avgPrice;
-                position.quantity -= sellQuantity;
+                position.totalCost = safeFloat(position.totalCost - (sellQuantity * avgPrice));
+                position.quantity = safeFloat(position.quantity - sellQuantity);
             }
         }
         
@@ -449,8 +446,8 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
         daysTxs.forEach(tx => {
             const tkr = tx.ticker.toUpperCase();
             if (tx.type === 'Compra') {
-                holdings[tkr] = (holdings[tkr] || 0) + tx.quantity;
-                invested[tkr] = (invested[tkr] || 0) + (tx.quantity * tx.price + (tx.costs || 0));
+                holdings[tkr] = safeFloat((holdings[tkr] || 0) + tx.quantity);
+                invested[tkr] = safeFloat((invested[tkr] || 0) + (tx.quantity * tx.price + (tx.costs || 0)));
                 
                 // CRITICAL: Initialize price if unknown (for new assets)
                 if (lastKnownPrice[tkr] === undefined) {
@@ -462,8 +459,8 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
                 const avgPrice = currentQty > 0 ? currentInvested / currentQty : 0;
                 const sellQty = Math.min(tx.quantity, currentQty);
                 
-                holdings[tkr] = currentQty - sellQty;
-                invested[tkr] = Math.max(0, currentInvested - (sellQty * avgPrice));
+                holdings[tkr] = safeFloat(currentQty - sellQty);
+                invested[tkr] = safeFloat(Math.max(0, currentInvested - (sellQty * avgPrice)));
             }
         });
 
@@ -481,13 +478,13 @@ export const calculatePortfolioEvolution = (transactions: Transaction[], marketD
         involvedTickers.forEach(tkr => {
             const qty = holdings[tkr] || 0;
             if (qty > EPSILON) {
-                totalInvested += invested[tkr] || 0;
+                totalInvested = safeFloat(totalInvested + (invested[tkr] || 0));
                 
                 // Use last known price (from history or transaction) or fallback to cost avg
                 let price = lastKnownPrice[tkr];
                 if (!price) price = invested[tkr] / qty;
                 
-                totalMarket += qty * price;
+                totalMarket = safeFloat(totalMarket + (qty * price));
             }
         });
 

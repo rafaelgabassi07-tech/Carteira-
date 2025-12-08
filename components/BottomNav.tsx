@@ -1,9 +1,7 @@
 
 import React from 'react';
 import type { View } from '../App';
-import LayoutGridIcon from './icons/LayoutGridIcon';
 import WalletIcon from './icons/WalletIcon';
-import TransactionIcon from './icons/TransactionIcon';
 import GlobeIcon from './icons/GlobeIcon';
 import { vibrate } from '../utils';
 import { useI18n } from '../contexts/I18nContext';
@@ -67,13 +65,12 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView }) => {
   return (
     <div className="fixed bottom-6 left-4 right-4 z-[100] flex justify-center pointer-events-none">
         <div 
-          className="pointer-events-auto h-[72px] w-full max-w-[380px] bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-color)] rounded-[32px] shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-between px-2 overflow-hidden ring-1 ring-white/5 transition-transform duration-300 hover:scale-[1.01]"
+          className="pointer-events-auto h-[72px] w-full max-w-[280px] bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-color)] rounded-[32px] shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-between px-2 overflow-hidden ring-1 ring-white/5 transition-transform duration-300 hover:scale-[1.01]"
           style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
-          <NavItem label={t('nav_portfolio')} view="dashboard" icon={<LayoutGridIcon />} isActive={activeView === 'dashboard'} onClick={() => handleNavClick('dashboard')} />
           <NavItem label={t('nav_analysis')} view="carteira" icon={<WalletIcon />} isActive={activeView === 'carteira'} onClick={() => handleNavClick('carteira')} />
+          <div className="w-px h-8 bg-[var(--border-color)] opacity-50"></div>
           <NavItem label={t('nav_market')} view="mercado" icon={<GlobeIcon />} isActive={activeView === 'mercado'} onClick={() => handleNavClick('mercado')} />
-          <NavItem label={t('nav_transactions')} view="transacoes" icon={<TransactionIcon />} isActive={activeView === 'transacoes'} onClick={() => handleNavClick('transacoes')} />
         </div>
     </div>
   );

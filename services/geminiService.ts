@@ -18,27 +18,25 @@ function getGeminiApiKey(prefs: AppPreferences): string {
 
 const createClient = (apiKey: string) => new GoogleGenAI({ apiKey });
 
-// Helper to extract JSON from Markdown code blocks or raw text
+// Enhanced Helper to extract JSON from potentially messy text
 function extractAndParseJSON(text: string): any {
     if (!text) return null;
     try {
         // 1. Try to find JSON inside ```json ... ``` or just ``` ... ```
         const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (match && match[1]) {
-            return JSON.parse(match[1]);
-        }
-        
-        // 2. Try to find the first '{' or '[' and the last '}' or ']'
-        const firstOpen = text.indexOf('{');
-        const firstArray = text.indexOf('[');
+        let jsonStr = match && match[1] ? match[1] : text;
+
+        // 2. Locate the outermost brackets to discard surrounding text
+        const firstOpen = jsonStr.indexOf('{');
+        const firstArray = jsonStr.indexOf('[');
         let start = -1;
         
         if (firstOpen !== -1 && firstArray !== -1) start = Math.min(firstOpen, firstArray);
         else if (firstOpen !== -1) start = firstOpen;
         else if (firstArray !== -1) start = firstArray;
 
-        const lastClose = text.lastIndexOf('}');
-        const lastArray = text.lastIndexOf(']');
+        const lastClose = jsonStr.lastIndexOf('}');
+        const lastArray = jsonStr.lastIndexOf(']');
         let end = -1;
 
         if (lastClose !== -1 && lastArray !== -1) end = Math.max(lastClose, lastArray);
@@ -46,15 +44,16 @@ function extractAndParseJSON(text: string): any {
         else if (lastArray !== -1) end = lastArray;
 
         if (start !== -1 && end !== -1 && end > start) {
-            const jsonStr = text.substring(start, end + 1);
-            return JSON.parse(jsonStr);
+            jsonStr = jsonStr.substring(start, end + 1);
         }
 
-        // 3. Last resort: Try parsing the whole text
-        return JSON.parse(text);
+        // 3. Sanitization: Remove comments and trailing commas which break JSON.parse
+        jsonStr = jsonStr.replace(/\/\/.*$/gm, ''); // Remove single-line comments
+        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1'); // Remove trailing commas before closing brackets
+
+        return JSON.parse(jsonStr);
     } catch (e) {
         console.error("Failed to parse JSON from Gemini response:", e);
-        // console.debug("Raw text:", text);
         return null;
     }
 }

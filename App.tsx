@@ -12,9 +12,7 @@ import { isLowEndDevice } from './utils';
 import type { MenuScreen } from './views/SettingsView';
 
 // Lazy Load Views
-const PortfolioView = React.lazy(() => import('./views/PortfolioView'));
 const SettingsView = React.lazy(() => import('./views/SettingsView'));
-const TransactionsView = React.lazy(() => import('./views/TransactionsView'));
 const NotificationsView = React.lazy(() => import('./views/NotificationsView'));
 const AnalysisView = React.lazy(() => import('./views/AnalysisView'));
 const AssetDetailView = React.lazy(() => import('./views/AssetDetailView'));
@@ -23,13 +21,15 @@ const IncomeReportView = React.lazy(() => import('./views/IncomeReportView'));
 const PinLockScreen = React.lazy(() => import('./components/PinLockScreen'));
 
 
-export type View = 'dashboard' | 'carteira' | 'transacoes' | 'mercado' | 'settings' | 'notificacoes' | 'assetDetail' | 'incomeReport';
+export type View = 'carteira' | 'mercado' | 'settings' | 'notificacoes' | 'assetDetail' | 'incomeReport' | 'dashboard' | 'transacoes';
 
 const App: React.FC = () => {
-  const { assets, preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
+  const { preferences, marketDataError, setTheme, unreadNotificationsCount } = usePortfolio();
   const { t } = useI18n();
-  const [activeView, setActiveView] = useState<View>(preferences.startScreen as View || 'dashboard');
-  const [previousView, setPreviousView] = useState<View>('dashboard');
+  
+  const startScreen = preferences.startScreen === 'mercado' ? 'mercado' : 'carteira';
+  const [activeView, setActiveView] = useState<View>(startScreen as View);
+  const [previousView, setPreviousView] = useState<View>('carteira');
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [transactionFilter, setTransactionFilter] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
@@ -46,9 +46,13 @@ const App: React.FC = () => {
       if (shareParam) {
           // If receiving shared text, go to Market
           setActiveView('mercado');
-      } else if (viewParam && ['dashboard', 'carteira', 'transacoes', 'settings', 'mercado'].includes(viewParam)) {
+      } else if (viewParam && ['carteira', 'settings', 'mercado'].includes(viewParam)) {
           // If coming from Shortcut
           setActiveView(viewParam as View);
+          if (viewParam === 'transacoes') {
+              // Legacy support: redirect to carteira with transactions tab
+              setActiveView('carteira');
+          }
       }
   }, []);
 
@@ -105,7 +109,9 @@ const App: React.FC = () => {
   const handleSetView = (view: View) => {
     setPreviousView(activeView);
     setActiveView(view);
-    if(view === 'transacoes') setTransactionFilter(null);
+    // Clear transaction filter when leaving/changing views if needed, 
+    // but we might want to persist it if we go back to wallet.
+    // For now, let's keep it simple.
   };
   
   const handleSelectAsset = (ticker: string) => {
@@ -117,7 +123,7 @@ const App: React.FC = () => {
 
   const handleViewTransactionsForAsset = (ticker: string) => {
     setTransactionFilter(ticker);
-    handleSetView('transacoes');
+    handleSetView('carteira'); // Now transactions are inside carteira
   };
   
   const handleOpenSettingsScreen = (screen: MenuScreen) => {
@@ -127,15 +133,17 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case 'dashboard': return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} unreadNotificationsCount={unreadNotificationsCount} />;
       case 'settings': return <SettingsView addToast={addToast} initialScreen={settingsStartScreen} />;
-      case 'transacoes': return <TransactionsView initialFilter={transactionFilter} clearFilter={() => setTransactionFilter(null)} addToast={addToast} />;
       case 'notificacoes': return <NotificationsView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} onOpenSettings={handleOpenSettingsScreen} />;
-      case 'carteira': return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} />;
+      case 'carteira': 
+      case 'dashboard':
+        return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} unreadNotificationsCount={unreadNotificationsCount} setActiveView={handleSetView} initialTransactionFilter={transactionFilter} clearTransactionFilter={() => setTransactionFilter(null)} />;
+      case 'transacoes':
+        return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} unreadNotificationsCount={unreadNotificationsCount} setActiveView={handleSetView} initialTab='transactions' />;
       case 'mercado': return <MarketView addToast={addToast} />;
-      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} addToast={addToast} /> : <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} />;
+      case 'assetDetail': return selectedTicker ? <AssetDetailView ticker={selectedTicker} onBack={handleBackFromDetail} onViewTransactions={handleViewTransactionsForAsset} addToast={addToast} /> : <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} unreadNotificationsCount={unreadNotificationsCount} setActiveView={handleSetView} />;
       case 'incomeReport': return <IncomeReportView onBack={handleBackFromDetail} />;
-      default: return <PortfolioView setActiveView={handleSetView} onSelectAsset={handleSelectAsset} addToast={addToast} />;
+      default: return <AnalysisView addToast={addToast} onSelectAsset={handleSelectAsset} unreadNotificationsCount={unreadNotificationsCount} setActiveView={handleSetView} />;
     }
   };
 

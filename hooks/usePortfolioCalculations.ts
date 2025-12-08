@@ -1,8 +1,7 @@
 
 import { useMemo } from 'react';
 import type { Asset, Transaction, PortfolioEvolutionPoint, MonthlyIncome, DividendHistoryEvent } from '../types';
-// FIX: STATIC_FII_SECTORS is exported from constants.ts, not utils.ts
-import { calculatePortfolioMetrics, calculatePortfolioEvolution } from '../utils';
+import { calculatePortfolioMetrics, calculatePortfolioEvolution, safeFloat } from '../utils';
 import { STATIC_FII_SECTORS } from '../constants';
 
 export interface PayerData {
@@ -37,15 +36,27 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
             }
             if (!segment) segment = 'Outros';
 
+            // Ensure YOC calculation is safe
+            const dyVal = data.dy || 0;
+            const yoc = avgPrice > 0 ? ((curPrice * (dyVal/100))/avgPrice)*100 : 0;
+
             return {
-                ticker, quantity: m.quantity, avgPrice, currentPrice: curPrice,
+                ticker, 
+                quantity: m.quantity, 
+                avgPrice: safeFloat(avgPrice), 
+                currentPrice: curPrice,
                 priceHistory: data.priceHistory || [],
                 dividendsHistory: Array.from(histMap.values()).sort((a,b) => b.exDate.localeCompare(a.exDate)),
-                dy: data.dy, pvp: data.pvp, segment: segment,
-                administrator: data.administrator, vacancyRate: data.vacancyRate, liquidity: data.dailyLiquidity,
+                dy: data.dy, 
+                pvp: data.pvp, 
+                segment: segment,
+                administrator: data.administrator, 
+                vacancyRate: data.vacancyRate, 
+                liquidity: data.dailyLiquidity,
                 shareholders: data.shareholders, 
-                yieldOnCost: avgPrice > 0 ? ((curPrice * ((data.dy||0)/100))/avgPrice)*100 : 0,
-                nextPaymentDate: data.nextPaymentDate, lastDividend: data.lastDividend,
+                yieldOnCost: safeFloat(yoc),
+                nextPaymentDate: data.nextPaymentDate, 
+                lastDividend: data.lastDividend,
                 lastUpdated: data.lastUpdated,
                 lastFundamentalUpdate: data.lastFundamentalUpdate,
                 netWorth: data.netWorth,
@@ -79,7 +90,13 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
             const projectedYearly = asset.dy ? (asset.quantity * asset.currentPrice * (asset.dy / 100)) : 0;
             const assetYoC = asset.avgPrice > 0 ? (projectedYearly / (asset.quantity * asset.avgPrice)) * 100 : 0;
 
-            payerAggregation[asset.ticker] = { ticker: asset.ticker, yieldOnCost: assetYoC, totalPaid: 0, count: 0, projectedAmount: 0 };
+            payerAggregation[asset.ticker] = { 
+                ticker: asset.ticker, 
+                yieldOnCost: safeFloat(assetYoC), 
+                totalPaid: 0, 
+                count: 0, 
+                projectedAmount: 0 
+            };
 
             const history = asset.dividendsHistory || [];
             history.forEach(div => {
@@ -93,15 +110,15 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
                 qtyOwnedAtExDate = Math.max(0, qtyOwnedAtExDate);
 
                 if (qtyOwnedAtExDate > 0) {
-                    const amount = qtyOwnedAtExDate * div.value;
+                    const amount = safeFloat(qtyOwnedAtExDate * div.value);
                     if (div.isProvisioned) {
-                        payerAggregation[asset.ticker]!.projectedAmount! += amount;
+                        payerAggregation[asset.ticker]!.projectedAmount = safeFloat(payerAggregation[asset.ticker]!.projectedAmount! + amount);
                     } else {
-                        totalReceived += amount;
-                        payerAggregation[asset.ticker]!.totalPaid! += amount;
+                        totalReceived = safeFloat(totalReceived + amount);
+                        payerAggregation[asset.ticker]!.totalPaid = safeFloat(payerAggregation[asset.ticker]!.totalPaid! + amount);
                         payerAggregation[asset.ticker]!.count!++;
                         const monthKey = div.paymentDate.substring(0, 7); 
-                        monthlyAggregation[monthKey] = (monthlyAggregation[monthKey] || 0) + amount;
+                        monthlyAggregation[monthKey] = safeFloat((monthlyAggregation[monthKey] || 0) + amount);
                     }
                 }
             });
@@ -114,10 +131,9 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
                 payerAggregation[asset.ticker]!.lastExDate = latestDiv?.exDate;
                 payerAggregation[asset.ticker]!.isProvisioned = provisioned.length > 0;
                 payerAggregation[asset.ticker]!.nextPaymentDate = provisioned.length > 0 ? provisioned[0].paymentDate : latestDiv?.paymentDate;
-                const paymentCount = payerAggregation[asset.ticker]!.count!;
                 const totalPaid = payerAggregation[asset.ticker]!.totalPaid!;
                 const uniqueMonthsPaid = new Set(history.filter(d => !d.isProvisioned).map(d => d.paymentDate.substring(0,7))).size;
-                payerAggregation[asset.ticker]!.averageMonthly = uniqueMonthsPaid > 0 ? totalPaid / uniqueMonthsPaid : 0;
+                payerAggregation[asset.ticker]!.averageMonthly = uniqueMonthsPaid > 0 ? safeFloat(totalPaid / uniqueMonthsPaid) : 0;
             }
         });
         
@@ -136,7 +152,7 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
         const totalInvested = assets.reduce((acc, a) => acc + (a.quantity * a.avgPrice), 0);
         const totalProjected = assets.reduce((acc, a) => acc + (a.quantity * a.currentPrice * ((a.dy || 0) / 100)), 0);
         const yoc = totalInvested > 0 ? (totalProjected / totalInvested) * 100 : 0;
-        return { yieldOnCost: yoc, projectedAnnualIncome: totalProjected };
+        return { yieldOnCost: safeFloat(yoc), projectedAnnualIncome: safeFloat(totalProjected) };
     }, [assets]);
     
     const portfolioEvolution = useMemo(() => {
