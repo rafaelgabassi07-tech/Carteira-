@@ -1,11 +1,11 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v3.0.2'; // Updated version
-const RUNTIME_CACHE = 'runtime-cache-v3.0.2';
+const CACHE_NAME = 'invest-portfolio-cache-v3.0.3'; // Updated version
+const RUNTIME_CACHE = 'runtime-cache-v3.0.3';
 
 // Remove index.html from pre-cache to allow Network-First strategy to take precedence for the entry point
 // This ensures that when the user opens the app, it checks the server for a new index.html (which contains new JS hashes)
 const urlsToCache = [
-  'manifest.json',
+  './manifest.json',
   './logo.svg'
 ];
 
@@ -72,7 +72,7 @@ self.addEventListener('fetch', event => {
                     console.log('Fetch failed; returning offline page from cache.', error);
                     // Fallback to cache if offline
                     const cachedResponse = await caches.match(event.request); 
-                    return cachedResponse || caches.match('index.html') || caches.match('/');
+                    return cachedResponse || caches.match('index.html') || caches.match('./');
                 }
             })()
         );

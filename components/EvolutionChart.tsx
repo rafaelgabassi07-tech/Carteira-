@@ -105,7 +105,14 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
     const investedPathStr = data.map((d, i) => `${getX(i).toFixed(1)},${getY(d.invested).toFixed(1)}`).join(' L');
     
     // Construct Area Path with 'M' (Move) start, 'L' (Line) points, and 'Z' (Close)
-    const areaPath = `M${getX(0).toFixed(1)},${height} L${marketPathStr} L${getX(data.length - 1).toFixed(1)},${height} Z`;
+    // Ensure start point is valid. If data length is 1, getX(0) is valid.
+    const startX = getX(0).toFixed(1);
+    const endX = getX(data.length - 1).toFixed(1);
+    
+    // Explicitly add 'M' command to avoid browser parser issues with string interpolation
+    const areaPath = `M${startX},${height} L${marketPathStr} L${endX},${height} Z`;
+    const marketPathD = `M${marketPathStr}`;
+    const investedPathD = `M${investedPathStr}`;
 
     const spread = tooltip ? tooltip.point.marketValue - tooltip.point.invested : 0;
 
@@ -138,7 +145,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
 
                 {/* 2. Invested Line (Dashed) */}
                 <path 
-                    d={`M${investedPathStr}`} 
+                    d={investedPathD} 
                     fill="none" 
                     stroke="var(--text-secondary)" 
                     strokeWidth="1.5" 
@@ -148,7 +155,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
 
                 {/* 3. Market Value Line (Solid, Prominent) */}
                 <path 
-                    d={`M${marketPathStr}`} 
+                    d={marketPathD} 
                     fill="none" 
                     stroke="var(--accent-color)" 
                     strokeWidth="2.5" 
