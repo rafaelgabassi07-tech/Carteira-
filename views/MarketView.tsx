@@ -21,6 +21,7 @@ import TransactionModal from '../components/modals/TransactionModal';
 import NewsView from './NewsView';
 import PortfolioLineChart from '../components/PortfolioLineChart';
 import DividendChart from '../components/DividendChart';
+import AIAnalystCard from '../components/AIAnalystCard';
 import type { ToastMessage, Asset } from '../types';
 import { KNOWN_TICKERS } from '../constants';
 
@@ -331,9 +332,21 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                     <StatItem label="Último Rendimento" value={result.fundamentals?.lastDividend ? formatCurrency(result.fundamentals.lastDividend) : '-'} />
                                                     <StatItem label="Vacância" value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'} highlight={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'red' : 'neutral'} />
                                                 </div>
+
+                                                {/* NOVO: IA Analista Pro Integration */}
+                                                <AIAnalystCard 
+                                                    ticker={result.ticker} 
+                                                    assetData={{
+                                                        price: result.price,
+                                                        change: result.change,
+                                                        ...result.fundamentals
+                                                    }} 
+                                                    addToast={addToast}
+                                                />
+
                                                 {(result.fundamentals?.businessDescription || result.fundamentals?.riskAssessment) && (
-                                                    <div className="bg-[var(--bg-primary)] p-5 rounded-2xl relative overflow-hidden">
-                                                        <div className="flex items-center gap-2 mb-3 z-10"><SparklesIcon className="w-4 h-4 text-[var(--accent-color)]" /><span className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-wider">Insight IA</span></div>
+                                                    <div className="bg-[var(--bg-primary)] p-5 rounded-2xl relative overflow-hidden mt-6">
+                                                        <div className="flex items-center gap-2 mb-3 z-10"><SparklesIcon className="w-4 h-4 text-[var(--accent-color)]" /><span className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-wider">Resumo IA</span></div>
                                                         {result.fundamentals?.businessDescription && (<p className="text-xs leading-relaxed text-[var(--text-primary)] font-medium mb-4 z-10">{result.fundamentals.businessDescription}</p>)}
                                                         {result.fundamentals?.riskAssessment && (<div className="flex items-center gap-2 pt-3 border-t border-[var(--border-color)] z-10"><span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Risco:</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${result.fundamentals.riskAssessment.includes('Alto') ? 'bg-red-500/10 text-red-500 border-red-500/20' : (result.fundamentals.riskAssessment.includes('Médio') ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20')}`}>{result.fundamentals.riskAssessment}</span></div>)}
                                                     </div>

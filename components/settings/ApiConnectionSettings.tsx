@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import PageHeader from '../PageHeader';
 import type { ToastMessage } from '../../types';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
-import { validateBrapiToken } from '../../services/brapiService';
-import { validateGeminiKey } from '../../services/geminiService';
+import { validateBrapiToken, getEnvBrapiToken } from '../../services/brapiService';
+import { validateGeminiKey, getEnvGeminiApiKey } from '../../services/geminiService';
 import { vibrate } from '../../utils';
 import TrashIcon from '../icons/TrashIcon';
 
@@ -35,10 +36,23 @@ const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: 
     const [testingBrapi, setTestingBrapi] = useState(false);
     const [testingGemini, setTestingGemini] = useState(false);
 
+    // Detect Environment Keys
+    const envGeminiKey = getEnvGeminiApiKey();
+    const envBrapiToken = getEnvBrapiToken();
+
     const handleTestBrapi = async () => {
         vibrate();
         setTestingBrapi(true);
-        const isValid = await validateBrapiToken(brapiToken);
+        // Test logic: Use input value OR environment value
+        const tokenToTest = brapiToken || envBrapiToken || '';
+        
+        if (!tokenToTest) {
+            addToast('Nenhum token para testar', 'error');
+            setTestingBrapi(false);
+            return;
+        }
+
+        const isValid = await validateBrapiToken(tokenToTest);
         setTestingBrapi(false);
         addToast(isValid ? t('toast_connection_success') : t('toast_connection_failed'), isValid ? 'success' : 'error');
     };
@@ -46,7 +60,16 @@ const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: 
     const handleTestGemini = async () => {
         vibrate();
         setTestingGemini(true);
-        const isValid = await validateGeminiKey(geminiApiKey);
+        // Test logic: Use input value OR environment value
+        const keyToTest = geminiApiKey || envGeminiKey || '';
+
+        if (!keyToTest) {
+            addToast('Nenhuma chave para testar', 'error');
+            setTestingGemini(false);
+            return;
+        }
+
+        const isValid = await validateGeminiKey(keyToTest);
         setTestingGemini(false);
         addToast(isValid ? t('toast_connection_success') : t('toast_connection_failed'), isValid ? 'success' : 'error');
     };
@@ -71,14 +94,17 @@ const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: 
             <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] space-y-6">
                 {/* Gemini API */}
                 <div>
-                    <label className="font-bold">{t('gemini_api_key')}</label>
+                    <div className="flex justify-between items-center">
+                        <label className="font-bold">{t('gemini_api_key')}</label>
+                        {envGeminiKey && <span className="text-[10px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Ambiente Detectado</span>}
+                    </div>
                     <p className="text-xs text-[var(--text-secondary)] mb-2">{t('gemini_api_desc')}</p>
                     <input
                         type="password"
                         value={geminiApiKey}
                         onChange={(e) => setGeminiApiKey(e.target.value)}
-                        placeholder={t('api_key_placeholder')}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 mt-1 text-sm focus:outline-none focus:border-[var(--accent-color)]"
+                        placeholder={envGeminiKey ? "Usando chave de ambiente (Vercel)..." : t('api_key_placeholder')}
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 mt-1 text-sm focus:outline-none focus:border-[var(--accent-color)] placeholder:text-[var(--text-secondary)]/50"
                     />
                         <button 
                         onClick={handleTestGemini} 
@@ -91,14 +117,17 @@ const ApiConnectionSettings: React.FC<{ onBack: () => void; addToast: (message: 
                 
                 {/* Brapi API */}
                 <div>
-                    <label className="font-bold">{t('brapi_token')}</label>
+                    <div className="flex justify-between items-center">
+                        <label className="font-bold">{t('brapi_token')}</label>
+                        {envBrapiToken && <span className="text-[10px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Ambiente Detectado</span>}
+                    </div>
                     <p className="text-xs text-[var(--text-secondary)] mb-2">{t('brapi_desc')}</p>
                     <input
                         type="password"
                         value={brapiToken}
                         onChange={(e) => setBrapiToken(e.target.value)}
-                        placeholder={t('api_key_placeholder')}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 mt-1 text-sm focus:outline-none focus:border-[var(--accent-color)]"
+                        placeholder={envBrapiToken ? "Usando token de ambiente (Vercel)..." : t('api_key_placeholder')}
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2 mt-1 text-sm focus:outline-none focus:border-[var(--accent-color)] placeholder:text-[var(--text-secondary)]/50"
                     />
                         <button 
                         onClick={handleTestBrapi} 

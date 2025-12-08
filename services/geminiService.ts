@@ -4,12 +4,17 @@ import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types
 
 // --- Configuration & Helpers ---
 
+// Helper para expor se a chave existe no ambiente (para a UI)
+export function getEnvGeminiApiKey(): string | undefined {
+    // @ts-ignore
+    return import.meta.env.VITE_API_KEY;
+}
+
 function getGeminiApiKey(prefs: AppPreferences): string {
     if (prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '') {
         return prefs.geminiApiKey;
     }
-    // @ts-ignore
-    const envApiKey = import.meta.env.VITE_API_KEY;
+    const envApiKey = getEnvGeminiApiKey();
     if (envApiKey && envApiKey.trim() !== '') {
         return envApiKey;
     }
@@ -312,6 +317,61 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     } catch (e) {
         console.error("Gemini Fundamentals Error:", e);
         throw e;
+    }
+}
+
+export async function askAssetAnalyst(
+    prefs: AppPreferences, 
+    ticker: string, 
+    question: string, 
+    assetContext: any
+): Promise<{ answer: string; stats: { bytesSent: number; bytesReceived: number } }> {
+    const apiKey = getGeminiApiKey(prefs);
+    const ai = createClient(apiKey);
+
+    // Prepare context to grounding the AI
+    const contextString = JSON.stringify(assetContext, null, 2);
+    const today = new Date().toLocaleDateString('pt-BR');
+
+    const prompt = `
+    Atue como um Analista Financeiro Sênior (CFA) especializado em Fundos Imobiliários (FIIs) e Ações Brasileiras.
+    O usuário está perguntando sobre o ativo: ${ticker}.
+    
+    DADOS FUNDAMENTAIS ATUAIS (Use estes dados como verdade absoluta):
+    ${contextString}
+    
+    Data de hoje: ${today}
+    
+    PERGUNTA DO USUÁRIO: "${question}"
+    
+    DIRETRIZES:
+    1. Seja direto, objetivo e profissional.
+    2. Use os dados fornecidos acima para embasar sua resposta. Se o P/VP estiver alto, mencione. Se a vacância for risco, alerte.
+    3. Se a pergunta for sobre "Vale a pena?", analise os prós e contras baseado nos indicadores (DY, P/VP, Liquidez), mas finalize com o disclaimer padrão.
+    4. Use formatação Markdown (negrito para destaque, listas para tópicos).
+    5. Se precisar de informações recentes que NÃO estão no JSON (ex: fatos relevantes de ontem), use a ferramenta googleSearch.
+    
+    Responda em português do Brasil.`;
+
+    try {
+        const response = await generateContentWithRetry(ai, {
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+            }
+        });
+
+        const answer = response.text || "Não consegui analisar este cenário no momento.";
+        
+        return {
+            answer,
+            stats: { bytesSent: prompt.length, bytesReceived: answer.length }
+        };
+
+    } catch (error: any) {
+        console.error("AI Analyst Error:", error);
+        throw new Error(error.message || "Erro ao consultar o analista.");
     }
 }
 

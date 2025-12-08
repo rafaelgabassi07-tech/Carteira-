@@ -6,11 +6,17 @@ interface BrapiHistoricalData {
     close: number;
 }
 
+// Helper para expor se a chave existe no ambiente (para a UI)
+export function getEnvBrapiToken(): string | undefined {
+    // @ts-ignore
+    return import.meta.env.VITE_BRAPI_TOKEN;
+}
+
 function getBrapiToken(prefs: AppPreferences): string {
     if (prefs.brapiToken && prefs.brapiToken.trim() !== '') {
         return prefs.brapiToken;
     }
-    const envToken = (import.meta as any).env?.VITE_BRAPI_TOKEN;
+    const envToken = getEnvBrapiToken();
     if (envToken && envToken.trim() !== '') {
         return envToken;
     }
