@@ -321,13 +321,15 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const failedTickers: string[] = [];
 
           if (assetsNeedingUpdate.length > 0) {
-              // Batch processing changed to 30 (Aggregated Request) for minimal network calls
-              // This consolidates updates into a single request for most users
-              const batches = chunkArray(assetsNeedingUpdate, 30); 
+              // Batch processing set to 40. This allows most portfolios to update in a SINGLE API call.
+              // Gemini 2.5 Flash has a massive context window, so putting all assets in one prompt is more efficient
+              // for the Rate Limits (RPM) than making multiple small calls.
+              const batches = chunkArray(assetsNeedingUpdate, 40); 
               
               for (let i = 0; i < batches.length; i++) {
                   const batch = batches[i];
                   try {
+                      // Note: fetchAdvancedAssetData now has internal retry logic for 429s
                       const geminiRes = await fetchAdvancedAssetData(preferences, batch);
                       logApiUsage('gemini', { requests: 1, ...geminiRes.stats });
 
@@ -348,9 +350,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       failedTickers.push(...batch);
                   }
                   
-                  // Rate limit delay: Wait 4.5s between batches (if multiple) to avoid 429
+                  // Rate limit delay: Even with retries, waiting between batches is good practice
                   if (i < batches.length - 1) {
-                      await new Promise(resolve => setTimeout(resolve, 4500));
+                      await new Promise(resolve => setTimeout(resolve, 2000));
                   }
               }
           }

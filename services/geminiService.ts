@@ -59,6 +59,52 @@ function extractAndParseJSON(text: string): any {
     }
 }
 
+// --- Helper for 429 Retries ---
+async function generateContentWithRetry(
+    ai: GoogleGenAI, 
+    params: any, 
+    maxRetries = 3
+): Promise<any> {
+    let attempt = 0;
+    
+    while (attempt <= maxRetries) {
+        try {
+            const response = await ai.models.generateContent(params);
+            return response;
+        } catch (error: any) {
+            // Check for 429 (Resource Exhausted / Quota Exceeded)
+            // Google GenAI SDK might wrap the error, check status or message
+            const isQuotaError = error.status === 429 || 
+                                 (error.message && error.message.includes('429')) ||
+                                 (error.message && error.message.includes('quota'));
+
+            if (isQuotaError && attempt < maxRetries) {
+                attempt++;
+                
+                // Try to parse "Please retry in X s." from message
+                let waitTime = 5000 * Math.pow(2, attempt); // Default exponential backoff: 10s, 20s, 40s
+                
+                if (error.message) {
+                    const match = error.message.match(/retry in (\d+(\.\d+)?)s/);
+                    if (match && match[1]) {
+                        // Add 1s buffer to the suggested time
+                        waitTime = (parseFloat(match[1]) + 1) * 1000;
+                    }
+                }
+
+                console.warn(`Gemini Quota Exceeded (429). Waiting ${waitTime}ms before retry ${attempt}/${maxRetries}...`);
+                
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                continue;
+            }
+            
+            // If not 429 or max retries reached, throw
+            throw error;
+        }
+    }
+}
+
 export interface NewsFilter {
     query?: string;
     tickers?: string[];
@@ -97,12 +143,12 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     ]`;
 
     try {
-        const response = await ai.models.generateContent({
+        // Use the retry wrapper
+        const response = await generateContentWithRetry(ai, {
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                // Note: responseSchema and responseMimeType are removed to support googleSearch
             }
         });
 
@@ -111,7 +157,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         
         // Enhance with Grounding Metadata (URLs) if JSON url is empty
         const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        const webChunks = groundingChunks.filter(c => c.web && c.web.uri);
+        const webChunks = groundingChunks.filter((c: any) => c.web && c.web.uri);
 
         const enhancedArticles = Array.isArray(articles) ? articles.map((art: any, idx: number) => {
             let realUrl = art.url;
@@ -154,7 +200,7 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
     Se não encontrar, retorne null. Não use markdown.`;
 
     try {
-        const response = await ai.models.generateContent({
+        const response = await generateContentWithRetry(ai, {
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
@@ -221,7 +267,8 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     Se um dado numérico não for encontrado, use null (não use zero se não for zero).`;
 
     try {
-        const response = await ai.models.generateContent({
+        // Use the retry wrapper for heavy requests
+        const response = await generateContentWithRetry(ai, {
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
