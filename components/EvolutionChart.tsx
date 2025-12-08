@@ -99,10 +99,13 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
 
     if (width === 0 || data.length === 0) return <div ref={containerRef} className="w-full h-full" />;
 
-    // Generate Paths
-    const marketPath = data.map((d, i) => `${getX(i).toFixed(1)},${getY(d.marketValue).toFixed(1)}`).join(' ');
-    const investedPath = data.map((d, i) => `${getX(i).toFixed(1)},${getY(d.invested).toFixed(1)}`).join(' ');
-    const areaPath = `${getX(0)},${height} ${marketPath} ${getX(data.length - 1)},${height}`;
+    // Generate Paths with Explicit Commands
+    // Helper to join points with 'L' command implicitly or explicitly for compatibility
+    const marketPathStr = data.map((d, i) => `${getX(i).toFixed(1)},${getY(d.marketValue).toFixed(1)}`).join(' L');
+    const investedPathStr = data.map((d, i) => `${getX(i).toFixed(1)},${getY(d.invested).toFixed(1)}`).join(' L');
+    
+    // Construct Area Path with 'M' (Move) start, 'L' (Line) points, and 'Z' (Close)
+    const areaPath = `M${getX(0)},${height} L${marketPathStr} L${getX(data.length - 1)},${height} Z`;
 
     const spread = tooltip ? tooltip.point.marketValue - tooltip.point.invested : 0;
 
@@ -135,7 +138,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
 
                 {/* 2. Invested Line (Dashed) */}
                 <path 
-                    d={`M${investedPath}`} 
+                    d={`M${investedPathStr}`} 
                     fill="none" 
                     stroke="var(--text-secondary)" 
                     strokeWidth="1.5" 
@@ -145,7 +148,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
 
                 {/* 3. Market Value Line (Solid, Prominent) */}
                 <path 
-                    d={`M${marketPath}`} 
+                    d={`M${marketPathStr}`} 
                     fill="none" 
                     stroke="var(--accent-color)" 
                     strokeWidth="2.5" 

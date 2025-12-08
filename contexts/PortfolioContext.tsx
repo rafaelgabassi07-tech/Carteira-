@@ -347,9 +347,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       failedTickers.push(...batch);
                   }
                   
-                  // Rate limit delay: Wait 2.0s between individual asset requests
+                  // Rate limit delay: Wait 4.5s between individual asset requests to avoid 429
                   if (i < batches.length - 1) {
-                      await new Promise(resolve => setTimeout(resolve, 2000));
+                      await new Promise(resolve => setTimeout(resolve, 4500));
                   }
               }
           }
