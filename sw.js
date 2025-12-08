@@ -1,16 +1,13 @@
+const CACHE_NAME = 'invest-portfolio-cache-v3.0.4'; // Updated version
+const RUNTIME_CACHE = 'runtime-cache-v3.0.4';
 
-const CACHE_NAME = 'invest-portfolio-cache-v3.0.3'; // Updated version
-const RUNTIME_CACHE = 'runtime-cache-v3.0.3';
-
-// Remove index.html from pre-cache to allow Network-First strategy to take precedence for the entry point
-// This ensures that when the user opens the app, it checks the server for a new index.html (which contains new JS hashes)
 const urlsToCache = [
   './manifest.json',
   './logo.svg'
 ];
 
 self.addEventListener('install', event => {
-  self.skipWaiting(); // Force activation immediately
+  self.skipWaiting(); 
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(async cache => {
@@ -48,21 +45,16 @@ const API_HOSTS = ['brapi.dev', 'generativelanguage.googleapis.com'];
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
-    // 1. API calls are network-only and not handled by the SW.
     if (API_HOSTS.some(host => url.hostname.includes(host))) {
         return; 
     }
 
-    // 2. App Navigation & HTML: Network-first, fallback to cache for offline SPA support.
-    // This is the CRITICAL fix for the "GitHub updates not showing" issue.
     if (event.request.mode === 'navigate' || event.request.destination === 'document') {
         event.respondWith(
             (async () => {
                 try {
-                    // Network First: Try to get the latest index.html from the server
                     const networkResponse = await fetch(event.request);
                     
-                    // Update cache only if successful and valid
                     if (networkResponse && networkResponse.status === 200) {
                          const cache = await caches.open(CACHE_NAME);
                          cache.put(event.request, networkResponse.clone());
@@ -70,7 +62,6 @@ self.addEventListener('fetch', event => {
                     return networkResponse;
                 } catch (error) {
                     console.log('Fetch failed; returning offline page from cache.', error);
-                    // Fallback to cache if offline
                     const cachedResponse = await caches.match(event.request); 
                     return cachedResponse || caches.match('index.html') || caches.match('./');
                 }
@@ -79,9 +70,6 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // 3. Static Assets (JS, CSS, Images): Cache-first, fallback to network.
-    // Since index.html is Network-First, it will request new JS filenames (hashes) when updated.
-    // These new files won't be in cache, so they will be fetched from network and then cached.
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
             if (cachedResponse) {

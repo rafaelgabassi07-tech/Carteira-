@@ -1,11 +1,21 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { AppPreferences, Transaction, AppNotification, Asset, MonthlyIncome } from '../types';
 // FIX: import calculatePortfolioMetrics from ../utils
-import { usePersistentState, calculatePortfolioMetrics } from '../utils';
+import { usePersistentState, calculatePortfolioMetrics, safeFloat } from '../utils';
 import { DEFAULT_PREFERENCES } from '../constants';
 import { usePortfolioCalculations, PayerData } from '../hooks/usePortfolioCalculations';
 import { fetchBrapiQuotes } from '../services/brapiService';
 import { fetchAdvancedAssetData } from '../services/geminiService'; // Import Gemini service
+
+// --- Helper Functions ---
+const chunkArray = <T,>(array: T[], size: number): T[][] => {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+        chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+};
+
 
 interface PortfolioContextType {
     preferences: AppPreferences;
@@ -70,11 +80,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [marketDataError, setMarketDataError] = useState<string | null>(null);
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const marketDataRef = useRef(marketData);
 
     // Derived State via Hook
     const calculations = usePortfolioCalculations(transactions, marketData);
-
+    
     // Effects
+    useEffect(() => {
+        marketDataRef.current = marketData;
+    }, [marketData]);
+
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', preferences.currentThemeId.includes('dark') ? 'dark' : 'light');
     }, [preferences.currentThemeId]);
@@ -112,63 +127,102 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (isRefreshing || calculations.assets.length === 0) return;
         setIsRefreshing(true);
         setMarketDataError(null);
-
+        let brapiErrorOccurred = false;
+        let geminiErrorOccurred = false;
+        const failedGeminiTickers: string[] = [];
+    
         try {
             // --- Step 1: Fetch Prices from Brapi ---
-            const allTickers = calculations.assets.map(a => a.ticker);
-            const { quotes: priceQuotes, stats: brapiStats } = await fetchBrapiQuotes(preferences, allTickers);
-            
-            logApiUsage('brapi', { requests: 1, ...brapiStats });
-            
-            // Apply price updates immediately
-            setMarketData(prev => {
-                const next = { ...prev };
-                Object.entries(priceQuotes).forEach(([ticker, data]) => {
-                    next[ticker] = { ...(prev[ticker] || {}), ...data, lastUpdated: Date.now() };
+            const allTickers = (calculations.assets as Asset[]).map(a => a.ticker);
+            try {
+                const { quotes: priceQuotes, stats: brapiStats } = await fetchBrapiQuotes(preferences, allTickers);
+                logApiUsage('brapi', { requests: 1, ...brapiStats });
+                
+                setMarketData(prev => {
+                    const next = { ...prev };
+                    // FIX: Use Object.keys to ensure ticker is a string and avoid potential type errors.
+                    Object.keys(priceQuotes).forEach(ticker => {
+                        const data = priceQuotes[ticker as keyof typeof priceQuotes];
+                        next[ticker] = { ...(prev[ticker] || {}), ...data, lastUpdated: Date.now() };
+                    });
+                    return next;
                 });
-                return next;
-            });
-
-            // --- Step 2: Fetch Fundamental Data from Gemini ---
+            } catch (brapiError) {
+                console.error("Brapi Error:", brapiError);
+                brapiErrorOccurred = true;
+            }
+    
+            // --- Step 2: Fetch Fundamental Data from Gemini in Batches ---
             const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+            // FIX: Cast calculations.assets to Asset[] to fix type inference issues causing downstream errors.
             const assetsNeedingUpdate = force 
                 ? allTickers 
-                : calculations.assets
-                    .filter(a => !a.lastFundamentalUpdate || Date.now() - a.lastFundamentalUpdate > ONE_DAY_MS)
+                : (calculations.assets as Asset[])
+                    .filter(a => !a.lastFundamentalUpdate || Date.now() - (a.lastFundamentalUpdate || 0) > ONE_DAY_MS)
                     .map(a => a.ticker);
-
+    
             if (assetsNeedingUpdate.length > 0) {
-                try {
-                    const { data: fundamentalData, stats: geminiStats } = await fetchAdvancedAssetData(preferences, assetsNeedingUpdate);
-                    
-                    logApiUsage('gemini', { requests: 1, ...geminiStats });
-
-                    setMarketData(prev => {
-                        const next = { ...prev };
-                        Object.entries(fundamentalData).forEach(([ticker, data]) => {
-                            next[ticker] = { ...(prev[ticker] || {}), ...data, lastFundamentalUpdate: Date.now() };
+                // Batch processing to be nicer to the Gemini API
+                const batches = chunkArray(assetsNeedingUpdate, 5); // Process in batches of 5
+                
+                for (let i = 0; i < batches.length; i++) {
+                    const batch = batches[i];
+                    try {
+                        const { data: fundamentalData, stats: geminiStats } = await fetchAdvancedAssetData(preferences, batch);
+                        logApiUsage('gemini', { requests: 1, ...geminiStats });
+    
+                        setMarketData(prev => {
+                            const next = { ...prev };
+                            // FIX: Use Object.keys to ensure ticker is a string and fix indexing errors with 'unknown' type.
+                            Object.keys(fundamentalData).forEach(ticker => {
+                                const data = fundamentalData[ticker];
+                                next[ticker] = { ...(prev[ticker] || {}), ...data, lastFundamentalUpdate: Date.now() };
+                            });
+                            return next;
                         });
-                        return next;
-                    });
-                } catch (geminiError: any) {
-                     console.error("Gemini Fundamentals Error:", geminiError);
-                     // Set a partial error, prices might have updated
-                     setMarketDataError('Dados de preços atualizados, mas falha ao buscar dados fundamentalistas.');
+
+                        // Check which tickers in batch were not returned
+                        // FIX: With assetsNeedingUpdate typed correctly, 'ticker' is now a string, fixing this check.
+                        batch.forEach(ticker => {
+                            if (!fundamentalData[ticker]) {
+                                failedGeminiTickers.push(ticker);
+                            }
+                        });
+
+                    } catch (geminiError: any) {
+                        console.error(`Gemini Fundamentals Error for batch ${i+1}:`, geminiError);
+                        geminiErrorOccurred = true;
+                        failedGeminiTickers.push(...batch);
+                    }
+    
+                    // Wait between batches to avoid rate limiting
+                    if (i < batches.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 5000)); // 5-second delay
+                    }
                 }
             }
+    
         } catch (e: any) {
+            // General catch for unexpected errors
             setMarketDataError(e.message);
         } finally {
             setIsRefreshing(false);
+            // Consolidated error reporting
+            if (brapiErrorOccurred && geminiErrorOccurred) {
+                setMarketDataError('Falha ao atualizar preços e fundamentos.');
+            } else if (brapiErrorOccurred) {
+                setMarketDataError('Falha ao atualizar preços (Brapi). Fundamentos OK.');
+            } else if (failedGeminiTickers.length > 0) {
+                 setMarketDataError(`Alguns dados fundamentais falharam: ${failedGeminiTickers.slice(0, 3).join(', ')}...`);
+            }
         }
     }, [isRefreshing, calculations.assets, preferences]);
-
 
     const refreshSingleAsset = async (ticker: string, force = false) => {
          if (isRefreshing) return;
          setIsRefreshing(true);
          try {
-            await refreshMarketData(true); // For simplicity, just trigger a full refresh.
+            await refreshMarketData(true);
          } catch (e: any) {
              console.error("Single asset refresh failed", e);
          } finally {
@@ -181,8 +235,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             ...prev,
             [api]: {
                 requests: prev[api].requests + (stats.requests || 0),
-                bytesSent: (prev[api] as any).bytesSent + (stats.bytesSent || 0),
-                bytesReceived: prev[api].bytesReceived + (stats.bytesReceived || 0)
+                bytesSent: safeFloat((prev[api] as any).bytesSent + (stats.bytesSent || 0)),
+                bytesReceived: safeFloat(prev[api].bytesReceived + (stats.bytesReceived || 0))
             }
         }));
     };
