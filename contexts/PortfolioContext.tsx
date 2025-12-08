@@ -1,10 +1,11 @@
-
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { AppPreferences, Transaction, AppNotification, Asset, MonthlyIncome } from '../types';
-import { usePersistentState } from '../utils';
+// FIX: import calculatePortfolioMetrics from ../utils
+import { usePersistentState, calculatePortfolioMetrics } from '../utils';
 import { DEFAULT_PREFERENCES } from '../constants';
 import { usePortfolioCalculations, PayerData } from '../hooks/usePortfolioCalculations';
 import { fetchBrapiQuotes } from '../services/brapiService';
+import { fetchAdvancedAssetData } from '../services/geminiService'; // Import Gemini service
 
 interface PortfolioContextType {
     preferences: AppPreferences;
@@ -84,6 +85,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setDeferredPrompt(e);
         });
     }, []);
+    
+    // Initial Load
+    useEffect(() => {
+        const hasAssets = calculations.assets.length > 0;
+        const hasMarketData = calculations.assets.some(a => a.lastUpdated);
+        if(hasAssets && !hasMarketData) {
+            console.log("Initial Load: Missing data detected, forcing refresh.");
+            refreshMarketData(true);
+        }
+    }, [calculations.assets.length]);
 
     // Actions
     const updatePreferences = (prefs: Partial<AppPreferences>) => {
@@ -97,36 +108,67 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const getAssetByTicker = (ticker: string) => calculations.assets.find(a => a.ticker === ticker);
 
-    const refreshMarketData = async (force = false) => {
-        if (isRefreshing) return;
+    const refreshMarketData = useCallback(async (force = false) => {
+        if (isRefreshing || calculations.assets.length === 0) return;
         setIsRefreshing(true);
         setMarketDataError(null);
+
         try {
-            const tickers = calculations.assets.map(a => a.ticker);
-            const { quotes, stats } = await fetchBrapiQuotes(preferences, tickers);
+            // --- Step 1: Fetch Prices from Brapi ---
+            const allTickers = calculations.assets.map(a => a.ticker);
+            const { quotes: priceQuotes, stats: brapiStats } = await fetchBrapiQuotes(preferences, allTickers);
+            
+            logApiUsage('brapi', { requests: 1, ...brapiStats });
+            
+            // Apply price updates immediately
             setMarketData(prev => {
                 const next = { ...prev };
-                Object.entries(quotes).forEach(([ticker, data]) => {
-                    next[ticker] = { ...next[ticker], ...data, lastUpdated: Date.now() };
+                Object.entries(priceQuotes).forEach(([ticker, data]) => {
+                    next[ticker] = { ...(prev[ticker] || {}), ...data, lastUpdated: Date.now() };
                 });
                 return next;
             });
-            logApiUsage('brapi', { requests: 1, ...stats });
+
+            // --- Step 2: Fetch Fundamental Data from Gemini ---
+            const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+            const assetsNeedingUpdate = force 
+                ? allTickers 
+                : calculations.assets
+                    .filter(a => !a.lastFundamentalUpdate || Date.now() - a.lastFundamentalUpdate > ONE_DAY_MS)
+                    .map(a => a.ticker);
+
+            if (assetsNeedingUpdate.length > 0) {
+                try {
+                    const { data: fundamentalData, stats: geminiStats } = await fetchAdvancedAssetData(preferences, assetsNeedingUpdate);
+                    
+                    logApiUsage('gemini', { requests: 1, ...geminiStats });
+
+                    setMarketData(prev => {
+                        const next = { ...prev };
+                        Object.entries(fundamentalData).forEach(([ticker, data]) => {
+                            next[ticker] = { ...(prev[ticker] || {}), ...data, lastFundamentalUpdate: Date.now() };
+                        });
+                        return next;
+                    });
+                } catch (geminiError: any) {
+                     console.error("Gemini Fundamentals Error:", geminiError);
+                     // Set a partial error, prices might have updated
+                     setMarketDataError('Dados de preços atualizados, mas falha ao buscar dados fundamentalistas.');
+                }
+            }
         } catch (e: any) {
             setMarketDataError(e.message);
         } finally {
             setIsRefreshing(false);
         }
-    };
+    }, [isRefreshing, calculations.assets, preferences]);
+
 
     const refreshSingleAsset = async (ticker: string, force = false) => {
-         // Re-uses general refresh for now, or could target single ticker
          if (isRefreshing) return;
          setIsRefreshing(true);
          try {
-            const { quotes, stats } = await fetchBrapiQuotes(preferences, [ticker]);
-            setMarketData(prev => ({ ...prev, ...quotes }));
-            logApiUsage('brapi', { requests: 1, ...stats });
+            await refreshMarketData(true); // For simplicity, just trigger a full refresh.
          } catch (e: any) {
              console.error("Single asset refresh failed", e);
          } finally {
@@ -153,11 +195,25 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const updateUserProfile = (profile: any) => setUserProfile(profile);
     
-    const resetApp = () => {
-        localStorage.clear();
-        // IndexedDB clear logic implies clearing all used stores
-        // We let the browser handle reloading to clear in-memory state
-        window.location.reload();
+    const resetApp = async () => {
+        try {
+            await caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))));
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map(reg => reg.unregister()));
+            }
+            // IndexedDB clear logic
+            const dbs = await indexedDB.databases();
+            dbs.forEach(db => { if(db.name) indexedDB.deleteDatabase(db.name) });
+
+        } catch (e) {
+            console.error("Error clearing data:", e);
+        } finally {
+            window.location.reload();
+        }
     };
 
     const restoreData = (data: any) => {
@@ -176,8 +232,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
 
     const getAveragePriceForTransaction = (tx: Transaction) => {
-        // Mock implementation - real calculation would filter previous txs
-        return 0; 
+        const previousTxs = transactions
+            .filter(t => t.ticker === tx.ticker && t.date < tx.date)
+            .sort((a,b) => a.date.localeCompare(b.date));
+
+        const metrics = calculatePortfolioMetrics(previousTxs)[tx.ticker];
+        return metrics && metrics.quantity > 0 ? metrics.totalCost / metrics.quantity : 0;
     };
     
     const togglePrivacyMode = () => setPrivacyMode(prev => !prev);
