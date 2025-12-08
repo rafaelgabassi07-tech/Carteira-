@@ -185,8 +185,11 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const tickerStr = tickers.join(", ");
     const today = new Date().toISOString().split('T')[0];
 
+    // Consolidated prompt for batched requests
     const prompt = `Analise os dados fundamentalistas para os ativos: [${tickerStr}]. Data de hoje: ${today}.
-    Use a ferramenta googleSearch para buscar dados RECENTES de DY, P/VP, Vacância e Histórico de Dividendos.
+    Use a ferramenta googleSearch para buscar dados RECENTES de DY, P/VP, Vacância e Histórico de Dividendos para CADA UM dos ativos listados.
+    
+    IMPORTANTE: Você deve processar TODOS os ativos da lista. Não pule nenhum. O output deve conter um objeto para cada ativo solicitado.
     
     Primeiro, colete os dados. DEPOIS, retorne um JSON seguindo EXATAMENTE este formato:
     {

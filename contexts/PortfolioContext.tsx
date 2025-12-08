@@ -321,8 +321,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const failedTickers: string[] = [];
 
           if (assetsNeedingUpdate.length > 0) {
-              // Batch processing changed to 1 (Request per Asset) for maximum isolation and stability
-              const batches = chunkArray(assetsNeedingUpdate, 1); 
+              // Batch processing changed to 30 (Aggregated Request) for minimal network calls
+              // This consolidates updates into a single request for most users
+              const batches = chunkArray(assetsNeedingUpdate, 30); 
               
               for (let i = 0; i < batches.length; i++) {
                   const batch = batches[i];
@@ -347,7 +348,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       failedTickers.push(...batch);
                   }
                   
-                  // Rate limit delay: Wait 4.5s between individual asset requests to avoid 429
+                  // Rate limit delay: Wait 4.5s between batches (if multiple) to avoid 429
                   if (i < batches.length - 1) {
                       await new Promise(resolve => setTimeout(resolve, 4500));
                   }
