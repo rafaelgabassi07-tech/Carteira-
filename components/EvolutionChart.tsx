@@ -105,7 +105,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ data, chartType = 'line
     const investedPathStr = data.map((d, i) => `${getX(i).toFixed(1)},${getY(d.invested).toFixed(1)}`).join(' L');
     
     // Construct Area Path with 'M' (Move) start, 'L' (Line) points, and 'Z' (Close)
-    const areaPath = `M${getX(0)},${height} L${marketPathStr} L${getX(data.length - 1)},${height} Z`;
+    const areaPath = `M${getX(0).toFixed(1)},${height} L${marketPathStr} L${getX(data.length - 1).toFixed(1)},${height} Z`;
 
     const spread = tooltip ? tooltip.point.marketValue - tooltip.point.invested : 0;
 

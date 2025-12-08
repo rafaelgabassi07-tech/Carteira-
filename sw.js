@@ -1,6 +1,6 @@
 
-const CACHE_NAME = 'invest-portfolio-cache-v3.0.1'; // Updated version bumped to v3.0.1 to force clean update
-const RUNTIME_CACHE = 'runtime-cache-v3.0.1';
+const CACHE_NAME = 'invest-portfolio-cache-v3.0.2'; // Updated version
+const RUNTIME_CACHE = 'runtime-cache-v3.0.2';
 
 // Remove index.html from pre-cache to allow Network-First strategy to take precedence for the entry point
 // This ensures that when the user opens the app, it checks the server for a new index.html (which contains new JS hashes)
