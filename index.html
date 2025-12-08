@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en" data-theme="dark" data-style="premium">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="logo.svg" />
+    <link rel="manifest" href="manifest.json" />
     
     <!-- Cache Control: Force Network Check for index.html -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
@@ -235,7 +236,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(registration => {
+          navigator.serviceWorker.register('sw.js').then(registration => {
              // Force update check
              registration.update(); 
              

@@ -5,8 +5,8 @@ const RUNTIME_CACHE = 'runtime-cache-v3.0.0';
 // Remove index.html from pre-cache to allow Network-First strategy to take precedence for the entry point
 // This ensures that when the user opens the app, it checks the server for a new index.html (which contains new JS hashes)
 const urlsToCache = [
-  '/manifest.json',
-  '/logo.svg'
+  'manifest.json',
+  'logo.svg'
 ];
 
 self.addEventListener('install', event => {
@@ -72,7 +72,7 @@ self.addEventListener('fetch', event => {
                     console.log('Fetch failed; returning offline page from cache.', error);
                     // Fallback to cache if offline
                     const cachedResponse = await caches.match(event.request); 
-                    return cachedResponse || caches.match('/index.html') || caches.match('/');
+                    return cachedResponse || caches.match('index.html') || caches.match('/');
                 }
             })()
         );

@@ -7,16 +7,13 @@ import ShareIcon from '../components/icons/ShareIcon';
 import BellIcon from '../components/icons/BellIcon';
 import SettingsIcon from '../components/icons/SettingsIcon';
 import CountUp from '../components/CountUp';
+import FloatingActionButton from '../components/FloatingActionButton';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
 import PortfolioPieChart from '../components/PortfolioPieChart';
-import BarChart from '../components/BarChart';
-
-// Icons
-const WalletIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
-);
+import DividendsSummaryCard from '../components/DividendsSummaryCard';
+import WalletIcon from '../components/icons/WalletIcon';
 
 // --- Components ---
 
@@ -150,45 +147,6 @@ const PortfolioSummary: React.FC = () => {
     );
 };
 
-const DashboardCard: React.FC<{ title: string; children: React.ReactNode; delay?: number }> = ({ title, children, delay = 0 }) => (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-300" style={{ animationDelay: `${delay}ms` }}>
-        <h3 className="font-bold text-lg text-[var(--text-primary)] mb-4">{title}</h3>
-        {children}
-    </div>
-);
-
-const IncomeCard: React.FC = () => {
-    const { t, formatCurrency } = useI18n();
-    const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
-    
-    const average = useMemo(() => {
-         const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
-         return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
-    }, [monthlyIncome]);
-
-    return (
-        <DashboardCard title={t('monthly_income')} delay={100}>
-            <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
-                    <span className="font-semibold text-lg text-[var(--green-text)]">
-                        <CountUp end={average} formatter={formatCurrency} />
-                    </span>
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
-                    <span className="font-semibold text-lg text-[var(--green-text)]">
-                        <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
-                    </span>
-                </div>
-            </div>
-             <div className="h-48 w-full">
-                 <BarChart data={monthlyIncome} />
-             </div>
-        </DashboardCard>
-    );
-};
-
 const DiversificationCard: React.FC = () => {
     const { t } = useI18n();
     const { assets, preferences } = usePortfolio();
@@ -211,15 +169,15 @@ const DiversificationCard: React.FC = () => {
     }, [assets, t]);
 
     return (
-        <DashboardCard title={t('diversification')} delay={200}>
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-300" style={{ animationDelay: `200ms` }}>
+            <h3 className="font-bold text-lg text-[var(--text-primary)] mb-4">{t('diversification')}</h3>
             <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
-        </DashboardCard>
+        </div>
     );
 };
 
 interface PortfolioViewProps {
     setActiveView: (view: View) => void;
-    setTransactionFilter: (ticker: string) => void;
     onSelectAsset: (ticker: string) => void;
     addToast: (message: string, type?: ToastMessage['type']) => void;
     unreadNotificationsCount?: number;
@@ -322,17 +280,22 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                         </div>
 
                         <div className="px-4 mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 pb-6">
-                            <IncomeCard />
+                            <div className="animate-fade-in-up" style={{ animationDelay: `100ms` }}>
+                                <DividendsSummaryCard setActiveView={setActiveView} />
+                            </div>
                             <DiversificationCard />
                         </div>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center animate-fade-in">
-                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-xl shadow-[var(--accent-color)]/5">
-                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                    <div className="relative h-[80vh]">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center animate-fade-in">
+                            <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-xl shadow-[var(--accent-color)]/5">
+                                <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
+                            </div>
+                            <h2 className="text-2xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
+                            <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
                         </div>
-                        <h2 className="text-2xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
-                        <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
+                        <FloatingActionButton id="add-first-transaction-button" onClick={() => { setActiveView('transacoes'); vibrate(); }} />
                     </div>
                 )}
             </div>
