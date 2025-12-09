@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -321,13 +320,9 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset, un
     return (
         <div className="h-full flex flex-col bg-[var(--bg-primary)]">
             <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)]/50 transition-all duration-300 flex-shrink-0">
-                <div className="flex flex-col">
-                    <h1 className="text-xl font-black tracking-tight text-[var(--text-primary)] leading-tight flex items-center gap-1">
-                        Invest
-                        <span className="w-1.5 h-1.5 bg-[var(--accent-color)] rounded-full animate-pulse mt-1"></span>
-                    </h1>
-                    <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-widest opacity-80">{t('nav_analysis')}</p>
-                </div>
+                <h1 className="text-xl font-black tracking-tight text-[var(--text-primary)]">
+                    {t('nav_analysis')}
+                </h1>
                 <div className="flex items-center gap-2">
                     <button 
                         id="refresh-btn" 
@@ -356,7 +351,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset, un
             </header>
 
             {/* Segmented Control */}
-            <div className="px-4 py-2 flex-shrink-0 bg-[var(--bg-primary)]/50 backdrop-blur-sm z-20">
+            <div className="px-4 py-2 flex-shrink-0 bg-[var(--bg-primary)]/50 backdrop-blur-sm z-20 border-b border-[var(--border-color)]">
                 <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm relative">
                     {/* Sliding Background */}
                     <div 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -333,14 +332,9 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                     <StatItem label="Vacância" value={result.fundamentals?.vacancyRate !== undefined ? `${result.fundamentals.vacancyRate}%` : '-'} highlight={result.fundamentals?.vacancyRate && result.fundamentals.vacancyRate > 10 ? 'red' : 'neutral'} />
                                                 </div>
 
-                                                {/* NOVO: IA Analista Pro Integration */}
                                                 <AIAnalystCard 
                                                     ticker={result.ticker} 
-                                                    assetData={{
-                                                        price: result.price,
-                                                        change: result.change,
-                                                        ...result.fundamentals
-                                                    }} 
+                                                    assetData={{ price: result.price, change: result.change, ...result.fundamentals }} 
                                                     addToast={addToast}
                                                 />
 
@@ -354,41 +348,22 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                                 {expandedDetails && (
                                                     <div className="animate-fade-in-up space-y-6 pt-2 border-t border-[var(--border-color)]/50">
                                                         {result.fundamentals?.dividendsHistory && result.fundamentals.dividendsHistory.length > 0 && (<div><SectionHeader title="Histórico de Proventos" className="mt-6" icon={<ClockIcon className="w-4 h-4 text-[var(--accent-color)]"/>}/><div className="bg-[var(--bg-primary)] p-4 rounded-2xl"><div className="h-56"><DividendChart data={result.fundamentals.dividendsHistory} /></div></div></div>)}
-                                                        
-                                                        {/* Pros & Cons Section */}
                                                         {((result.fundamentals?.strengths && result.fundamentals.strengths.length > 0) || (result.fundamentals?.weaknesses && result.fundamentals.weaknesses.length > 0)) && (
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                {/* Pros */}
                                                                 {result.fundamentals?.strengths && result.fundamentals.strengths.length > 0 && (
                                                                     <div className="bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/10">
                                                                         <SectionHeader title="Pontos Fortes" className="!mt-0 !mb-2 !border-emerald-500/20" icon={<TrendingUpIcon className="w-4 h-4 text-emerald-500"/>} />
-                                                                        <ul className="space-y-2">
-                                                                            {result.fundamentals.strengths.map((s, i) => (
-                                                                                <li key={i} className="text-[11px] text-[var(--text-primary)] font-medium flex items-start gap-2">
-                                                                                    <span className="text-emerald-500 font-bold mt-0.5">✓</span>
-                                                                                    <span className="leading-snug opacity-90">{s}</span>
-                                                                                </li>
-                                                                            ))}
-                                                                        </ul>
+                                                                        <ul className="space-y-2">{result.fundamentals.strengths.map((s, i) => (<li key={i} className="text-[11px] text-[var(--text-primary)] font-medium flex items-start gap-2"><span className="text-emerald-500 font-bold mt-0.5">✓</span><span className="leading-snug opacity-90">{s}</span></li>))}</ul>
                                                                     </div>
                                                                 )}
-                                                                {/* Cons */}
                                                                 {result.fundamentals?.weaknesses && result.fundamentals.weaknesses.length > 0 && (
                                                                     <div className="bg-rose-500/5 p-4 rounded-2xl border border-rose-500/10">
                                                                         <SectionHeader title="Pontos de Atenção" className="!mt-0 !mb-2 !border-rose-500/20" icon={<AlertTriangleIcon className="w-4 h-4 text-rose-500"/>} />
-                                                                        <ul className="space-y-2">
-                                                                            {result.fundamentals.weaknesses.map((w, i) => (
-                                                                                <li key={i} className="text-[11px] text-[var(--text-primary)] font-medium flex items-start gap-2">
-                                                                                    <span className="text-rose-500 font-bold mt-0.5">!</span>
-                                                                                    <span className="leading-snug opacity-90">{w}</span>
-                                                                                </li>
-                                                                            ))}
-                                                                        </ul>
+                                                                        <ul className="space-y-2">{result.fundamentals.weaknesses.map((w, i) => (<li key={i} className="text-[11px] text-[var(--text-primary)] font-medium flex items-start gap-2"><span className="text-rose-500 font-bold mt-0.5">!</span><span className="leading-snug opacity-90">{w}</span></li>))}</ul>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         )}
-
                                                         <div className="grid grid-cols-2 gap-3">
                                                             <StatItem label="Patrimônio Líq." value={result.fundamentals?.netWorth ?? '-'} />
                                                             <StatItem label="Nº Cotistas" value={result.fundamentals?.shareholders ? `${(result.fundamentals.shareholders/1000).toFixed(1)}k` : '-'} />
@@ -409,32 +384,23 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                             {!result && (
                                 <div className="animate-fade-in space-y-8 mt-4">
                                     {recentSearches.length > 0 && (
-                                        <div className="mb-6">
+                                        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] p-4">
                                             <div className="flex justify-between items-center mb-4 px-1"><h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2"><ClockIcon className="w-3.5 h-3.5"/> Recentes</h3><button onClick={clearRecent} className="text-[var(--text-secondary)] hover:text-red-400 p-1 transition-colors"><TrashIcon className="w-3.5 h-3.5"/></button></div>
-                                            <div className="flex flex-wrap gap-2">{recentSearches.map(term => (<button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group">{term} <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">→</span></button>))}</div>
+                                            <div className="flex flex-wrap gap-2">{recentSearches.map(term => (<button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group">{term} <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">→</span></button>))}</div>
                                         </div>
                                     )}
-                                    
                                     {favorites.length > 0 && (
-                                        <div className="mb-6">
+                                        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] p-4">
                                             <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider px-1 mb-4 flex items-center gap-2"><StarIcon filled className="w-3.5 h-3.5 text-yellow-500"/> Meus Favoritos</h3>
-                                            <div className="flex flex-wrap gap-2">
-                                                {favorites.map(term => (
-                                                    <button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group border-yellow-500/20">
-                                                        {term} 
-                                                        <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">→</span>
-                                                    </button>
-                                                ))}
-                                            </div>
+                                            <div className="flex flex-wrap gap-2">{favorites.map(term => (<button key={term} onClick={() => handleSearch(term)} className="bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary-hover)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl font-bold text-sm text-[var(--text-primary)] transition-colors active:scale-95 flex items-center gap-2 group border-yellow-500/20">{term} <span className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity -mr-1">→</span></button>))}</div>
                                         </div>
                                     )}
-
-                                    <div>
+                                    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] p-4">
                                         <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider px-1 mb-4">Descubra Oportunidades</h3>
                                         {MARKET_CATEGORIES.map((cat, i) => (
                                             <div key={i} className="mb-6">
                                                 <div className="flex items-center gap-2 px-1 mb-3"><div className={`w-2 h-2 rounded-full ${cat.color} shadow-[0_0_8px_rgba(0,0,0,0.3)]`}></div><span className="text-sm font-bold text-[var(--text-primary)]">{cat.title}</span></div>
-                                                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">{cat.tickers.map(t => (<button key={t} onClick={() => { setSearchTerm(t); handleSearch(t); }} className="flex-shrink-0 w-32 bg-[var(--bg-secondary)] border border-[var(--border-color)] p-4 rounded-2xl hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all active:scale-95 text-left group shadow-sm"><span className="block font-black text-sm text-[var(--text-primary)] mb-1">{t}</span><span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors font-medium flex items-center gap-1">Ver detalhes <ChevronRightIcon className="w-2.5 h-2.5"/></span></button>))}</div>
+                                                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">{cat.tickers.map(t => (<button key={t} onClick={() => { setSearchTerm(t); handleSearch(t); }} className="flex-shrink-0 w-32 bg-[var(--bg-primary)] border border-[var(--border-color)] p-4 rounded-2xl hover:bg-[var(--bg-tertiary-hover)] hover:border-[var(--accent-color)]/30 transition-all active:scale-95 text-left group shadow-sm"><span className="block font-black text-sm text-[var(--text-primary)] mb-1">{t}</span><span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--accent-color)] transition-colors font-medium flex items-center gap-1">Ver detalhes <ChevronRightIcon className="w-2.5 h-2.5"/></span></button>))}</div>
                                             </div>
                                         ))}
                                     </div>

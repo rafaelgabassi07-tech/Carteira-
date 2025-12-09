@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -106,23 +105,23 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const renderSummary = () => (
         <div className="space-y-4 animate-fade-in">
             {/* Position Card */}
-            <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
+            <div className="bg-gradient-to-br from-[var(--bg-tertiary-hover)] to-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-lg shadow-[var(--accent-color)]/5">
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{t('current_position')}</p>
-                        <p className="text-3xl font-black text-[var(--text-primary)] tracking-tight">
+                        <p className="text-4xl font-black text-[var(--text-primary)] tracking-tighter">
                             <CountUp end={currentValue} formatter={formatCurrency} />
                         </p>
                     </div>
                     <div className="text-right">
                         <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{t('result')}</p>
-                        <div className={`text-lg font-bold ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
+                        <div className={`text-xl font-bold ${variation >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
                             {variation >= 0 ? '+' : ''}
                             <CountUp end={Math.abs(variation)} formatter={formatCurrency} />
                         </div>
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--border-color)]">
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--border-color)]/50">
                     <IndicatorItem label={t('quantity')} value={asset.quantity.toString()} />
                     <IndicatorItem label={t('avg_price')} value={formatCurrency(asset.avgPrice)} />
                 </div>
