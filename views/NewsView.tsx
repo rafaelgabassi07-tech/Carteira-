@@ -160,6 +160,18 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const containerRef = useRef<HTMLDivElement>(null);
 
   const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
+  
+  // Generate Quick Topics (General + User Assets)
+  const quickTopics = useMemo(() => {
+      const baseTopics = ['Mercado', 'Selic', 'IFIX', 'Dividendos', 'Cripto'];
+      // Add top 5 assets from portfolio
+      const topAssets = assets
+        .sort((a,b) => (b.quantity * b.currentPrice) - (a.quantity * a.currentPrice))
+        .slice(0, 5)
+        .map(a => a.ticker);
+      
+      return [...baseTopics, ...topAssets];
+  }, [assets]);
 
   useEffect(() => {
     localStorage.setItem('news-favorites', JSON.stringify(Array.from(favorites)));
@@ -232,6 +244,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       setSearchQuery(e.target.value);
       setLoading(true);
       debouncedLoadNews(e.target.value, dateRange, sourceFilter);
+  };
+  
+  const handleQuickTopicClick = (topic: string) => {
+      vibrate();
+      setSearchQuery(topic);
+      setLoading(true);
+      loadNews(true, topic, dateRange, sourceFilter);
   };
 
   const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -383,6 +402,19 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                   <CloseIcon className="w-4 h-4" />
               </button>
           )}
+        </div>
+        
+        {/* Quick Topics Chips */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 no-scrollbar">
+            {quickTopics.map(topic => (
+                <button
+                    key={topic}
+                    onClick={() => handleQuickTopicClick(topic)}
+                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${searchQuery === topic ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)]'}`}
+                >
+                    {topic}
+                </button>
+            ))}
         </div>
         
         <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">

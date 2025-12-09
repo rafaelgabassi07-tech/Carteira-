@@ -122,23 +122,33 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     const apiKey = getGeminiApiKey(prefs);
     const ai = createClient(apiKey);
     
-    let context = "Mercado Financeiro Brasileiro e FIIs";
-    if (filter.tickers && filter.tickers.length > 0) {
-        context += `. Foco: ${filter.tickers.join(', ')}`;
+    // Smart Context Logic:
+    // If a specific query exists, prioritize it and ignore general portfolio context to avoid pollution.
+    // If no query, use portfolio tickers for a personalized feed.
+    let context = "";
+    if (filter.query && filter.query.trim().length > 0) {
+        context = `FOCO TOTAL NO TEMA: "${filter.query}". Busque fatos RECENTES e específicos sobre isso.`;
+    } else {
+        context = "Resumo do Mercado Financeiro Brasileiro";
+        if (filter.tickers && filter.tickers.length > 0) {
+            context += ` com foco especial nestes ativos: ${filter.tickers.join(', ')}`;
+        }
     }
-    if (filter.query) context += `. Tópico: ${filter.query}`;
 
     // Prompt engineered to force JSON output without Schema validation (incompatible with Search)
-    const prompt = `Atue como um jornalista financeiro sênior. Busque notícias recentes e relevantes sobre: ${context}.
-    Use a ferramenta googleSearch para encontrar fatos reais e atualizados.
+    const prompt = `Atue como um jornalista financeiro sênior. 
+    ${context}
+    
+    Use a ferramenta googleSearch para encontrar notícias reais, datas exatas e fontes confiáveis.
+    Priorize notícias publicadas nas últimas 24-48 horas.
     
     IMPORTANTE: Retorne a resposta ESTRITAMENTE como um array JSON cru. Não use Markdown. Não inclua explicações antes ou depois.
     O formato deve ser exatamente:
     [
       {
-        "title": "Título da notícia",
-        "summary": "Resumo curto",
-        "source": "Fonte",
+        "title": "Título da notícia (PT-BR)",
+        "summary": "Resumo objetivo (max 2 linhas)",
+        "source": "Nome da Fonte",
         "date": "YYYY-MM-DD",
         "sentimentScore": 0.5 (número entre -1 negativo e 1 positivo),
         "sentimentReason": "Motivo do sentimento",
@@ -165,7 +175,7 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
 
         const enhancedArticles = Array.isArray(articles) ? articles.map((art: any, idx: number) => {
             let realUrl = art.url;
-            if ((!realUrl || realUrl === 'null') && idx < webChunks.length) realUrl = webChunks[idx].web?.uri;
+            if ((!realUrl || realUrl === 'null' || realUrl === 'string') && idx < webChunks.length) realUrl = webChunks[idx].web?.uri;
             if (!realUrl) realUrl = `https://www.google.com/search?q=${encodeURIComponent(art.title)}`;
 
             return {
