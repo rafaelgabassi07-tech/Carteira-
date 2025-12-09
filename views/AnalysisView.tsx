@@ -58,7 +58,7 @@ const IncomeCard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActi
         <AnalysisCard title={t('income_report_title')} delay={100} onClick={handleClick}>
             <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
                 <div className="flex flex-col">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('average_income')}</span>
                     <span className="font-semibold text-lg text-[var(--green-text)]">
                         <CountUp end={average} formatter={formatCurrency} />
                     </span>
@@ -73,9 +73,9 @@ const IncomeCard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActi
              <div className="h-48 w-full relative pointer-events-none">
                  <BarChart data={monthlyIncome} />
              </div>
-             <div className="mt-4 text-center">
-                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider group-hover:text-[var(--text-primary)] transition-colors">
-                    Toque para ver detalhes
+             <div className="mt-4 text-center border-t border-[var(--border-color)]/50 pt-3">
+                <span className="text-xs font-bold text-[var(--accent-color)] uppercase tracking-wider flex items-center justify-center gap-1 group-hover:underline">
+                    Abrir Relatório Completo <ChevronRightIcon className="w-3 h-3" />
                 </span>
              </div>
         </AnalysisCard>
