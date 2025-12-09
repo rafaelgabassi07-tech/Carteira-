@@ -36,6 +36,7 @@ interface PortfolioContextType {
     notifications: AppNotification[];
     unreadNotificationsCount: number;
     markNotificationsAsRead: () => void;
+    markSingleNotificationAsRead: (id: number) => void;
     deleteNotification: (id: number) => void;
     clearAllNotifications: () => void;
     
@@ -247,6 +248,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const resetApiStats = () => setApiStats({ gemini: { requests: 0, bytesSent: 0, bytesReceived: 0 }, brapi: { requests: 0, bytesReceived: 0 } });
 
     const markNotificationsAsRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    const markSingleNotificationAsRead = (id: number) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     const deleteNotification = (id: number) => setNotifications(prev => prev.filter(n => n.id !== id));
     const clearAllNotifications = () => setNotifications([]);
 
@@ -305,7 +307,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         assets: calculations.assets, getAssetByTicker,
         marketDataError, refreshMarketData, refreshSingleAsset, isRefreshing,
         notifications, unreadNotificationsCount: notifications.filter(n => !n.read).length,
-        markNotificationsAsRead, deleteNotification, clearAllNotifications,
+        markNotificationsAsRead, markSingleNotificationAsRead, deleteNotification, clearAllNotifications,
         userProfile, updateUserProfile,
         setTheme, setFont, resetApp, restoreData,
         apiStats, logApiUsage, resetApiStats,

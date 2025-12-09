@@ -8,7 +8,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 import type { ToastMessage } from './types';
 import { usePortfolio } from './contexts/PortfolioContext';
 import { useI18n } from './contexts/I18nContext';
-import { isLowEndDevice } from './utils';
+import { isLowEndDevice, vibrate } from './utils';
 import type { MenuScreen } from './views/SettingsView';
 
 // Lazy Load Views
@@ -109,9 +109,6 @@ const App: React.FC = () => {
   const handleSetView = (view: View) => {
     setPreviousView(activeView);
     setActiveView(view);
-    // Clear transaction filter when leaving/changing views if needed, 
-    // but we might want to persist it if we go back to wallet.
-    // For now, let's keep it simple.
   };
   
   const handleSelectAsset = (ticker: string) => {
@@ -130,6 +127,64 @@ const App: React.FC = () => {
       setSettingsStartScreen(screen);
       handleSetView('settings');
   }
+
+  // --- Gesture Navigation Logic ---
+  const touchStartRef = useRef<{ x: number, y: number } | null>(null);
+
+  const handleGlobalBack = () => {
+      // Don't navigate back from root screens via gesture
+      if (['carteira', 'mercado'].includes(activeView)) return;
+
+      vibrate();
+
+      if (activeView === 'assetDetail') {
+          handleBackFromDetail();
+      } else {
+          // Go to previous view, or default to start screen if previous is invalid/same
+          const target = (previousView && previousView !== activeView) ? previousView : startScreen;
+          handleSetView(target as View);
+      }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+      touchStartRef.current = { 
+          x: e.touches[0].clientX, 
+          y: e.touches[0].clientY 
+      };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+      if (!touchStartRef.current) return;
+
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      
+      const deltaX = touchEndX - touchStartRef.current.x;
+      const deltaY = touchEndY - touchStartRef.current.y;
+
+      const MIN_SWIPE = 60; // Minimum distance to trigger
+      const MAX_Y_VARIANCE = 60; // Maximum vertical tolerance to ensure it's a horizontal swipe
+      const EDGE_ZONE = 50; // Pixels from edge to count as an edge swipe
+
+      // Check if horizontal movement dominates and is long enough
+      if (Math.abs(deltaY) < MAX_Y_VARIANCE && Math.abs(deltaX) > MIN_SWIPE) {
+          const startX = touchStartRef.current.x;
+          const screenWidth = window.innerWidth;
+
+          // Swipe Right (from Left Edge) -> Back
+          const isLeftEdgeSwipe = startX <= EDGE_ZONE && deltaX > 0;
+          
+          // Swipe Left (from Right Edge) -> Back
+          const isRightEdgeSwipe = startX >= (screenWidth - EDGE_ZONE) && deltaX < 0;
+
+          if (isLeftEdgeSwipe || isRightEdgeSwipe) {
+              handleGlobalBack();
+          }
+      }
+      
+      touchStartRef.current = null;
+  };
+  // -----------------------------
 
   const renderView = () => {
     switch (activeView) {
@@ -153,7 +208,11 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-        <div className="h-[100dvh] w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden relative transition-colors duration-300">
+        <div 
+            className="h-[100dvh] w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden relative transition-colors duration-300"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
             <OfflineBanner />
             
             {/* Main Content Area */}

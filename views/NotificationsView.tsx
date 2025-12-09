@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { View, } from '../App';
 import type { AppNotification, NotificationType } from '../types';
@@ -13,6 +14,7 @@ import TrendingUpIcon from '../components/icons/TrendingUpIcon';
 import InfoIcon from '../components/icons/InfoIcon';
 import DollarSignIcon from '../components/icons/DollarSignIcon';
 import AlertTriangleIcon from '../components/icons/AlertTriangleIcon';
+import CheckCircleIcon from '../components/icons/CheckCircleIcon';
 
 const NotificationIcon: React.FC<{ type: NotificationType }> = ({ type }) => {
     let icon, color;
@@ -109,7 +111,7 @@ const SwipeableNotificationItem: React.FC<{
                 <div className="relative flex-shrink-0">
                     <NotificationIcon type={notification.type} />
                     {!notification.read && (
-                         <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[var(--accent-color)] rounded-full border-2 border-[var(--bg-secondary)]"></span>
+                         <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[var(--accent-color)] rounded-full border-2 border-[var(--bg-secondary)] shadow-sm animate-pulse"></span>
                     )}
                 </div>
                 
@@ -135,18 +137,12 @@ const SwipeableNotificationItem: React.FC<{
 
 const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelectAsset: (ticker: string) => void; onOpenSettings: (screen: MenuScreen) => void; }> = ({ setActiveView, onSelectAsset, onOpenSettings }) => {
     const { t } = useI18n();
-    const { notifications, markNotificationsAsRead, unreadNotificationsCount, deleteNotification, clearAllNotifications } = usePortfolio();
+    const { notifications, markNotificationsAsRead, markSingleNotificationAsRead, deleteNotification, clearAllNotifications } = usePortfolio();
     
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (unreadNotificationsCount > 0) {
-                markNotificationsAsRead();
-            }
-        }, 1500); 
-        return () => clearTimeout(timer);
-    }, [unreadNotificationsCount, markNotificationsAsRead]);
+    // Removed auto-read logic useEffect
 
     const handleNotificationClick = (notification: AppNotification) => {
+        markSingleNotificationAsRead(notification.id);
         if (notification.relatedTicker) {
             onSelectAsset(notification.relatedTicker);
         }
@@ -157,6 +153,11 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
         if (window.confirm(t('clear_all') + '?')) {
             clearAllNotifications();
         }
+    };
+
+    const handleMarkAllRead = () => {
+        vibrate();
+        markNotificationsAsRead();
     };
 
     const goToSettings = () => {
@@ -179,6 +180,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
     }, [notifications]);
 
     const groupTitles = { today: t('today'), yesterday: t('yesterday'), older: t('older') };
+    const hasUnread = notifications.some(n => !n.read);
     
     return (
         <div className="h-full flex flex-col overflow-x-hidden">
@@ -191,9 +193,16 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                  </div>
                  <div className="flex space-x-2 items-center">
                     {notifications.length > 0 && (
-                        <button onClick={handleClearAll} className="p-2 rounded-full text-red-500/80 hover:text-red-500 hover:bg-red-500/10 transition-colors" aria-label={t('clear_all')}>
-                            <TrashIcon className="w-5 h-5" />
-                        </button>
+                        <>
+                            {hasUnread && (
+                                <button onClick={handleMarkAllRead} className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-tertiary-hover)] transition-colors" aria-label={t('mark_all_as_read')}>
+                                    <CheckCircleIcon className="w-5 h-5" />
+                                </button>
+                            )}
+                            <button onClick={handleClearAll} className="p-2 rounded-full text-red-500/80 hover:text-red-500 hover:bg-red-500/10 transition-colors" aria-label={t('clear_all')}>
+                                <TrashIcon className="w-5 h-5" />
+                            </button>
+                        </>
                     )}
                     <button onClick={goToSettings} className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary-hover)] transition-colors" aria-label="Configurações">
                         <SettingsIcon className="w-5 h-5" />
