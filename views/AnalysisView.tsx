@@ -73,9 +73,9 @@ const IncomeCard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActi
              <div className="h-48 w-full relative pointer-events-none">
                  <BarChart data={monthlyIncome} />
              </div>
-             <div className="mt-4 text-center border-t border-[var(--border-color)]/50 pt-3">
-                <span className="text-xs font-bold text-[var(--accent-color)] uppercase tracking-wider flex items-center justify-center gap-1 group-hover:underline">
-                    Abrir Relatório Completo <ChevronRightIcon className="w-3 h-3" />
+             <div className="mt-4 text-center">
+                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider group-hover:text-[var(--text-primary)] transition-colors">
+                    Toque para ver detalhes
                 </span>
              </div>
         </AnalysisCard>
