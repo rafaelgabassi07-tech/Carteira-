@@ -9,12 +9,10 @@ import { vibrate, fromISODate } from '../utils';
 import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import SparklesIcon from '../components/icons/SparklesIcon';
 import WalletIcon from '../components/icons/WalletIcon';
-import BarChart from '../components/BarChart';
+import BarChart from '../components/charts/BarChart';
 import SortIcon from '../components/icons/SortIcon';
 import type { PayerData } from '../hooks/usePortfolioCalculations';
 
-
-// --- Sub-components ---
 const SummaryCard: React.FC<{ averageIncome: number; totalReceived: number; annualForecast: number; yieldOnCost: number; selectedYear: string }> = ({ averageIncome, totalReceived, annualForecast, yieldOnCost, selectedYear }) => {
     const { t, formatCurrency } = useI18n();
     const isCurrentYear = selectedYear === new Date().getFullYear().toString();
@@ -91,7 +89,6 @@ const TopPayersCard: React.FC<{ topPayers: PayerData[]; totalIncome: number }> =
 
 const PayerListItem: React.FC<{ payer: PayerData; totalAllPayers: number; isHistorical: boolean }> = ({ payer, totalAllPayers, isHistorical }) => {
     const { t, formatCurrency } = useI18n();
-    // Use totalAllPayers to calculate visual bar, but ensure we don't divide by zero
     const contribution = totalAllPayers > 0 ? (payer.totalPaid / totalAllPayers) * 100 : 0;
 
     return (
@@ -105,7 +102,6 @@ const PayerListItem: React.FC<{ payer: PayerData; totalAllPayers: number; isHist
                             <span className="font-bold text-sm text-[var(--text-primary)]">{formatCurrency(payer.totalPaid)}</span>
                         </div>
                     </div>
-                    {/* Only show bar if there is a payment, otherwise it might be just provisioned */}
                     {payer.totalPaid > 0 && (
                         <div className="w-full bg-[var(--bg-secondary)] h-1.5 rounded-full border border-black/10">
                             <div className="bg-[var(--accent-color)] h-full rounded-full animate-grow-x" style={{ width: `${contribution}%` }}></div>
@@ -144,7 +140,6 @@ const PayerListItem: React.FC<{ payer: PayerData; totalAllPayers: number; isHist
     );
 }
 
-// --- Main View ---
 const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const { t, formatCurrency } = useI18n();
     const { assets, fullIncomeHistory, projectedAnnualIncome, annualDistribution, payersData: contextPayersData } = usePortfolio();
@@ -153,19 +148,16 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const [sortOption, setSortOption] = useState<'total' | 'yoc' | 'name'>('total');
     const [isSortOpen, setIsSortOpen] = useState(false);
 
-    // Calculate Available Years
     const availableYears = useMemo(() => {
         const years = new Set(Object.keys(fullIncomeHistory).map(k => k.split('-')[0]));
         years.add(new Date().getFullYear().toString());
         return Array.from(years).sort((a, b) => b.localeCompare(a));
     }, [fullIncomeHistory]);
 
-    // Derived Data based on Selected Year
     const { yearlyMonthlyData, yearlyTotalReceived, yearlyPayers } = useMemo(() => {
         const monthlyData = [];
         let total = 0;
         
-        // 1. Filter Monthly Data
         for (let i = 1; i <= 12; i++) {
             const monthStr = i.toString().padStart(2, '0');
             const key = `${selectedYear}-${monthStr}`;
@@ -178,7 +170,6 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
             total += value;
         }
 
-        // 2. Generate Payers List for the specific year using annualDistribution
         const yearDist: Record<string, number> = annualDistribution[selectedYear] || {};
         const payersList: PayerData[] = [];
 
@@ -212,11 +203,9 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const isCurrentYear = selectedYear === new Date().getFullYear().toString();
 
     const displayPayers = useMemo(() => {
-        // Start with the payers for this specific year (Realized)
         let finalPayers = [...yearlyPayers];
 
         if (isCurrentYear) {
-            // Enrich with Provisioned Data from global context
             finalPayers = finalPayers.map(p => {
                 const globalData = contextPayersData.find(g => g.ticker === p.ticker);
                 return globalData ? {
@@ -227,13 +216,12 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                 } : p;
             });
 
-            // Find items that haven't paid yet this year but have provisions
             const provisionedOnly = contextPayersData.filter(g => 
                 g.projectedAmount > 0 && !finalPayers.find(fp => fp.ticker === g.ticker)
             ).map(g => ({
                 ...g,
-                totalPaid: 0, // IMPORTANT: Should be 0 for this year view if not in yearlyPayers
-                averageMonthly: 0, // Reset average since it's lifetime average in global context
+                totalPaid: 0,
+                averageMonthly: 0,
                 yieldOnCost: 0 
             }));
 
@@ -249,13 +237,11 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
 
     const topPayers = useMemo(() => displayPayers.filter(p => p.totalPaid > 0).slice(0, 3), [displayPayers]);
 
-    // Average for the chart
     const chartAverage = useMemo(() => {
         const monthsWithIncome = yearlyMonthlyData.filter(m => m.total > 0).length;
         return monthsWithIncome > 0 ? yearlyTotalReceived / monthsWithIncome : 0;
     }, [yearlyMonthlyData, yearlyTotalReceived]);
 
-    // Calculate YoC for the specific year
     const yearYieldOnCost = useMemo(() => {
         const totalInvested = assets.reduce((acc, a) => acc + (a.quantity * a.avgPrice), 0);
         return totalInvested > 0 ? (yearlyTotalReceived / totalInvested) * 100 : 0;
@@ -274,7 +260,6 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        {/* Year Selector */}
                         <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] overflow-x-auto no-scrollbar">
                             {availableYears.map(year => (
                                 <button
@@ -295,7 +280,6 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                             selectedYear={selectedYear}
                         />
 
-                        {/* Chart */}
                         <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm animate-fade-in-up" style={{ animationDelay: '100ms' }}>
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-lg text-[var(--text-primary)]">{t('monthly_evolution')} <span className="text-sm font-normal text-[var(--text-secondary)]">({selectedYear})</span></h3>
@@ -315,10 +299,8 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                             </div>
                         </div>
 
-                        {/* Top Payers */}
                         <TopPayersCard topPayers={topPayers} totalIncome={yearlyTotalReceived} />
 
-                        {/* List Header & Sorting */}
                         <div className="flex items-center justify-between mt-8 mb-3 px-1 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
                             <h3 className="font-bold text-lg text-[var(--text-primary)]">{t('paying_sources')}</h3>
                             <div className="relative">
@@ -342,7 +324,6 @@ const IncomeReportView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                             </div>
                         </div>
 
-                        {/* List */}
                         <div className="space-y-2">
                             {displayPayers.map((payer, idx) => (
                                 <div key={payer.ticker} className="animate-fade-in-up" style={{ animationDelay: `${200 + idx * 50}ms`}}>

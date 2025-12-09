@@ -2,10 +2,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import PatrimonyEvolutionCard from '../components/PatrimonyEvolutionCard';
-import PortfolioSummary from '../components/PortfolioSummary';
-import PortfolioPieChart from '../components/PortfolioPieChart';
-import BarChart from '../components/BarChart';
+import PatrimonyEvolutionCard from '../components/cards/PatrimonyEvolutionCard';
+import PortfolioSummary from '../components/cards/PortfolioSummary';
+import PortfolioPieChart from '../components/charts/PortfolioPieChart';
+import BarChart from '../components/charts/BarChart';
 import CountUp from '../components/CountUp';
 import { vibrate } from '../utils';
 import RefreshIcon from '../components/icons/RefreshIcon';
@@ -110,7 +110,6 @@ const DiversificationCard: React.FC = () => {
     );
 };
 
-// Sub-component for the Overview Content
 const OverviewContent: React.FC<{ 
     addToast: (message: string, type?: ToastMessage['type']) => void, 
     onSelectAsset: (ticker: string) => void,
@@ -157,7 +156,6 @@ const OverviewContent: React.FC<{
                 <DiversificationCard />
             </div>
 
-            {/* Assets List Section */}
             <div>
                 {assets.length > 0 ? (
                     <>
@@ -267,20 +265,16 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset, un
     const { t } = useI18n();
     const { refreshMarketData, isRefreshing: isContextRefreshing } = usePortfolio();
     
-    // Tab State: 'general' (Overview) or 'transactions'
     const [activeTab, setActiveTab] = useState<'general' | 'transactions'>(initialTab);
-    
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
     const isRefreshing = isContextRefreshing || isPullRefreshing;
 
-    // Use specific useEffect for transaction filter navigation
     useEffect(() => {
         if (initialTransactionFilter) {
             setActiveTab('transactions');
         }
     }, [initialTransactionFilter]);
 
-    // Pull to Refresh Logic (Wraps both tabs)
     const touchStartY = useRef(0);
     const [pullDistance, setPullDistance] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -323,7 +317,6 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset, un
         }
     };
     
-    // Memoize content components to prevent unnecessary re-renders when switching tabs
     const overviewContent = useMemo(() => (
         <OverviewContent addToast={addToast} onSelectAsset={onSelectAsset} setActiveView={setActiveView} />
     ), [addToast, onSelectAsset, setActiveView]);
@@ -333,7 +326,6 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset, un
             initialFilter={initialTransactionFilter} 
             clearFilter={clearTransactionFilter || (() => {})} 
             addToast={addToast} 
-            // isEmbedded={true} removed because TransactionsView handles layout fine
         />
     ), [initialTransactionFilter, clearTransactionFilter, addToast]);
 
@@ -370,10 +362,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset, un
                 </div>
             </header>
 
-            {/* Segmented Control */}
             <div className="px-4 py-2 flex-shrink-0 bg-[var(--bg-primary)]/50 backdrop-blur-sm z-20 border-b border-[var(--border-color)]">
                 <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-color)] shadow-sm relative">
-                    {/* Sliding Background */}
                     <div 
                         className="absolute top-1 bottom-1 bg-[var(--bg-primary)] rounded-lg shadow-sm border border-[var(--border-color)] transition-all duration-300 ease-spring"
                         style={{ 
@@ -406,7 +396,6 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset, un
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
             >
-                 {/* Refresh Spinner */}
                  <div 
                     className="absolute top-4 left-0 right-0 flex justify-center pointer-events-none z-20 transition-transform duration-200"
                     style={{ transform: `translateY(${pullDistance > 0 ? pullDistance - 40 : (isRefreshing ? 10 : -100)}px)`, opacity: Math.min(pullDistance / 40, 1) }}

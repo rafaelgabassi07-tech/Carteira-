@@ -1,10 +1,11 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import ChevronLeftIcon from '../components/icons/ChevronLeftIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import AnalysisIcon from '../components/icons/AnalysisIcon';
-import DividendChart from '../components/DividendChart';
+import DividendChart from '../components/charts/DividendChart';
 import CountUp from '../components/CountUp';
 import { vibrate } from '../utils';
 import type { ToastMessage } from '../types';
@@ -16,7 +17,6 @@ interface AssetDetailViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
 }
 
-// Helper para barras de progresso (P/VP e Vacância)
 const ProgressBar: React.FC<{ value: number; max: number; label?: string; colorClass: string; inverse?: boolean }> = ({ value, max, label, colorClass, inverse }) => {
     let percent = (value / max) * 100;
     if (percent > 100) percent = 100;
@@ -88,23 +88,20 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         return transactions.filter(tx => tx.ticker === ticker).sort((a, b) => b.date.localeCompare(a.date));
     }, [transactions, ticker]);
 
-    // Lógica Dividendos: Consumir dados já processados do contexto
     const fullDividendHistory = useMemo(() => {
         return (asset?.dividendsHistory || []).sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
     }, [asset?.dividendsHistory]);
 
-    // Metrics
     const currentValue = asset ? asset.quantity * asset.currentPrice : 0;
     const totalInvested = asset ? asset.quantity * asset.avgPrice : 0;
     const variation = currentValue - totalInvested;
 
     if (!asset && !isRefreshing) return <div className="p-8 text-center">{t('asset_not_found')}</div>;
 
-    if (!asset) return null; // or a skeleton loader
+    if (!asset) return null;
 
     const renderSummary = () => (
         <div className="space-y-4 animate-fade-in">
-            {/* Position Card */}
             <div className="bg-gradient-to-br from-[var(--bg-tertiary-hover)] to-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-lg shadow-[var(--accent-color)]/5">
                 <div className="flex justify-between items-center mb-4">
                     <div>
@@ -127,7 +124,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 </div>
             </div>
 
-            {/* NEW KEY INDICATORS LAYOUT */}
             <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                     <AnalysisIcon className="w-4 h-4 text-[var(--accent-color)]" />
@@ -135,7 +131,6 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 </div>
 
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                    {/* Valuation Group */}
                     <GroupHeader title="Preço & Valuation" />
                     <IndicatorItem label="Cotação Atual" value={formatCurrency(asset.currentPrice)} />
                     <div className="flex flex-col p-2">
@@ -152,14 +147,12 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                         )}
                     </div>
 
-                    {/* Income Group */}
                     <GroupHeader title="Renda & Dividendos" />
                     <IndicatorItem label="Dividend Yield (12m)" value={`${asset.dy?.toFixed(2) || '-'}%`} />
                     <IndicatorItem label="Yield on Cost" value={`${asset.yieldOnCost?.toFixed(2) || '-'}%`} subtext={<span className="text-[9px] text-[var(--text-secondary)] opacity-70">Pessoal</span>} />
                     <IndicatorItem label="Último Rendimento" value={formatCurrency(asset.lastDividend || 0)} />
                     <IndicatorItem label="Próx. Pagamento" value={asset.nextPaymentDate ? new Date(asset.nextPaymentDate).toLocaleDateString(locale, {day:'2-digit', month:'short'}) : '-'} />
 
-                    {/* Quality Group */}
                     <GroupHeader title="Qualidade & Liquidez" />
                     <div className="flex flex-col p-2">
                         <div className="flex justify-between items-end">

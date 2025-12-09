@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { fetchBrapiQuotes } from '../services/brapiService';
@@ -18,9 +19,9 @@ import StarIcon from '../components/icons/StarIcon';
 import CloseIcon from '../components/icons/CloseIcon';
 import TransactionModal from '../components/modals/TransactionModal';
 import NewsView from './NewsView';
-import PortfolioLineChart from '../components/PortfolioLineChart';
-import DividendChart from '../components/DividendChart';
-import AIAnalystCard from '../components/AIAnalystCard';
+import PortfolioLineChart from '../components/charts/PortfolioLineChart';
+import DividendChart from '../components/charts/DividendChart';
+import AIAnalystCard from '../components/cards/AIAnalystCard';
 import type { ToastMessage, Asset } from '../types';
 import { KNOWN_TICKERS } from '../constants';
 
@@ -136,7 +137,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
         setSuggestions([]);
         setShowSuggestions(false);
         
-        // Esconde teclado em mobile
         if (inputRef.current) inputRef.current.blur();
 
         try {
@@ -238,12 +238,10 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                     </div>
                     {viewMode === 'quotes' && (
                         <div className="relative group mb-2">
-                            {/* Search Icon */}
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none z-10">
                                 <SearchIcon className="w-5 h-5" />
                             </div>
                             
-                            {/* Enhanced Input */}
                             <input 
                                 ref={inputRef}
                                 type="text" 
@@ -256,7 +254,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-12 pr-24 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-4 focus:ring-[var(--accent-color)]/10 transition-all shadow-sm placeholder:text-[var(--text-secondary)]/40 uppercase tracking-wide" 
                             />
                             
-                            {/* Right Actions */}
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                 {searchTerm && !loading && (
                                     <button 
@@ -277,7 +274,6 @@ const MarketView: React.FC<MarketViewProps> = ({ addToast }) => {
                                 </button>
                             </div>
                             
-                            {/* Autocomplete Dropdown */}
                             {showSuggestions && suggestions.length > 0 && (
                                 <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in-up origin-top ring-1 ring-black/5">
                                     {suggestions.map((ticker, index) => (

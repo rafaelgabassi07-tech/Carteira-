@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import PageHeader from '../components/PageHeader';
 import { useI18n } from '../contexts/I18nContext';
-import SimulationChart from '../components/SimulationChart';
+import SimulationChart from '../components/charts/SimulationChart';
 import LineChartIcon from '../components/icons/LineChartIcon';
 import TrendingUpIcon from '../components/icons/TrendingUpIcon';
 import RocketIcon from '../components/icons/RocketIcon';
@@ -11,8 +11,6 @@ import PiggyBankIcon from '../components/icons/PiggyBankIcon';
 import CalendarPlusIcon from '../components/icons/CalendarPlusIcon';
 import PercentIcon from '../components/icons/PercentIcon';
 import ClockIcon from '../components/icons/ClockIcon';
-
-// --- Compact Components ---
 
 const CompactInput: React.FC<{ 
     label: string; 
@@ -73,8 +71,6 @@ const ResultBar: React.FC<{ invested: number; interest: number; total: number }>
     );
 };
 
-// --- Calculators ---
-
 const CompoundInterestCalculator: React.FC = () => {
     const { t, formatCurrency } = useI18n();
     const [initial, setInitial] = useState(1000);
@@ -99,7 +95,6 @@ const CompoundInterestCalculator: React.FC = () => {
 
     return (
         <div className="space-y-4">
-            {/* Inputs Grid */}
             <div className="grid grid-cols-2 gap-3 bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)]">
                 <CompactInput icon={<PiggyBankIcon />} label="Inicial" value={initial} onChange={setInitial} prefix="R$" />
                 <CompactInput icon={<CalendarPlusIcon />} label="Mensal" value={monthly} onChange={setMonthly} prefix="R$" />
@@ -107,7 +102,6 @@ const CompoundInterestCalculator: React.FC = () => {
                 <CompactInput icon={<ClockIcon />} label="Tempo" value={years} onChange={setYears} suffix="anos" />
             </div>
 
-            {/* Main Result */}
             <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
                 <div className="text-center mb-4">
                     <p className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-widest mb-1">{t('final_balance')}</p>
@@ -119,7 +113,6 @@ const CompoundInterestCalculator: React.FC = () => {
                 <ResultBar invested={finalData.invested} interest={totalInterest} total={finalData.total} />
             </div>
 
-            {/* Chart */}
             <div className="h-48 bg-[var(--bg-secondary)] p-2 rounded-2xl border border-[var(--border-color)]">
                 <SimulationChart data={chartData} years={years} type="compound" />
             </div>
@@ -145,7 +138,7 @@ const SimpleInterestCalculator: React.FC = () => {
         <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)]">
                 <CompactInput icon={<PiggyBankIcon />} label="Valor Inicial" value={initial} onChange={setInitial} prefix="R$" step={100} />
-                <div className="hidden"></div> {/* Spacer to keep grid consistent if needed */}
+                <div className="hidden"></div> 
                 <CompactInput icon={<PercentIcon />} label="Taxa Anual" value={rate} onChange={setRate} suffix="%" step={0.1} />
                 <CompactInput icon={<ClockIcon />} label="Tempo" value={years} onChange={setYears} suffix="anos" />
             </div>
