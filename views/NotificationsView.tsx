@@ -93,7 +93,7 @@ const SwipeableNotificationItem: React.FC<{
 
             {/* Foreground Content */}
             <div 
-                className={`relative bg-[var(--bg-secondary)] p-4 flex items-center gap-4 transition-all duration-200 ease-out active:scale-[0.98] rounded-2xl w-full z-10 ${notification.read ? 'opacity-60' : 'shadow-sm'}`}
+                className={`relative bg-[var(--bg-secondary)] p-4 flex items-center gap-4 transition-all duration-200 ease-out active:scale-[0.98] rounded-2xl w-full z-10 ${notification.read ? 'opacity-60' : 'shadow-sm border border-[var(--accent-color)]/20'}`}
                 style={{ 
                     transform: `translateX(${offsetX}px)`,
                     transition: isSwiping ? 'none' : 'transform 0.2s ease-out, opacity 0.3s'
@@ -139,7 +139,8 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
     const { t } = useI18n();
     const { notifications, markNotificationsAsRead, markSingleNotificationAsRead, deleteNotification, clearAllNotifications } = usePortfolio();
     
-    // Removed auto-read logic useEffect
+    // Removed automatic read effect to fix user issue.
+    // Notifications now stay unread until clicked or "Mark all" is used.
 
     const handleNotificationClick = (notification: AppNotification) => {
         markSingleNotificationAsRead(notification.id);
@@ -170,7 +171,10 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
         const todayDate = new Date().toDateString();
         const yesterdayDate = new Date(Date.now() - 86400000).toDateString();
 
-        for (const n of notifications) {
+        // Sort by newest first
+        const sorted = [...notifications].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        for (const n of sorted) {
             const nDate = new Date(n.date).toDateString();
             if (nDate === todayDate) groups.today.push(n);
             else if (nDate === yesterdayDate) groups.yesterday.push(n);
@@ -195,7 +199,7 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                     {notifications.length > 0 && (
                         <>
                             {hasUnread && (
-                                <button onClick={handleMarkAllRead} className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-tertiary-hover)] transition-colors" aria-label={t('mark_all_as_read')}>
+                                <button onClick={handleMarkAllRead} className="p-2 rounded-full text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 transition-colors" aria-label={t('mark_all_as_read')}>
                                     <CheckCircleIcon className="w-5 h-5" />
                                 </button>
                             )}
@@ -215,8 +219,9 @@ const NotificationsView: React.FC<{ setActiveView: (view: View) => void; onSelec
                     {(Object.keys(groupedNotifications) as Array<keyof typeof groupedNotifications>).map(groupKey => 
                         groupedNotifications[groupKey].length > 0 && (
                             <div key={groupKey} className="relative">
-                                <h2 className="text-[10px] font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)]/80 backdrop-blur-md py-2 z-20 px-1">
+                                <h2 className="text-[10px] font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider sticky top-0 bg-[var(--bg-primary)]/80 backdrop-blur-md py-2 z-20 px-1 flex items-center justify-between">
                                     {groupTitles[groupKey]}
+                                    <span className="bg-[var(--bg-secondary)] px-2 py-0.5 rounded-full border border-[var(--border-color)]">{groupedNotifications[groupKey].length}</span>
                                 </h2>
                                 <div className="space-y-3">
                                     {groupedNotifications[groupKey].map((notification, index) => (
