@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { AppPreferences, Transaction, AppNotification, Asset, MonthlyIncome } from '../types';
 // FIX: import calculatePortfolioMetrics from ../utils
@@ -63,6 +64,8 @@ interface PortfolioContextType {
     getAveragePriceForTransaction: (tx: Transaction) => number;
     privacyMode: boolean;
     togglePrivacyMode: () => void;
+    fullIncomeHistory: Record<string, number>;
+    annualDistribution: Record<string, Record<string, number>>;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -314,7 +317,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         yieldOnCost: calculations.yieldOnCost,
         projectedAnnualIncome: calculations.projectedAnnualIncome,
         getAveragePriceForTransaction,
-        privacyMode, togglePrivacyMode
+        privacyMode, togglePrivacyMode,
+        fullIncomeHistory: calculations.fullIncomeHistory,
+        annualDistribution: calculations.annualDistribution
     };
 
     return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;

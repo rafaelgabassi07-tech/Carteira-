@@ -71,9 +71,11 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
         }).filter(a => a.quantity > 0.000001);
     }, [metrics, marketData]);
 
-    const { monthlyIncome, payersData, totalReceived } = useMemo(() => {
+    const { monthlyIncome, payersData, totalReceived, fullIncomeHistory, annualDistribution } = useMemo(() => {
         let totalReceived = 0;
-        const monthlyAggregation: Record<string, number> = {}; 
+        const monthlyAggregation: Record<string, number> = {}; // Last 12 months for dashboard
+        const fullHistoryAggregation: Record<string, number> = {}; // All time history for reports
+        const annualDistribution: Record<string, Record<string, number>> = {}; // Year -> Ticker -> Amount
         const payerAggregation: Record<string, Partial<PayerData>> = {};
         
         const transactionsByTicker: Record<string, Transaction[]> = {};
@@ -117,8 +119,19 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
                         totalReceived = safeFloat(totalReceived + amount);
                         payerAggregation[asset.ticker]!.totalPaid = safeFloat(payerAggregation[asset.ticker]!.totalPaid! + amount);
                         payerAggregation[asset.ticker]!.count!++;
+                        
                         const monthKey = div.paymentDate.substring(0, 7); 
+                        
+                        // For dashboard (Last 12 months check done later, just aggregating here)
                         monthlyAggregation[monthKey] = safeFloat((monthlyAggregation[monthKey] || 0) + amount);
+                        
+                        // For Full History
+                        fullHistoryAggregation[monthKey] = safeFloat((fullHistoryAggregation[monthKey] || 0) + amount);
+
+                        // For Annual Distribution (Yearly Reports)
+                        const yearKey = div.paymentDate.substring(0, 4);
+                        if (!annualDistribution[yearKey]) annualDistribution[yearKey] = {};
+                        annualDistribution[yearKey][asset.ticker] = safeFloat((annualDistribution[yearKey][asset.ticker] || 0) + amount);
                     }
                 }
             });
@@ -145,7 +158,13 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
             monthlyData.push({ month: d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''), total: monthlyAggregation[key] || 0 });
         }
         
-        return { monthlyIncome: monthlyData, payersData: Object.values(payerAggregation) as PayerData[], totalReceived };
+        return { 
+            monthlyIncome: monthlyData, 
+            payersData: Object.values(payerAggregation) as PayerData[], 
+            totalReceived,
+            fullIncomeHistory: fullHistoryAggregation,
+            annualDistribution
+        };
     }, [assets, transactions]);
 
     const { yieldOnCost, projectedAnnualIncome } = useMemo(() => {
@@ -167,5 +186,7 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
         totalReceived,
         yieldOnCost,
         projectedAnnualIncome,
+        fullIncomeHistory,
+        annualDistribution
     };
 };

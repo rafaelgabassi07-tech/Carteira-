@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
@@ -18,20 +19,28 @@ import BellIcon from '../components/icons/BellIcon';
 import TransactionIcon from '../components/icons/TransactionIcon';
 import AnalysisIcon from '../components/icons/AnalysisIcon';
 import TransactionsView from './TransactionsView';
+import ChevronRightIcon from '../components/icons/ChevronRightIcon';
 import type { ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 
-const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number; className?: string }> = ({ title, children, action, delay = 0, className = '' }) => (
-    <div className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${className}`} style={{ animationDelay: `${delay}ms` }}>
+const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode; delay?: number; className?: string; onClick?: () => void }> = ({ title, children, action, delay = 0, className = '', onClick }) => (
+    <div 
+        onClick={onClick}
+        className={`bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up transition-all duration-300 ${onClick ? 'cursor-pointer hover:bg-[var(--bg-tertiary-hover)] active:scale-[0.99] group' : 'hover:-translate-y-1 hover:shadow-xl'} ${className}`} 
+        style={{ animationDelay: `${delay}ms` }}
+    >
         <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-lg text-[var(--text-primary)]">{title}</h3>
+            <h3 className="font-bold text-lg text-[var(--text-primary)] group-hover:text-[var(--accent-color)] transition-colors flex items-center gap-2">
+                {title}
+                {onClick && <ChevronRightIcon className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />}
+            </h3>
             {action}
         </div>
         {children}
     </div>
 );
 
-const IncomeCard: React.FC = () => {
+const IncomeCard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActiveView }) => {
     const { t, formatCurrency } = useI18n();
     const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
     
@@ -40,8 +49,13 @@ const IncomeCard: React.FC = () => {
          return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
     }, [monthlyIncome]);
 
+    const handleClick = () => {
+        vibrate();
+        setActiveView('incomeReport');
+    };
+
     return (
-        <AnalysisCard title={t('income_report_title')} delay={100}>
+        <AnalysisCard title={t('income_report_title')} delay={100} onClick={handleClick}>
             <div className="grid grid-cols-2 gap-4 mb-4 pt-2 border-t border-[var(--border-color)]">
                 <div className="flex flex-col">
                     <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('avg_monthly_income_12m')}</span>
@@ -49,15 +63,20 @@ const IncomeCard: React.FC = () => {
                         <CountUp end={average} formatter={formatCurrency} />
                     </span>
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col text-right">
                     <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wide mb-0.5">{t('projected_annual_income')}</span>
-                    <span className="font-semibold text-lg text-[var(--green-text)]">
+                    <span className="font-semibold text-lg text-[var(--accent-color)]">
                         <CountUp end={projectedAnnualIncome} formatter={formatCurrency} />
                     </span>
                 </div>
             </div>
-             <div className="h-48 w-full">
+             <div className="h-48 w-full relative pointer-events-none">
                  <BarChart data={monthlyIncome} />
+             </div>
+             <div className="mt-4 text-center border-t border-[var(--border-color)]/50 pt-3">
+                <span className="text-xs font-bold text-[var(--accent-color)] uppercase tracking-wider flex items-center justify-center gap-1 group-hover:underline">
+                    Abrir Relatório Completo <ChevronRightIcon className="w-3 h-3" />
+                </span>
              </div>
         </AnalysisCard>
     );
@@ -94,8 +113,9 @@ const DiversificationCard: React.FC = () => {
 // Sub-component for the Overview Content
 const OverviewContent: React.FC<{ 
     addToast: (message: string, type?: ToastMessage['type']) => void, 
-    onSelectAsset: (ticker: string) => void 
-}> = ({ addToast, onSelectAsset }) => {
+    onSelectAsset: (ticker: string) => void,
+    setActiveView: (view: View) => void
+}> = ({ addToast, onSelectAsset, setActiveView }) => {
     const { t } = useI18n();
     const { assets, preferences, isRefreshing } = usePortfolio();
     const [searchQuery, setSearchQuery] = useState('');
@@ -133,7 +153,7 @@ const OverviewContent: React.FC<{
                 <div className="lg:col-span-2">
                     <PatrimonyEvolutionCard />
                 </div>
-                <IncomeCard />
+                <IncomeCard setActiveView={setActiveView} />
                 <DiversificationCard />
             </div>
 
@@ -305,15 +325,15 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ addToast, onSelectAsset, un
     
     // Memoize content components to prevent unnecessary re-renders when switching tabs
     const overviewContent = useMemo(() => (
-        <OverviewContent addToast={addToast} onSelectAsset={onSelectAsset} />
-    ), [addToast, onSelectAsset]);
+        <OverviewContent addToast={addToast} onSelectAsset={onSelectAsset} setActiveView={setActiveView} />
+    ), [addToast, onSelectAsset, setActiveView]);
 
     const transactionsContent = useMemo(() => (
         <TransactionsView 
             initialFilter={initialTransactionFilter} 
             clearFilter={clearTransactionFilter || (() => {})} 
             addToast={addToast} 
-            isEmbedded={true}
+            // isEmbedded={true} removed because TransactionsView handles layout fine
         />
     ), [initialTransactionFilter, clearTransactionFilter, addToast]);
 
