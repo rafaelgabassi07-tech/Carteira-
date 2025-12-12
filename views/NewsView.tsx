@@ -6,11 +6,9 @@ import StarIcon from '../components/icons/StarIcon';
 import ShareIcon from '../components/icons/ShareIcon';
 import RefreshIcon from '../components/icons/RefreshIcon';
 import FilterIcon from '../components/icons/FilterIcon';
-import SearchIcon from '../components/icons/SearchIcon';
-import CloseIcon from '../components/icons/CloseIcon';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
-import { CacheManager, vibrate, debounce, usePersistentState } from '../utils';
+import { CacheManager, vibrate, debounce } from '../utils';
 import { CACHE_TTL } from '../constants';
 
 // Fix: Changed props from `sentiment` to `sentimentScore` and added logic to derive sentiment category from the score.
@@ -133,7 +131,7 @@ const NewsCardSkeleton: React.FC = () => (
 );
 
 
-const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void; isEmbedded?: boolean}> = ({ addToast, isEmbedded }) => {
+const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type']) => void}> = ({ addToast }) => {
   const { t } = useI18n();
   const { assets, preferences, logApiUsage } = usePortfolio();
   const [news, setNews] = useState<NewsArticle[]>([]);
@@ -146,9 +144,12 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('week');
   const [sourceFilter, setSourceFilter] = useState('');
 
-  // Favorites System - Now stores full objects
-  const [savedArticles, setSavedArticles] = usePersistentState<NewsArticle[]>('saved_news_articles', []);
-  const favoriteTitles = useMemo(() => new Set(savedArticles.map(a => a.title)), [savedArticles]);
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try {
+        const saved = localStorage.getItem('news-favorites');
+        return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
   
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
   
@@ -157,22 +158,26 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   const containerRef = useRef<HTMLDivElement>(null);
 
   const assetTickers = useMemo(() => assets.map(a => a.ticker), [assets]);
-  
-  const handleToggleFavorite = (article: NewsArticle) => {
-    vibrate(20);
-    setSavedArticles(prev => {
-        const exists = prev.some(a => a.title === article.title);
-        if (exists) {
-            return prev.filter(a => a.title !== article.title);
-        } else {
-            return [article, ...prev]; // Add to top
-        }
+
+  useEffect(() => {
+    localStorage.setItem('news-favorites', JSON.stringify(Array.from(favorites)));
+  }, [favorites]);
+
+  const handleToggleFavorite = (articleTitle: string) => {
+    setFavorites(prevFavorites => {
+      const newFavorites = new Set(prevFavorites);
+      if (newFavorites.has(articleTitle)) {
+        newFavorites.delete(articleTitle);
+      } else {
+        newFavorites.add(articleTitle);
+      }
+      return newFavorites;
     });
   };
 
   const clearFavorites = () => {
       if (window.confirm(t('clear_cache_confirm'))) {
-          setSavedArticles([]);
+          setFavorites(new Set());
           addToast(t('cache_cleared'), 'success');
           setActiveTab('all');
       }
@@ -186,7 +191,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
       const filterKey = `news_${currentQuery}_${currentDateRange}_${currentSource}`.toLowerCase().replace(/\s+/g, '_');
       
       if (!isRefresh) {
-          const cachedNews = CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
+          const cachedNews = await CacheManager.get<NewsArticle[]>(filterKey, CACHE_TTL.NEWS);
           if (cachedNews) {
               setNews(cachedNews);
               setLoading(false);
@@ -223,10 +228,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setSearchQuery(e.target.value);
-      if (activeTab === 'all') {
-          setLoading(true);
-          debouncedLoadNews(e.target.value, dateRange, sourceFilter);
-      }
+      setLoading(true);
+      debouncedLoadNews(e.target.value, dateRange, sourceFilter);
   };
 
   const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -247,15 +250,6 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
     loadNews(true, searchQuery, dateRange, sourceFilter);
   };
   
-  const clearSearch = () => {
-      vibrate(5);
-      setSearchQuery('');
-      if (activeTab === 'all') {
-          setLoading(true);
-          debouncedLoadNews('', dateRange, sourceFilter);
-      }
-  };
-  
   const handleTouchStart = (e: React.TouchEvent) => {
       if(containerRef.current && containerRef.current.scrollTop === 0) {
           touchStartY.current = e.targetTouches[0].clientY;
@@ -263,7 +257,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-      if(touchStartY.current > 0 && !loading && activeTab === 'all') {
+      if(touchStartY.current > 0 && !loading) {
           const touchY = e.targetTouches[0].clientY;
           const pullDistance = touchY - touchStartY.current;
           if(pullDistance > 0) {
@@ -288,60 +282,50 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
   }, [loadNews]);
 
   const displayedNews = useMemo(() => {
-      if (activeTab === 'favorites') {
-          if (!searchQuery) return savedArticles;
-          const q = searchQuery.toLowerCase();
-          return savedArticles.filter(a => 
-              a.title.toLowerCase().includes(q) || 
-              a.summary.toLowerCase().includes(q)
-          );
-      }
-      return news;
-  }, [news, activeTab, savedArticles, searchQuery]);
+      return activeTab === 'favorites' 
+        ? news.filter(n => favorites.has(n.title))
+        : news;
+  }, [news, activeTab, favorites]);
 
   return (
     <div 
-        className={`h-full flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6 ${isEmbedded ? 'p-0 pb-0' : 'p-4 pb-24 md:pb-6'}`}
+        className="p-4 h-full pb-24 md:pb-6 flex flex-col overflow-y-auto custom-scrollbar landscape-pb-6"
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
     >
-      {activeTab === 'all' && (
-          <div 
-            className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
-            style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
-          >
-            <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
-          </div>
-      )}
+      <div 
+        className="absolute top-0 left-1/2 -translate-x-1/2 transition-all duration-300" 
+        style={{ top: `${Math.min(pullPosition / 2, 20) - 20}px`, opacity: pullPosition/70 }}
+      >
+        <RefreshIcon className={`w-6 h-6 text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`}/>
+      </div>
       
       <div className="w-full max-w-7xl mx-auto">
-        <div className={`flex justify-between items-center mb-4`}>
-          {!isEmbedded && <h1 className="text-2xl font-bold">{t('market_news')}</h1>}
-          <div className={`flex gap-2 ${isEmbedded ? 'w-full justify-end' : ''}`}>
-               {activeTab === 'all' && (
-                   <button 
-                      onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
-                      className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
-                      aria-label="Filtros"
-                  >
-                      <FilterIcon className="w-5 h-5" />
-                  </button>
-               )}
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">{t('market_news')}</h1>
+          <div className="flex gap-2">
+               <button 
+                  onClick={() => { setShowFilters(!showFilters); vibrate(); }} 
+                  className={`p-2 rounded-full transition-all active:scale-95 border ${showFilters ? 'bg-[var(--accent-color)] text-[var(--accent-color-text)] border-[var(--accent-color)]' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-tertiary-hover)]'}`}
+                  aria-label="Filtros"
+              >
+                  <FilterIcon className="w-5 h-5" />
+              </button>
               <button 
                   onClick={handleRefresh} 
-                  disabled={loading || activeTab === 'favorites'}
+                  disabled={loading}
                   className="p-2 rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 disabled:opacity-50 border border-[var(--border-color)]"
                   aria-label={t('refresh_prices')}
               >
-                  <RefreshIcon className={`w-5 h-5 ${loading && activeTab === 'all' ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
+                  <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin text-[var(--accent-color)]' : ''}`} />
               </button>
           </div>
         </div>
         
         {/* Filter Panel */}
-        {showFilters && activeTab === 'all' && (
+        {showFilters && (
             <div className="bg-[var(--bg-secondary)] p-4 rounded-xl mb-4 border border-[var(--border-color)] animate-fade-in-up space-y-4">
                  <div>
                     <label className="text-xs font-bold text-[var(--text-secondary)] uppercase mb-2 block">Período</label>
@@ -371,25 +355,14 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
             </div>
         )}
 
-        <div className="mb-4 relative group">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-color)] transition-colors pointer-events-none">
-              <SearchIcon className="w-5 h-5" />
-          </div>
+        <div className="mb-4">
           <input 
             type="text"
-            placeholder={activeTab === 'favorites' ? "Buscar nos favoritos..." : t('search_news_placeholder')}
+            placeholder={t('search_news_placeholder')}
             value={searchQuery}
             onChange={handleSearchChange}
-            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-12 pr-12 text-sm font-bold focus:outline-none focus:border-[var(--accent-color)] focus:ring-4 focus:ring-[var(--accent-color)]/10 transition-all shadow-sm placeholder:text-[var(--text-secondary)]/50"
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 text-sm focus:outline-none focus:border-[var(--accent-color)] transition-colors shadow-sm"
           />
-          {searchQuery && (
-              <button 
-                  onClick={clearSearch}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] hover:text-[var(--text-primary)] transition-colors active:scale-90"
-              >
-                  <CloseIcon className="w-4 h-4" />
-              </button>
-          )}
         </div>
         
         <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl mb-4 border border-[var(--border-color)] shrink-0">
@@ -404,13 +377,13 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
             >
                 {t('news_tab_favorites')}
-                {savedArticles.length > 0 && <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] px-1.5 py-0.5 rounded-full text-[9px]">{savedArticles.length}</span>}
+                {favorites.size > 0 && <span className="bg-[var(--accent-color)] text-[var(--accent-color-text)] px-1.5 py-0.5 rounded-full text-[9px]">{favorites.size}</span>}
             </button>
         </div>
 
-        {loading && activeTab === 'all' && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
+        {loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({length: 5}).map((_, i) => <NewsCardSkeleton key={i}/>)}</div>}
         
-        {error && activeTab === 'all' && (
+        {error && (
           <div className="bg-red-900/50 border border-red-600/50 text-red-200 px-4 py-3 rounded-lg text-center">
             <p className="font-bold">{t('error')}</p>
             <p className="text-sm">{error}</p>
@@ -420,7 +393,7 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
           </div>
         )}
 
-        {(!loading || activeTab === 'favorites') && !error && (
+        {!loading && !error && (
           <div className="flex-1">
             {displayedNews.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 landscape-grid-cols-3">
@@ -432,8 +405,8 @@ const NewsView: React.FC<{addToast: (message: string, type?: ToastMessage['type'
                   >
                       <NewsCard 
                       article={article}
-                      isFavorited={favoriteTitles.has(article.title)}
-                      onToggleFavorite={() => handleToggleFavorite(article)}
+                      isFavorited={favorites.has(article.title)}
+                      onToggleFavorite={() => handleToggleFavorite(article.title)}
                       addToast={addToast}
                       />
                   </div>

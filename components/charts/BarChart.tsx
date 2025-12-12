@@ -72,7 +72,7 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
 
     if (dimensions.width === 0 || data.length === 0) return (
         <div ref={containerRef} className="w-full h-full flex items-center justify-center text-xs text-[var(--text-secondary)]">
-            {data.length === 0 ? 'Sem dados de renda projetada.' : ''}
+            {data.length === 0 ? 'Sem dados.' : ''}
         </div>
     );
 
@@ -99,7 +99,6 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                     if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
                 }}
                 className="w-full h-full cursor-crosshair"
-                shapeRendering="geometricPrecision"
             >
                  <defs>
                     <linearGradient id={gradientId} x1="0" y1="1" x2="0" y2="0">
@@ -143,13 +142,6 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                     return (
                         <g key={d.month}>
                             <rect
-                                x={padding.left + i * barSlotWidth}
-                                y={padding.top}
-                                width={barSlotWidth}
-                                height={height - padding.top - padding.bottom}
-                                fill="transparent"
-                            />
-                            <rect
                                 x={x}
                                 y={y}
                                 width={barWidth}
@@ -187,7 +179,6 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                 >
                     <p className="text-[var(--text-secondary)] mb-0.5 capitalize">{tooltip.month}</p>
                     <p className="font-bold text-[var(--text-primary)] text-sm">{formatCurrency(tooltip.total)}</p>
-                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)]"></div>
                 </div>
             )}
         </div>

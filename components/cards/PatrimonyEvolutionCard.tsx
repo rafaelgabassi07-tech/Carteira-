@@ -54,7 +54,7 @@ const PatrimonyEvolutionCard: React.FC = () => {
         { id: '30d', label: '30D' },
         { id: '6m', label: '6M' },
         { id: '1y', label: '1A' },
-        { id: 'all', label: 'Todos' },
+        { id: 'all', label: 'Tudo' },
     ];
 
     if (assets.length === 0) return null;
@@ -106,4 +106,3 @@ const PatrimonyEvolutionCard: React.FC = () => {
 };
 
 export default PatrimonyEvolutionCard;
-    

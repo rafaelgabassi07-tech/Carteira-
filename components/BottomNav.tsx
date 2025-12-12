@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { View } from '../App';
 import WalletIcon from './icons/WalletIcon';
@@ -29,7 +30,7 @@ const NavItem: React.FC<{
             : 'text-[var(--text-secondary)] group-active:scale-90 opacity-70 group-hover:opacity-100'
         }`}
       >
-        {React.cloneElement(icon, { className: 'w-6 h-6', strokeWidth: isActive ? 2.5 : 2 })}
+        {React.cloneElement(icon, { className: 'w-6 h-6' })}
       </div>
       
       <span 

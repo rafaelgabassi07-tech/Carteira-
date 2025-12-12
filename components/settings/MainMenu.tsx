@@ -38,7 +38,12 @@ const MenuItem: React.FC<{ icon: React.ReactNode; title: string; subtitle: strin
 );
 
 
-const MainMenu: React.FC<{ setScreen: (screen: MenuScreen) => void; addToast: (message: string, type?: ToastMessage['type']) => void; }> = ({ setScreen, addToast }) => {
+const MainMenu: React.FC<{ 
+    setScreen: (screen: MenuScreen) => void; 
+    addToast: (message: string, type?: ToastMessage['type']) => void;
+    onShowUpdateModal?: () => void;
+    updateAvailable?: boolean;
+}> = ({ setScreen, addToast, onShowUpdateModal, updateAvailable }) => {
     const { t } = useI18n();
     const { userProfile, resetApp } = usePortfolio();
 

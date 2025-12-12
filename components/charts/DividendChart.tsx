@@ -56,8 +56,7 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
         else if (period === '1y') cutoffDate = new Date(now.getFullYear() - 1, now.getMonth(), 1);
         else if (period === '5y') cutoffDate = new Date(now.getFullYear() - 5, now.getMonth(), 1);
 
-        const result = sortedData.filter(d => new Date(d.paymentDate) >= cutoffDate);
-        return result;
+        return sortedData.filter(d => new Date(d.paymentDate) >= cutoffDate);
     }, [data, period]);
 
     const { width, height } = dimensions;
@@ -154,7 +153,7 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                             const touch = e.touches[0];
                             if (touch) handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
                         }}
-                        className="w-full h-full cursor-crosshair overflow-visible"
+                        className="w-full h-full cursor-crosshair"
                     >
                         {yTicks.map((tick, i) => {
                             const y = height - padding.bottom - (tick / effectiveMaxValue) * chartHeight;
@@ -258,7 +257,6 @@ const DividendChart: React.FC<DividendChartProps> = ({ data }) => {
                             <span className="w-2 h-2 rounded-full bg-[var(--accent-color)]"></span>
                             {formatCurrency(tooltip.value)} <span className="text-[10px] font-normal text-[var(--text-secondary)]">/ cota</span>
                         </p>
-                        <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)]"></div>
                     </div>
                 )}
             </div>

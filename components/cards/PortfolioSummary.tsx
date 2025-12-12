@@ -41,7 +41,7 @@ const PortfolioSummary: React.FC = () => {
     }
 
     return (
-        <div className="relative bg-[var(--bg-secondary)] rounded-3xl p-6 border border-[var(--border-color)] shadow-sm overflow-hidden">
+        <div className="relative bg-[var(--bg-secondary)] rounded-3xl p-6 border border-[var(--border-color)] shadow-sm overflow-hidden animate-fade-in">
             {/* Minimalist Background Decoration */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)]/5 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2"></div>
 
@@ -78,4 +78,3 @@ const PortfolioSummary: React.FC = () => {
 };
 
 export default PortfolioSummary;
-    

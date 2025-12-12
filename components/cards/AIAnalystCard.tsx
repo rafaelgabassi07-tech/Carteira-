@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useI18n } from '../../contexts/I18nContext';
 import { usePortfolio } from '../../contexts/PortfolioContext';
 import { askAssetAnalyst } from '../../services/geminiService';
@@ -23,7 +23,6 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 const AIAnalystCard: React.FC<AIAnalystCardProps> = ({ ticker, assetData, addToast }) => {
-    const { t } = useI18n();
     const { preferences, logApiUsage } = usePortfolio();
     
     const [query, setQuery] = useState('');

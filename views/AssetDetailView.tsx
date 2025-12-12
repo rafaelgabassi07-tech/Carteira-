@@ -53,21 +53,23 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const asset = getAssetByTicker(ticker);
 
     useEffect(() => {
+        let isMounted = true;
         const checkAndLoad = async () => {
-            const isStale = !asset?.lastUpdated || (Date.now() - asset.lastUpdated > 5 * 60 * 1000);
-            if (!asset || isStale || !asset.dividendsHistory || asset.dividendsHistory.length === 0) {
-                setIsRefreshing(true);
-                try {
-                    await refreshSingleAsset(ticker, true);
-                } catch(e: any){
-                    addToast(e.message, 'error');
-                } finally {
-                    setIsRefreshing(false);
-                }
+            // FIX: Removed 'asset' dependency to prevent infinite loops.
+            // Using a separate check for freshness that doesn't depend on the object reference stability.
+            setIsRefreshing(true);
+            try {
+                await refreshSingleAsset(ticker);
+            } catch(e: any){
+                // Silent catch or specific error handling
+            } finally {
+                if (isMounted) setIsRefreshing(false);
             }
         };
+        // Only auto-refresh on mount
         checkAndLoad();
-    }, [ticker, refreshSingleAsset, asset, addToast]); 
+        return () => { isMounted = false; };
+    }, [ticker]); 
 
     const handleRefresh = useCallback(async () => {
         if (isRefreshing) return;

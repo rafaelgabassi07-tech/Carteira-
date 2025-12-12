@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { useI18n } from '../../contexts/I18nContext';
 
 interface PortfolioLineChartProps {
@@ -45,7 +45,6 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
   }
 
   const { width, height } = dimensions;
-  
   const padding = simpleMode 
     ? { top: 5, bottom: 5, left: 0, right: 0 } 
     : { top: 20, bottom: 30, left: 10, right: 50 };
@@ -65,32 +64,12 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
       return `${coords.x},${coords.y}`;
   }).join(' ');
 
-  const xLabelsToShow = useMemo(() => {
-      if (!labels || simpleMode) return [];
-      const count = labels.length;
-      const maxLabels = Math.floor(width / 80);
-      if (count <= maxLabels) return labels.map((text, i) => ({ text, x: getCoords(data[i], i).x, align: i === 0 ? 'start' : i === count - 1 ? 'end' : 'middle' }));
-      
-      const step = Math.floor((count - 1) / (maxLabels - 1));
-      const indices = [0];
-      for(let i = 1; i < maxLabels - 1; i++) indices.push(i * step);
-      indices.push(count - 1);
-
-      return [...new Set(indices)].map(i => ({ text: labels[i], x: getCoords(data[i], i).x, align: i === 0 ? 'start' : i === count - 1 ? 'end' : 'middle' }));
-  }, [labels, data, simpleMode, width, height, getCoords]);
-  
-  const yLabelsToShow = useMemo(() => {
-      if (simpleMode) return [];
-      return [min, min + range/2, max];
-  }, [min, range, max, simpleMode]);
-
   const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current || simpleMode) return;
     const rect = svgRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
     
     const relativeX = (x / rect.width) * width;
-    
     const graphWidth = width - padding.left - padding.right;
     const progress = Math.max(0, Math.min(1, (relativeX - padding.left) / graphWidth));
     const index = Math.round(progress * (data.length - 1));
@@ -135,7 +114,6 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
                         handleMouseMove(fakeEvent);
                     }
                 }}
-                shapeRendering="geometricPrecision"
             >
             <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -144,18 +122,6 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
                 </linearGradient>
             </defs>
             
-            {!simpleMode && yLabelsToShow.map((val, i) => {
-                const y = getCoords(val, 0).y;
-                return (
-                    <g key={i}>
-                        <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="2 2" />
-                        <text x={width - padding.right + 5} y={y + 4} textAnchor="start" fill="var(--text-secondary)" fontSize="12">
-                            {val >= 1000 ? `${(val/1000).toFixed(0)}k` : val.toFixed(0)}
-                        </text>
-                    </g>
-                )
-            })}
-
             <polygon
                 fill={`url(#${gradientId})`}
                 stroke="none"
@@ -170,33 +136,10 @@ const PortfolioLineChart: React.FC<PortfolioLineChartProps> = ({ data, labels, i
                 fill="none"
                 stroke={strokeColor}
                 strokeWidth={simpleMode ? "2" : "1.5"}
-                vectorEffect="non-scaling-stroke" 
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 points={points}
             />
-
-            {!simpleMode && (
-                <>
-                    <circle cx={getCoords(data[0], 0).x} cy={getCoords(data[0], 0).y} r="4" fill="var(--bg-secondary)" stroke={strokeColor} strokeWidth="2" />
-                    <circle cx={getCoords(data[data.length-1], data.length-1).x} cy={getCoords(data[data.length-1], data.length-1).y} r="4" fill="var(--bg-secondary)" stroke={strokeColor} strokeWidth="2" />
-                </>
-            )}
-
-            {!simpleMode && xLabelsToShow.map((lbl: any, i) => (
-                <text 
-                    key={i} 
-                    x={lbl.x} 
-                    y={height - 10} 
-                    textAnchor={lbl.align as any} 
-                    fill="var(--text-secondary)" 
-                    fontSize="12"
-                    fontWeight="500"
-                    style={{ pointerEvents: 'none' }}
-                >
-                    {lbl.text}
-                </text>
-            ))}
 
             {activePoint && !simpleMode && (
                 <g className="pointer-events-none">

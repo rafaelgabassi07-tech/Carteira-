@@ -79,7 +79,7 @@ const PieRing: React.FC<{ data: PieChartData[], radius: number, strokeWidth: num
 };
 
 const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) => {
-    const { t, formatCurrency } = useI18n();
+    const { formatCurrency } = useI18n();
     const [animate, setAnimate] = useState(false);
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -104,7 +104,7 @@ const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ data, goals }) =>
                 
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-300">
                     <span className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-widest mb-0.5">
-                        {activeItem ? activeItem.name : t('total_invested')}
+                        {activeItem ? activeItem.name : 'Total'}
                     </span>
                     <span className={`font-bold text-[var(--text-primary)] ${activeItem ? 'text-2xl' : 'text-lg'}`}>
                         {activeItem ? `${activeItem.percentage.toFixed(1)}%` : formatCurrency(totalValue)}
