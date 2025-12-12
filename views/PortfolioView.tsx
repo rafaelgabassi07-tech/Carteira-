@@ -1,160 +1,83 @@
 
-import React, { useMemo, useRef, useState } from 'react';
-import type { ToastMessage } from '../types';
+import React, { useState, useRef } from 'react';
 import type { View } from '../App';
+import type { ToastMessage } from '../types';
 import RefreshIcon from '../components/icons/RefreshIcon';
-import ShareIcon from '../components/icons/ShareIcon';
-import BellIcon from '../components/icons/BellIcon';
 import SettingsIcon from '../components/icons/SettingsIcon';
-import CountUp from '../components/CountUp';
+import BellIcon from '../components/icons/BellIcon';
+import ShareIcon from '../components/icons/ShareIcon';
 import FloatingActionButton from '../components/FloatingActionButton';
 import { useI18n } from '../contexts/I18nContext';
 import { usePortfolio } from '../contexts/PortfolioContext';
 import { vibrate } from '../utils';
-import PortfolioPieChart from '../components/PortfolioPieChart';
 
-// Icons
-const WalletIcon: React.FC<{className?:string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
-);
+// Componentes Organizados
+import PortfolioSummary from '../components/cards/PortfolioSummary';
+import DividendsSummaryCard from '../components/cards/DividendsSummaryCard';
+import PortfolioPieChart from '../components/charts/PortfolioPieChart';
+import WalletIcon from '../components/icons/WalletIcon';
 
-// --- Components ---
-
+// Sub-componente Header Local (limpo)
 const Header: React.FC<{ 
     setActiveView: (view: View) => void;
-    onShare: () => void;
     onRefresh: () => void;
+    onShare: () => void;
     isRefreshing: boolean;
     unreadNotificationsCount?: number;
-}> = ({ setActiveView, onShare, onRefresh, isRefreshing, unreadNotificationsCount }) => {
+}> = ({ setActiveView, onRefresh, onShare, isRefreshing, unreadNotificationsCount }) => {
     const { t } = useI18n();
 
     return (
-        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 glass border-b border-[var(--border-color)]/50 transition-all duration-300">
-            <div className="flex flex-col">
-                <h1 className="text-xl font-black tracking-tight text-[var(--text-primary)] leading-tight flex items-center gap-1">
+        <header className="px-4 py-3 flex justify-between items-center sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-md border-b border-[var(--border-color)]/50 transition-all duration-300">
+            <div>
+                <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
                     Invest
-                    <span className="w-1.5 h-1.5 bg-[var(--accent-color)] rounded-full animate-pulse mt-1"></span>
+                    <span className="w-2 h-2 bg-[var(--accent-color)] rounded-full animate-pulse"></span>
                 </h1>
-                <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-widest opacity-80">{t('main_portfolio')}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+                 <button 
+                    onClick={() => { onShare(); vibrate(); }} 
+                    className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95"
+                    aria-label="Compartilhar"
+                >
+                     <ShareIcon className="w-5 h-5"/>
+                </button>
                 <button 
-                    id="refresh-btn" 
                     onClick={() => { onRefresh(); vibrate(); }} 
-                    className={`p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-90 border border-transparent hover:border-[var(--border-color)] ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
+                    className={`p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-90 ${isRefreshing ? 'animate-spin text-[var(--accent-color)]' : ''}`} 
                     aria-label={t('refresh_prices')}
                 >
                      <RefreshIcon className="w-5 h-5"/>
                 </button>
                 <button 
-                    id="settings-btn" 
-                    onClick={() => { setActiveView('settings'); vibrate(); }} 
-                    className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95 border border-transparent hover:border-[var(--border-color)]" 
-                    aria-label={t('nav_settings')}
+                    onClick={() => { setActiveView('notificacoes'); vibrate(); }} 
+                    className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95"
                 >
-                     <SettingsIcon className="w-5 h-5"/>
-                </button>
-                <button id="notifications-btn" onClick={() => { setActiveView('notificacoes'); vibrate(); }} className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] relative text-[var(--text-secondary)] transition-all active:scale-95 border border-transparent hover:border-[var(--border-color)]">
                     <BellIcon className="w-5 h-5" />
                     {unreadNotificationsCount && unreadNotificationsCount > 0 ? (
                         <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[var(--bg-primary)]"></span>
                     ) : null}
+                </button>
+                <button 
+                    onClick={() => { setActiveView('settings'); vibrate(); }} 
+                    className="p-2.5 rounded-full hover:bg-[var(--bg-tertiary-hover)] text-[var(--text-secondary)] transition-all active:scale-95" 
+                    aria-label={t('nav_settings')}
+                >
+                     <SettingsIcon className="w-5 h-5"/>
                 </button>
             </div>
         </header>
     );
 };
 
-const Metric: React.FC<{ label: string; children: React.ReactNode; }> = ({ label, children }) => (
-    <div className="flex flex-col">
-        <h3 className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1 opacity-70">{label}</h3>
-        <div className="font-bold text-lg tracking-tight">{children}</div>
-    </div>
-);
-
-const PortfolioSummary: React.FC = () => {
-    const { t, formatCurrency, locale } = useI18n();
-    const { assets, privacyMode, preferences, yieldOnCost, projectedAnnualIncome } = usePortfolio();
-
-    const summary = useMemo(() => {
-        return assets.reduce(
-            (acc, asset) => {
-                const totalInvested = asset.quantity * asset.avgPrice;
-                const currentValue = asset.quantity * asset.currentPrice;
-                acc.totalInvested += totalInvested;
-                acc.currentValue += currentValue;
-                return acc;
-            },
-            { totalInvested: 0, currentValue: 0 }
-        );
-    }, [assets]);
-    
-    const unrealizedGain = summary.currentValue - summary.totalInvested;
-    const unrealizedGainPercent = summary.totalInvested > 0 ? (unrealizedGain / summary.totalInvested) * 100 : 0;
-    const today = new Date().toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-
-    const format = (val: number) => {
-        let formatted = formatCurrency(val);
-        if (preferences.hideCents) formatted = formatted.replace(/,\d{2}$/, '');
-        return formatted;
-    }
-
-    return (
-        <div id="portfolio-summary" className="relative p-6 rounded-[28px] mb-6 overflow-hidden group shadow-2xl shadow-[var(--accent-color)]/5 transition-all duration-500 border border-[var(--border-color)]">
-            {/* Background Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[var(--bg-secondary)] via-[var(--bg-secondary)] to-[var(--bg-tertiary-hover)] opacity-90"></div>
-            
-            {/* Subtle Noise/Glow Effect */}
-            <div className="absolute -top-24 -right-24 w-64 h-64 bg-[var(--accent-color)] opacity-[0.07] blur-[80px] rounded-full pointer-events-none"></div>
-            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500 opacity-[0.05] blur-[80px] rounded-full pointer-events-none"></div>
-
-            <div className="relative z-10">
-                <div className="flex justify-between items-start mb-2">
-                     <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-80">{t('my_portfolio')}</h2>
-                     <span className="text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-primary)]/50 backdrop-blur-sm px-2 py-0.5 rounded-full border border-[var(--border-color)]">{today}</span>
-                </div>
-                
-                <div className={`mt-3 mb-2 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
-                    <p className="text-[2.75rem] font-black tracking-tighter mb-1 text-[var(--text-primary)] leading-none">
-                        <CountUp end={summary.currentValue} formatter={format} />
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border ${unrealizedGain >= 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-500'}`}>
-                            <span className="text-xs font-bold">{unrealizedGain >= 0 ? '▲' : '▼'} {unrealizedGainPercent.toFixed(2)}%</span>
-                        </div>
-                        <p className={`text-sm font-semibold ${unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                            {unrealizedGain >= 0 ? '+' : ''} <CountUp end={Math.abs(unrealizedGain)} formatter={format} /> 
-                        </p>
-                    </div>
-                </div>
-
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-[var(--border-color)] to-transparent my-6 opacity-60"></div>
-
-                <div className={`grid grid-cols-2 gap-y-6 gap-x-4 transition-all duration-300 ${privacyMode ? 'blur-md select-none grayscale opacity-50' : ''}`}>
-                    <Metric label={t('total_invested')}>
-                        <p className="text-[var(--text-primary)]"><CountUp end={summary.totalInvested} formatter={format} /></p>
-                    </Metric>
-                    <Metric label={t('yield_on_cost')}>
-                        <p className="text-[var(--accent-color)] drop-shadow-sm"><CountUp end={yieldOnCost} decimals={2} />%</p>
-                    </Metric>
-                    <Metric label={t('projected_annual_income')}>
-                        <p className="text-[var(--text-primary)]"><CountUp end={projectedAnnualIncome} formatter={format} /></p>
-                    </Metric>
-                    <Metric label={t('capital_gain')}>
-                        <p className={unrealizedGain >= 0 ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}><CountUp end={unrealizedGain} formatter={format} /></p>
-                    </Metric>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const DiversificationCard: React.FC = () => {
+// Sub-componente Card de Diversificação
+const DiversificationSection: React.FC = () => {
     const { t } = useI18n();
     const { assets, preferences } = usePortfolio();
     
-    const data = useMemo(() => {
+    // Lógica de cálculo simplificada e memorizada no componente pai ou aqui se necessário
+    const data = React.useMemo(() => {
         const segments: Record<string, number> = {};
         let totalValue = 0;
         assets.forEach(a => {
@@ -171,9 +94,11 @@ const DiversificationCard: React.FC = () => {
         })).sort((a, b) => b.value - a.value);
     }, [assets, t]);
 
+    if (assets.length === 0) return null;
+
     return (
-        <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm animate-fade-in-up hover:bg-[var(--bg-tertiary-hover)] transition-colors duration-300" style={{ animationDelay: `200ms` }}>
-            <h3 className="font-bold text-lg text-[var(--text-primary)] mb-4">{t('diversification')}</h3>
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm">
+            <h3 className="font-bold text-base text-[var(--text-primary)] mb-4">{t('diversification')}</h3>
             <PortfolioPieChart data={data} goals={preferences.segmentGoals || {}} />
         </div>
     );
@@ -186,14 +111,14 @@ interface PortfolioViewProps {
     unreadNotificationsCount?: number;
 }
 
-const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAsset, addToast, unreadNotificationsCount }) => {
+const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, addToast, unreadNotificationsCount }) => {
     const { t, formatCurrency } = useI18n();
     const { assets, refreshMarketData, isRefreshing: isContextRefreshing } = usePortfolio();
     const [isPullRefreshing, setIsPullRefreshing] = useState(false);
     
     const isRefreshing = isContextRefreshing || isPullRefreshing;
 
-    // Pull to Refresh Logic
+    // Lógica Pull to Refresh
     const touchStartY = useRef(0);
     const [pullDistance, setPullDistance] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -209,15 +134,13 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             const touchY = e.targetTouches[0].clientY;
             const dist = touchY - touchStartY.current;
             if (dist > 0) {
-                setPullDistance(Math.min(dist * 0.4, 80)); // Resistance
+                setPullDistance(Math.min(dist * 0.4, 80));
             }
         }
     };
 
     const handleTouchEnd = () => {
-        if (pullDistance > 60) {
-            handleRefreshPrices();
-        }
+        if (pullDistance > 60) handleRefreshPrices();
         setPullDistance(0);
         touchStartY.current = 0;
     };
@@ -230,7 +153,6 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
             await refreshMarketData(true);
             addToast(t('toast_update_success'), 'success');
         } catch (error: any) {
-            console.error("Error refreshing data:", error);
             addToast(error.message || t('toast_update_failed'), 'error');
         } finally {
             setIsPullRefreshing(false);
@@ -250,57 +172,71 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ setActiveView, onSelectAs
                 await navigator.clipboard.writeText(shareData.text);
                 addToast('Copiado para área de transferência!', 'success');
             }
-        } catch (err) {
-            // User cancelled
-        }
+        } catch (err) {}
     };
 
     return (
         <div 
-            className="pb-24 md:pb-6 h-full overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6 scroll-smooth"
+            className="h-full flex flex-col overflow-y-auto overscroll-contain no-scrollbar landscape-pb-6 bg-[var(--bg-primary)]"
             ref={containerRef}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
         >
-            {/* Refresh Spinner */}
+            {/* Spinner Pull-to-Refresh */}
             <div 
-                className="fixed top-16 left-0 right-0 flex justify-center pointer-events-none z-20 transition-transform duration-200"
-                style={{ transform: `translateY(${pullDistance > 0 ? pullDistance : (isRefreshing ? 60 : -50)}px)`, opacity: Math.min(pullDistance / 40, 1) }}
+                className="fixed top-20 left-0 right-0 flex justify-center pointer-events-none z-20 transition-transform duration-200"
+                style={{ 
+                    transform: `translateY(${pullDistance > 0 ? pullDistance : (isRefreshing ? 10 : -50)}px)`, 
+                    opacity: Math.min(pullDistance / 40, 1) 
+                }}
             >
                 <div className="bg-[var(--bg-secondary)] p-2 rounded-full shadow-lg border border-[var(--border-color)]">
                     <RefreshIcon className={`w-5 h-5 text-[var(--accent-color)] ${isRefreshing ? 'animate-spin' : ''}`} />
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto">
-                <Header setActiveView={setActiveView} onShare={handleShare} onRefresh={handleRefreshPrices} isRefreshing={isRefreshing} unreadNotificationsCount={unreadNotificationsCount} />
+            <div className="max-w-5xl mx-auto w-full pb-24 md:pb-6">
+                <Header 
+                    setActiveView={setActiveView} 
+                    onShare={handleShare} 
+                    onRefresh={handleRefreshPrices} 
+                    isRefreshing={isRefreshing} 
+                    unreadNotificationsCount={unreadNotificationsCount} 
+                />
                 
                 {assets.length > 0 ? (
-                    <>
-                        <div className="md:max-w-2xl md:mx-auto lg:max-w-3xl">
-                            <PortfolioSummary />
-                        </div>
+                    <div className="animate-fade-in space-y-6 p-4">
+                        <PortfolioSummary />
 
-                        <div className="px-4 mt-6 pb-6">
-                            <DiversificationCard />
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <DividendsSummaryCard setActiveView={setActiveView} />
+                            <DiversificationSection />
                         </div>
-                    </>
+                    </div>
                 ) : (
-                    <div className="relative h-[80vh]">
-                        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center animate-fade-in">
-                            <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-xl shadow-[var(--accent-color)]/5">
-                                <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
-                            </div>
-                            <h2 className="text-2xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
-                            <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
+                    <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center animate-fade-in">
+                        <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 border border-[var(--border-color)] shadow-sm">
+                            <WalletIcon className="w-10 h-10 text-[var(--text-secondary)] opacity-50"/>
                         </div>
-                        <FloatingActionButton id="add-first-transaction-button" onClick={() => { setActiveView('transacoes'); vibrate(); }} />
+                        <h2 className="text-xl font-bold mb-2 text-[var(--text-primary)]">{t('portfolio_empty_title')}</h2>
+                        <p className="text-[var(--text-secondary)] mb-8 max-w-xs leading-relaxed">{t('portfolio_empty_subtitle')}</p>
+                        <button 
+                            onClick={() => { setActiveView('transacoes'); vibrate(); }}
+                            className="bg-[var(--accent-color)] text-[var(--accent-color-text)] font-bold py-3 px-8 rounded-xl shadow-lg shadow-[var(--accent-color)]/20 active:scale-95 transition-all"
+                        >
+                            Adicionar Transação
+                        </button>
                     </div>
                 )}
             </div>
+            
+            {assets.length > 0 && (
+                <FloatingActionButton id="add-transaction-fab" onClick={() => { setActiveView('transacoes'); vibrate(); }} />
+            )}
         </div>
     );
 };
 
 export default PortfolioView;
+    
