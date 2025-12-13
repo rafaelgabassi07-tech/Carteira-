@@ -31,12 +31,13 @@ const IncomeSection: React.FC<{ setActiveView: (view: View) => void }> = ({ setA
     const { t, formatCurrency } = useI18n();
     const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
     
+    // Average calculated on full data (12m) for accuracy
     const average = useMemo(() => {
          const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
          return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
     }, [monthlyIncome]);
 
-    // GARANTE QUE APENAS OS ÚLTIMOS 6 MESES SEJAM EXIBIDOS NO CARD DE RESUMO
+    // Display only last 6 months for the card to keep it clean
     const chartData = useMemo(() => monthlyIncome.slice(-6), [monthlyIncome]);
 
     return (
