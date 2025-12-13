@@ -55,18 +55,15 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     useEffect(() => {
         let isMounted = true;
         const checkAndLoad = async () => {
-            // FIX: Removed 'asset' dependency to prevent infinite loops.
-            // Using a separate check for freshness that doesn't depend on the object reference stability.
             setIsRefreshing(true);
             try {
                 await refreshSingleAsset(ticker);
             } catch(e: any){
-                // Silent catch or specific error handling
+                // Silent catch
             } finally {
                 if (isMounted) setIsRefreshing(false);
             }
         };
-        // Only auto-refresh on mount
         checkAndLoad();
         return () => { isMounted = false; };
     }, [ticker]); 
@@ -98,7 +95,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const totalInvested = asset ? asset.quantity * asset.avgPrice : 0;
     const variation = currentValue - totalInvested;
 
-    if (!asset && !isRefreshing) return <div className="p-8 text-center">{t('asset_not_found')}</div>;
+    if (!asset && !isRefreshing) return <div className="p-8 text-center text-[var(--text-secondary)]">{t('asset_not_found')}</div>;
 
     if (!asset) return null;
 
@@ -198,7 +195,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
         <div className="space-y-4 pb-4">
             {fullDividendHistory.length > 0 ? (
                 <>
-                    <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm">
+                    <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm h-64">
                         <DividendChart data={asset?.dividendsHistory || []} />
                     </div>
                     
@@ -235,9 +232,9 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     );
 
     return (
-        <div className="p-4 pb-20 landscape-pb-6">
-            <div className="max-w-4xl mx-auto">
-                <div className="flex items-center justify-between mb-6">
+        <div className="h-full flex flex-col bg-[var(--bg-primary)]">
+            <div className="flex-none p-4 sticky top-0 z-30 bg-[var(--bg-primary)]/90 backdrop-blur-md border-b border-[var(--border-color)]/50">
+                <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <div className="flex items-center">
                         <button onClick={onBack} className="p-2 -ml-2 mr-2 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary-hover)] transition-all active:scale-95"><ChevronLeftIcon className="w-6 h-6" /></button>
                         <h2 className="text-2xl font-bold tracking-tight">{ticker}</h2>
@@ -247,22 +244,26 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                     </button>
                 </div>
                 
-                <div className="flex border-b border-[var(--border-color)] mb-4">
+                <div className="max-w-4xl mx-auto flex border-b border-[var(--border-color)] mt-4">
                     {['summary', 'history', 'dividends'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => { setActiveTab(tab); vibrate(); }}
-                            className={`pb-2 px-4 text-sm font-bold transition-colors ${activeTab === tab ? 'text-[var(--accent-color)] border-b-2 border-[var(--accent-color)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                            className={`flex-1 pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === tab ? 'text-[var(--accent-color)] border-[var(--accent-color)]' : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'}`}
                         >
                             {t(tab === 'dividends' ? 'dividends_received' : tab)}
                         </button>
                     ))}
                 </div>
-                
-                {isRefreshing && activeTab === 'summary' && !asset ? <div className="animate-pulse h-96 bg-gray-800 rounded-xl"></div> : null}
-                {activeTab === 'summary' && asset && renderSummary()}
-                {activeTab === 'history' && renderHistory()}
-                {activeTab === 'dividends' && renderDividends()}
+            </div>
+            
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-24 landscape-pb-6">
+                <div className="max-w-4xl mx-auto">
+                    {isRefreshing && activeTab === 'summary' && !asset ? <div className="animate-pulse h-96 bg-gray-800 rounded-xl"></div> : null}
+                    {activeTab === 'summary' && asset && renderSummary()}
+                    {activeTab === 'history' && renderHistory()}
+                    {activeTab === 'dividends' && renderDividends()}
+                </div>
             </div>
         </div>
     );

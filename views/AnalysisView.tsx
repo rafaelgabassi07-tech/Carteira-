@@ -101,10 +101,12 @@ const OverviewContent: React.FC<{
     const [sortOption, setSortOption] = useState<SortOption>(preferences.defaultSort || 'valueDesc');
     const [isSortOpen, setIsSortOpen] = useState(false);
 
-    const totalPortfolioValue = useMemo(() => assets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0), [assets]);
+    // Calculate active assets (quantity > 0)
+    const activeAssets = useMemo(() => assets.filter(a => a.quantity > 0), [assets]);
+    const totalPortfolioValue = useMemo(() => activeAssets.reduce((acc, asset) => acc + asset.currentPrice * asset.quantity, 0), [activeAssets]);
     
     const processedAssets = useMemo(() => {
-        let filtered = assets.filter(asset => asset.ticker.toLowerCase().includes(searchQuery.toLowerCase()));
+        let filtered = activeAssets.filter(asset => asset.ticker.toLowerCase().includes(searchQuery.toLowerCase()));
         return filtered.sort((a, b) => {
             switch (sortOption) {
                 case 'valueDesc': return (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity);
@@ -117,11 +119,11 @@ const OverviewContent: React.FC<{
                 default: return 0;
             }
         });
-    }, [assets, searchQuery, sortOption]);
+    }, [activeAssets, searchQuery, sortOption]);
 
     return (
         <div className="space-y-6">
-            {assets.length > 0 && <PortfolioSummary />}
+            {activeAssets.length > 0 && <PortfolioSummary />}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <IncomeSection setActiveView={setActiveView} />
@@ -129,13 +131,13 @@ const OverviewContent: React.FC<{
             </div>
 
             <div className="space-y-4">
-                {assets.length > 0 ? (
+                {activeAssets.length > 0 ? (
                     <>
                         <div className="flex items-center justify-between">
                             <h3 className="font-bold text-lg px-1 flex items-center gap-2">
                                 {t('my_assets')} 
                                 <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">
-                                    {searchQuery ? `${processedAssets.length} / ${assets.length}` : assets.length}
+                                    {searchQuery ? `${processedAssets.length} / ${activeAssets.length}` : activeAssets.length}
                                 </span>
                             </h3>
                             
