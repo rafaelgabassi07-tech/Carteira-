@@ -4,7 +4,6 @@ import type { NewsArticle, AppPreferences, DividendHistoryEvent } from '../types
 
 // --- Configuration & Helpers ---
 
-// Helper para expor se a chave existe no ambiente (para a UI)
 export function getEnvGeminiApiKey(): string | undefined {
     // @ts-ignore
     return import.meta.env.VITE_API_KEY;
@@ -27,38 +26,30 @@ const createClient = (apiKey: string) => new GoogleGenAI({ apiKey });
 function extractAndParseJSON(text: string): any {
     if (!text) return null;
     try {
-        // 1. Try to find JSON inside ```json ... ``` or just ``` ... ```
+        // 1. Try to find JSON inside markdown code blocks
         const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
         let jsonStr = match && match[1] ? match[1] : text;
 
-        // 2. Locate the outermost brackets to discard surrounding text
-        const firstOpen = jsonStr.indexOf('{');
-        const firstArray = jsonStr.indexOf('[');
-        let start = -1;
-        
-        if (firstOpen !== -1 && firstArray !== -1) start = Math.min(firstOpen, firstArray);
-        else if (firstOpen !== -1) start = firstOpen;
-        else if (firstArray !== -1) start = firstArray;
+        // 2. Aggressive Cleanup: Find the first '[' or '{' and the last ']' or '}'
+        const firstOpen = jsonStr.search(/[\{\[]/);
+        const lastClose = jsonStr.search(/[\]\}][^\]\}]*$/);
 
-        const lastClose = jsonStr.lastIndexOf('}');
-        const lastArray = jsonStr.lastIndexOf(']');
-        let end = -1;
-
-        if (lastClose !== -1 && lastArray !== -1) end = Math.max(lastClose, lastArray);
-        else if (lastClose !== -1) end = lastClose;
-        else if (lastArray !== -1) end = lastArray;
-
-        if (start !== -1 && end !== -1 && end > start) {
-            jsonStr = jsonStr.substring(start, end + 1);
+        if (firstOpen !== -1 && lastClose !== -1) {
+            jsonStr = jsonStr.substring(firstOpen, lastClose + 1);
+        } else if (firstOpen !== -1) {
+             // Try to recover if only start found (rare)
+             jsonStr = jsonStr.substring(firstOpen);
         }
 
-        // 3. Sanitization: Remove comments and trailing commas which break JSON.parse
-        jsonStr = jsonStr.replace(/\/\/.*$/gm, ''); // Remove single-line comments
-        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1'); // Remove trailing commas before closing brackets
+        // 3. Remove typical JS comments if any leaked
+        jsonStr = jsonStr.replace(/\/\/.*$/gm, ''); 
+        
+        // 4. Clean trailing commas (common LLM error)
+        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
 
         return JSON.parse(jsonStr);
     } catch (e) {
-        console.error("Failed to parse JSON from Gemini response:", e);
+        console.warn("Failed to parse JSON from Gemini response. Raw text:", text);
         return null;
     }
 }
@@ -76,34 +67,21 @@ async function generateContentWithRetry(
             const response = await ai.models.generateContent(params);
             return response;
         } catch (error: any) {
-            // Check for 429 (Resource Exhausted / Quota Exceeded)
-            // Google GenAI SDK might wrap the error, check status or message
             const isQuotaError = error.status === 429 || 
                                  (error.message && error.message.includes('429')) ||
                                  (error.message && error.message.includes('quota'));
 
             if (isQuotaError && attempt < maxRetries) {
                 attempt++;
-                
-                // Try to parse "Please retry in X s." from message
-                let waitTime = 5000 * Math.pow(2, attempt); // Default exponential backoff: 10s, 20s, 40s
-                
+                let waitTime = 5000 * Math.pow(2, attempt);
                 if (error.message) {
                     const match = error.message.match(/retry in (\d+(\.\d+)?)s/);
-                    if (match && match[1]) {
-                        // Add 1s buffer to the suggested time
-                        waitTime = (parseFloat(match[1]) + 1) * 1000;
-                    }
+                    if (match && match[1]) waitTime = (parseFloat(match[1]) + 1) * 1000;
                 }
-
-                console.warn(`Gemini Quota Exceeded (429). Waiting ${waitTime}ms before retry ${attempt}/${maxRetries}...`);
-                
-                // Wait before retrying
+                console.warn(`Gemini Quota 429. Retry ${attempt}/${maxRetries} in ${waitTime}ms...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
                 continue;
             }
-            
-            // If not 429 or max retries reached, throw
             throw error;
         }
     }
@@ -122,42 +100,36 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     const apiKey = getGeminiApiKey(prefs);
     const ai = createClient(apiKey);
     
-    // Smart Context Logic:
-    // If a specific query exists, prioritize it and ignore general portfolio context to avoid pollution.
-    // If no query, use portfolio tickers for a personalized feed.
     let context = "";
     if (filter.query && filter.query.trim().length > 0) {
-        context = `FOCO TOTAL NO TEMA: "${filter.query}". Busque fatos RECENTES e específicos sobre isso.`;
+        context = `TEMA: "${filter.query}". Notícias recentes.`;
     } else {
         context = "Resumo do Mercado Financeiro Brasileiro";
         if (filter.tickers && filter.tickers.length > 0) {
-            context += ` com foco especial nestes ativos: ${filter.tickers.join(', ')}`;
+            // Limit tickers to prevent context overflow
+            context += ` com foco: ${filter.tickers.slice(0, 10).join(', ')}`;
         }
     }
 
-    // Prompt engineered to force JSON output without Schema validation (incompatible with Search)
-    const prompt = `Atue como um jornalista financeiro sênior. 
+    const prompt = `
     ${context}
+    Busque notícias reais e recentes (últimas 48h) usando o Google Search.
     
-    Use a ferramenta googleSearch para encontrar notícias reais, datas exatas e fontes confiáveis.
-    Priorize notícias publicadas nas últimas 24-48 horas.
-    
-    IMPORTANTE: Retorne a resposta ESTRITAMENTE como um array JSON cru. Não use Markdown. Não inclua explicações antes ou depois.
-    O formato deve ser exatamente:
+    RETORNE APENAS UM ARRAY JSON. SEM MARKDOWN. SEM TEXTO EXTRA.
+    Formato obrigatório:
     [
       {
-        "title": "Título da notícia (PT-BR)",
-        "summary": "Resumo objetivo (max 2 linhas)",
-        "source": "Nome da Fonte",
+        "title": "Título (PT-BR)",
+        "summary": "Resumo curto",
+        "source": "Fonte",
         "date": "YYYY-MM-DD",
-        "sentimentScore": 0.5 (número entre -1 negativo e 1 positivo),
-        "sentimentReason": "Motivo do sentimento",
-        "url": "Link original se disponível"
+        "sentimentScore": 0.5,
+        "url": "link"
       }
-    ]`;
+    ]
+    `;
 
     try {
-        // Use the retry wrapper
         const response = await generateContentWithRetry(ai, {
             model: "gemini-2.5-flash",
             contents: prompt,
@@ -169,19 +141,21 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
         const textData = response.text || "";
         const articles = extractAndParseJSON(textData);
         
-        // Enhance with Grounding Metadata (URLs) if JSON url is empty
         const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
         const webChunks = groundingChunks.filter((c: any) => c.web && c.web.uri);
 
         const enhancedArticles = Array.isArray(articles) ? articles.map((art: any, idx: number) => {
             let realUrl = art.url;
-            if ((!realUrl || realUrl === 'null' || realUrl === 'string') && idx < webChunks.length) realUrl = webChunks[idx].web?.uri;
+            // Use grounding data if URL is missing or placeholder
+            if ((!realUrl || realUrl === 'link' || realUrl.length < 5) && idx < webChunks.length) {
+                realUrl = webChunks[idx].web?.uri;
+            }
             if (!realUrl) realUrl = `https://www.google.com/search?q=${encodeURIComponent(art.title)}`;
 
             return {
-                title: art.title || "Sem título",
+                title: art.title || "Notícia de Mercado",
                 summary: art.summary || "...",
-                source: art.source || "Gemini News",
+                source: art.source || "Invest News",
                 date: art.date || new Date().toISOString(),
                 sentimentScore: typeof art.sentimentScore === 'number' ? art.sentimentScore : 0,
                 sentimentReason: art.sentimentReason,
@@ -205,13 +179,11 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
     const apiKey = getGeminiApiKey(prefs);
     const ai = createClient(apiKey);
 
-    const prompt = `Qual é o preço exato (current price) e a variação % hoje do ativo ${ticker} na B3?
-    Use googleSearch para buscar o valor em tempo real.
-    
-    Retorne APENAS um JSON cru no formato:
-    { "price": 10.50, "changePercent": 0.5 }
-    
-    Se não encontrar, retorne null. Não use markdown.`;
+    const prompt = `
+    Qual o preço atual (BRL) e variação (%) de ${ticker}?
+    Use googleSearch.
+    Retorne JSON puro: { "price": 10.50, "changePercent": 0.5 }
+    `;
 
     try {
         const response = await generateContentWithRetry(ai, {
@@ -245,13 +217,10 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const tickerStr = tickers.join(", ");
     const today = new Date().toISOString().split('T')[0];
 
-    // Consolidated prompt for batched requests
-    const prompt = `Analise os dados fundamentalistas para os ativos: [${tickerStr}]. Data de hoje: ${today}.
-    Use a ferramenta googleSearch para buscar dados RECENTES de DY, P/VP, Vacância e Histórico de Dividendos para CADA UM dos ativos listados.
+    const prompt = `Analise os dados fundamentalistas: [${tickerStr}]. Data: ${today}.
+    Use googleSearch para buscar DY, P/VP, Vacância e Dividendos recentes.
     
-    IMPORTANTE: Você deve processar TODOS os ativos da lista. Não pule nenhum. O output deve conter um objeto para cada ativo solicitado.
-    
-    Primeiro, colete os dados. DEPOIS, retorne um JSON seguindo EXATAMENTE este formato:
+    RETORNE APENAS UM JSON (SEM MARKDOWN):
     {
       "assets": [
         {
@@ -265,29 +234,20 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
           "netWorth": "R$ 1.5B",
           "shareholders": 250000,
           "vpPerShare": 100.50,
-          "businessDescription": "Resumo curto...",
-          "riskAssessment": "Baixo/Médio/Alto - Motivo",
-          "strengths": ["Ponto forte 1"],
-          "weaknesses": ["Ponto fraco 1"],
-          "dividendCAGR": 5.2,
-          "managementFee": "1.2% a.a.",
+          "liquidity": 2000000,
           "dividendsHistory": [
              { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": 0.85, "isProvisioned": false }
           ]
         }
       ]
-    }
-    
-    Se um dado numérico não for encontrado, use null (não use zero se não for zero).`;
+    }`;
 
     try {
-        // Use the retry wrapper for heavy requests
         const response = await generateContentWithRetry(ai, {
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
-                tools: [{ googleSearch: {} }],
-                // Removed responseSchema to prevent conflict with Google Search tool and allow text processing
+                tools: [{ googleSearch: {} }]
             }
         });
 
@@ -339,29 +299,16 @@ export async function askAssetAnalyst(
     const apiKey = getGeminiApiKey(prefs);
     const ai = createClient(apiKey);
 
-    // Prepare context to grounding the AI
     const contextString = JSON.stringify(assetContext, null, 2);
-    const today = new Date().toLocaleDateString('pt-BR');
-
+    
     const prompt = `
-    Atue como um Analista Financeiro Sênior (CFA) especializado em Fundos Imobiliários (FIIs) e Ações Brasileiras.
-    O usuário está perguntando sobre o ativo: ${ticker}.
+    Contexto do Ativo ${ticker}: ${contextString}
+    Pergunta: "${question}"
     
-    DADOS FUNDAMENTAIS ATUAIS (Use estes dados como verdade absoluta):
-    ${contextString}
-    
-    Data de hoje: ${today}
-    
-    PERGUNTA DO USUÁRIO: "${question}"
-    
-    DIRETRIZES:
-    1. Seja direto, objetivo e profissional.
-    2. Use os dados fornecidos acima para embasar sua resposta. Se o P/VP estiver alto, mencione. Se a vacância for risco, alerte.
-    3. Se a pergunta for sobre "Vale a pena?", analise os prós e contras baseado nos indicadores (DY, P/VP, Liquidez), mas finalize com o disclaimer padrão.
-    4. Use formatação Markdown (negrito para destaque, listas para tópicos).
-    5. Se precisar de informações recentes que NÃO estão no JSON (ex: fatos relevantes de ontem), use a ferramenta googleSearch.
-    
-    Responda em português do Brasil.`;
+    Como analista financeiro sênior, responda em Português do Brasil. Use dados do contexto.
+    Se faltar informação recente, use googleSearch.
+    Seja conciso.
+    `;
 
     try {
         const response = await generateContentWithRetry(ai, {
@@ -372,7 +319,7 @@ export async function askAssetAnalyst(
             }
         });
 
-        const answer = response.text || "Não consegui analisar este cenário no momento.";
+        const answer = response.text || "Sem resposta.";
         
         return {
             answer,
@@ -381,7 +328,7 @@ export async function askAssetAnalyst(
 
     } catch (error: any) {
         console.error("AI Analyst Error:", error);
-        throw new Error(error.message || "Erro ao consultar o analista.");
+        throw new Error("Erro ao consultar o analista.");
     }
 }
 
@@ -389,10 +336,9 @@ export async function validateGeminiKey(key: string): Promise<boolean> {
     if (!key) return false;
     try {
         const ai = createClient(key);
-        // Simple test call without tools to verify key validity
         await ai.models.generateContent({ 
             model: "gemini-2.5-flash", 
-            contents: "Hi" 
+            contents: "Teste" 
         });
         return true;
     } catch (e) {

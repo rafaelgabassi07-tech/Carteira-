@@ -134,7 +134,9 @@ const OverviewContent: React.FC<{
                         <div className="flex items-center justify-between">
                             <h3 className="font-bold text-lg px-1 flex items-center gap-2">
                                 {t('my_assets')} 
-                                <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">{processedAssets.length}</span>
+                                <span className="text-xs font-semibold bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-color)]">
+                                    {searchQuery ? `${processedAssets.length} / ${assets.length}` : assets.length}
+                                </span>
                             </h3>
                             
                             <div className="flex gap-2">
@@ -200,6 +202,11 @@ const OverviewContent: React.FC<{
                                     privacyMode={false}
                                 />
                             ))}
+                            {processedAssets.length === 0 && searchQuery && (
+                                <div className="text-center py-8 text-[var(--text-secondary)] text-sm">
+                                    Nenhum ativo encontrado para "{searchQuery}".
+                                </div>
+                            )}
                         </div>
                     </>
                 ) : (
