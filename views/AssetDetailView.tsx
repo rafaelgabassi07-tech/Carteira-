@@ -17,6 +17,7 @@ interface AssetDetailViewProps {
     addToast: (message: string, type?: ToastMessage['type']) => void;
 }
 
+// Sub-components for cleaner render logic
 const ProgressBar: React.FC<{ value: number; max: number; label?: string; colorClass: string; inverse?: boolean }> = ({ value, max, label, colorClass, inverse }) => {
     let percent = (value / max) * 100;
     if (percent > 100) percent = 100;
@@ -52,16 +53,20 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     
     const asset = getAssetByTicker(ticker);
 
+    // Initial Data Check
     useEffect(() => {
         let isMounted = true;
         const checkAndLoad = async () => {
-            setIsRefreshing(true);
-            try {
-                await refreshSingleAsset(ticker);
-            } catch(e: any){
-                // Silent catch
-            } finally {
-                if (isMounted) setIsRefreshing(false);
+            // If asset exists but lacks deep data, or simply to ensure freshness
+            if (asset) {
+                setIsRefreshing(true);
+                try {
+                    await refreshSingleAsset(ticker);
+                } catch(e: any){
+                    // Silent catch
+                } finally {
+                    if (isMounted) setIsRefreshing(false);
+                }
             }
         };
         checkAndLoad();
@@ -95,12 +100,20 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
     const totalInvested = asset ? asset.quantity * asset.avgPrice : 0;
     const variation = currentValue - totalInvested;
 
-    if (!asset && !isRefreshing) return <div className="p-8 text-center text-[var(--text-secondary)]">{t('asset_not_found')}</div>;
+    // --- Render Helpers ---
 
-    if (!asset) return null;
+    if (!asset && !isRefreshing) return (
+        <div className="h-full flex flex-col items-center justify-center p-8 text-[var(--text-secondary)]">
+            <p className="mb-4">{t('asset_not_found')}</p>
+            <button onClick={onBack} className="text-[var(--accent-color)] font-bold">Voltar</button>
+        </div>
+    );
+
+    if (!asset) return <div className="h-full w-full bg-[var(--bg-primary)]"></div>;
 
     const renderSummary = () => (
         <div className="space-y-4 animate-fade-in">
+            {/* Main Value Card */}
             <div className="bg-gradient-to-br from-[var(--bg-tertiary-hover)] to-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-lg shadow-[var(--accent-color)]/5">
                 <div className="flex justify-between items-center mb-4">
                     <div>
@@ -123,6 +136,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 </div>
             </div>
 
+            {/* Indicators Grid */}
             <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                     <AnalysisIcon className="w-4 h-4 text-[var(--accent-color)]" />
@@ -233,6 +247,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
 
     return (
         <div className="h-full flex flex-col bg-[var(--bg-primary)]">
+            {/* Header Fixed */}
             <div className="flex-none p-4 sticky top-0 z-30 bg-[var(--bg-primary)]/90 backdrop-blur-md border-b border-[var(--border-color)]/50">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <div className="flex items-center">
@@ -257,7 +272,8 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ ticker, onBack, onVie
                 </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-24 landscape-pb-6">
+            {/* Content Scrollable Area */}
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 pb-24 landscape-pb-6">
                 <div className="max-w-4xl mx-auto">
                     {isRefreshing && activeTab === 'summary' && !asset ? <div className="animate-pulse h-96 bg-gray-800 rounded-xl"></div> : null}
                     {activeTab === 'summary' && asset && renderSummary()}

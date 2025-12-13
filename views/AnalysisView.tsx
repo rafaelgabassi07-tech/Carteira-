@@ -69,17 +69,20 @@ const DiversificationSection: React.FC = () => {
     const { t } = useI18n();
     const { assets, preferences } = usePortfolio();
     
+    // Using only active assets for diversification chart
+    const activeAssets = useMemo(() => assets.filter(a => a.quantity > 0), [assets]);
+
     const data = useMemo(() => {
         const segments: Record<string, number> = {};
         let totalValue = 0;
-        assets.forEach(a => {
+        activeAssets.forEach(a => {
             const val = a.quantity * a.currentPrice;
             const seg = a.segment || t('outros');
             segments[seg] = (segments[seg] || 0) + val;
             totalValue += val;
         });
         return Object.entries(segments).map(([name, value]) => ({ name, value, percentage: totalValue > 0 ? (value / totalValue) * 100 : 0 })).sort((a, b) => b.value - a.value);
-    }, [assets, t]);
+    }, [activeAssets, t]);
 
     return (
         <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm">
