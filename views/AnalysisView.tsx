@@ -31,10 +31,14 @@ const IncomeSection: React.FC<{ setActiveView: (view: View) => void }> = ({ setA
     const { t, formatCurrency } = useI18n();
     const { monthlyIncome, projectedAnnualIncome } = usePortfolio();
     
+    // Average calculated on full data (12m) for accuracy
     const average = useMemo(() => {
          const total = monthlyIncome.reduce((acc, item) => acc + item.total, 0);
          return monthlyIncome.length > 0 ? total / monthlyIncome.length : 0;
     }, [monthlyIncome]);
+
+    // Display only last 6 months for the card to keep it clean
+    const chartData = useMemo(() => monthlyIncome.slice(-6), [monthlyIncome]);
 
     return (
         <div onClick={() => { vibrate(); setActiveView('incomeReport'); }} className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-color)] shadow-sm cursor-pointer hover:bg-[var(--bg-tertiary-hover)] transition-all group">
@@ -55,7 +59,7 @@ const IncomeSection: React.FC<{ setActiveView: (view: View) => void }> = ({ setA
                 </div>
             </div>
              <div className="h-40 w-full pointer-events-none opacity-80">
-                 <BarChart data={monthlyIncome} />
+                 <BarChart data={chartData} />
              </div>
         </div>
     );

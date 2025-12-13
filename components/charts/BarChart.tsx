@@ -12,7 +12,7 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
     const [tooltip, setTooltip] = useState<{ month: string, total: number, x: number, y: number } | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dimensions, setDimensions] = useState({ width: 300, height: 200 });
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const gradientId = useMemo(() => `barGradient-${Math.random().toString(36).substr(2, 9)}`, []);
 
     useLayoutEffect(() => {
@@ -23,7 +23,9 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
             for (let entry of entries) {
                 const { width, height } = entry.contentRect;
                 if (width > 0 && height > 0) {
-                    setDimensions({ width, height });
+                    requestAnimationFrame(() => {
+                        setDimensions({ width, height });
+                    });
                 }
             }
         });
@@ -46,7 +48,7 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
     }, [effectiveMaxValue]);
 
     const handleMouseMove = (event: { clientX: number, clientY: number }) => {
-        if (!svgRef.current || data.length === 0) return;
+        if (!svgRef.current || data.length === 0 || width === 0) return;
         const rect = svgRef.current.getBoundingClientRect();
         const x = event.clientX - rect.left; 
         
@@ -70,15 +72,22 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
         }
     };
 
-    if (dimensions.width === 0 || data.length === 0) return (
+    if (dimensions.width === 0 && data.length > 0) return <div ref={containerRef} className="w-full h-full" />;
+
+    if (data.length === 0) return (
         <div ref={containerRef} className="w-full h-full flex items-center justify-center text-xs text-[var(--text-secondary)]">
-            {data.length === 0 ? 'Sem dados.' : ''}
+            Sem dados.
         </div>
     );
 
-    const chartWidth = width - padding.left - padding.right;
+    const chartWidth = Math.max(0, width - padding.left - padding.right);
     const barSlotWidth = data.length > 0 ? chartWidth / data.length : 0;
-    const barWidth = barSlotWidth * 0.6;
+    const barWidth = Math.max(4, Math.min(barSlotWidth * 0.65, 40));
+
+    // Smart Label Logic
+    // Approx 35px per label needed to avoid overlap
+    const maxLabels = Math.floor(chartWidth / 35);
+    const step = Math.ceil(data.length / maxLabels);
 
     return (
         <div ref={containerRef} className="relative w-full h-full">
@@ -102,11 +111,12 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
             >
                  <defs>
                     <linearGradient id={gradientId} x1="0" y1="1" x2="0" y2="0">
-                        <stop offset="0%" stopColor="var(--accent-color)" stopOpacity="0.7" />
+                        <stop offset="0%" stopColor="var(--accent-color)" stopOpacity="0.5" />
                         <stop offset="100%" stopColor="var(--accent-color)" stopOpacity="1" />
                     </linearGradient>
                 </defs>
 
+                {/* Y Axis Grid & Labels */}
                 {yTicks.map((tick, i) => {
                     const y = height - padding.bottom - (tick / effectiveMaxValue) * (height - padding.top - padding.bottom);
                     return (
@@ -122,11 +132,12 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                                 opacity="0.5"
                             />
                             <text 
-                                x={padding.left - 5} 
+                                x={padding.left - 6} 
                                 y={y + 3} 
                                 textAnchor="end" 
                                 fontSize="9" 
                                 fill="var(--text-secondary)"
+                                fontWeight="500"
                             >
                                 {tick >= 1000 ? `${(tick/1000).toFixed(0)}k` : tick.toFixed(0)}
                             </text>
@@ -134,51 +145,75 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                     )
                 })}
 
+                {/* Bars & X Axis Labels */}
                 {data.map((d, i) => {
                     const barHeight = (d.total / effectiveMaxValue) * (height - padding.top - padding.bottom);
                     const x = padding.left + i * barSlotWidth + (barSlotWidth - barWidth) / 2;
                     const y = height - padding.bottom - barHeight;
                     const isHovered = tooltip?.month === d.month;
+                    
+                    // Show label if index matches step OR if it's the last item (to ensure range end is visible)
+                    // But prioritizing step consistency to avoid overlapping the second to last.
+                    const showLabel = i % step === 0; 
+
                     return (
                         <g key={d.month}>
+                            {/* Hit Area */}
+                            <rect
+                                x={padding.left + i * barSlotWidth}
+                                y={padding.top}
+                                width={barSlotWidth}
+                                height={height - padding.top - padding.bottom}
+                                fill="transparent"
+                            />
+                            {/* Visual Bar */}
                             <rect
                                 x={x}
                                 y={y}
                                 width={barWidth}
                                 height={Math.max(barHeight, 0)}
                                 fill={`url(#${gradientId})`}
-                                rx="2"
-                                className="transition-all duration-300 animate-grow-up"
+                                rx={Math.min(barWidth / 2, 4)}
+                                className="transition-all duration-300"
                                 style={{ 
-                                    animationDelay: `${Math.min(i * 50, 1000)}ms`,
-                                    opacity: isHovered ? 1 : 0.7
+                                    opacity: isHovered ? 1 : 0.8,
+                                    transformOrigin: 'bottom',
+                                    animation: 'grow-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                                    animationDelay: `${i * 30}ms`
                                 }}
                             />
-                            <text 
-                                x={x + barWidth / 2} 
-                                y={height - 5} 
-                                textAnchor="middle" 
-                                fontSize="9" 
-                                fill="var(--text-secondary)"
-                                className="capitalize"
-                            >
-                                {d.month.split('/')[0]}
-                            </text>
+                            {/* X Label */}
+                            {showLabel && (
+                                <text 
+                                    x={x + barWidth / 2} 
+                                    y={height - 6} 
+                                    textAnchor="middle" 
+                                    fontSize="9" 
+                                    fill="var(--text-secondary)"
+                                    className="capitalize"
+                                    fontWeight="500"
+                                >
+                                    {d.month.split('/')[0]}
+                                </text>
+                            )}
                         </g>
                     );
                 })}
             </svg>
+            
+            {/* Tooltip */}
             {tooltip && (
                 <div 
-                    className="absolute bg-[var(--bg-secondary)] border border-[var(--border-color)] p-2 rounded-lg text-xs shadow-xl pointer-events-none transition-all z-10 whitespace-nowrap backdrop-blur-sm"
+                    className="absolute bg-[var(--bg-secondary)] border border-[var(--border-color)] p-2 rounded-xl text-xs shadow-xl pointer-events-none transition-all z-20 whitespace-nowrap backdrop-blur-md"
                     style={{ 
                         left: tooltip.x, 
-                        top: tooltip.y, 
-                        transform: `translate(-50%, -120%)`
+                        top: tooltip.y - 8, 
+                        transform: `translate(-50%, -100%)`
                     }}
                 >
-                    <p className="text-[var(--text-secondary)] mb-0.5 capitalize">{tooltip.month}</p>
+                    <p className="text-[var(--text-secondary)] mb-0.5 capitalize font-semibold text-[10px]">{tooltip.month}</p>
                     <p className="font-bold text-[var(--text-primary)] text-sm">{formatCurrency(tooltip.total)}</p>
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--border-color)]"></div>
                 </div>
             )}
         </div>
