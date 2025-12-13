@@ -1,7 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { AppPreferences, Transaction, AppNotification, Asset, MonthlyIncome } from '../types';
-// FIX: import calculatePortfolioMetrics from ../utils
 import { usePersistentState, calculatePortfolioMetrics, safeFloat } from '../utils';
 import { DEFAULT_PREFERENCES } from '../constants';
 import { usePortfolioCalculations, PayerData } from '../hooks/usePortfolioCalculations';
@@ -56,7 +55,6 @@ interface PortfolioContextType {
     installPwa: () => void;
     
     // Calculated values
-    portfolioEvolution: any;
     monthlyIncome: MonthlyIncome[];
     payersData: PayerData[];
     totalReceived: number;
@@ -312,7 +310,6 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setTheme, setFont, resetApp, restoreData,
         apiStats, logApiUsage, resetApiStats,
         deferredPrompt, installPwa,
-        portfolioEvolution: calculations.portfolioEvolution,
         monthlyIncome: calculations.monthlyIncome,
         payersData: calculations.payersData,
         totalReceived: calculations.totalReceived,

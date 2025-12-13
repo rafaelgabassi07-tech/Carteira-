@@ -7,7 +7,6 @@ import type { ToastMessage, SortOption } from '../types';
 import type { View } from '../App';
 
 // Importação de Componentes Padronizados
-import PatrimonyEvolutionCard from '../components/cards/PatrimonyEvolutionCard';
 import PortfolioSummary from '../components/cards/PortfolioSummary';
 import PortfolioPieChart from '../components/charts/PortfolioPieChart';
 import BarChart from '../components/charts/BarChart';
@@ -121,9 +120,6 @@ const OverviewContent: React.FC<{
             {assets.length > 0 && <PortfolioSummary />}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="lg:col-span-2">
-                    <PatrimonyEvolutionCard />
-                </div>
                 <IncomeSection setActiveView={setActiveView} />
                 <DiversificationSection />
             </div>
@@ -288,4 +284,3 @@ const AnalysisView: React.FC<any> = ({ addToast, onSelectAsset, unreadNotificati
 };
 
 export default AnalysisView;
-    

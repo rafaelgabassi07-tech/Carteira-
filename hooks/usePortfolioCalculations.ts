@@ -1,7 +1,7 @@
 
 import { useMemo } from 'react';
-import type { Asset, Transaction, PortfolioEvolutionPoint, MonthlyIncome, DividendHistoryEvent } from '../types';
-import { calculatePortfolioMetrics, calculatePortfolioEvolution, safeFloat } from '../utils';
+import type { Asset, Transaction, MonthlyIncome, DividendHistoryEvent } from '../types';
+import { calculatePortfolioMetrics, safeFloat } from '../utils';
 import { STATIC_FII_SECTORS } from '../constants';
 
 export interface PayerData {
@@ -173,14 +173,9 @@ export const usePortfolioCalculations = (transactions: Transaction[], marketData
         const yoc = totalInvested > 0 ? (totalProjected / totalInvested) * 100 : 0;
         return { yieldOnCost: safeFloat(yoc), projectedAnnualIncome: safeFloat(totalProjected) };
     }, [assets]);
-    
-    const portfolioEvolution = useMemo(() => {
-        return calculatePortfolioEvolution(transactions, marketData);
-    }, [transactions, marketData]);
 
     return {
         assets,
-        portfolioEvolution,
         monthlyIncome,
         payersData,
         totalReceived,

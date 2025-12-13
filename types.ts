@@ -141,9 +141,8 @@ export interface MonthlyIncome {
 
 export interface PortfolioEvolutionPoint {
     dateISO: string;
-    month: string;
-    invested: number;
     marketValue: number;
+    invested: number;
 }
 
 export type SortOption = 'valueDesc' | 'valueAsc' | 'tickerAsc' | 'performanceDesc';
