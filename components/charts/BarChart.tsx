@@ -84,8 +84,8 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
     const barSlotWidth = data.length > 0 ? chartWidth / data.length : 0;
     const barWidth = Math.max(4, Math.min(barSlotWidth * 0.65, 40));
 
-    // Smart Label Logic
-    // Approx 35px per label needed to avoid overlap
+    // Lógica Inteligente de Rótulos (Smart Labels)
+    // Calcula quantos rótulos cabem na largura disponível (aprox 35px por rótulo)
     const maxLabels = Math.floor(chartWidth / 35);
     const step = Math.ceil(data.length / maxLabels);
 
@@ -152,8 +152,7 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                     const y = height - padding.bottom - barHeight;
                     const isHovered = tooltip?.month === d.month;
                     
-                    // Show label if index matches step OR if it's the last item (to ensure range end is visible)
-                    // But prioritizing step consistency to avoid overlapping the second to last.
+                    // Exibir rótulo apenas se o índice for múltiplo do passo (step)
                     const showLabel = i % step === 0; 
 
                     return (
