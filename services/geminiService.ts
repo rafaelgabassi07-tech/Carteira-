@@ -22,64 +22,65 @@ function getGeminiApiKey(prefs: AppPreferences): string {
 
 const createClient = (apiKey: string) => new GoogleGenAI({ apiKey });
 
-// Enhanced Helper to extract JSON from potentially messy text
+// Helper robusto para limpar e extrair JSON de respostas da IA
 function extractAndParseJSON(text: string): any {
     if (!text) return null;
     try {
-        // 1. Try to find JSON inside markdown code blocks
-        const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        let jsonStr = match && match[1] ? match[1] : text;
+        // 1. Tenta extrair de blocos de código markdown ```json ... ```
+        const markdownMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        let jsonCandidate = markdownMatch ? markdownMatch[1] : text;
 
-        // 2. Aggressive Cleanup: Find the first '[' or '{' and the last ']' or '}'
-        const firstOpen = jsonStr.search(/[\{\[]/);
-        const lastClose = jsonStr.search(/[\]\}][^\]\}]*$/);
-
-        if (firstOpen !== -1 && lastClose !== -1) {
-            jsonStr = jsonStr.substring(firstOpen, lastClose + 1);
-        } else if (firstOpen !== -1) {
-             // Try to recover if only start found (rare)
-             jsonStr = jsonStr.substring(firstOpen);
+        // 2. Limpeza agressiva: encontrar o primeiro '[' ou '{' e o último ']' ou '}'
+        const firstOpenBrace = jsonCandidate.indexOf('{');
+        const firstOpenBracket = jsonCandidate.indexOf('[');
+        
+        let startIndex = -1;
+        if (firstOpenBrace !== -1 && firstOpenBracket !== -1) {
+            startIndex = Math.min(firstOpenBrace, firstOpenBracket);
+        } else {
+            startIndex = Math.max(firstOpenBrace, firstOpenBracket);
         }
 
-        // 3. Remove typical JS comments if any leaked
-        jsonStr = jsonStr.replace(/\/\/.*$/gm, ''); 
-        
-        // 4. Clean trailing commas (common LLM error)
-        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+        if (startIndex !== -1) {
+            // Encontrar o fechamento correspondente
+            const lastCloseBrace = jsonCandidate.lastIndexOf('}');
+            const lastCloseBracket = jsonCandidate.lastIndexOf(']');
+            const endIndex = Math.max(lastCloseBrace, lastCloseBracket);
+            
+            if (endIndex > startIndex) {
+                jsonCandidate = jsonCandidate.substring(startIndex, endIndex + 1);
+            }
+        }
 
-        return JSON.parse(jsonStr);
+        // 3. Remove comentários JS (//) que a IA as vezes insere
+        jsonCandidate = jsonCandidate.replace(/\/\/.*$/gm, ''); 
+        
+        // 4. Corrige vírgulas sobrando antes de fechar arrays/objetos
+        jsonCandidate = jsonCandidate.replace(/,\s*([\]}])/g, '$1');
+
+        return JSON.parse(jsonCandidate);
     } catch (e) {
-        console.warn("Failed to parse JSON from Gemini response. Raw text:", text);
+        console.warn("Falha no parsing JSON da IA. Texto bruto:", text);
         return null;
     }
 }
 
-// --- Helper for 429 Retries ---
+// Helper para retry automático em caso de erro 429 (Quota)
 async function generateContentWithRetry(
     ai: GoogleGenAI, 
     params: any, 
-    maxRetries = 3
+    maxRetries = 2
 ): Promise<any> {
     let attempt = 0;
-    
     while (attempt <= maxRetries) {
         try {
             const response = await ai.models.generateContent(params);
             return response;
         } catch (error: any) {
-            const isQuotaError = error.status === 429 || 
-                                 (error.message && error.message.includes('429')) ||
-                                 (error.message && error.message.includes('quota'));
-
-            if (isQuotaError && attempt < maxRetries) {
+            const isQuota = error.status === 429 || (error.message && error.message.includes('429'));
+            if (isQuota && attempt < maxRetries) {
                 attempt++;
-                let waitTime = 5000 * Math.pow(2, attempt);
-                if (error.message) {
-                    const match = error.message.match(/retry in (\d+(\.\d+)?)s/);
-                    if (match && match[1]) waitTime = (parseFloat(match[1]) + 1) * 1000;
-                }
-                console.warn(`Gemini Quota 429. Retry ${attempt}/${maxRetries} in ${waitTime}ms...`);
-                await new Promise(resolve => setTimeout(resolve, waitTime));
+                await new Promise(r => setTimeout(r, 2000 * attempt)); // Backoff simples
                 continue;
             }
             throw error;
@@ -100,31 +101,42 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
     const apiKey = getGeminiApiKey(prefs);
     const ai = createClient(apiKey);
     
-    let context = "";
+    // Construção do contexto temporal para garantir notícias frescas
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-BR');
+    
+    let searchTopic = "Fundos Imobiliários (FIIs) e Mercado Financeiro Brasil";
     if (filter.query && filter.query.trim().length > 0) {
-        context = `TEMA: "${filter.query}". Notícias recentes.`;
-    } else {
-        context = "Resumo do Mercado Financeiro Brasileiro";
-        if (filter.tickers && filter.tickers.length > 0) {
-            // Limit tickers to prevent context overflow
-            context += ` com foco: ${filter.tickers.slice(0, 10).join(', ')}`;
-        }
+        searchTopic = filter.query;
+    } else if (filter.tickers && filter.tickers.length > 0) {
+        // Foca nos primeiros 5 tickers para não poluir a busca
+        searchTopic = `Notícias recentes sobre: ${filter.tickers.slice(0, 5).join(', ')}`;
     }
 
+    const timeContext = filter.dateRange === 'today' ? 'nas últimas 24 horas' : 
+                        filter.dateRange === 'month' ? 'no último mês' : 'nesta semana';
+
     const prompt = `
-    ${context}
-    Busque notícias reais e recentes (últimas 48h) usando o Google Search.
+    Data atual: ${dateStr}.
+    Tarefa: Atue como um agregador de notícias financeiras via API JSON.
     
-    RETORNE APENAS UM ARRAY JSON. SEM MARKDOWN. SEM TEXTO EXTRA.
-    Formato obrigatório:
+    Use a ferramenta googleSearch para encontrar notícias REAIS e ATUAIS sobre: "${searchTopic}".
+    Foco temporal: ${timeContext}.
+    
+    Regras estritas de saída:
+    1. Retorne APENAS um array JSON válido.
+    2. Não inclua texto introdutório como "Aqui estão as notícias".
+    3. Se não encontrar notícias específicas, busque tendências gerais do IFIX.
+    
+    Schema do JSON:
     [
       {
-        "title": "Título (PT-BR)",
-        "summary": "Resumo curto",
-        "source": "Fonte",
-        "date": "YYYY-MM-DD",
-        "sentimentScore": 0.5,
-        "url": "link"
+        "title": "Título da manchete (max 80 caracteres)",
+        "summary": "Resumo objetivo em português (max 150 caracteres)",
+        "source": "Nome da Fonte (ex: InfoMoney, Valor)",
+        "date": "YYYY-MM-DDTHH:mm:ssZ (ISO 8601 aproximado)",
+        "sentimentScore": 0.5 (número entre -1.0 negativo e 1.0 positivo),
+        "url": "URL da notícia se disponível, senão null"
       }
     ]
     `;
@@ -135,37 +147,47 @@ export async function fetchMarketNews(prefs: AppPreferences, filter: NewsFilter)
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
+                // Nota: responseMimeType 'application/json' conflita com googleSearch em algumas versões, 
+                // então confiamos no prompt engineering e no parser robusto.
             }
         });
 
         const textData = response.text || "";
-        const articles = extractAndParseJSON(textData);
+        const parsedData = extractAndParseJSON(textData);
         
-        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        const webChunks = groundingChunks.filter((c: any) => c.web && c.web.uri);
+        let articles: NewsArticle[] = [];
 
-        const enhancedArticles = Array.isArray(articles) ? articles.map((art: any, idx: number) => {
-            let realUrl = art.url;
-            // Use grounding data if URL is missing or placeholder
-            if ((!realUrl || realUrl === 'link' || realUrl.length < 5) && idx < webChunks.length) {
-                realUrl = webChunks[idx].web?.uri;
-            }
-            if (!realUrl) realUrl = `https://www.google.com/search?q=${encodeURIComponent(art.title)}`;
+        if (Array.isArray(parsedData)) {
+            // Tenta enriquecer URLs usando os chunks de aterramento (grounding) se o JSON não tiver links
+            const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+            const webChunks = groundingChunks.filter((c: any) => c.web?.uri);
 
-            return {
-                title: art.title || "Notícia de Mercado",
-                summary: art.summary || "...",
-                source: art.source || "Invest News",
-                date: art.date || new Date().toISOString(),
-                sentimentScore: typeof art.sentimentScore === 'number' ? art.sentimentScore : 0,
-                sentimentReason: art.sentimentReason,
-                url: realUrl,
-                imageUrl: art.imageUrl
-            };
-        }) : [];
+            articles = parsedData.map((art: any, index: number) => {
+                let finalUrl = art.url;
+                
+                // Se a URL for inválida ou genérica, tenta pegar do grounding
+                if ((!finalUrl || finalUrl.includes('null') || finalUrl.length < 10) && index < webChunks.length) {
+                    finalUrl = webChunks[index].web.uri;
+                }
+                
+                // Fallback final para busca no Google
+                if (!finalUrl || finalUrl.length < 5) {
+                    finalUrl = `https://www.google.com/search?q=${encodeURIComponent(art.title + " " + art.source)}`;
+                }
+
+                return {
+                    title: art.title || "Notícia do Mercado",
+                    summary: art.summary || "Sem resumo disponível.",
+                    source: art.source || "Invest App",
+                    date: art.date || new Date().toISOString(),
+                    sentimentScore: typeof art.sentimentScore === 'number' ? art.sentimentScore : 0,
+                    url: finalUrl
+                };
+            });
+        }
 
         return {
-            data: enhancedArticles,
+            data: articles,
             stats: { bytesSent: prompt.length, bytesReceived: textData.length }
         };
 
@@ -180,7 +202,8 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
     const ai = createClient(apiKey);
 
     const prompt = `
-    Qual o preço atual (BRL) e variação (%) de ${ticker}?
+    Data de hoje: ${new Date().toLocaleDateString('pt-BR')}.
+    Qual o preço atual (BRL) e variação (%) do ativo ${ticker}?
     Use googleSearch.
     Retorne JSON puro: { "price": 10.50, "changePercent": 0.5 }
     `;
@@ -196,8 +219,11 @@ export async function fetchLiveAssetQuote(prefs: AppPreferences, ticker: string)
 
         const data = extractAndParseJSON(response.text || "");
         
-        if (data && typeof data.price === 'number') {
-            return { price: data.price, change: data.changePercent || 0 };
+        if (data && (typeof data.price === 'number' || typeof data.price === 'string')) {
+            return { 
+                price: typeof data.price === 'string' ? parseFloat(data.price.replace(',','.')) : data.price,
+                change: typeof data.changePercent === 'string' ? parseFloat(data.changePercent.replace(',','.')) : (data.changePercent || 0)
+            };
         }
         return null;
     } catch (e) {
@@ -217,15 +243,17 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
     const tickerStr = tickers.join(", ");
     const today = new Date().toISOString().split('T')[0];
 
-    const prompt = `Analise os dados fundamentalistas: [${tickerStr}]. Data: ${today}.
+    const prompt = `
+    Analise os dados fundamentalistas para: [${tickerStr}]. 
+    Data de referência: ${today}.
     Use googleSearch para buscar DY, P/VP, Vacância e Dividendos recentes.
     
-    RETORNE APENAS UM JSON (SEM MARKDOWN):
+    RETORNE APENAS JSON (sem markdown):
     {
       "assets": [
         {
           "ticker": "XXXX11",
-          "dy": 10.5,
+          "dy": 10.5 (anual),
           "pvp": 0.98,
           "assetType": "Tijolo|Papel|Fiagro|Infra|FOF",
           "administrator": "Nome Admin",
@@ -233,7 +261,6 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
           "lastDividend": 0.85,
           "netWorth": "R$ 1.5B",
           "shareholders": 250000,
-          "vpPerShare": 100.50,
           "liquidity": 2000000,
           "dividendsHistory": [
              { "exDate": "YYYY-MM-DD", "paymentDate": "YYYY-MM-DD", "value": 0.85, "isProvisioned": false }
@@ -266,7 +293,7 @@ export async function fetchAdvancedAssetData(prefs: AppPreferences, tickers: str
                         cleanDividends = asset.dividendsHistory.filter((d: any) => d.exDate && d.value).map((d: any) => ({
                             exDate: d.exDate,
                             paymentDate: d.paymentDate || d.exDate,
-                            value: Number(d.value),
+                            value: typeof d.value === 'string' ? parseFloat(d.value.replace(',','.')) : d.value,
                             isProvisioned: !!d.isProvisioned
                         }));
                     }
